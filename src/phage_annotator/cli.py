@@ -9,7 +9,6 @@ import click
 
 from phage_annotator import __version__
 from phage_annotator.demo import generate_dummy_image
-from phage_annotator.gui_mpl import run_gui
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -31,6 +30,9 @@ from phage_annotator.gui_mpl import run_gui
 )
 def main(inputs: List[pathlib.Path], demo: bool) -> None:
     """Launch the Matplotlib+Qt keypoint annotation GUI for microscopy stacks."""
+    # Import GUI lazily to avoid initializing Qt during module import or non-GUI tests.
+    from phage_annotator.gui_mpl import run_gui
+
     if demo:
         dummy = generate_dummy_image(pathlib.Path.cwd() / "phage_annotator_demo.tif", mode="t")
         run_gui([dummy])
