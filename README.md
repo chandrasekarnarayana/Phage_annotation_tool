@@ -1,183 +1,240 @@
-# Phage Annotator ![PyPI](https://img.shields.io/badge/PyPI-coming--soon-lightgray) ![License](https://img.shields.io/badge/License-MIT-blue) ![Python](https://img.shields.io/badge/Python-3.9%2B-brightgreen)
+# Phage Annotator  
+![PyPI](https://img.shields.io/pypi/v/phage-annotator)  
+![License](https://img.shields.io/badge/License-Custom--Permission-critical)  
+![Python](https://img.shields.io/badge/Python-3.9%2B-brightgreen)
 
-Phage Annotator is an interactive, publication-grade keypoint annotation tool for fluorescence microscopy. Built with Matplotlib + Qt (no Tkinter, no Napari), it streamlines labeling of particles in 2D/3D/time TIFF and OME-TIFF datasets—designed for phage imaging but fully general for any keypoint protocol.
+**IMPORTANT NOTICE — PLEASE READ**
+
+> **This codebase is NOT open for reuse, modification, redistribution, or integration in any project without my explicit written permission.  
+If you wish to reuse or extend any part of this software (code or GUI), please contact me directly for authorization.**  
+>  
+> **Email:** chandrasekarnarayana@gmail.com
+
+The repository contains my original research software and full workflow implementation.  
+Unauthorized copying or reusing any portion of this code is strictly prohibited.
+
+---
+
+# Phage Annotator
+
+Phage Annotator is an interactive, publication-grade keypoint annotation tool for fluorescence microscopy.  
+Built with **Matplotlib + Qt** (no Tkinter, no Napari), it supports precise annotation of particles in **2D / 3D / time** TIFF and OME-TIFF datasets.
+
+It is designed for **single-molecule and phage imaging**, but can be used for **any keypoint-based microscopy annotation workflow**.
 
 ---
 
 ## Key Features
-- Five synchronized panels: Frame, Mean, Composite/GT, Support (secondary modality), and STD with shared navigation and zoom.
-- TIFF / OME-TIFF loading with automatic axis standardization to (T, Z, Y, X); per-FOV time/depth interpretation control.
-- Lazy/on-demand loading; open files or folders without loading all pixels up front.
-- Display crop (X,Y,W,H) and ROI (X,Y,W,H; box/circle) are independent; zoom preserved across playback and shared across panels.
-- Interactive keypoint annotation (add/remove, frame/all scopes), per-panel visibility (Frame/Mean/Composite/Support), editable annotation table (changes persist), legacy x/y CSV import.
-- Intensity controls (vmin/vmax), colormap selection, playback with loop, link/unlink zoom; native Matplotlib toolbar.
-- Analyze menu: line profiles (raw vs corrected), ROI mean with bleaching fit, ROI mean table (per file) with CSV export.
-- CSV + JSON export of all annotations; keyboard shortcuts: `r` reset zoom, `c` cycle colormap, `s` quick-save CSV.
+
+- **Five synchronized panels**  
+  Frame, Mean projection, Composite/GT, Support (secondary modality), Standard deviation map  
+  — all with shared zoom, shared ROI, and shared navigation.
+
+- **TIFF / OME-TIFF** loading with automatic axis standardization to `(T, Z, Y, X)`  
+  and manual override for ambiguous stacks.
+
+- **Lazy, on-demand image loading**  
+  (load folders without loading all images into memory).
+
+- **Display crop vs. ROI — fully independent**  
+  Crop `(X, Y, W, H)` for viewing; ROI `(X, Y, W, H)` or circle for annotation constraints.
+
+- **Annotation system**  
+  - Add/remove with click radius  
+  - Per-panel visibility  
+  - Annotate on Frame / Mean / Composite / Support  
+  - Editable annotation table  
+  - Import legacy x/y CSV or structured CSV/JSON  
+  - Save CSV / JSON  
+  - Quick-save with **`s`**
+
+- **Intensity controls**  
+  vmin/vmax, colormap switcher, histogram, stats, linked playback-safe zoom.
+
+- **Analysis tools**  
+  - Line profile (raw/corrected)  
+  - ROI mean over frames with bleaching fit  
+  - ROI mean table for all files with CSV export
+
+- **Playback engine**  
+  Time or depth slider, auto-play with FPS, optional loop  
+  — zoom preserved during playback.
 
 ---
 
-## Architecture
-- `src/phage_annotator/io.py` — TIFF/OME-TIFF loader, axis standardization, `ImageMeta`.
-- `src/phage_annotator/annotations.py` — `Keypoint` dataclass, CSV/JSON serializers.
-- `src/phage_annotator/gui_mpl.py` — Matplotlib + Qt GUI (views, sliders, labels, export).
-- `src/phage_annotator/cli.py` — CLI entry (`phage-annotator -i image.tif …`).
-- `src/phage_annotator/config.py` — `AppConfig` defaults (labels, suffixes, config dir).
+# Architecture
+
+```
+
+src/phage_annotator/
+├── io.py              # TIFF loader, metadata, axis normalizer
+├── annotations.py     # Keypoint models, CSV/JSON serializers
+├── gui_mpl.py         # Full Qt + Matplotlib GUI
+├── cli.py             # CLI entry point
+└── config.py          # App defaults
+
+````
 
 ---
 
-## Installation
+# Installation
 
-### From source (pip)
+### **Install from PyPI**
+
+```bash
+pip install phage-annotator
+````
+
+### From source
+
 ```bash
 python -m venv .venv-phage
 source .venv-phage/bin/activate
 pip install .
 ```
 
-### Layout and GUI
-- Splitter-based layout prioritizes the five synchronized panels (Frame, Mean, Composite/GT, Support/epi, STD) with resizable panes for FOV list and settings.
-- Compact control bar keeps T/Z sliders, autoplay/loop, vmin/vmax, colormap, label, and annotation scope/target visible; advanced tools (marker size, visibility, line/histogram, ROI details) are in a collapsible group and View menu.
-- Menu bar (File/View/Help) covers opening files/folders, loading/saving annotations (CSV/JSON), toggling panels, linking zoom, and about dialog.
+### System Requirements
 
-### System requirements
-- Python 3.9+
-- Qt runtime (provided via PyQt5 wheel on most platforms)
-- A display environment (X11/Wayland on Linux, or run under a VNC/Xvfb session for headless)
-
-### Optional: conda example
-```bash
-conda create -n phage-annotator python=3.11
-conda activate phage-annotator
-pip install .
-```
+* Python 3.9+
+* PyQt5 (auto-installed)
+* Linux / macOS / Windows with GUI support
 
 ---
 
-## Usage
+# Usage
 
-### Basic CLI
+### Basic launch
+
 ```bash
 phage-annotator -i image1.tif image2.ome.tif
 ```
 
-The GUI launches with the first image loaded. Use Prev/Next to switch FOVs. Annotate points, adjust contrast/colormap, and export to CSV/JSON.
+### Folder-based workflow
 
-### New workflow highlights
-- Open files or entire folders (TIFF/OME-TIFF) via File menu; lazy/on-demand loading reduces memory usage.
-- Five synchronized panels with shared ROI/navigation and shared zoom; Support panel for secondary modality.
-- ROI defined by X/Y/Width/Height with Box/Circle shapes; annotations and histogram/stats respect the ROI. Display crop (X,Y,W,H) is separate to focus on subregions.
-- Annotation table is editable (changes persist); load legacy x/y CSV or full CSV/JSON; per-panel visibility toggles and selectable annotation targets (Frame/Mean/Composite/Support).
-- Analyze menu: line profiles (raw vs corrected), ROI mean vs frame with exponential bleaching fit, ROI mean table per file (from last opened folder or loaded images) with CSV export.
-- Toggle line profile/histogram panels, link/unlink zoom (zoom preserved during playback), adjust marker size and click radius independently.
-- Settings pane can be collapsed/hidden to maximize the image area; zoom linking preserves view during playback.
-- Per-FOV control for interpreting 3D stacks as time or depth; override via “Interpret 3D axis as” control.
+Use **File → Open folder…** to populate the FOV list (lazy loading).
 
----
+### Highlights
 
-## GUI Walkthrough
-
-### Loading images
-- Pass one or more TIFF/OME-TIFF paths via CLI (`-i`).
-- Use File → Open files… or Open folder… to add FOVs; only active FOVs load into memory.
-
-### Navigating FOVs
-- FOV list + Primary/Support selectors
-- Buttons: **Prev FOV** / **Next FOV** (via list selection)
-- FOV label shows current index and filename.
-
-### Time / Depth sliders
-- **T slider** (time) and **Z slider** (depth) enable only if the axis exists.
-- Current slice view shows data at (T, Z).
-
-### Brightness and colormap
-- **Vmin/Vmax sliders** adjust contrast percentiles.
-- Colormap radio buttons: gray, viridis, magma, plasma, cividis.
-- Zoom/pan/home via Matplotlib toolbar.
-
-### Adding / removing annotations
-- Left-click in the slice view to add a keypoint at (y, x) for the current (T, Z).
-- Click near an existing point on the same slice to remove it (distance threshold).
-- Choose the active label via radio buttons (phage/artifact/other). Annotations can target Frame/Mean/Composite/Support; visibility per panel is toggled in Advanced.
-- Edit annotations directly in the table (T/Z/Y/X/Label) and changes persist; selecting a row highlights points.
-- Legacy two-column x/y CSV imports are supported (defaults applied for missing fields).
-
-### Projection view
-- Mean projection over T and Z shown on the right; all points for the current image are displayed.
-
-### Exporting
-- Buttons: **Save CSV**, **Save JSON**.
-- Quick-save CSV: press `s` (saves alongside the first image).
-- CSV/JSON include all points across all images.
-
-### Keyboard shortcuts
-| Key | Action              |
-| --- | ------------------- |
-| r   | Reset zoom          |
-| c   | Cycle colormap      |
-| s   | Quick-save CSV      |
-
-### Screenshot placeholder
-- _Insert GUI screenshot here (slice + projection, controls, labels)._
+* Five synchronized views with shared ROI
+* Crop view independently of ROI
+* Annotate across frames / all frames
+* Edit annotation table directly
+* Histogram + stats + line profile
+* Playback with zoom lock
+* Multi-modality visualization (Primary + Support)
 
 ---
 
-## Annotation Data Format
+# GUI Walkthrough
 
-### CSV schema
-Columns: `image_id, image_name, t, z, y, x, label`
+### Navigation
 
-### JSON schema
+* FOV list
+* Prev / Next
+* Primary / Support selector
+
+### Playback
+
+* Time slider (T)
+* Depth slider (Z)
+* FPS + Loop
+
+### Intensity + Colormap
+
+* vmin/vmax sliders
+* Gray / Viridis / Magma / Plasma / Cividis
+
+### Annotation
+
+* Add: click
+* Remove: click near point
+* Choose label (phage/artifact/other)
+* Marker size vs. click radius (separate controls)
+* Show/hide annotation per panel
+
+### Export
+
+* Save CSV
+* Save JSON
+* Quick-save (`s`)
+
+### Keyboard Shortcuts
+
+| Key | Action         |
+| --- | -------------- |
+| r   | Reset zoom     |
+| c   | Cycle colormap |
+| s   | Save CSV       |
+
+---
+
+# Annotation Data Format
+
+### CSV
+
+```
+image_id, image_name, t, z, y, x, label
+```
+
+### JSON example
+
 ```json
 {
   "image_name_1": [
     {"image_id": 0, "image_name": "image_name_1", "t": 0, "z": 0, "y": 10.5, "x": 20.1, "label": "phage"}
-  ],
-  "image_name_2": [
-    {"image_id": 1, "image_name": "image_name_2", "t": 3, "z": 1, "y": 5.0, "x": 12.3, "label": "artifact"}
   ]
 }
 ```
 
 ---
 
-## Supported Image Types
-- TIFF and OME-TIFF.
-- Dimensionality handled:
-  - 2D (Y, X) → (1, 1, Y, X)
-  - Z stacks (Z, Y, X) → (1, Z, Y, X)
-  - Time stacks (T, Y, X; T<20 heuristic) → (T, 1, Y, X)
-  - T/Z stacks (T, Z, Y, X) → unchanged
+# Supported Image Types
+
+* `.tif`, `.tiff`, `.ome.tif`, `.ome.tiff`
+* Automatically interpreted as:
+
+  * 2D → (1,1,Y,X)
+  * Z-stack → (1,Z,Y,X)
+  * Time-stack → (T,1,Y,X)
+  * Full TZ stack → (T,Z,Y,X)
 
 ---
 
-## Troubleshooting
-- **Qt backend errors**: Ensure a Qt-capable backend; launching via the CLI will set `Qt5Agg` automatically.
-- **No display on Linux**: Use X11/Wayland or run under Xvfb/VNC for headless environments.
-- **Large TIFFs**: Loading full stacks can be memory-intensive; consider downsampling externally if needed.
+# Troubleshooting
+
+* Qt errors → ensure system has a display or use Xvfb
+* Very large TIFFs → use lazy load and crop view
+* Wrong axis interpretation → override using the “Interpret 3D axis as” control
 
 ---
 
-## Roadmap
-- Multi-channel support and channel selector
-- Undo/redo for annotations
-- ROI masks and polygon tools
-- Batch export presets
-- Configurable distance thresholds and label sets
-- Optional multi-window or tabbed FOV layout
+# Roadmap
+
+* Multi-channel support
+* Undo/redo
+* Polygon ROI
+* Batch annotation presets
+* Fully dockable GUI layout
 
 ---
 
-## Contributing
-- Run tests: `pytest`
-- Code style: keep docstrings concise; add comments only for non-obvious logic; prefer type hints.
-- Issues and PRs are welcome.
+# Contribution Policy
+
+At this time, the project does **not** accept external code contributions.
+You may file issues, but **code modifications or forks are NOT permitted without my written permission**.
 
 ---
 
-## License
-MIT with attribution. See `LICENSE`.
+# Custom License Notice
+
+Although the repository includes an MIT license file for packaging compatibility, **actual reuse rights are restricted**.
+
+> **No part of this codebase may be reused, modified, cloned, forked, or integrated into any other software — commercial or academic — without explicit written permission from the author.**
 
 ---
 
-## Citation
-If you use this tool in your work, please cite “Phage Annotator” (citation details to be provided).
+# Citation
+
+If you use this tool in research, please cite (Will be updated soon):
+
+**“Phage Annotator — Chandrasekar Subramani Narayana (2025)”**
