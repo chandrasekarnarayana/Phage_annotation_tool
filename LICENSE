@@ -1,22 +1,112 @@
-Copyright (c) 2024 Phage Annotator Maintainers
+# 📄 **LICENSE — ALL RIGHTS RESERVED WITH PERMISSION CLAUSE**
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+**Copyright (c) 2025
+Chandrasekar Subramani Narayana
+All Rights Reserved.**
 
-1. The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
-2. Any public use, publication, distribution, or derivative work based on the
-   Software must include a citation or attribution to "Phage Annotator" and
-   the Phage Annotator maintainers in accompanying documentation or materials.
+---
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+## 1. Grant of Use
+
+You are permitted to **download, install, and use** this software (“Software”) for personal, academic, or research purposes **without modification**.
+
+No other rights are granted.
+
+---
+
+## 2. Restrictions (No Copying / No Modification / No Redistribution)
+
+Except where **explicit written permission** is granted by the copyright holder, **you may NOT**:
+
+1. Copy, reproduce, or duplicate any part of the Software
+2. Modify, alter, adapt, translate, or create derivative works
+3. Publish, redistribute, or share the Software or any portion thereof
+4. Incorporate the Software into other software, tools, or packages
+5. Upload the Software to any package index, repository, cloud service, or distribution platform
+6. Use any part of the Software for commercial purposes
+7. Reverse engineer, decompile, or extract any component for reuse
+
+Any such action **without explicit written permission** constitutes copyright infringement.
+
+---
+
+## 3. Permission Requests
+
+If you wish to:
+
+* modify the Software
+* build derivative works
+* reuse code components
+* incorporate the Software into another project
+* redistribute the Software
+* use the Software commercially
+* use the Software in teaching or training materials
+
+You **must** obtain prior written authorization from:
+
+**📧 Email:** *[your preferred email — example below]*
+**[chandrasekarsn@gmail.com](mailto:chandrasekarsn@gmail.com)**
+
+Permission may be granted **case-by-case** at the discretion of the author.
+
+---
+
+## 4. Academic and Citation Requirements
+
+Any academic use, figure generation, or mention of this Software must cite:
+
+> **“Phage Annotator — Chandrasekar Subramani Narayana (2024–2025)”**
+
+Citation details may be updated in the repository.
+
+---
+
+## 5. No License for Derivative Models, Datasets, or Tools
+
+The restrictions in Section 2 apply equally to:
+
+* GUI layouts and logic
+* annotation formats and schemas
+* algorithms, code structure, and workflow designs
+* documentation and manuals
+* icons, graphics, images, demo files
+* example datasets and generated outputs
+
+No reuse or adaptation is permitted without explicit permission.
+
+---
+
+## 6. Warranty Disclaimer
+
+THE SOFTWARE IS PROVIDED “AS IS,” WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO:
+
+* FITNESS FOR A PARTICULAR PURPOSE
+* MERCHANTABILITY
+* NON-INFRINGEMENT
+
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM THE USE OF THE SOFTWARE.
+
+---
+
+## 7. Termination
+
+Any violation of these terms automatically terminates your right to use this Software.
+Continued use after termination is a violation of copyright law.
+
+---
+
+## 8. Governing Law
+
+This license shall be governed by the laws applicable in the author’s jurisdiction (India/France).
+
+---
+
+# ✔ Summary (human readable)
+
+* You can use and run the software
+* You **cannot** copy, modify, reuse, or share it
+* You **must** ask permission for *any* reuse
+* Academic use must cite the tool
+* All rights are retained by the author
+
+---
