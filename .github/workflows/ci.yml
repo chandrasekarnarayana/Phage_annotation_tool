@@ -37,5 +37,8 @@ jobs:
       - name: Run GUI tests under Xvfb
         env:
           QT_QPA_PLATFORM: offscreen
+          QT_XCB_GL_INTEGRATION: none
+          QT_OPENGL: software
+          MPLBACKEND: Agg
         run: |
           xvfb-run -a pytest -m gui
