@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: phage-annotator
-Version: 1.0.0
+Version: 1.0.1
 Summary: General keypoint annotation GUI for 2D/3D/time microscopy, with a phage preset
 Author: Chandrasekar Subramani Narayana
 Requires-Python: >=3.9

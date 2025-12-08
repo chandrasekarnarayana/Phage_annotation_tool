@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phage-annotator"
-version = "1.0.0"
+version = "1.0.1"
 description = "General keypoint annotation GUI for 2D/3D/time microscopy, with a phage preset"
 authors = [
   { name = "Chandrasekar Subramani Narayana" }

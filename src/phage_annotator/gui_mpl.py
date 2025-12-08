@@ -24,6 +24,7 @@ import pandas as pd
 import tifffile as tif
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from PyQt5.QtWidgets import QSizePolicy
 from scipy.optimize import curve_fit
 
 from phage_annotator.annotations import (
@@ -205,6 +206,14 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         # Undo/redo stacks of annotation actions (add/delete).
         self._undo_stack: List[dict] = []
         self._redo_stack: List[dict] = []
+        # Panel visibility controls which axes exist; at least one must remain visible.
+        self._panel_visibility = {"frame": True, "mean": True, "composite": True, "support": True, "std": True}
+        # Skip the next zoom capture when layout is rebuilt to preserve previous zoom.
+        self._skip_capture_once = False
+        # Pixel size (um per pixel) for density calculations.
+        self.pixel_size_um_per_px = 0.069
+        self._status_base = ""
+        self._status_extra = ""
 
         # Matplotlib image artists reused across refreshes to avoid recreation.
         self.im_frame = None
@@ -255,6 +264,20 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.link_zoom_act = view_menu.addAction("Link zoom")
         self.link_zoom_act.setCheckable(True)
         self.link_zoom_act.setChecked(True)
+        panels_menu = view_menu.addMenu("Panels")
+        self.panel_actions = {}
+        for key, label in [
+            ("frame", "Show Frame"),
+            ("mean", "Show Mean"),
+            ("composite", "Show Composite"),
+            ("support", "Show Support"),
+            ("std", "Show STD"),
+        ]:
+            act = panels_menu.addAction(label)
+            act.setCheckable(True)
+            act.setChecked(True)
+            act.toggled.connect(lambda checked, k=key: self._on_panel_toggle(k, checked))
+            self.panel_actions[key] = act
 
         edit_menu = menubar.addMenu("&Edit")
         self.undo_act = edit_menu.addAction("Undo")
@@ -296,6 +319,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.fov_list.setCurrentRow(self.current_image_idx)
         left_layout.addWidget(QtWidgets.QLabel("FOVs"))
         left_layout.addWidget(self.fov_list)
+        self.clear_fovs_btn = QtWidgets.QPushButton("Clear FOV list")
+        left_layout.addWidget(self.clear_fovs_btn)
 
         primary_box = QtWidgets.QHBoxLayout()
         primary_box.addWidget(QtWidgets.QLabel("Primary"))
@@ -325,24 +350,23 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         fig_container = QtWidgets.QWidget()
         fig_layout = QtWidgets.QVBoxLayout(fig_container)
         self.figure = plt.figure(figsize=(13, 7))
-        gs = self.figure.add_gridspec(2, 5, height_ratios=[2, 1])
-        self.ax_frame = self.figure.add_subplot(gs[0, 0], sharex=None, sharey=None)
-        self.ax_mean = self.figure.add_subplot(gs[0, 1], sharex=self.ax_frame, sharey=self.ax_frame)
-        self.ax_comp = self.figure.add_subplot(gs[0, 2], sharex=self.ax_frame, sharey=self.ax_frame)
-        self.ax_support = self.figure.add_subplot(gs[0, 3], sharex=self.ax_frame, sharey=self.ax_frame)
-        self.ax_std = self.figure.add_subplot(gs[0, 4], sharex=self.ax_frame, sharey=self.ax_frame)
-        self.ax_line = self.figure.add_subplot(gs[1, 0:2])
-        self.ax_hist = self.figure.add_subplot(gs[1, 2:4])
-        self.ax_blank = self.figure.add_subplot(gs[1, 4])
-        self.ax_blank.axis("off")
+        self.ax_frame = None
+        self.ax_mean = None
+        self.ax_comp = None
+        self.ax_support = None
+        self.ax_std = None
+        self.ax_line = None
+        self.ax_hist = None
         self.canvas = FigureCanvasQTAgg(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.canvas.updateGeometry()
         self.toolbar = NavigationToolbar2QT(self.canvas, self)
         fig_layout.addWidget(self.toolbar)
         fig_layout.addWidget(self.canvas, stretch=1)
 
         self.top_splitter.addWidget(fig_container)
         self.top_splitter.setStretchFactor(0, 0)
-        self.top_splitter.setStretchFactor(1, 4)
+        self.top_splitter.setStretchFactor(1, 6)
 
         # Settings pane
         settings_layout = QtWidgets.QVBoxLayout(self.settings_widget)
@@ -449,6 +473,14 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         primary_controls.addWidget(QtWidgets.QLabel("Vmax"), row, 0)
         primary_controls.addWidget(self.vmax_label, row, 1)
         primary_controls.addLayout(vmax_slider_box, row, 2)
+        row += 1
+
+        self.pixel_size_spin = QtWidgets.QDoubleSpinBox()
+        self.pixel_size_spin.setDecimals(4)
+        self.pixel_size_spin.setRange(1e-4, 100.0)
+        self.pixel_size_spin.setValue(self.pixel_size_um_per_px)
+        primary_controls.addWidget(QtWidgets.QLabel("Pixel size (um/px)"), row, 0)
+        primary_controls.addWidget(self.pixel_size_spin, row, 1)
         row += 1
 
         self.reset_view_btn = QtWidgets.QPushButton("Reset view")
@@ -685,14 +717,13 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.show_table_act.triggered.connect(self._show_table_dialog)
         self.undo_act.triggered.connect(self.undo_last_action)
         self.redo_act.triggered.connect(self.redo_last_action)
+        self._rebuild_figure_layout()
 
     # --- Events and data helpers ----------------------------------------
     def _bind_events(self) -> None:
         self.canvas.mpl_connect("button_press_event", self._on_click)
         self.canvas.mpl_connect("key_press_event", self._on_key)
-        for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
-            ax.callbacks.connect("xlim_changed", self._on_limits_changed)
-            ax.callbacks.connect("ylim_changed", self._on_limits_changed)
+        self._bind_axis_callbacks()
 
         self.prev_btn = None  # kept for compatibility; buttons are managed in menu now
 
@@ -724,6 +755,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.scope_group.buttonToggled.connect(self._on_scope_change)
         self.target_group.buttonToggled.connect(self._on_target_change)
         self.reset_view_btn.clicked.connect(self.reset_all_view)
+        self.pixel_size_spin.valueChanged.connect(self._on_pixel_size_change)
         self.show_frame_chk.stateChanged.connect(self._refresh_image)
         self.show_mean_chk.stateChanged.connect(self._refresh_image)
         self.show_comp_chk.stateChanged.connect(self._refresh_image)
@@ -753,11 +785,21 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.annot_table.itemSelectionChanged.connect(self._on_table_selection)
         self.annot_table.itemChanged.connect(self._on_table_item_changed)
         self.show_ann_master_chk.stateChanged.connect(self._refresh_image)
+        self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
+
+    def _bind_axis_callbacks(self) -> None:
+        """Bind zoom callbacks for current axes to keep zoom synced."""
+        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        for ax in axes:
+            ax.callbacks.connect("xlim_changed", self._on_limits_changed)
+            ax.callbacks.connect("ylim_changed", self._on_limits_changed)
 
     def reset_view(self) -> None:
         """Reset zoom/pan to full extent of current frame."""
         self._last_zoom_linked = None
         for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            if ax is None:
+                continue
             ax.set_xlim(auto=True)
             ax.set_ylim(auto=True)
         self._refresh_image()
@@ -864,10 +906,17 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         if not has_time and has_z:
             z_idx = self.t_slider.value()
             t_idx = 0
+        if img.array is not None:
+            t_idx = max(0, min(t_idx, img.array.shape[0] - 1))
+            z_idx = max(0, min(z_idx, img.array.shape[1] - 1))
         return t_idx, z_idx
 
-    def _slice_data(self, img: LazyImage) -> np.ndarray:
+    def _slice_data(self, img: LazyImage, t_override: Optional[int] = None, z_override: Optional[int] = None) -> np.ndarray:
         t_idx, z_idx = self._slice_indices(img)
+        if t_override is not None:
+            t_idx = max(0, t_override if img.array is None else min(t_override, img.array.shape[0] - 1))
+        if z_override is not None:
+            z_idx = max(0, z_override if img.array is None else min(z_override, img.array.shape[1] - 1))
         assert img.array is not None
         return img.array[t_idx, z_idx, :, :]
 
@@ -911,6 +960,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
     def _clear_image_overlays(self) -> None:
         """Clear scatter/ROI overlays while keeping base images intact."""
         for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            if ax is None:
+                continue
             # Matplotlib ArtistList inconsistencies: fall back to manual removal.
             for artist in list(ax.patches):
                 artist.remove()
@@ -1030,10 +1081,14 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         """Lightweight per-frame update for playback without recomputing projections."""
         if self.im_frame is None:
             self._refresh_image()
-        if self.im_frame is None:
+        if self.im_frame is None or self.ax_frame is None:
             return
         self.im_frame.set_data(frame)
         self.im_frame.set_clim(self._last_vmin, self._last_vmax)
+        # Update support panel in sync (clamped to its own length).
+        if self.im_support is not None and self.ax_support is not None and self.support_image.array is not None:
+            support_slice = self._apply_crop(self._slice_data(self.support_image, t_override=t_idx))
+            self._update_image_artist(self.im_support, support_slice, COLORMAPS[self.current_cmap_idx], self._last_vmin, self._last_vmax)
         prim = self.primary_image
         t_max = prim.array.shape[0] if prim.array is not None else 0
         # Title update is cheap but skip every few frames to reduce churn.
@@ -1074,7 +1129,10 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
     # --- Rendering -------------------------------------------------------
     def _refresh_image(self) -> None:
         # Preserve current zoom before redraw
-        self._capture_zoom_state()
+        if self._skip_capture_once:
+            self._skip_capture_once = False
+        else:
+            self._capture_zoom_state()
         self._ensure_loaded(self.current_image_idx)
         self._ensure_loaded(self.support_image_idx)
         prim = self.primary_image
@@ -1118,27 +1176,32 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             (self.ax_std, "STD IMG"),
         ]
         for ax, title in titles:
-            ax.set_title(title)
+            if ax is not None:
+                ax.set_title(title)
 
-        if self.im_frame is None:
+        if self.im_frame is None and self.ax_frame is not None:
             self.im_frame = self.ax_frame.imshow(slice_data, cmap=cmap, vmin=vmin, vmax=vmax)
-            self.im_mean = self.ax_mean.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
-            self.im_comp = self.ax_comp.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
-            self.im_support = self.ax_support.imshow(support_slice, cmap=cmap, vmin=vmin, vmax=vmax)
-            self.im_std = self.ax_std.imshow(std_data, cmap=cmap, vmin=std_vmin, vmax=std_vmax)
-            for artist, data in [
-                (self.im_frame, slice_data),
-                (self.im_mean, mean_data),
-                (self.im_comp, mean_data),
-                (self.im_support, support_slice),
-                (self.im_std, std_data),
-            ]:
-                artist.set_extent((0, data.shape[1], data.shape[0], 0))
-        else:
+        elif self.im_frame is not None:
             self._update_image_artist(self.im_frame, slice_data, cmap, vmin, vmax)
+
+        if self.im_mean is None and self.ax_mean is not None:
+            self.im_mean = self.ax_mean.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
+        elif self.im_mean is not None:
             self._update_image_artist(self.im_mean, mean_data, cmap, vmin, vmax)
+
+        if self.im_comp is None and self.ax_comp is not None:
+            self.im_comp = self.ax_comp.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
+        elif self.im_comp is not None:
             self._update_image_artist(self.im_comp, mean_data, cmap, vmin, vmax)
+
+        if self.im_support is None and self.ax_support is not None:
+            self.im_support = self.ax_support.imshow(support_slice, cmap=cmap, vmin=vmin, vmax=vmax)
+        elif self.im_support is not None:
             self._update_image_artist(self.im_support, support_slice, cmap, vmin, vmax)
+
+        if self.im_std is None and self.ax_std is not None:
+            self.im_std = self.ax_std.imshow(std_data, cmap=cmap, vmin=std_vmin, vmax=std_vmax)
+        elif self.im_std is not None:
             self._update_image_artist(self.im_std, std_data, cmap, std_vmin, std_vmax)
 
         self._clear_image_overlays()
@@ -1157,6 +1220,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         active_color = "#ff9800" if self.annotate_target == "frame" else "#00acc1"
         neutral_color = "#cccccc"
         for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            if ax is None:
+                continue
             is_target = (
                 (self.annotate_target == "frame" and ax is self.ax_frame)
                 or (self.annotate_target == "mean" and ax is self.ax_mean)
@@ -1182,6 +1247,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
                     selected_pts.append(self._table_rows[row])
 
         def scatter_on(ax, predicate, faded=False):
+            if ax is None:
+                return
             pts_sel = [(kp.y, kp.x, kp.label) for kp in pts if predicate(kp)]
             if not pts_sel:
                 return
@@ -1201,12 +1268,16 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         # Highlight selected points in red across all image axes
         if selected_pts and self.show_ann_master_chk.isChecked():
             for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+                if ax is None:
+                    continue
                 ys = [kp.y for kp in selected_pts]
                 xs = [kp.x for kp in selected_pts]
                 ax.scatter(xs, ys, c="red", s=self.marker_size * 1.3, marker="o", edgecolors="k")
+        # Refresh status to reflect view density after drawing points.
+        self._update_status()
 
     def _draw_diagnostics(self, slice_data: np.ndarray, vmin: float, vmax: float) -> None:
-        if self.profile_enabled and self.profile_chk.isChecked():
+        if self.profile_enabled and self.profile_chk.isChecked() and self.ax_line is not None:
             self.ax_line.clear()
             if self.profile_line:
                 (y1, x1), (y2, x2) = self.profile_line
@@ -1223,10 +1294,11 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             self.ax_line.set_ylabel("Intensity")
             self.ax_line.axis("on")
         else:
-            self.ax_line.clear()
-            self.ax_line.axis("off")
+            if self.ax_line is not None:
+                self.ax_line.clear()
+                self.ax_line.axis("off")
 
-        if self.hist_enabled and self.hist_chk.isChecked():
+        if self.hist_enabled and self.hist_chk.isChecked() and self.ax_hist is not None:
             self.ax_hist.clear()
             vals = self._roi_values(slice_data) if self.hist_region == "roi" else slice_data.flatten()
             bins = self.hist_bins_spin.value()
@@ -1239,8 +1311,9 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
                 self.ax_hist.text(0.02, 0.95, stats, transform=self.ax_hist.transAxes, va="top", fontsize=8)
             self.ax_hist.axis("on")
         else:
-            self.ax_hist.clear()
-            self.ax_hist.axis("off")
+            if self.ax_hist is not None:
+                self.ax_hist.clear()
+                self.ax_hist.axis("off")
 
     # --- ROI helpers -----------------------------------------------------
     def _roi_mask(self, shape: Tuple[int, int]) -> np.ndarray:
@@ -1329,6 +1402,89 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         x1, y1 = int(min(data.shape[1], x0 + max(1, int(w)))), int(min(data.shape[0], y0 + max(1, int(h))))
         return data[y0:y1, x0:x1]
 
+    def _on_panel_toggle(self, key: str, checked: bool) -> None:
+        """Toggle panel visibility; ensure at least one panel stays on."""
+        # Capture current zoom before layout rebuild so we can restore it.
+        self._capture_zoom_state()
+        self._panel_visibility[key] = checked
+        if not any(self._panel_visibility.values()):
+            # Prevent hiding all; re-enable the current key.
+            self._panel_visibility[key] = True
+            self.panel_actions[key].setChecked(True)
+            return
+        self._skip_capture_once = True
+        self._rebuild_figure_layout()
+        # Re-render content on the new layout so remaining panels show current data.
+        self._refresh_image()
+
+    def _panel_grid_shape(self, n: int) -> Tuple[int, int]:
+        """Map number of visible panels to a compact grid."""
+        if n <= 1:
+            return 1, 1
+        cols = int(np.ceil(np.sqrt(n)))
+        rows = int(np.ceil(n / cols))
+        return rows, cols
+
+    def _rebuild_figure_layout(self) -> None:
+        """
+        Recreate axes based on visible panels (images + diagnostics) so remaining panels grow.
+
+        Called at init and when panel visibility toggles; avoids touching playback/memmap logic.
+        """
+        ordered = ["frame", "mean", "composite", "support", "std"]
+        visible_images = [p for p in ordered if self._panel_visibility.get(p, False)]
+        diag_panels = []
+        if getattr(self, "profile_chk", None) is None or getattr(self, "hist_chk", None) is None:
+            # During early init, default to showing diagnostics.
+            diag_panels = ["line", "hist"]
+        else:
+            if self.profile_chk.isChecked():
+                diag_panels.append("line")
+            if self.hist_chk.isChecked():
+                diag_panels.append("hist")
+        if not visible_images and not diag_panels:
+            return
+        # Images occupy the first row in a single row; diagnostics go to a second row.
+        img_cols = max(1, len(visible_images))
+        diag_cols = len(diag_panels)
+        nrows = 1 + (1 if diag_panels else 0)
+        ncols = max(img_cols, diag_cols if diag_cols else img_cols)
+        self.figure.clear()
+        self.figure.set_constrained_layout(True)
+        gs = self.figure.add_gridspec(nrows, ncols)
+        # Reset axes references
+        self.ax_frame = self.ax_mean = self.ax_comp = self.ax_support = self.ax_std = None
+        self.ax_line = self.ax_hist = None
+        ax_map = {}
+        base_ax = None
+        for idx, panel in enumerate(visible_images):
+            r, c = 0, idx  # first row only
+            # Share axes with first visible panel to keep zoom/pan synced.
+            share_ax = base_ax if panel in visible_images else None
+            ax = self.figure.add_subplot(gs[r, c], sharex=share_ax, sharey=share_ax)
+            if panel in visible_images and base_ax is None:
+                base_ax = ax
+            ax.set_aspect("auto")
+            ax_map[panel] = ax
+        # Diagnostics on second row, no sharing needed.
+        for idx, panel in enumerate(diag_panels):
+            ax = self.figure.add_subplot(gs[1, idx])
+            ax.set_aspect("auto")
+            if panel == "line":
+                self.ax_line = ax
+            elif panel == "hist":
+                self.ax_hist = ax
+        self.ax_frame = ax_map.get("frame")
+        self.ax_mean = ax_map.get("mean")
+        self.ax_comp = ax_map.get("composite")
+        self.ax_support = ax_map.get("support")
+        self.ax_std = ax_map.get("std")
+        self.ax_blank = None
+        # Reset image artists; they will be recreated on next refresh
+        self.im_frame = self.im_mean = self.im_comp = self.im_support = self.im_std = None
+        self._bind_axis_callbacks()
+        self.canvas.draw_idle()
+
     # --- Annotation logic ------------------------------------------------
     def _on_click(self, event) -> None:
         target_map = {
@@ -1371,6 +1527,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             )
         )
         self._push_undo({"type": "add_point", "point": pts[-1], "image_id": image_id})
+        self._update_status()
 
     def _remove_annotation_near(self, ax, t: int, z: int, x: float, y: float) -> bool:
         pts = self._current_keypoints()
@@ -1385,6 +1542,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             if dist <= self.click_radius_px:
                 removed = pts.pop(idx)
                 self._push_undo({"type": "delete_point", "point": removed, "image_id": removed.image_id})
+                self._update_status()
                 return True
         return False
 
@@ -1525,10 +1683,12 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
     def _toggle_profile_panel(self) -> None:
         self.profile_chk.setChecked(not self.profile_chk.isChecked())
+        self._rebuild_figure_layout()
         self._refresh_image()
 
     def _toggle_hist_panel(self) -> None:
         self.hist_chk.setChecked(not self.hist_chk.isChecked())
+        self._rebuild_figure_layout()
         self._refresh_image()
 
     def _toggle_left_pane(self) -> None:
@@ -1728,6 +1888,27 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         # Will lazily reload the active images after purge.
         self._refresh_image()
 
+    def _clear_fov_list(self) -> None:
+        """Remove all FOVs except the current primary to reset the list."""
+        if not self.images:
+            return
+        self.stop_playback_t()
+        keep_idx = self.current_image_idx
+        keep_img = self.images[keep_idx]
+        self.images = [keep_img]
+        self.annotations = {keep_img.id: self.annotations.get(keep_img.id, [])}
+        self.fov_list.clear()
+        self.primary_combo.clear()
+        self.support_combo.clear()
+        keep_img.id = 0
+        self.fov_list.addItem(keep_img.name)
+        self.primary_combo.addItem(keep_img.name)
+        self.support_combo.addItem(keep_img.name)
+        self.current_image_idx = 0
+        self.support_image_idx = 0
+        self._set_status("Cleared FOV list; kept current image.")
+        self._refresh_image()
+
     # --- Controls handlers -----------------------------------------------
     def _set_fov(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.images):
@@ -1870,6 +2051,10 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.hist_region = "roi" if btns[0].isChecked() else "full"
         self._refresh_image()
 
+    def _on_pixel_size_change(self, val: float) -> None:
+        self.pixel_size_um_per_px = float(val)
+        self._update_status()
+
     def _on_limits_changed(self, ax) -> None:
         if ax not in {self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std}:
             return
@@ -1877,6 +2062,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             return
         if self.link_zoom:
             self._last_zoom_linked = (ax.get_xlim(), ax.get_ylim())
+        self._update_status()
             # shared axes handle propagation automatically
 
     def _on_link_zoom_menu(self) -> None:
@@ -1946,16 +2132,31 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
                 removed_any = True
         if removed_any:
             self._refresh_image()
+            self._update_status()
 
     def _update_status(self) -> None:
         total = sum(len(v) for v in self.annotations.values())
         current = len(self._current_keypoints())
-        self._set_status(
-            f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} | Speed {self.speed_slider.value()} fps"
+        density_txt = ""
+        pts_view, area_um2 = self._view_density_stats()
+        if area_um2 > 0:
+            density = pts_view / area_um2 if area_um2 > 0 else 0.0
+            density_txt = f" | View pts: {pts_view} | Area: {area_um2:.2f} um^2 | Density: {density:.3f} /um^2"
+        self._status_base = (
+            f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} | Speed {self.speed_slider.value()} fps{density_txt}"
         )
+        self._render_status()
 
     def _set_status(self, text: str) -> None:
-        self.status.setText(text)
+        """Set a transient status message; base status persists during playback."""
+        self._status_extra = text
+        self._render_status()
+
+    def _render_status(self) -> None:
+        if self._status_extra:
+            self.status.setText(f"{self._status_base} | {self._status_extra}")
+        else:
+            self.status.setText(self._status_base)
 
     def _label_color(self, label: str, faded: bool = False) -> str:
         palette = {
@@ -1967,6 +2168,73 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         if faded:
             return matplotlib.colors.to_hex(matplotlib.colors.to_rgba(color, alpha=0.4))
         return color
+
+    def _view_density_stats(self) -> Tuple[int, float]:
+        """Compute number of points and area (um^2) in current view extent."""
+        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        if not axes:
+            return 0, 0.0
+        xlim, ylim = axes[0].get_xlim(), axes[0].get_ylim()
+        # Limit density area to ROI if set, otherwise use current view extents.
+        circle_mode = self.roi_shape == "circle"
+        circle_center = None
+        circle_r = None
+        if self.roi_rect and self.roi_rect[2] > 0 and self.roi_rect[3] > 0:
+            rx, ry, rw, rh = self.roi_rect
+            x0, x1 = max(min(xlim), rx), min(max(xlim), rx + rw)
+            y0, y1 = max(min(ylim), ry), min(max(ylim), ry + rh)
+            width_px = max(0, x1 - x0)
+            height_px = max(0, y1 - y0)
+            x_bounds = (x0, x1)
+            y_bounds = (y0, y1)
+            if circle_mode:
+                circle_center = (rx + rw / 2, ry + rh / 2)
+                circle_r = min(rw, rh) / 2
+        else:
+            width_px = abs(xlim[1] - xlim[0])
+            height_px = abs(ylim[1] - ylim[0])
+            x_bounds = xlim
+            y_bounds = ylim
+        area_px = width_px * height_px
+        # If circle ROI is partially in view, approximate overlap area via sampling.
+        if circle_mode and circle_center is not None and width_px > 0 and height_px > 0:
+            cx, cy = circle_center
+            # If view contains full circle bounding box, use exact circle area.
+            full_contained = (
+                x_bounds[0] <= cx - circle_r
+                and x_bounds[1] >= cx + circle_r
+                and y_bounds[0] <= cy - circle_r
+                and y_bounds[1] >= cy + circle_r
+            )
+            if full_contained:
+                area_px = np.pi * (circle_r ** 2)
+            else:
+                # Sample overlap rectangle to estimate circular overlap fraction.
+                nx = max(1, min(256, int(width_px)))
+                ny = max(1, min(256, int(height_px)))
+                xs = np.linspace(x_bounds[0], x_bounds[1], nx)
+                ys = np.linspace(y_bounds[0], y_bounds[1], ny)
+                xx, yy = np.meshgrid(xs, ys)
+                inside = (xx - cx) ** 2 + (yy - cy) ** 2 <= circle_r ** 2
+                frac = inside.mean()
+                area_px = area_px * frac
+        area_um2 = area_px * (self.pixel_size_um_per_px ** 2)
+        t_sel, z_sel = self.t_slider.value(), self.z_slider.value()
+        def _inside_circle(kp_x: float, kp_y: float) -> bool:
+            if not circle_mode or circle_center is None or circle_r is None:
+                return True
+            cx, cy = circle_center
+            return (kp_x - cx) ** 2 + (kp_y - cy) ** 2 <= circle_r ** 2
+        pts = [
+            kp
+            for kp in self._current_keypoints()
+            if kp.t in (t_sel, -1)
+            and kp.z in (z_sel, -1)
+            and x_bounds[0] <= kp.x <= x_bounds[1]
+            and y_bounds[0] <= kp.y <= y_bounds[1]
+            and _inside_circle(kp.x, kp.y)
+        ]
+        return len(pts), area_um2
 
     def _point_in_roi(self, x: float, y: float) -> bool:
         rx, ry, rw, rh = self.roi_rect
@@ -1983,23 +2251,29 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         """Restore zoom using shared axes; defaults to full extent when none stored."""
         default_xlim = (0, data_shape[1])
         default_ylim = (data_shape[0], 0)
+        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        if not axes:
+            return
         if self.link_zoom:
             if self._last_zoom_linked is None:
                 self._last_zoom_linked = (default_xlim, default_ylim)
             xlim, ylim = self._last_zoom_linked
-            for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            for ax in axes:
                 ax.set_xlim(xlim)
                 ax.set_ylim(ylim)
         else:
             # independent zoom preserved by shared axes; fallback to defaults
-            for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            for ax in axes:
                 if ax.get_xlim() == (0.0, 1.0) or ax.get_ylim() == (0.0, 1.0):
                     ax.set_xlim(default_xlim)
                     ax.set_ylim(default_ylim)
 
     def _capture_zoom_state(self) -> None:
         """Capture current zoom from frame axis to preserve during redraws/playback."""
-        xlim, ylim = self.ax_frame.get_xlim(), self.ax_frame.get_ylim()
+        anchor_axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        if not anchor_axes:
+            return
+        xlim, ylim = anchor_axes[0].get_xlim(), anchor_axes[0].get_ylim()
         if self._valid_zoom(xlim, ylim):
             self._last_zoom_linked = (xlim, ylim)
 
