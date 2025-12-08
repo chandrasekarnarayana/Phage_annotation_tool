@@ -8,10 +8,14 @@ to populate the FOV list without eager loading.
 
 from __future__ import annotations
 
+import gc
 import itertools
 import pathlib
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -31,13 +35,49 @@ from phage_annotator.annotations import (
 )
 from phage_annotator.config import DEFAULT_CONFIG, SUPPORTED_SUFFIXES
 from phage_annotator.io import load_images, standardize_axes
+from phage_annotator.project_io import load_project, save_project
 
 COLORMAPS = ["gray", "viridis", "magma", "plasma", "cividis"]
+# Avoid pulling multi-GB TIFFs fully into RAM; switch to memmap beyond this.
+BIG_TIFF_BYTES_THRESHOLD = 512 * 1024 * 1024  # 512 MB
+# Toggle verbose cache logging for debugging (loading, projection caching, clearing).
+DEBUG_CACHE = False
+# Optional FPS overlay for playback diagnostics.
+DEBUG_FPS = False
+# Small ring buffer size for playback prefetch; trades memory vs latency.
+PLAYBACK_BUFFER_SIZE = 5
+# Only compute FPS every N frames to keep overhead small.
+FPS_UPDATE_STRIDE = 5
+# Target FPS for high-speed playback; speed slider sets the requested rate.
+DEFAULT_PLAYBACK_FPS = 30
+
+# Dev notes:
+# - Sliders have +/- buttons, high-FPS playback uses a ring buffer + prefetch thread.
+# - Undo/redo stacks record add/delete annotation actions (symmetry between forward/inverse).
+# - Keyboard shortcuts: arrows for T/Z, space toggles Play T, Delete removes selected annotation,
+#   R resets view+contrast, A/N prompt add guidance.
+# - Reset view = zoom to full extent; reset contrast recomputes percentiles; reset_all does both.
+# - Project files (.phageproj) store image paths + annotation paths + basic settings; see project_io.
+
+# Dev notes:
+# - Sliders now have +/- step buttons to mirror ImageJ-style nudge controls.
+# - Large TIFFs are memmapped and projections are cached to emulate Fiji's virtual stack behavior.
+# - See tests/stress_test_memory.py for a headless stress harness that exercises loading, navigation, and cache clearing.
+
+
+def _debug_log(msg: str) -> None:
+    if DEBUG_CACHE:
+        print(msg)
 
 
 @dataclass
 class LazyImage:
-    """Metadata and optional pixel data for an image."""
+    """Metadata and optional pixel data for an image.
+
+    A LazyImage may hold the array in memory, be backed by a memmap, or have no
+    array loaded at all (virtual). Mean/std projections are cached once
+    computed to keep refreshes responsive.
+    """
 
     path: pathlib.Path
     name: str
@@ -48,6 +88,8 @@ class LazyImage:
     array: Optional[np.ndarray] = None
     id: int = -1
     interpret_3d_as: str = "auto"
+    mean_proj: Optional[np.ndarray] = None
+    std_proj: Optional[np.ndarray] = None
 
 
 def _read_metadata(path: pathlib.Path) -> LazyImage:
@@ -75,8 +117,24 @@ def _read_metadata(path: pathlib.Path) -> LazyImage:
 
 
 def _load_array(path: pathlib.Path, interpret_3d_as: str = "auto") -> Tuple[np.ndarray, bool, bool]:
-    """Load image data and standardize to (T, Z, Y, X)."""
-    arr = tif.imread(str(path))
+    """
+    Load image data and standardize to (T, Z, Y, X).
+
+    Large stacks are memory-mapped to keep RAM usage manageable; smaller files
+    are read eagerly for speed.
+    """
+    with tif.TiffFile(path) as tf:
+        page = tf.series[0]
+        shape = page.shape
+        dtype = np.dtype(page.dtype)
+        nbytes = int(np.prod(shape, dtype=np.int64)) * dtype.itemsize
+    use_memmap = nbytes > BIG_TIFF_BYTES_THRESHOLD
+    if use_memmap:
+        _debug_log(f"Memmap loading {path} ({nbytes/1e6:.1f} MB)")
+        arr = tif.memmap(str(path))
+    else:
+        _debug_log(f"Loading into memory {path} ({nbytes/1e6:.1f} MB)")
+        arr = tif.imread(str(path))
     std, has_time, has_z = standardize_axes(arr, interpret_3d_as=interpret_3d_as)
     return std, has_time, has_z
 
@@ -127,6 +185,34 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
         self._suppress_limits = False
 
+        # Playback helpers (high-FPS path)
+        self._playback_mode = False
+        self._playback_buffer: Deque[np.ndarray] = deque()
+        self._playback_buffer_indices: Deque[int] = deque()
+        self._playback_buffer_lock = threading.Lock()
+        self._playback_stop_event = threading.Event()
+        self._playback_thread: Optional[threading.Thread] = None
+        self._playback_buffer_size = PLAYBACK_BUFFER_SIZE
+        self._playback_direction = 1
+        self._playback_overlay_stride = 3
+        self._playback_frame_counter = 0
+        self._fps_times: Deque[float] = deque(maxlen=120)
+        self._fps_text = None
+        self._last_vmin = 0.0
+        self._last_vmax = 1.0
+        self._playback_cursor = 0
+        self._last_frame_time: Optional[float] = None
+        # Undo/redo stacks of annotation actions (add/delete).
+        self._undo_stack: List[dict] = []
+        self._redo_stack: List[dict] = []
+
+        # Matplotlib image artists reused across refreshes to avoid recreation.
+        self.im_frame = None
+        self.im_mean = None
+        self.im_comp = None
+        self.im_support = None
+        self.im_std = None
+
         self._setup_ui()
         self._bind_events()
         self._ensure_loaded(self.current_image_idx)
@@ -148,6 +234,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         load_ann_act = file_menu.addAction("Load annotations…")
         save_csv_act = file_menu.addAction("Save annotations (CSV)")
         save_json_act = file_menu.addAction("Save annotations (JSON)")
+        save_proj_act = file_menu.addAction("Save project…")
+        load_proj_act = file_menu.addAction("Load project…")
         file_menu.addSeparator()
         exit_act = file_menu.addAction("Exit")
 
@@ -167,6 +255,14 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.link_zoom_act = view_menu.addAction("Link zoom")
         self.link_zoom_act.setCheckable(True)
         self.link_zoom_act.setChecked(True)
+
+        edit_menu = menubar.addMenu("&Edit")
+        self.undo_act = edit_menu.addAction("Undo")
+        self.redo_act = edit_menu.addAction("Redo")
+        self.undo_act.setShortcut("Ctrl+Z")
+        self.redo_act.setShortcut("Ctrl+Shift+Z")
+        self.undo_act.setEnabled(False)
+        self.redo_act.setEnabled(False)
 
         analyze_menu = menubar.addMenu("&Analyze")
         self.show_profiles_act = analyze_menu.addAction("Line profiles (raw vs corrected)")
@@ -257,26 +353,53 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
         self.t_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.t_slider_label = QtWidgets.QLabel("T: 1")
+        self.t_slider.setSingleStep(1)
+        self.t_minus_button = QtWidgets.QPushButton("-")
+        self.t_plus_button = QtWidgets.QPushButton("+")
+        self.t_minus_button.setToolTip("Previous time frame")
+        self.t_plus_button.setToolTip("Next time frame")
+        t_slider_box = QtWidgets.QHBoxLayout()
+        t_slider_box.addWidget(self.t_minus_button)
+        t_slider_box.addWidget(self.t_slider, stretch=1)
+        t_slider_box.addWidget(self.t_plus_button)
         self.play_t_btn = QtWidgets.QPushButton("Play T")
         self.z_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.z_slider_label = QtWidgets.QLabel("Z: 1")
+        self.z_slider.setSingleStep(1)
+        self.z_minus_button = QtWidgets.QPushButton("-")
+        self.z_plus_button = QtWidgets.QPushButton("+")
+        self.z_minus_button.setToolTip("Previous Z plane")
+        self.z_plus_button.setToolTip("Next Z plane")
+        z_slider_box = QtWidgets.QHBoxLayout()
+        z_slider_box.addWidget(self.z_minus_button)
+        z_slider_box.addWidget(self.z_slider, stretch=1)
+        z_slider_box.addWidget(self.z_plus_button)
         self.play_z_btn = QtWidgets.QPushButton("Play Z")
         self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(1, 10)
-        self.speed_slider.setValue(5)
+        self.speed_slider.setRange(1, DEFAULT_PLAYBACK_FPS)
+        self.speed_slider.setValue(DEFAULT_PLAYBACK_FPS)
+        self.speed_slider.setSingleStep(1)
+        self.speed_minus_button = QtWidgets.QPushButton("-")
+        self.speed_plus_button = QtWidgets.QPushButton("+")
+        self.speed_minus_button.setToolTip("Slow down playback")
+        self.speed_plus_button.setToolTip("Speed up playback")
+        speed_slider_box = QtWidgets.QHBoxLayout()
+        speed_slider_box.addWidget(self.speed_minus_button)
+        speed_slider_box.addWidget(self.speed_slider, stretch=1)
+        speed_slider_box.addWidget(self.speed_plus_button)
         self.loop_chk = QtWidgets.QCheckBox("Loop")
         primary_controls.addWidget(QtWidgets.QLabel("Time"), row, 0)
         primary_controls.addWidget(self.t_slider_label, row, 1)
-        primary_controls.addWidget(self.t_slider, row, 2)
+        primary_controls.addLayout(t_slider_box, row, 2)
         primary_controls.addWidget(self.play_t_btn, row, 3)
         row += 1
         primary_controls.addWidget(QtWidgets.QLabel("Depth"), row, 0)
         primary_controls.addWidget(self.z_slider_label, row, 1)
-        primary_controls.addWidget(self.z_slider, row, 2)
+        primary_controls.addLayout(z_slider_box, row, 2)
         primary_controls.addWidget(self.play_z_btn, row, 3)
         row += 1
         primary_controls.addWidget(QtWidgets.QLabel("Speed (fps)"), row, 0)
-        primary_controls.addWidget(self.speed_slider, row, 2)
+        primary_controls.addLayout(speed_slider_box, row, 2)
         primary_controls.addWidget(self.loop_chk, row, 3)
         row += 1
 
@@ -286,15 +409,51 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.vmax_slider.setRange(0, 100)
         self.vmin_slider.setValue(5)
         self.vmax_slider.setValue(95)
+        self.vmin_slider.setSingleStep(1)
+        self.vmax_slider.setSingleStep(1)
+        self.vmin_minus_button = QtWidgets.QPushButton("-")
+        self.vmin_plus_button = QtWidgets.QPushButton("+")
+        self.vmax_minus_button = QtWidgets.QPushButton("-")
+        self.vmax_plus_button = QtWidgets.QPushButton("+")
+        self.vmin_minus_button.setToolTip("Step down lower contrast bound")
+        self.vmin_plus_button.setToolTip("Step up lower contrast bound")
+        self.vmax_minus_button.setToolTip("Step down upper contrast bound")
+        self.vmax_plus_button.setToolTip("Step up upper contrast bound")
+        for btn in [
+            self.t_minus_button,
+            self.t_plus_button,
+            self.z_minus_button,
+            self.z_plus_button,
+            self.speed_minus_button,
+            self.speed_plus_button,
+            self.vmin_minus_button,
+            self.vmin_plus_button,
+            self.vmax_minus_button,
+            self.vmax_plus_button,
+        ]:
+            btn.setFixedWidth(28)
+        vmin_slider_box = QtWidgets.QHBoxLayout()
+        vmin_slider_box.addWidget(self.vmin_minus_button)
+        vmin_slider_box.addWidget(self.vmin_slider, stretch=1)
+        vmin_slider_box.addWidget(self.vmin_plus_button)
+        vmax_slider_box = QtWidgets.QHBoxLayout()
+        vmax_slider_box.addWidget(self.vmax_minus_button)
+        vmax_slider_box.addWidget(self.vmax_slider, stretch=1)
+        vmax_slider_box.addWidget(self.vmax_plus_button)
         self.vmin_label = QtWidgets.QLabel("vmin: -")
         self.vmax_label = QtWidgets.QLabel("vmax: -")
         primary_controls.addWidget(QtWidgets.QLabel("Vmin"), row, 0)
         primary_controls.addWidget(self.vmin_label, row, 1)
-        primary_controls.addWidget(self.vmin_slider, row, 2)
+        primary_controls.addLayout(vmin_slider_box, row, 2)
         row += 1
         primary_controls.addWidget(QtWidgets.QLabel("Vmax"), row, 0)
         primary_controls.addWidget(self.vmax_label, row, 1)
-        primary_controls.addWidget(self.vmax_slider, row, 2)
+        primary_controls.addLayout(vmax_slider_box, row, 2)
+        row += 1
+
+        self.reset_view_btn = QtWidgets.QPushButton("Reset view")
+        self.reset_view_btn.setToolTip("Reset zoom and contrast")
+        primary_controls.addWidget(self.reset_view_btn, row, 0, 1, 2)
         row += 1
 
         cmap_box = QtWidgets.QHBoxLayout()
@@ -494,8 +653,10 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
         self.save_csv_btn = QtWidgets.QPushButton("Save CSV")
         self.save_json_btn = QtWidgets.QPushButton("Save JSON")
+        self.clear_cache_btn = QtWidgets.QPushButton("Clear cache")
         adv_layout.addWidget(self.save_csv_btn, r, 0)
         adv_layout.addWidget(self.save_json_btn, r, 1)
+        adv_layout.addWidget(self.clear_cache_btn, r, 2)
 
         advanced_group.setLayout(adv_layout)
         adv_container_layout.addWidget(advanced_group)
@@ -510,6 +671,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         load_ann_act.triggered.connect(self._load_annotations)
         save_csv_act.triggered.connect(self._save_csv)
         save_json_act.triggered.connect(self._save_json)
+        save_proj_act.triggered.connect(self._save_project)
+        load_proj_act.triggered.connect(self._load_project)
         exit_act.triggered.connect(self.close)
         self.toggle_profile_act.triggered.connect(self._toggle_profile_panel)
         self.toggle_hist_act.triggered.connect(self._toggle_hist_panel)
@@ -520,6 +683,8 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.show_profiles_act.triggered.connect(self._show_profile_dialog)
         self.show_bleach_act.triggered.connect(self._show_bleach_dialog)
         self.show_table_act.triggered.connect(self._show_table_dialog)
+        self.undo_act.triggered.connect(self.undo_last_action)
+        self.redo_act.triggered.connect(self.redo_last_action)
 
     # --- Events and data helpers ----------------------------------------
     def _bind_events(self) -> None:
@@ -536,6 +701,12 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.support_combo.currentIndexChanged.connect(self._set_support_combo)
         self.t_slider.valueChanged.connect(self._refresh_image)
         self.z_slider.valueChanged.connect(self._refresh_image)
+        self.t_minus_button.clicked.connect(lambda: self._step_slider(self.t_slider, -1))
+        self.t_plus_button.clicked.connect(lambda: self._step_slider(self.t_slider, 1))
+        self.z_minus_button.clicked.connect(lambda: self._step_slider(self.z_slider, -1))
+        self.z_plus_button.clicked.connect(lambda: self._step_slider(self.z_slider, 1))
+        self.speed_minus_button.clicked.connect(lambda: self._step_slider(self.speed_slider, -1))
+        self.speed_plus_button.clicked.connect(lambda: self._step_slider(self.speed_slider, 1))
         self.play_t_btn.clicked.connect(lambda: self._toggle_play("t"))
         self.play_z_btn.clicked.connect(lambda: self._toggle_play("z"))
         self.play_timer.timeout.connect(self._on_play_tick)
@@ -544,10 +715,15 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.axis_mode_combo.currentTextChanged.connect(self._on_axis_mode_change)
         self.vmin_slider.valueChanged.connect(self._on_vminmax_change)
         self.vmax_slider.valueChanged.connect(self._on_vminmax_change)
+        self.vmin_minus_button.clicked.connect(lambda: self._step_slider(self.vmin_slider, -1))
+        self.vmin_plus_button.clicked.connect(lambda: self._step_slider(self.vmin_slider, 1))
+        self.vmax_minus_button.clicked.connect(lambda: self._step_slider(self.vmax_slider, -1))
+        self.vmax_plus_button.clicked.connect(lambda: self._step_slider(self.vmax_slider, 1))
         self.cmap_group.buttonToggled.connect(self._on_cmap_change)
         self.label_group.buttonToggled.connect(self._on_label_change)
         self.scope_group.buttonToggled.connect(self._on_scope_change)
         self.target_group.buttonToggled.connect(self._on_target_change)
+        self.reset_view_btn.clicked.connect(self.reset_all_view)
         self.show_frame_chk.stateChanged.connect(self._refresh_image)
         self.show_mean_chk.stateChanged.connect(self._refresh_image)
         self.show_comp_chk.stateChanged.connect(self._refresh_image)
@@ -567,6 +743,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.hist_bins_spin.valueChanged.connect(self._refresh_image)
         self.save_csv_btn.clicked.connect(self._save_csv)
         self.save_json_btn.clicked.connect(self._save_json)
+        self.clear_cache_btn.clicked.connect(self._clear_cache)
         self.filter_current_chk.stateChanged.connect(self._populate_table)
         self.crop_reset_btn.clicked.connect(self._reset_crop)
         self.crop_x_spin.valueChanged.connect(self._on_crop_change)
@@ -577,18 +754,69 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.annot_table.itemChanged.connect(self._on_table_item_changed)
         self.show_ann_master_chk.stateChanged.connect(self._refresh_image)
 
+    def reset_view(self) -> None:
+        """Reset zoom/pan to full extent of current frame."""
+        self._last_zoom_linked = None
+        for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            ax.set_xlim(auto=True)
+            ax.set_ylim(auto=True)
+        self._refresh_image()
+
+    def reset_contrast(self) -> None:
+        """Reset vmin/vmax to default percentiles of the primary image."""
+        prim = self.primary_image
+        if prim.array is None:
+            self.vmin_slider.setValue(5)
+            self.vmax_slider.setValue(95)
+            return
+        vmin = float(np.percentile(prim.array, 5))
+        vmax = float(np.percentile(prim.array, 95))
+        self._last_vmin, self._last_vmax = vmin, vmax
+        self.vmin_slider.setValue(5)
+        self.vmax_slider.setValue(95)
+        self.vmin_label.setText(f"vmin: {vmin:.3f}")
+        self.vmax_label.setText(f"vmax: {vmax:.3f}")
+        self._refresh_image()
+
+    def reset_all_view(self) -> None:
+        """Reset zoom and contrast (ImageJ-like reset)."""
+        self.reset_contrast()
+        self.reset_view()
+
     def _on_key(self, event) -> None:
         """Handle keyboard shortcuts for reset zoom, colormap cycle, and quick-save."""
         if event.key == "r":
-            for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
-                ax.set_xlim(auto=True)
-                ax.set_ylim(auto=True)
-            self.canvas.draw_idle()
+            self.reset_all_view()
         elif event.key == "c":
             self.current_cmap_idx = (self.current_cmap_idx + 1) % len(COLORMAPS)
             self._refresh_image()
         elif event.key == "s":
             self._quick_save_csv()
+
+    def keyPressEvent(self, event) -> None:
+        """Qt-level shortcuts for fast navigation; ignored when editing text fields."""
+        focused = QtWidgets.QApplication.focusWidget()
+        if isinstance(focused, (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)):
+            return super().keyPressEvent(event)
+        key = event.key()
+        if key == QtCore.Qt.Key_Left:
+            self._step_slider(self.t_slider, -1)
+        elif key == QtCore.Qt.Key_Right:
+            self._step_slider(self.t_slider, 1)
+        elif key == QtCore.Qt.Key_Up:
+            self._step_slider(self.z_slider, -1)
+        elif key == QtCore.Qt.Key_Down:
+            self._step_slider(self.z_slider, 1)
+        elif key == QtCore.Qt.Key_Space:
+            self._toggle_play("t")
+        elif key in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
+            self._delete_selected_annotations()
+        elif key in (QtCore.Qt.Key_A, QtCore.Qt.Key_N):
+            self._set_status("Click on the image to add an annotation point.")
+        elif key == QtCore.Qt.Key_R:
+            self.reset_all_view()
+        else:
+            super().keyPressEvent(event)
 
     @property
     def primary_image(self) -> LazyImage:
@@ -605,10 +833,21 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             img.array = arr
             img.has_time = has_time
             img.has_z = has_z
+            img.mean_proj = None
+            img.std_proj = None
+            _debug_log(f"Loaded image {img.name} (id={img.id})")
         # Drop others to save memory (keep primary and support)
         for j, other in enumerate(self.images):
             if j not in (self.current_image_idx, self.support_image_idx):
-                other.array = None
+                self._evict_image_cache(other)
+
+    def _evict_image_cache(self, img: LazyImage) -> None:
+        """Remove array and projection caches for an image to free memory."""
+        if img.array is not None or img.mean_proj is not None or img.std_proj is not None:
+            _debug_log(f"Evicting cache for {img.name} (id={img.id})")
+        img.array = None
+        img.mean_proj = None
+        img.std_proj = None
 
     def _effective_axes(self, img: LazyImage) -> Tuple[bool, bool]:
         mode = img.interpret_3d_as
@@ -632,13 +871,205 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         assert img.array is not None
         return img.array[t_idx, z_idx, :, :]
 
+    def _ensure_projections(self, img: LazyImage) -> None:
+        """
+        Compute and cache mean/std projections for an image.
+
+        Projections are taken over (T, Z) axes in float32. Cache is invalidated
+        when the image array is evicted from memory.
+        """
+        if img.mean_proj is not None and img.std_proj is not None:
+            return
+        if img.array is None:
+            self._ensure_loaded(img.id)
+        if img.array is None:
+            return
+        if img.mean_proj is None:
+            img.mean_proj = img.array.mean(axis=(0, 1)).astype(np.float32, copy=False)
+            _debug_log(f"Computed mean projection for {img.name}")
+        if img.std_proj is None:
+            img.std_proj = img.array.std(axis=(0, 1)).astype(np.float32, copy=False)
+            _debug_log(f"Computed std projection for {img.name}")
+
     def _projection(self, img: LazyImage) -> np.ndarray:
-        assert img.array is not None
-        return img.array.mean(axis=(0, 1))
+        self._ensure_projections(img)
+        assert img.mean_proj is not None
+        return img.mean_proj
 
     def _std_projection(self, img: LazyImage) -> np.ndarray:
-        assert img.array is not None
-        return img.array.std(axis=(0, 1))
+        self._ensure_projections(img)
+        assert img.std_proj is not None
+        return img.std_proj
+
+    def _update_image_artist(self, artist, data: np.ndarray, cmap: str, vmin: float, vmax: float) -> None:
+        """Reuse an AxesImage instead of recreating it for every refresh."""
+        artist.set_data(data)
+        artist.set_cmap(cmap)
+        artist.set_clim(vmin, vmax)
+        artist.set_extent((0, data.shape[1], data.shape[0], 0))
+
+    def _clear_image_overlays(self) -> None:
+        """Clear scatter/ROI overlays while keeping base images intact."""
+        for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+            # Matplotlib ArtistList inconsistencies: fall back to manual removal.
+            for artist in list(ax.patches):
+                artist.remove()
+            for artist in list(ax.lines):
+                artist.remove()
+            # Keep the image artist (AxesImage) but remove other collections (e.g., scatter).
+            for artist in list(ax.collections):
+                if artist is getattr(self, "im_frame", None):
+                    continue
+                if artist is getattr(self, "im_mean", None):
+                    continue
+                if artist is getattr(self, "im_comp", None):
+                    continue
+                if artist is getattr(self, "im_support", None):
+                    continue
+                if artist is getattr(self, "im_std", None):
+                    continue
+                artist.remove()
+
+    # --- High-FPS playback helpers --------------------------------------
+    def start_playback_t(self, fps: Optional[int] = None) -> None:
+        """Start high-FPS playback along the time axis with prefetch buffer."""
+        self._ensure_loaded(self.current_image_idx)
+        # Heavy refresh once to ensure artists/vmin/vmax exist.
+        if self.im_frame is None:
+            self._refresh_image()
+        self._playback_mode = True
+        self.play_mode = "t"
+        self._playback_stop_event.clear()
+        with self._playback_buffer_lock:
+            self._playback_buffer.clear()
+            self._playback_buffer_indices.clear()
+        if fps is None:
+            fps = max(1, int(self.speed_slider.value()))
+        self._playback_direction = 1
+        self._playback_cursor = self.t_slider.value()
+        self._playback_frame_counter = 0
+        self._last_frame_time = None
+        self._start_playback_thread()
+        interval_ms = int(1000 / max(1, fps))
+        self.play_timer.setInterval(interval_ms)
+        self.play_timer.start()
+        self._set_status(f"Playing T at {fps} fps (buffer {self._playback_buffer_size})")
+
+    def stop_playback_t(self) -> None:
+        """Stop playback and return to interactive mode."""
+        if not self._playback_mode:
+            return
+        self._playback_mode = False
+        self.play_mode = None
+        self.play_timer.stop()
+        self._playback_stop_event.set()
+        if self._playback_thread and self._playback_thread.is_alive():
+            self._playback_thread.join(timeout=0.2)
+        self._playback_thread = None
+        with self._playback_buffer_lock:
+            self._playback_buffer.clear()
+            self._playback_buffer_indices.clear()
+        self._fps_times.clear()
+        self._set_status("Stopped playback")
+        self._refresh_image()
+
+    def _start_playback_thread(self) -> None:
+        if self._playback_thread and self._playback_thread.is_alive():
+            return
+        self._playback_stop_event.clear()
+        self._playback_thread = threading.Thread(target=self._playback_prefetch, daemon=True)
+        self._playback_thread.start()
+
+    def _playback_prefetch(self) -> None:
+        """Background loader that keeps a small buffer of frames ready."""
+        while not self._playback_stop_event.is_set():
+            prim = self.primary_image
+            if prim.array is None:
+                time.sleep(0.005)
+                continue
+            t_max = prim.array.shape[0] - 1
+            z_idx = self._slice_indices(prim)[1]
+            with self._playback_buffer_lock:
+                if len(self._playback_buffer) >= self._playback_buffer_size:
+                    pass
+                else:
+                    t_idx = self._playback_cursor
+                    # Pure slicing path to avoid copies; returns a view on memmap.
+                    frame_view = prim.array[t_idx, z_idx, :, :]
+                    frame_view = self._apply_crop(frame_view)
+                    if DEBUG_FPS and frame_view.base is None:
+                        _debug_log("Playback frame copy detected (crop may have forced a copy)")
+                    self._playback_buffer.append(frame_view)
+                    self._playback_buffer_indices.append(t_idx)
+                    self._playback_cursor = t_idx + self._playback_direction
+                    if self._playback_cursor > t_max:
+                        if self.loop_chk.isChecked():
+                            self._playback_cursor = 0
+                        else:
+                            self._playback_cursor = t_max
+                            self._playback_stop_event.set()
+            time.sleep(0.002)
+
+    def _playback_tick(self) -> None:
+        """Called from timer; display the next prefetched frame if available."""
+        if not self._playback_mode:
+            return
+        frame = None
+        t_idx = None
+        with self._playback_buffer_lock:
+            if self._playback_buffer:
+                frame = self._playback_buffer.popleft()
+                t_idx = self._playback_buffer_indices.popleft()
+        if frame is None or t_idx is None:
+            if self._playback_stop_event.is_set():
+                self.stop_playback_t()
+            return
+        self._update_frame_only(frame, t_idx)
+
+    def _update_frame_only(self, frame: np.ndarray, t_idx: int) -> None:
+        """Lightweight per-frame update for playback without recomputing projections."""
+        if self.im_frame is None:
+            self._refresh_image()
+        if self.im_frame is None:
+            return
+        self.im_frame.set_data(frame)
+        self.im_frame.set_clim(self._last_vmin, self._last_vmax)
+        prim = self.primary_image
+        t_max = prim.array.shape[0] if prim.array is not None else 0
+        # Title update is cheap but skip every few frames to reduce churn.
+        if self._playback_frame_counter % FPS_UPDATE_STRIDE == 0:
+            self.ax_frame.set_title(f"Frame (T {t_idx+1}/{t_max})")
+        # Keep slider in sync without triggering heavy refresh.
+        self.t_slider.blockSignals(True)
+        self.t_slider.setValue(t_idx)
+        self.t_slider.blockSignals(False)
+        self.t_slider_label.setText(f"T: {t_idx + 1}/{t_max}")
+        now = time.perf_counter()
+        if self._last_frame_time is not None:
+            self._fps_times.append(now - self._last_frame_time)
+        self._last_frame_time = now
+        self._playback_frame_counter += 1
+        if DEBUG_FPS and (self._playback_frame_counter % FPS_UPDATE_STRIDE == 0):
+            self._update_fps_meter()
+        self.canvas.draw_idle()
+
+    def _update_fps_meter(self) -> None:
+        if not self._fps_times:
+            return
+        fps = 1.0 / (sum(self._fps_times) / len(self._fps_times))
+        if self._fps_text is None:
+            self._fps_text = self.ax_frame.text(
+                0.98, 0.02, f"FPS: {fps:.1f}", color="yellow", ha="right", va="bottom", transform=self.ax_frame.transAxes
+            )
+        else:
+            self._fps_text.set_text(f"FPS: {fps:.1f}")
+        self._set_status(f"FPS ~ {fps:.1f}")
+    def _step_slider(self, slider: QtWidgets.QSlider, direction: int) -> None:
+        """Nudge a slider by its single step, clamped to bounds."""
+        step = slider.singleStep() or 1
+        target = slider.value() + direction * step
+        target = max(slider.minimum(), min(slider.maximum(), target))
+        slider.setValue(target)
 
     # --- Rendering -------------------------------------------------------
     def _refresh_image(self) -> None:
@@ -673,27 +1104,44 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         std_data = self._apply_crop(self._std_projection(prim))
         support_slice = self._apply_crop(self._slice_data(self.support_image))
 
-        for ax, title in [
-            (self.ax_frame, f"Frame (T {self.t_slider.value()+1}/{t_max+1})"),
-            (self.ax_mean, "Mean IMG"),
-            (self.ax_comp, "Composite / GT IMG"),
-            (self.ax_support, "Support (epi)"),
-            (self.ax_std, "STD IMG"),
-        ]:
-            ax.clear()
-            ax.set_title(title)
-
-        self.ax_frame.imshow(slice_data, cmap=cmap, vmin=vmin, vmax=vmax)
-        self.ax_mean.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
-        self.ax_comp.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
-        self.ax_support.imshow(support_slice, cmap=cmap, vmin=vmin, vmax=vmax)
         # Auto-contrast std projection based on its own data (zoomed/cropped region).
         std_vmin = float(np.percentile(std_data, self.vmin_slider.value()))
         std_vmax = float(np.percentile(std_data, self.vmax_slider.value()))
         if std_vmin >= std_vmax:
             std_vmax = std_vmin + 1e-3
-        self.ax_std.imshow(std_data, cmap=cmap, vmin=std_vmin, vmax=std_vmax)
 
+        titles = [
+            (self.ax_frame, f"Frame (T {self.t_slider.value()+1}/{t_max+1})"),
+            (self.ax_mean, "Mean IMG"),
+            (self.ax_comp, "Composite / GT IMG"),
+            (self.ax_support, "Support (epi)"),
+            (self.ax_std, "STD IMG"),
+        ]
+        for ax, title in titles:
+            ax.set_title(title)
+
+        if self.im_frame is None:
+            self.im_frame = self.ax_frame.imshow(slice_data, cmap=cmap, vmin=vmin, vmax=vmax)
+            self.im_mean = self.ax_mean.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
+            self.im_comp = self.ax_comp.imshow(mean_data, cmap=cmap, vmin=vmin, vmax=vmax)
+            self.im_support = self.ax_support.imshow(support_slice, cmap=cmap, vmin=vmin, vmax=vmax)
+            self.im_std = self.ax_std.imshow(std_data, cmap=cmap, vmin=std_vmin, vmax=std_vmax)
+            for artist, data in [
+                (self.im_frame, slice_data),
+                (self.im_mean, mean_data),
+                (self.im_comp, mean_data),
+                (self.im_support, support_slice),
+                (self.im_std, std_data),
+            ]:
+                artist.set_extent((0, data.shape[1], data.shape[0], 0))
+        else:
+            self._update_image_artist(self.im_frame, slice_data, cmap, vmin, vmax)
+            self._update_image_artist(self.im_mean, mean_data, cmap, vmin, vmax)
+            self._update_image_artist(self.im_comp, mean_data, cmap, vmin, vmax)
+            self._update_image_artist(self.im_support, support_slice, cmap, vmin, vmax)
+            self._update_image_artist(self.im_std, std_data, cmap, std_vmin, std_vmax)
+
+        self._clear_image_overlays()
         self._draw_roi()
         self._draw_points()
         self._draw_diagnostics(slice_data, vmin, vmax)
@@ -922,6 +1370,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
                 label=label,
             )
         )
+        self._push_undo({"type": "add_point", "point": pts[-1], "image_id": image_id})
 
     def _remove_annotation_near(self, ax, t: int, z: int, x: float, y: float) -> bool:
         pts = self._current_keypoints()
@@ -934,9 +1383,73 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             kp_disp = ax.transData.transform((kp.x, kp.y))
             dist = np.hypot(kp_disp[0] - click_disp[0], kp_disp[1] - click_disp[1])
             if dist <= self.click_radius_px:
-                del pts[idx]
+                removed = pts.pop(idx)
+                self._push_undo({"type": "delete_point", "point": removed, "image_id": removed.image_id})
                 return True
         return False
+
+    def _push_undo(self, action: dict) -> None:
+        """Record an action and clear redo stack."""
+        self._undo_stack.append(action)
+        self._redo_stack.clear()
+        self.undo_act.setEnabled(bool(self._undo_stack))
+        self.redo_act.setEnabled(bool(self._redo_stack))
+
+    def undo_last_action(self) -> None:
+        if not self._undo_stack:
+            return
+        action = self._undo_stack.pop()
+        inverse = self._apply_action(action, undo=True)
+        if inverse:
+            self._redo_stack.append(inverse)
+        self.undo_act.setEnabled(bool(self._undo_stack))
+        self.redo_act.setEnabled(bool(self._redo_stack))
+        self._refresh_image()
+
+    def redo_last_action(self) -> None:
+        if not self._redo_stack:
+            return
+        action = self._redo_stack.pop()
+        inverse = self._apply_action(action, undo=False)
+        if inverse:
+            self._undo_stack.append(inverse)
+        self.undo_act.setEnabled(bool(self._undo_stack))
+        self.redo_act.setEnabled(bool(self._redo_stack))
+        self._refresh_image()
+
+    def _apply_action(self, action: dict, undo: bool) -> Optional[dict]:
+        """
+        Apply an action and return the inverse action for redo/undo symmetry.
+
+        Supported types:
+          - add_point: point => remove on undo; inverse is delete_point.
+          - delete_point: point => add on undo; inverse is add_point.
+        """
+        atype = action.get("type")
+        point: Keypoint = action.get("point")
+        image_id = action.get("image_id")
+        if atype == "add_point":
+            if undo:
+                self._remove_point(point, image_id)
+                return {"type": "delete_point", "point": point, "image_id": image_id}
+            else:
+                self.annotations.setdefault(image_id, []).append(point)
+                return {"type": "add_point", "point": point, "image_id": image_id}
+        if atype == "delete_point":
+            if undo:
+                self.annotations.setdefault(image_id, []).append(point)
+                return {"type": "add_point", "point": point, "image_id": image_id}
+            else:
+                self._remove_point(point, image_id)
+                return {"type": "delete_point", "point": point, "image_id": image_id}
+        return None
+
+    def _remove_point(self, point: Keypoint, image_id: int) -> None:
+        pts = self.annotations.get(image_id, [])
+        try:
+            pts.remove(point)
+        except ValueError:
+            pass
 
     def _handle_profile_click(self, event) -> None:
         if event.xdata is None or event.ydata is None:
@@ -949,6 +1462,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
     # --- Menu actions ----------------------------------------------------
     def _open_files(self) -> None:
+        self.stop_playback_t()
         paths, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self,
             "Open TIFF/OME-TIFF files",
@@ -970,6 +1484,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self._refresh_image()
 
     def _open_folder(self) -> None:
+        self.stop_playback_t()
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Open folder")
         if not folder:
             return
@@ -1199,10 +1714,25 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         except Exception:
             return float("nan")
 
+    def _clear_cache(self) -> None:
+        """Clear all lazy image data (arrays + projections) and refresh the view."""
+        self.stop_playback_t()
+        cleared = 0
+        for img in self.images:
+            if img.array is not None or img.mean_proj is not None or img.std_proj is not None:
+                cleared += 1
+            self._evict_image_cache(img)
+        gc.collect()
+        _debug_log(f"Cleared cached data for {cleared} images")
+        self._set_status(f"Cleared cached image data for {cleared} images.")
+        # Will lazily reload the active images after purge.
+        self._refresh_image()
+
     # --- Controls handlers -----------------------------------------------
     def _set_fov(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.images):
             return
+        self.stop_playback_t()
         self.current_image_idx = idx
         self.primary_combo.setCurrentIndex(idx)
         self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
@@ -1210,6 +1740,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
     def _set_primary_combo(self, idx: int) -> None:
         if 0 <= idx < len(self.images):
+            self.stop_playback_t()
             self.current_image_idx = idx
             self.fov_list.setCurrentRow(idx)
             self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
@@ -1217,21 +1748,33 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
 
     def _set_support_combo(self, idx: int) -> None:
         if 0 <= idx < len(self.images):
+            self.stop_playback_t()
             self.support_image_idx = idx
             self._refresh_image()
 
     def _toggle_play(self, axis: str) -> None:
+        if axis == "t":
+            if self._playback_mode:
+                self.stop_playback_t()
+            else:
+                self.start_playback_t(fps=self.speed_slider.value())
+            return
+        # legacy Z playback uses the existing lightweight timer stepping
         if self.play_timer.isActive() and self.play_mode == axis:
             self.play_timer.stop()
             self.play_mode = None
             self._set_status("Stopped playback")
             return
+        self.stop_playback_t()
         self.play_mode = axis
         interval_ms = int(1000 / max(1, self.speed_slider.value()))
         self.play_timer.start(interval_ms)
         self._set_status(f"Playing {axis.upper()} at {self.speed_slider.value()} fps")
 
     def _on_play_tick(self) -> None:
+        if self._playback_mode and self.play_mode == "t":
+            self._playback_tick()
+            return
         if self.play_mode == "t":
             max_val = self.t_slider.maximum()
             if self.t_slider.value() >= max_val:
@@ -1257,9 +1800,10 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.loop_playback = self.loop_chk.isChecked()
 
     def _on_axis_mode_change(self, mode: str) -> None:
+        self.stop_playback_t()
         self.primary_image.interpret_3d_as = mode
         # Force reload for current primary to honor new interpretation.
-        self.primary_image.array = None
+        self._evict_image_cache(self.primary_image)
         self._refresh_image()
 
     def _on_vminmax_change(self) -> None:
@@ -1275,6 +1819,7 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         vmax = float(np.percentile(prim.array, self.vmax_slider.value()))
         if vmin > vmax:
             vmin, vmax = vmax, vmin
+        self._last_vmin, self._last_vmax = vmin, vmax
         self.vmin_label.setText(f"vmin: {vmin:.3f}")
         self.vmax_label.setText(f"vmax: {vmax:.3f}")
         return vmin, vmax
@@ -1387,6 +1932,21 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
             pass
         self._refresh_image()
 
+    def _delete_selected_annotations(self) -> None:
+        """Delete selected rows from the annotation table."""
+        rows = sorted({idx.row() for idx in self.annot_table.selectionModel().selectedRows()}) if self.annot_table.selectionModel() else []
+        if not rows or not self._table_rows:
+            return
+        removed_any = False
+        for row in reversed(rows):
+            if 0 <= row < len(self._table_rows):
+                kp = self._table_rows[row]
+                self._remove_point(kp, kp.image_id)
+                self._push_undo({"type": "delete_point", "point": kp, "image_id": kp.image_id})
+                removed_any = True
+        if removed_any:
+            self._refresh_image()
+
     def _update_status(self) -> None:
         total = sum(len(v) for v in self.annotations.values())
         current = len(self._current_keypoints())
@@ -1465,6 +2025,69 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         csv_path = first.with_suffix(".annotations.csv")
         json_path = first.with_suffix(".annotations.json")
         return csv_path, json_path
+
+    def _save_project(self) -> None:
+        """Persist a lightweight project (.phageproj) with images + annotation paths + settings."""
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save project", str(pathlib.Path.cwd() / "session.phageproj"), "Phage project (*.phageproj)"
+        )
+        if not path:
+            return
+        settings = {
+            "fps_default": int(self.speed_slider.value()),
+            "lut": COLORMAPS[self.current_cmap_idx],
+            "last_fov_index": self.current_image_idx,
+            "last_support_index": self.support_image_idx,
+        }
+        save_project(pathlib.Path(path), self.images, self.annotations, settings)
+        self._set_status(f"Saved project to {path}")
+
+    def _load_project(self) -> None:
+        """Load a .phageproj and rebuild images/annotations minimally."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load project", str(pathlib.Path.cwd()), "Phage project (*.phageproj)"
+        )
+        if not path:
+            return
+        try:
+            image_entries, settings, ann_map = load_project(pathlib.Path(path))
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Load project failed", str(exc))
+            return
+        self.stop_playback_t()
+        self.images.clear()
+        self.annotations.clear()
+        self.fov_list.clear()
+        self.primary_combo.clear()
+        self.support_combo.clear()
+        for idx, entry in enumerate(image_entries):
+            meta = _read_metadata(pathlib.Path(entry["path"]))
+            meta.id = idx
+            self.images.append(meta)
+            self.annotations[idx] = []
+            self.fov_list.addItem(meta.name)
+            self.primary_combo.addItem(meta.name)
+            self.support_combo.addItem(meta.name)
+        for idx, ann_path in ann_map.items():
+            if ann_path.exists():
+                kps = keypoints_from_json(ann_path)
+                for kp in kps:
+                    kp.image_id = idx
+                    self.annotations[idx].append(kp)
+        self.current_image_idx = int(settings.get("last_fov_index", 0))
+        self.support_image_idx = int(settings.get("last_support_index", min(1, len(self.images) - 1)))
+        self.fov_list.setCurrentRow(self.current_image_idx)
+        self.primary_combo.setCurrentIndex(self.current_image_idx)
+        self.support_combo.setCurrentIndex(self.support_image_idx)
+        lut = settings.get("lut")
+        if lut in COLORMAPS:
+            self.current_cmap_idx = COLORMAPS.index(lut)
+        self.speed_slider.setValue(int(settings.get("fps_default", self.speed_slider.value())))
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self.undo_act.setEnabled(False)
+        self.redo_act.setEnabled(False)
+        self._refresh_image()
 
 
 def run_gui(image_paths: List[pathlib.Path]) -> None:

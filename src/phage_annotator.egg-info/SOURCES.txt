@@ -10,6 +10,7 @@ src/phage_annotator/demo.py
 src/phage_annotator/gui_mpl.py
 src/phage_annotator/image_processing.py
 src/phage_annotator/io.py
+src/phage_annotator/project_io.py
 src/phage_annotator.egg-info/PKG-INFO
 src/phage_annotator.egg-info/SOURCES.txt
 src/phage_annotator.egg-info/dependency_links.txt
