@@ -233,7 +233,14 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
     # --- UI creation -----------------------------------------------------
     def _setup_ui(self) -> None:
         self.setWindowTitle("Phage Annotator - Microscopy Keypoints")
-        self.resize(1700, 1000)
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            geom = screen.availableGeometry()
+            target_w = min(max(int(geom.width() * 0.9), 1200), geom.width())
+            target_h = min(max(int(geom.height() * 0.9), 800), geom.height())
+            self.resize(target_w, target_h)
+        else:
+            self.resize(1700, 1000)
 
         # Menu bar
         menubar = self.menuBar()
@@ -435,6 +442,10 @@ class KeypointAnnotator(QtWidgets.QMainWindow):
         self.vmax_slider.setValue(95)
         self.vmin_slider.setSingleStep(1)
         self.vmax_slider.setSingleStep(1)
+        self.vmin_slider.setPageStep(1)
+        self.vmax_slider.setPageStep(1)
+        self.vmin_slider.setTickInterval(1)
+        self.vmax_slider.setTickInterval(1)
         self.vmin_minus_button = QtWidgets.QPushButton("-")
         self.vmin_plus_button = QtWidgets.QPushButton("+")
         self.vmax_minus_button = QtWidgets.QPushButton("-")
