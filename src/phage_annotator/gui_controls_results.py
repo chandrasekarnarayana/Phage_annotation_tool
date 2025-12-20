@@ -2,27 +2,39 @@
 
 from __future__ import annotations
 
-import csv
+import pathlib
+from typing import List
+
 from matplotlib.backends.qt_compat import QtWidgets
+
+from phage_annotator.analysis import roi_mask_from_points, roi_stats
+from phage_annotator.roi_manager import Roi
 
 
 class ResultsControlsMixin:
     """Mixin for results table handlers."""
+
     def _results_clear(self) -> None:
         if self.results_widget is not None:
             self.results_widget.clear()
+
     def _results_copy(self) -> None:
         if self.results_widget is not None:
             self.results_widget.copy_to_clipboard()
+
     def _results_export(self) -> None:
         if self.results_widget is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export Results", str(pathlib.Path.cwd() / "results.csv"), "CSV Files (*.csv)"
-            )
+            self,
+            "Export Results",
+            str(pathlib.Path.cwd() / "results.csv"),
+            "CSV Files (*.csv)",
+        )
         if not path:
             return
         self.results_widget.export_csv(path)
+
     def _results_measure_current(self) -> None:
         if self.primary_image.array is None or self.results_widget is None:
             return
@@ -40,18 +52,19 @@ class ResultsControlsMixin:
             area_um2 = area_px * (px_um**2) if px_um else None
             self.results_widget.add_row(
                 {
-                "image_name": self.primary_image.name,
-                "t": t,
-                "z": z,
-                "roi_id": roi.roi_id,
-                "mean": f"{mean:.4f}",
-                "std": f"{std:.4f}",
-                "min": f"{vmin:.4f}",
-                "max": f"{vmax:.4f}",
-                "area_pixels": area_px,
-                "area_um2": f"{area_um2:.4f}" if area_um2 is not None else "",
+                    "image_name": self.primary_image.name,
+                    "t": t,
+                    "z": z,
+                    "roi_id": roi.roi_id,
+                    "mean": f"{mean:.4f}",
+                    "std": f"{std:.4f}",
+                    "min": f"{vmin:.4f}",
+                    "max": f"{vmax:.4f}",
+                    "area_pixels": area_px,
+                    "area_um2": f"{area_um2:.4f}" if area_um2 is not None else "",
                 }
-                )
+            )
+
     def _results_measure_over_time(self) -> None:
         if self.primary_image.array is None or self.results_widget is None:
             return
@@ -65,20 +78,47 @@ class ResultsControlsMixin:
         img_name = self.primary_image.name
         cal = self._get_calibration_state(self.primary_image.id)
         pixel_size = cal.pixel_size_um_per_px or 0.0
-    def _job(progress, cancel_token):
+        self._results_job_context = {
+            "arr": arr,
+            "z": z,
+            "roi_defs": roi_defs,
+            "img_name": img_name,
+            "pixel_size": pixel_size,
+            "job_gen": job_gen,
+        }
+        self.jobs.submit(
+            self._results_job,
+            name="ROI Measure T",
+            on_progress=self._results_on_progress,
+            on_result=self._results_on_result,
+            on_error=self._results_on_error,
+        )
+
+    def _results_job(self, progress, cancel_token) -> int | None:
+        ctx = getattr(self, "_results_job_context", None)
+        if ctx is None:
+            return None
+        arr = ctx["arr"]
+        z = ctx["z"]
+        roi_defs = ctx["roi_defs"]
+        img_name = ctx["img_name"]
+        pixel_size = ctx["pixel_size"]
+        job_gen = ctx["job_gen"]
+
         total = arr.shape[0]
         masks = {}
         for roi_id, roi_type, points in roi_defs:
             masks[roi_id] = roi_mask_from_points(arr.shape[2:], roi_type, points)
-            for t in range(total):
-                if cancel_token.is_cancelled():
-                    return None
-                frame = arr[t, z, :, :]
-                for roi_id, _, _ in roi_defs:
-                    mean, std, vmin, vmax, area_px = roi_stats(frame, masks[roi_id])
-                    area_um2 = area_px * (pixel_size ** 2)
-                    payload = ",".join(
-                        [
+
+        for t in range(total):
+            if cancel_token.is_cancelled():
+                return None
+            frame = arr[t, z, :, :]
+            for roi_id, _, _ in roi_defs:
+                mean, std, vmin, vmax, area_px = roi_stats(frame, masks[roi_id])
+                area_um2 = area_px * (pixel_size**2)
+                payload = ",".join(
+                    [
                         img_name,
                         str(t),
                         str(z),
@@ -89,11 +129,14 @@ class ResultsControlsMixin:
                         f"{vmax:.4f}",
                         str(area_px),
                         f"{area_um2:.4f}",
-                        ]
-                        )
-                    progress(int((t + 1) / total * 100), payload)
-                    return job_gen
-    def _on_progress(value: int, msg: str) -> None:
+                    ]
+                )
+                progress(int((t + 1) / total * 100), payload)
+        return job_gen
+
+    def _results_on_progress(self, value: int, msg: str) -> None:
+        if self.results_widget is None:
+            return
         parts = msg.split(",")
         if len(parts) != 10:
             return
@@ -108,16 +151,18 @@ class ResultsControlsMixin:
             "max": parts[7],
             "area_pixels": parts[8],
             "area_um2": parts[9],
-            }
+        }
         self.results_widget.add_row(row)
-    def _on_result(result) -> None:
+
+    def _results_on_result(self, result: int | None) -> None:
         if result is None:
             return
         if result != self._job_generation:
             return
-    def _on_error(err: str) -> None:
+
+    def _results_on_error(self, err: str) -> None:
         self._append_log(f"[JOB] Results error\n{err}")
-        self.jobs.submit(_job, name="ROI Measure T", on_progress=_on_progress, on_result=_on_result, on_error=_on_error)
+
     def _results_rois(self) -> List[Roi]:
         active = self.roi_manager.get_active(self.primary_image.id)
         if active is not None:
