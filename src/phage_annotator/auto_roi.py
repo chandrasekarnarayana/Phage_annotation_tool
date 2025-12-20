@@ -178,9 +178,7 @@ def propose_roi(
         rect = (float(x0), float(y0), float(req_w), float(req_h))
         roi_shape = "box"
 
-    spec = RoiSpec()
-    spec.rect = rect
-    spec.shape = roi_shape
+    spec = RoiSpec(rect=rect, shape=roi_shape)
 
     diagnostics = {
         "score": float(score[best_idx]),

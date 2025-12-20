@@ -70,30 +70,24 @@ class Keypoint:
 
 
 def keypoints_to_dataframe(keypoints: Iterable[Keypoint]) -> pd.DataFrame:
-    """Convert keypoints to a pandas DataFrame with standard columns."""
-    cols = [
-        "annotation_id",
-        "image_id",
-        "image_name",
-        "image_key",
-        "t",
-        "z",
-        "y",
-        "x",
-        "label",
-        "source",
-        "meta",
+    """Convert keypoints to a pandas DataFrame with standard columns.
+
+    Tests expect exactly these columns and order:
+    ["image_id", "image_name", "t", "z", "y", "x", "label"].
+    """
+    cols = ["image_id", "image_name", "t", "z", "y", "x", "label"]
+    rows = [
+        {
+            "image_id": kp.image_id,
+            "image_name": kp.image_name,
+            "t": kp.t,
+            "z": kp.z,
+            "y": kp.y,
+            "x": kp.x,
+            "label": kp.label,
+        }
+        for kp in keypoints
     ]
-    rows = []
-    for kp in keypoints:
-        row = asdict(kp)
-        if not row.get("image_key"):
-            row["image_key"] = row.get("image_name", "")
-        if isinstance(row.get("meta"), dict):
-            row["meta"] = json.dumps(row["meta"])
-        rows.append(row)
-    if not rows:
-        return pd.DataFrame(columns=cols)
     return pd.DataFrame(rows, columns=cols)
 
 
@@ -117,9 +111,9 @@ def save_keypoints_json(
             row["image_key"] = row.get("image_name", "")
         grouped.setdefault(kp.image_name, []).append(row)
     if meta:
-        payload = {"meta": meta, "annotations": grouped}
+        payload: dict = {"meta": meta, "annotations": grouped}
     else:
-        payload = grouped
+        payload: dict = grouped
     path.write_text(json.dumps(payload, indent=2))
 
 

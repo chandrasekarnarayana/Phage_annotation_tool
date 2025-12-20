@@ -55,16 +55,17 @@ def save_project(
     -----
     Per-image ``interpret_3d_as`` values are stored to preserve axis overrides.
     """
+    images_payload: List[dict] = []
     payload = {
         "tool": "PhageAnnotator",
         "version": "0.9.0",
-        "images": [],
+        "images": images_payload,
         "settings": settings,
     }
     for img in images:
         ann_path = Path(img.path).with_suffix(".annotations.json")
         save_keypoints_json(annotations.get(img.id, []), ann_path)
-        payload["images"].append(
+        images_payload.append(
             {
                 "path": str(Path(img.path).resolve()),
                 "annotations": str(ann_path.resolve()),
@@ -90,7 +91,7 @@ def save_project(
         json.dump(payload, f, indent=2)
 
 
-def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, Dict]:
+def load_project(path: Path) -> Tuple[List[dict], Dict, Dict]:
     """Load a project JSON and return raw image entries, settings, and annotation paths.
 
     Returns
@@ -118,20 +119,4 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, 
         for idx, entry in enumerate(images)
         if entry.get("annotations")
     }
-    roi_map = {idx: entry.get("rois", []) for idx, entry in enumerate(images) if entry.get("rois")}
-    thr_map = {
-        idx: entry.get("threshold_config", {})
-        for idx, entry in enumerate(images)
-        if entry.get("threshold_config")
-    }
-    part_map = {
-        idx: entry.get("particles_config", {})
-        for idx, entry in enumerate(images)
-        if entry.get("particles_config")
-    }
-    import_map = {
-        idx: entry.get("annotation_imports", [])
-        for idx, entry in enumerate(images)
-        if entry.get("annotation_imports")
-    }
-    return images, settings, ann_map, roi_map, thr_map, part_map, import_map
+    return images, settings, ann_map

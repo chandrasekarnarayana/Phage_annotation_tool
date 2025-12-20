@@ -85,12 +85,12 @@ class ProjectionCache:
 
     def invalidate_image(self, image_id: int) -> None:
         """Remove all cached entries for a given image id."""
-        for key in [k for k in self._items.keys() if k[0] == image_id]:
-            item = self._items.pop(key, None)
+        for cache_key in [k for k in self._items.keys() if k[0] == image_id]:
+            item = self._items.pop(cache_key, None)
             if item is not None:
                 self._total_bytes -= item.nbytes
-        for key in [k for k in self._pyramid_items.keys() if k[0] == image_id]:
-            item = self._pyramid_items.pop(key, None)
+        for pyramid_key in [k for k in self._pyramid_items.keys() if k[0] == image_id]:
+            item = self._pyramid_items.pop(pyramid_key, None)
             if item is not None:
                 self._total_bytes -= item.nbytes
 

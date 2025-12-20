@@ -135,9 +135,12 @@ def load_images(paths: Iterable[Path]) -> List[ImageMeta]:
     metas: List[ImageMeta] = []
     for idx, p in enumerate(paths):
         axes = None
-        with tif.TiffFile(str(p)) as tf:
-            if tf.ome_metadata:
-                axes = tf.series[0].axes
+        try:
+            with tif.TiffFile(str(p)) as tf:
+                if tf.ome_metadata:
+                    axes = tf.series[0].axes
+        except Exception:
+            axes = None
         arr = tif.imread(str(p))
         std, has_time, has_z = standardize_axes(arr, ome_axes=axes)
         metas.append(
