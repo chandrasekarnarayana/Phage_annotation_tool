@@ -1,13 +1,36 @@
+"""TIFF/OME-TIFF loading and axis normalization utilities.
+
+This module standardizes image arrays into (T, Z, Y, X) order and carries
+axis metadata derived from OME when available. When OME metadata is missing,
+it falls back to a conservative heuristic for 3D stacks.
+
+Conventions
+-----------
+- Arrays are returned in (T, Z, Y, X) order.
+- OME metadata has priority when available and consistent with array shape.
+- Heuristic fallback uses axis0 <= 5 to interpret 3D as time.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
 import tifffile as tif
 
-__all__ = ["ImageMeta", "load_images", "standardize_axes"]
+from phage_annotator.metadata_reader import MetadataBundle, read_metadata as _read_metadata, read_metadata_summary as _read_summary
+
+__all__ = [
+    "ImageMeta",
+    "load_images",
+    "standardize_axes",
+    "read_contiguous_block",
+    "read_contiguous_block_from_path",
+    "read_metadata_bundle",
+    "read_metadata_summary",
+]
 
 
 @dataclass
@@ -26,18 +49,57 @@ class ImageMeta:
     has_z: bool
 
 
-def standardize_axes(arr: np.ndarray, interpret_3d_as: str = "auto") -> tuple[np.ndarray, bool, bool]:
-    """
-    Convert an array to (T, Z, Y, X) format and report the presence of time/Z axes.
+def standardize_axes(
+    arr: np.ndarray, interpret_3d_as: str = "auto", ome_axes: Optional[str] = None
+) -> tuple[np.ndarray, bool, bool]:
+    """Standardize an array to (T, Z, Y, X) and report time/Z presence.
 
-    Rules:
-      - 2D (Y,X) -> (1,1,Y,X)
-      - 3D (Z,Y,X) -> (1,Z,Y,X)
-      - 3D (T,Y,X) -> (T,1,Y,X) or (1,Z,Y,X) based on interpretation
-      - 4D (T,Z,Y,X) -> (T,Z,Y,X)
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        Input array in an unknown axis order.
+    interpret_3d_as : {"auto", "time", "depth"}
+        Interpretation for 3D stacks when metadata is unavailable.
+    ome_axes : str, optional
+        OME axes string (e.g., "TCZYX") when available.
 
-    Heuristic for 3D when interpret_3d_as="auto": if the first axis <= 5, treat as time; otherwise treat as depth.
+    Returns
+    -------
+    tuple[numpy.ndarray, bool, bool]
+        Standardized array, has_time, has_z flags.
+
+    Notes
+    -----
+    - OME metadata takes priority when available and consistent.
+    - Heuristic fallback for 3D uses axis0 <= 5 as time.
     """
+    if ome_axes:
+        axes = ome_axes.upper()
+        if len(axes) == arr.ndim:
+            keep_axes = []
+            squeeze_axes = []
+            for idx, ax in enumerate(axes):
+                if ax in {"T", "Z", "Y", "X"}:
+                    keep_axes.append((idx, ax))
+                else:
+                    if arr.shape[idx] == 1:
+                        squeeze_axes.append(idx)
+                    else:
+                        keep_axes = []
+                        break
+            if keep_axes:
+                if squeeze_axes:
+                    arr = np.squeeze(arr, axis=tuple(squeeze_axes))
+                axes_kept = "".join(ax for _, ax in keep_axes)
+                order = [axes_kept.index(ax) for ax in "TZYX" if ax in axes_kept]
+                arr = np.transpose(arr, order)
+                for pos, ax in enumerate("TZYX"):
+                    if ax not in axes_kept:
+                        arr = np.expand_dims(arr, axis=pos)
+                has_time = "T" in axes_kept
+                has_z = "Z" in axes_kept
+                return arr, has_time, has_z
+
     ndim = arr.ndim
     if ndim == 2:
         arr = arr[np.newaxis, np.newaxis, :, :]
@@ -63,11 +125,19 @@ def standardize_axes(arr: np.ndarray, interpret_3d_as: str = "auto") -> tuple[np
 
 
 def load_images(paths: Iterable[Path]) -> List[ImageMeta]:
-    """Load TIFF/OME-TIFF stacks, standardize axes, and wrap in ImageMeta."""
+    """Load TIFF/OME-TIFF stacks, standardize axes, and wrap in ImageMeta.
+
+    OME metadata is used when available; otherwise, the heuristic fallback
+    in ``standardize_axes`` is applied.
+    """
     metas: List[ImageMeta] = []
     for idx, p in enumerate(paths):
+        axes = None
+        with tif.TiffFile(str(p)) as tf:
+            if tf.ome_metadata:
+                axes = tf.series[0].axes
         arr = tif.imread(str(p))
-        std, has_time, has_z = standardize_axes(arr)
+        std, has_time, has_z = standardize_axes(arr, ome_axes=axes)
         metas.append(
             ImageMeta(
                 id=idx,
@@ -80,3 +150,50 @@ def load_images(paths: Iterable[Path]) -> List[ImageMeta]:
             )
         )
     return metas
+
+
+def read_contiguous_block(arr: np.ndarray, t_start: int, t_stop: int, z_idx: int) -> np.ndarray:
+    """Return a contiguous block (T slice) from a standardized (T, Z, Y, X) array.
+
+    Contiguous slicing helps the OS perform sequential reads for memmap-backed
+    arrays, reducing disk seek overhead during playback.
+    """
+    return arr[t_start:t_stop, z_idx, :, :]
+
+
+def read_contiguous_block_from_path(
+    path: Path,
+    t_start: int,
+    t_stop: int,
+    z_idx: int,
+    interpret_3d_as: str = "auto",
+    ome_axes: Optional[str] = None,
+) -> np.ndarray:
+    """Read a contiguous block of frames from disk and standardize axes.
+
+    This helper prefers tifffile's key slicing for contiguous reads and falls
+    back to a per-frame loop when key slicing is unavailable.
+    """
+    try:
+        arr = tif.imread(str(path), key=slice(t_start, t_stop))
+    except Exception:
+        frames = []
+        with tif.TiffFile(str(path)) as tf:
+            series = tf.series[0]
+            for idx in range(t_start, t_stop):
+                frames.append(series.asarray(key=idx))
+        if not frames:
+            return np.empty((0, 0, 0), dtype=np.float32)
+        arr = np.stack(frames, axis=0)
+    std, _, _ = standardize_axes(arr, interpret_3d_as=interpret_3d_as, ome_axes=ome_axes)
+    return std[:, z_idx, :, :]
+
+
+def read_metadata_bundle(path: Path) -> MetadataBundle:
+    """Read full metadata bundle from a TIFF/OME-TIFF."""
+    return _read_metadata(str(path))
+
+
+def read_metadata_summary(path: Path) -> dict:
+    """Read a lightweight metadata summary without pixel data."""
+    return _read_summary(str(path))
