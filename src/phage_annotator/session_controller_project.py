@@ -8,7 +8,12 @@ from typing import Dict, Iterable, List, Optional
 
 from matplotlib.backends.qt_compat import QtWidgets
 
-from phage_annotator.annotations import Keypoint, keypoints_from_json, save_keypoints_json
+from phage_annotator.annotations import (
+    Keypoint,
+    keypoints_from_json,
+    save_keypoints_csv,
+    save_keypoints_json,
+)
 from phage_annotator.display_mapping import DisplayMapping, mapping_from_dict, mapping_to_dict
 from phage_annotator.density_config import DensityConfig
 from phage_annotator.project_io import load_project, save_project
@@ -17,6 +22,28 @@ from phage_annotator.roi_manager import Roi, roi_from_dict
 
 class SessionProjectMixin:
     """Mixin for project persistence and recovery helpers."""
+
+    def save_csv(self, parent: QtWidgets.QWidget, path: pathlib.Path) -> None:
+        """Save annotations for the active image to CSV."""
+        image_id = self.session_state.active_primary_id
+        points = self.session_state.annotations.get(image_id, [])
+        try:
+            save_keypoints_csv(points, path)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(parent, "Save CSV failed", str(exc))
+            return
+        self.set_dirty(False)
+
+    def save_json(self, parent: QtWidgets.QWidget, path: pathlib.Path) -> None:
+        """Save annotations for the active image to JSON."""
+        image_id = self.session_state.active_primary_id
+        points = self.session_state.annotations.get(image_id, [])
+        try:
+            save_keypoints_json(points, path)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(parent, "Save JSON failed", str(exc))
+            return
+        self.set_dirty(False)
 
     def set_dirty(self, dirty: bool = True) -> None:
         """Mark the session as dirty (or clean)."""
