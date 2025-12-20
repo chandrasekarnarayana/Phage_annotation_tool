@@ -14,45 +14,72 @@ class UiExtrasMixin:
 
     def _build_sidebar_stack(self) -> QtWidgets.QWidget:
         """Create the stacked sidebar and activity bar for mode switching."""
+        self._sidebar_expanded = True
+        self._sidebar_last_width = None
+        self._sidebar_stack_min_width = 260
+        self._sidebar_bar_width = 36
         self.sidebar_stack = QtWidgets.QStackedWidget()
-        self.sidebar_stack.addWidget(self.explore_panel)
-        self.sidebar_stack.addWidget(self.annotate_panel)
-        self.sidebar_stack.addWidget(self._build_analyze_panel())
+        use_controls = getattr(self, "controls_sidebar_panel", None) is not None
+        if use_controls:
+            self.sidebar_stack.addWidget(self.controls_sidebar_panel)
+        else:
+            self.sidebar_stack.addWidget(self.explore_panel)
+            self.sidebar_stack.addWidget(self.annotate_panel)
+            self.sidebar_stack.addWidget(self._build_analyze_panel())
 
         bar = QtWidgets.QToolBar("Activity Bar", self)
         bar.setOrientation(QtCore.Qt.Orientation.Vertical)
         bar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         bar.setMovable(False)
         bar.setIconSize(QtCore.QSize(20, 20))
+        bar.setFixedWidth(self._sidebar_bar_width)
+        self.sidebar_bar = bar
 
         self.sidebar_actions = []
-        explore_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
-            "Explore",
-            self,
-        )
-        annotate_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
-            "Annotate",
-            self,
-        )
-        analyze_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
-            "Analyze",
-            self,
-        )
-        for idx, act in enumerate([explore_act, annotate_act, analyze_act]):
-            act.setCheckable(True)
-            act.triggered.connect(lambda checked, i=idx: self._set_sidebar_mode(i))
-            self.sidebar_actions.append(act)
-            bar.addAction(act)
-        explore_act.setChecked(True)
+        if use_controls:
+            controls_act = QtWidgets.QAction(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ComputerIcon),
+                "Controls",
+                self,
+            )
+            controls_act.setCheckable(True)
+            controls_act.triggered.connect(lambda checked, i=0: self._set_sidebar_mode(i))
+            self.sidebar_actions.append(controls_act)
+            bar.addAction(controls_act)
+            controls_act.setChecked(True)
+        else:
+            explore_act = QtWidgets.QAction(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
+                "Explore",
+                self,
+            )
+            annotate_act = QtWidgets.QAction(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
+                "Annotate",
+                self,
+            )
+            analyze_act = QtWidgets.QAction(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
+                "Analyze",
+                self,
+            )
+            for idx, act in enumerate([explore_act, annotate_act, analyze_act]):
+                act.setCheckable(True)
+                act.triggered.connect(lambda checked, i=idx: self._set_sidebar_mode(i))
+                self.sidebar_actions.append(act)
+                bar.addAction(act)
+            explore_act.setChecked(True)
 
         sidebar_container = QtWidgets.QWidget()
         sidebar_layout = QtWidgets.QHBoxLayout(sidebar_container)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
         sidebar_layout.addWidget(bar)
+        self.sidebar_stack.setMinimumWidth(self._sidebar_stack_min_width)
+        self.sidebar_stack.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
         sidebar_layout.addWidget(self.sidebar_stack)
         self._restore_sidebar_mode()
         return sidebar_container
@@ -62,6 +89,26 @@ class UiExtrasMixin:
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+        vis_group = QtWidgets.QGroupBox("Annotation visibility")
+        vis_layout = QtWidgets.QVBoxLayout(vis_group)
+        self.show_ann_master_chk = QtWidgets.QCheckBox("Show annotations")
+        self.show_ann_master_chk.setChecked(True)
+        row = QtWidgets.QHBoxLayout()
+        self.show_frame_chk = QtWidgets.QCheckBox("Frame")
+        self.show_mean_chk = QtWidgets.QCheckBox("Mean")
+        self.show_comp_chk = QtWidgets.QCheckBox("Composite")
+        self.show_support_chk = QtWidgets.QCheckBox("Support")
+        self.show_frame_chk.setChecked(True)
+        self.show_mean_chk.setChecked(True)
+        self.show_comp_chk.setChecked(True)
+        self.show_support_chk.setChecked(False)
+        row.addWidget(self.show_frame_chk)
+        row.addWidget(self.show_mean_chk)
+        row.addWidget(self.show_comp_chk)
+        row.addWidget(self.show_support_chk)
+        vis_layout.addWidget(self.show_ann_master_chk)
+        vis_layout.addLayout(row)
+        layout.addWidget(vis_group)
         label_group = QtWidgets.QGroupBox("Labels")
         label_layout = QtWidgets.QVBoxLayout(label_group)
         self.label_buttons = QtWidgets.QButtonGroup()
@@ -327,16 +374,57 @@ class UiExtrasMixin:
     def _set_sidebar_mode(self, idx: int) -> None:
         if self.sidebar_stack is None:
             return
+        current_idx = self.sidebar_stack.currentIndex()
+        if self.sidebar_stack.isVisible() and current_idx == idx:
+            self._set_sidebar_expanded(False)
+            self._settings.setValue("sidebarExpanded", False)
+            for act in self.sidebar_actions:
+                act.setChecked(False)
+            return
         self.sidebar_stack.setCurrentIndex(idx)
         self._settings.setValue("sidebarMode", idx)
+        self._set_sidebar_expanded(True)
+        self._settings.setValue("sidebarExpanded", True)
+        for i, act in enumerate(self.sidebar_actions):
+            act.setChecked(i == idx)
 
     def _restore_sidebar_mode(self) -> None:
         idx = self._settings.value("sidebarMode", 0, type=int)
         if self.sidebar_stack is None or not self.sidebar_actions:
             return
         idx = max(0, min(idx, self.sidebar_stack.count() - 1))
-        self.sidebar_actions[idx].setChecked(True)
-        self.sidebar_stack.setCurrentIndex(idx)
+        expanded = self._settings.value("sidebarExpanded", True, type=bool)
+        if expanded:
+            self.sidebar_actions[idx].setChecked(True)
+            self.sidebar_stack.setCurrentIndex(idx)
+        else:
+            for act in self.sidebar_actions:
+                act.setChecked(False)
+            self.sidebar_stack.setCurrentIndex(idx)
+        self._set_sidebar_expanded(bool(expanded))
+
+    def _set_sidebar_expanded(self, expanded: bool) -> None:
+        if self.sidebar_stack is None:
+            return
+        if expanded == self._sidebar_expanded:
+            return
+        self._sidebar_expanded = expanded
+        if expanded:
+            self.sidebar_stack.setVisible(True)
+            if self.dock_sidebar is not None:
+                self.dock_sidebar.setMaximumWidth(16777215)
+                self.dock_sidebar.setMinimumWidth(
+                    self._sidebar_bar_width + self._sidebar_stack_min_width
+                )
+                if self._sidebar_last_width:
+                    self.dock_sidebar.resize(self._sidebar_last_width, self.dock_sidebar.height())
+        else:
+            if self.dock_sidebar is not None:
+                self._sidebar_last_width = self.dock_sidebar.width()
+                self.dock_sidebar.setMinimumWidth(self._sidebar_bar_width)
+                self.dock_sidebar.setMaximumWidth(self._sidebar_bar_width)
+                self.dock_sidebar.resize(self._sidebar_bar_width, self.dock_sidebar.height())
+            self.sidebar_stack.setVisible(False)
 
     def _collect_command_actions(self) -> List[QtWidgets.QAction]:
         actions: List[QtWidgets.QAction] = []

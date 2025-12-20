@@ -753,6 +753,7 @@ class RenderingMixin:
                     va="top",
                     fontsize=8,
                 )
+            self._update_bc_controls(vals, vmin, vmax)
             self.ax_hist.axis("on")
         else:
             if self.ax_hist is not None:

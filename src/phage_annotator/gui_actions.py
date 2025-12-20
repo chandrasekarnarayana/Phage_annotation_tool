@@ -205,9 +205,9 @@ class ActionsMixin:
         self.hist_chk.setChecked(not self.hist_chk.isChecked())
 
     def _toggle_left_pane(self) -> None:
-        if self.dock_annotations is None:
+        if self.dock_sidebar is None:
             return
-        self.dock_annotations.setVisible(not self.dock_annotations.isVisible())
+        self.dock_sidebar.setVisible(not self.dock_sidebar.isVisible())
 
     def _toggle_settings_pane(self) -> None:
         self.settings_advanced_container.setVisible(

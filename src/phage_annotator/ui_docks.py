@@ -95,6 +95,8 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_sidebar = self.panel_docks.get("sidebar")
     self.dock_annotations = self.panel_docks.get("annotations")
     self.dock_roi = self.panel_docks.get("roi")
+    self.dock_roi_manager = self.panel_docks.get("roi_manager")
+    self.dock_results = self.panel_docks.get("results")
     self.dock_hist = self.panel_docks.get("hist")
     self.dock_profile = self.panel_docks.get("profile")
     self.dock_orthoview = self.panel_docks.get("orthoview")
@@ -380,6 +382,58 @@ def make_hist_widget(self) -> QtWidgets.QWidget:
     controls.addStretch(1)
     hist_layout.addLayout(controls)
     hist_layout.addWidget(self.hist_canvas)
+    bc_group = QtWidgets.QGroupBox("B&C")
+    bc_layout = QtWidgets.QGridLayout(bc_group)
+    bc_layout.setContentsMargins(6, 6, 6, 6)
+    bc_layout.setSpacing(6)
+
+    self.bc_preview = QtWidgets.QLabel()
+    self.bc_preview.setFixedHeight(60)
+    self.bc_preview.setMinimumWidth(140)
+    self.bc_preview.setSizePolicy(
+        QtWidgets.QSizePolicy.Policy.Expanding,
+        QtWidgets.QSizePolicy.Policy.Fixed,
+    )
+    bc_layout.addWidget(self.bc_preview, 0, 0, 1, 3)
+
+    self.bc_min_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    self.bc_max_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    self.bc_min_spin = QtWidgets.QDoubleSpinBox()
+    self.bc_max_spin = QtWidgets.QDoubleSpinBox()
+    for spin in (self.bc_min_spin, self.bc_max_spin):
+        spin.setDecimals(3)
+        spin.setSingleStep(1.0)
+        spin.setKeyboardTracking(False)
+    bc_layout.addWidget(QtWidgets.QLabel("Minimum"), 1, 0)
+    bc_layout.addWidget(self.bc_min_spin, 1, 1)
+    bc_layout.addWidget(self.bc_min_slider, 1, 2)
+    bc_layout.addWidget(QtWidgets.QLabel("Maximum"), 2, 0)
+    bc_layout.addWidget(self.bc_max_spin, 2, 1)
+    bc_layout.addWidget(self.bc_max_slider, 2, 2)
+
+    self.bc_brightness_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    self.bc_brightness_slider.setRange(-100, 100)
+    self.bc_brightness_slider.setValue(0)
+    self.bc_contrast_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    self.bc_contrast_slider.setRange(-100, 100)
+    self.bc_contrast_slider.setValue(0)
+    bc_layout.addWidget(QtWidgets.QLabel("Brightness"), 3, 0)
+    bc_layout.addWidget(self.bc_brightness_slider, 3, 1, 1, 2)
+    bc_layout.addWidget(QtWidgets.QLabel("Contrast"), 4, 0)
+    bc_layout.addWidget(self.bc_contrast_slider, 4, 1, 1, 2)
+
+    bc_btns = QtWidgets.QHBoxLayout()
+    self.bc_auto_btn = QtWidgets.QPushButton("Auto")
+    self.bc_reset_btn = QtWidgets.QPushButton("Reset")
+    self.bc_set_btn = QtWidgets.QPushButton("Set")
+    self.bc_apply_btn = QtWidgets.QPushButton("Apply")
+    bc_btns.addWidget(self.bc_auto_btn)
+    bc_btns.addWidget(self.bc_reset_btn)
+    bc_btns.addWidget(self.bc_set_btn)
+    bc_btns.addWidget(self.bc_apply_btn)
+    bc_layout.addLayout(bc_btns, 5, 0, 1, 3)
+
+    hist_layout.addWidget(bc_group)
     return hist_container
 
 

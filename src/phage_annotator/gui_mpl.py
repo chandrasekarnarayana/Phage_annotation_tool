@@ -31,6 +31,7 @@ from phage_annotator.gui_constants import INTERACTIVE_DOWNSAMPLE, PLAYBACK_BUFFE
 from phage_annotator.gui_controls import ControlsMixin
 from phage_annotator.gui_events import EventsMixin
 from phage_annotator.gui_export import ExportMixin
+from phage_annotator.gui_file_actions import FileActionsMixin
 from phage_annotator.gui_image_io import read_metadata
 from phage_annotator.gui_jobs import JobsMixin
 from phage_annotator.gui_playback import PlaybackMixin
@@ -64,6 +65,7 @@ class KeypointAnnotator(
     RoiCropMixin,
     AnnotationsMixin,
     ActionsMixin,
+    FileActionsMixin,
     ControlsMixin,
     TableStatusMixin,
     ExportMixin,

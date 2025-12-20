@@ -46,7 +46,18 @@ class UiSetupMixin:
         This eliminates the need for defensive guards and makes dependencies explicit.
         """
         self.setWindowTitle("Phage Annotator - Microscopy Keypoints")
-        self.resize(1700, 1000)
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            min_w = min(1100, avail.width())
+            min_h = min(700, avail.height())
+            target_w = min(1700, int(avail.width() * 0.9))
+            target_h = min(1000, int(avail.height() * 0.9))
+            self.resize(max(min_w, target_w), max(min_h, target_h))
+            self.setMinimumSize(min_w, min_h)
+        else:
+            self.resize(1700, 1000)
+            self.setMinimumSize(1100, 700)
         self.setDockOptions(
             QtWidgets.QMainWindow.DockOption.AllowTabbedDocks
             | QtWidgets.QMainWindow.DockOption.AllowNestedDocks
@@ -169,39 +180,13 @@ class UiSetupMixin:
         self.renderer = Renderer(self.figure, self.canvas, fallback_cmaps)
         self.renderer.set_roi_callback(self._on_roi_interactor_change)
 
-        # Settings pane
-        self.settings_widget = QtWidgets.QWidget()
-        settings_layout = QtWidgets.QVBoxLayout(self.settings_widget)
-        settings_layout.setContentsMargins(8, 8, 8, 8)
-        settings_layout.setSpacing(10)
-
-        self.axis_warning = QtWidgets.QLabel()
-        self.axis_warning.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.axis_warning.setTextInteractionFlags(
-            QtCore.Qt.TextInteractionFlag.TextBrowserInteraction
-        )
-        self.axis_warning.setOpenExternalLinks(False)
-        self.axis_warning.linkActivated.connect(self._focus_axis_mode_control)
-        self.axis_warning.setVisible(False)
-        settings_layout.addWidget(self.axis_warning)
-
-        axes_group = QtWidgets.QGroupBox("Axes")
-        axes_layout = QtWidgets.QVBoxLayout(axes_group)
-        self.axes_info_label = QtWidgets.QLabel("T: ?  Z: ?  Y: ?  X: ?  | Interpretation: auto")
-        axes_layout.addWidget(self.axes_info_label)
-        settings_layout.addWidget(axes_group)
-
-        self.central_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
-        self.central_splitter.addWidget(fig_container)
-        self.central_splitter.addWidget(self.settings_widget)
-        self.central_splitter.setStretchFactor(0, 8)
-        self.central_splitter.setStretchFactor(1, 2)
-        central_layout.addWidget(self.central_splitter)
+        # Playback bar (compact bottom controls)
+        playback_bar = QtWidgets.QWidget()
+        playback_layout = QtWidgets.QGridLayout(playback_bar)
+        playback_layout.setContentsMargins(6, 6, 6, 6)
+        playback_layout.setSpacing(6)
 
         # Primary controls bar
-        primary_controls = QtWidgets.QGridLayout()
-        row = 0
-
         self.t_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.t_slider_label = QtWidgets.QLabel("T: 1")
         self.t_slider.setSingleStep(1)
@@ -239,35 +224,19 @@ class UiSetupMixin:
         speed_slider_box.addWidget(self.speed_slider, stretch=1)
         speed_slider_box.addWidget(self.speed_plus_button)
         self.loop_chk = QtWidgets.QCheckBox("Loop")
-        primary_controls.addWidget(QtWidgets.QLabel("Time"), row, 0)
-        primary_controls.addWidget(self.t_slider_label, row, 1)
-        primary_controls.addLayout(t_slider_box, row, 2)
-        primary_controls.addWidget(self.play_t_btn, row, 3)
-        row += 1
-        primary_controls.addWidget(QtWidgets.QLabel("Depth"), row, 0)
-        primary_controls.addWidget(self.z_slider_label, row, 1)
-        primary_controls.addLayout(z_slider_box, row, 2)
-        primary_controls.addWidget(self.play_z_btn, row, 3)
-        row += 1
-        primary_controls.addWidget(QtWidgets.QLabel("Speed (fps)"), row, 0)
-        primary_controls.addLayout(speed_slider_box, row, 2)
-        primary_controls.addWidget(self.loop_chk, row, 3)
-        row += 1
-
-        self.pixel_size_spin = QtWidgets.QDoubleSpinBox()
-        self.pixel_size_spin.setDecimals(4)
-        self.pixel_size_spin.setRange(1e-4, 100.0)
-        self.pixel_size_spin.setValue(self.pixel_size_um_per_px)
-        primary_controls.addWidget(QtWidgets.QLabel("Pixel size (um/px)"), row, 0)
-        primary_controls.addWidget(self.pixel_size_spin, row, 1)
-        row += 1
-
-        self.reset_view_btn = QtWidgets.QPushButton("Reset view")
-        self.reset_view_btn.setToolTip("Reset zoom and contrast")
-        primary_controls.addWidget(self.reset_view_btn, row, 0, 1, 2)
-        row += 1
-
-        settings_layout.addLayout(primary_controls)
+        playback_layout.addWidget(QtWidgets.QLabel("Time"), 0, 0)
+        playback_layout.addWidget(self.t_slider_label, 0, 1)
+        playback_layout.addLayout(t_slider_box, 0, 2)
+        playback_layout.addWidget(self.play_t_btn, 0, 3)
+        playback_layout.addWidget(QtWidgets.QLabel("Depth"), 1, 0)
+        playback_layout.addWidget(self.z_slider_label, 1, 1)
+        playback_layout.addLayout(z_slider_box, 1, 2)
+        playback_layout.addWidget(self.play_z_btn, 1, 3)
+        playback_layout.addWidget(QtWidgets.QLabel("Speed (fps)"), 2, 0)
+        playback_layout.addLayout(speed_slider_box, 2, 2)
+        playback_layout.addWidget(self.loop_chk, 2, 3)
+        self.fps_label = QtWidgets.QLabel(f"FPS: {self.speed_slider.value()}")
+        playback_layout.addWidget(self.fps_label, 2, 1)
 
         display_group = QtWidgets.QGroupBox("Display")
         display_layout = QtWidgets.QGridLayout(display_group)
@@ -414,8 +383,6 @@ class UiSetupMixin:
         display_layout.addLayout(scalebar_flags, drow, 2)
         drow += 1
 
-        settings_layout.addWidget(display_group)
-
         self.annotate_panel = self._build_annotate_panel()
         self._build_roi_controls_layout()
 
@@ -447,27 +414,6 @@ class UiSetupMixin:
         adv_layout.addWidget(self.marker_size_spin, r, 1)
         adv_layout.addWidget(QtWidgets.QLabel("Click radius (px)"), r, 2)
         adv_layout.addWidget(self.click_radius_spin, r, 3)
-        r += 1
-
-        # PHASE 2D FIX: Add annotation visibility controls
-        vis_opts = QtWidgets.QHBoxLayout()
-        self.show_ann_master_chk = QtWidgets.QCheckBox("Show annotations")
-        self.show_ann_master_chk.setChecked(True)
-        self.show_frame_chk = QtWidgets.QCheckBox("Frame")
-        self.show_mean_chk = QtWidgets.QCheckBox("Mean")
-        self.show_comp_chk = QtWidgets.QCheckBox("Composite")
-        self.show_support_chk = QtWidgets.QCheckBox("Support")
-        self.show_frame_chk.setChecked(True)
-        self.show_mean_chk.setChecked(True)
-        self.show_comp_chk.setChecked(True)
-        self.show_support_chk.setChecked(False)
-        vis_opts.addWidget(self.show_ann_master_chk)
-        vis_opts.addWidget(self.show_frame_chk)
-        vis_opts.addWidget(self.show_mean_chk)
-        vis_opts.addWidget(self.show_comp_chk)
-        vis_opts.addWidget(self.show_support_chk)
-        adv_layout.addWidget(QtWidgets.QLabel("Annotation visibility"), r, 0)
-        adv_layout.addLayout(vis_opts, r, 1, 1, 3)
         r += 1
 
         # PHASE 2D FIX: Add profile controls (profile_clear_btn was missing)
@@ -571,9 +517,17 @@ class UiSetupMixin:
         self.settings_advanced_container.setLayout(adv_container_layout)
         self.advanced_group.setLayout(adv_layout)
         adv_container_layout.addWidget(self.advanced_group)
-        settings_layout.addWidget(self.annotate_panel)
-        settings_layout.addWidget(self.settings_advanced_container)
-        settings_layout.addStretch(1)
+        self.axis_warning = QtWidgets.QLabel()
+        self.axis_warning.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self.axis_warning.setTextInteractionFlags(
+            QtCore.Qt.TextInteractionFlag.TextBrowserInteraction
+        )
+        self.axis_warning.setOpenExternalLinks(False)
+        self.axis_warning.linkActivated.connect(self._focus_axis_mode_control)
+        self.axis_warning.setVisible(False)
+        self.axes_info_label = QtWidgets.QLabel("T: ?  Z: ?  Y: ?  X: ?  | Interpretation: auto")
+
+        self.controls_sidebar_panel = self._build_controls_sidebar_panel(display_group)
 
         # Diagnostics panels (histogram/profile)
         self.hist_fig = plt.figure(figsize=(5, 3))
@@ -587,12 +541,8 @@ class UiSetupMixin:
         self._setup_status_bar()
         self._init_panels(dock_panels_menu)
 
-        left_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        left_splitter.addWidget(self._build_sidebar_stack())
-        left_splitter.addWidget(self.central_splitter)
-        left_splitter.setStretchFactor(0, 0)
-        left_splitter.setStretchFactor(1, 1)
-        central_layout.addWidget(left_splitter)
+        central_layout.addWidget(fig_container, stretch=1)
+        central_layout.addWidget(playback_bar, stretch=0)
 
         # Hooks for menus
         open_files_act.triggered.connect(self._open_files)
@@ -788,6 +738,152 @@ class UiSetupMixin:
         self.performance_panel = panel
         return panel
 
+    def _build_controls_sidebar_panel(
+        self, display_group: QtWidgets.QGroupBox
+    ) -> QtWidgets.QWidget:
+        panel = QtWidgets.QWidget()
+        panel_layout = QtWidgets.QVBoxLayout(panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(content)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
+
+        def _wrap(title: str, widget: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
+            box = QtWidgets.QGroupBox(title)
+            box_layout = QtWidgets.QVBoxLayout(box)
+            box_layout.setContentsMargins(6, 6, 6, 6)
+            box_layout.setSpacing(6)
+            box_layout.addWidget(widget)
+            return box
+
+        def _dock_button(text: str, dock_attr: str) -> QtWidgets.QPushButton:
+            btn = QtWidgets.QPushButton(text)
+            btn.clicked.connect(
+                lambda: (
+                    getattr(self, dock_attr, None).setVisible(True)
+                    if getattr(self, dock_attr, None) is not None
+                    else None
+                )
+            )
+            return btn
+
+        # 1) Explore / Data
+        explore_section = QtWidgets.QWidget()
+        explore_layout = QtWidgets.QVBoxLayout(explore_section)
+        explore_layout.setContentsMargins(0, 0, 0, 0)
+        explore_layout.setSpacing(6)
+        explore_layout.addWidget(QtWidgets.QLabel("Lazy loading: enabled"))
+        explore_layout.addWidget(self.explore_panel)
+        layout.addWidget(_wrap("Explore / Data", explore_section))
+
+        # 2) Navigate & Playback (info only; controls in bottom bar)
+        nav_section = QtWidgets.QWidget()
+        nav_layout = QtWidgets.QVBoxLayout(nav_section)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
+        nav_layout.setSpacing(6)
+        nav_layout.addWidget(QtWidgets.QLabel("Playback controls are in the bottom bar."))
+        nav_layout.addWidget(self.axis_warning)
+        nav_layout.addWidget(self.axes_info_label)
+        layout.addWidget(_wrap("Navigate & Playback", nav_section))
+
+        # 3) Display & Contrast
+        display_section = QtWidgets.QWidget()
+        display_layout = QtWidgets.QVBoxLayout(display_section)
+        display_layout.setContentsMargins(0, 0, 0, 0)
+        display_layout.setSpacing(6)
+        self.reset_view_btn = QtWidgets.QPushButton("Reset view")
+        self.reset_view_btn.setToolTip("Reset zoom and contrast")
+        display_header = QtWidgets.QHBoxLayout()
+        display_header.addWidget(_dock_button("Show Histogram/B&C", "dock_hist"))
+        display_header.addWidget(self.reset_view_btn)
+        display_layout.addLayout(display_header)
+        display_layout.addWidget(display_group)
+        layout.addWidget(_wrap("Display & Contrast", display_section))
+
+        # 4) ROI & Tools
+        roi_section = QtWidgets.QWidget()
+        roi_layout = QtWidgets.QVBoxLayout(roi_section)
+        roi_layout.setContentsMargins(0, 0, 0, 0)
+        roi_layout.setSpacing(6)
+        roi_layout.addWidget(_dock_button("Show ROI Controls", "dock_roi"))
+        roi_layout.addWidget(_dock_button("Show ROI Manager", "dock_roi_manager"))
+        clear_roi_btn = QtWidgets.QPushButton("Clear ROI")
+        clear_roi_btn.clicked.connect(self._clear_roi)
+        roi_layout.addWidget(clear_roi_btn)
+        roi_layout.addWidget(QtWidgets.QLabel("ROI tools are available in the ROI dock."))
+        layout.addWidget(_wrap("ROI & Tools", roi_section))
+
+        # 5) Annotate
+        layout.addWidget(_wrap("Annotate", self.annotate_panel))
+
+        # 6) Analysis
+        analysis_section = QtWidgets.QWidget()
+        analysis_layout = QtWidgets.QVBoxLayout(analysis_section)
+        analysis_layout.setContentsMargins(0, 0, 0, 0)
+        analysis_layout.setSpacing(6)
+        analysis_layout.addWidget(_dock_button("Results", "dock_results"))
+        analysis_layout.addWidget(_dock_button("Threshold", "dock_threshold"))
+        analysis_layout.addWidget(_dock_button("Analyze Particles", "dock_particles"))
+        analysis_layout.addWidget(_dock_button("SMLM", "dock_smlm"))
+        analysis_layout.addWidget(_dock_button("Density", "dock_density"))
+        analysis_layout.addWidget(_dock_button("Ortho Views", "dock_orthoview"))
+        layout.addWidget(_wrap("Analysis", analysis_section))
+
+        # 7) Export
+        export_section = QtWidgets.QWidget()
+        export_layout = QtWidgets.QVBoxLayout(export_section)
+        export_layout.setContentsMargins(0, 0, 0, 0)
+        export_layout.setSpacing(6)
+        export_csv_btn = QtWidgets.QPushButton("Save CSV")
+        export_csv_btn.clicked.connect(self._save_csv)
+        export_layout.addWidget(export_csv_btn)
+        export_json_btn = QtWidgets.QPushButton("Save JSON")
+        export_json_btn.clicked.connect(self._save_json)
+        export_layout.addWidget(export_json_btn)
+        export_view_btn = QtWidgets.QPushButton("Export View")
+        export_view_btn.clicked.connect(self._export_view_dialog)
+        export_layout.addWidget(export_view_btn)
+        save_proj_btn = QtWidgets.QPushButton("Save Project")
+        save_proj_btn.clicked.connect(self._save_project)
+        export_layout.addWidget(save_proj_btn)
+        load_proj_btn = QtWidgets.QPushButton("Load Project")
+        load_proj_btn.clicked.connect(self._load_project)
+        export_layout.addWidget(load_proj_btn)
+        layout.addWidget(_wrap("Export", export_section))
+
+        # 8) Preferences / Debug
+        prefs_section = QtWidgets.QWidget()
+        prefs_layout = QtWidgets.QVBoxLayout(prefs_section)
+        prefs_layout.setContentsMargins(0, 0, 0, 0)
+        prefs_layout.setSpacing(6)
+        self.pixel_size_spin = QtWidgets.QDoubleSpinBox()
+        self.pixel_size_spin.setDecimals(4)
+        self.pixel_size_spin.setRange(1e-4, 100.0)
+        self.pixel_size_spin.setValue(self.pixel_size_um_per_px)
+        pixel_row = QtWidgets.QHBoxLayout()
+        pixel_row.addWidget(QtWidgets.QLabel("Pixel size (um/px)"))
+        pixel_row.addWidget(self.pixel_size_spin)
+        prefs_layout.addLayout(pixel_row)
+        prefs_layout.addWidget(self.settings_advanced_container)
+        prefs_btn = QtWidgets.QPushButton("Preferences…")
+        prefs_btn.clicked.connect(self._show_preferences_dialog)
+        prefs_layout.addWidget(prefs_btn)
+        prefs_layout.addWidget(_dock_button("Logs", "dock_logs"))
+        prefs_layout.addWidget(_dock_button("Performance", "dock_performance"))
+        prefs_layout.addWidget(_dock_button("Metadata", "dock_metadata"))
+        layout.addWidget(_wrap("Preferences / Debug", prefs_section))
+
+        layout.addStretch(1)
+        scroll.setWidget(content)
+        panel_layout.addWidget(scroll)
+        return panel
+
+    def _build_roi_controls_layout(self) -> None:
         """Build ROI/crop controls used by the ROI dock."""
         layout = QtWidgets.QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
