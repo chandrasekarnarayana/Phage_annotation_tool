@@ -151,6 +151,7 @@ class UiSetupMixin:
         self.ax_frame = None
         self.ax_mean = None
         self.ax_comp = None
+        self.ax_composite = None  # Alias for ax_comp
         self.ax_support = None
         self.ax_std = None
         self.ax_line = None

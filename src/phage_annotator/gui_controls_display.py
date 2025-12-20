@@ -146,7 +146,8 @@ class DisplayControlsMixin:
             mapping.set_window(vmin, vmax)
             self.vmin_label.setText(f"vmin: {vmin:.3f}")
             self.vmax_label.setText(f"vmax: {vmax:.3f}")
-            return vmin, vmax
+        # PHASE 2D FIX: Always return vmin, vmax (was missing return statement)
+        return vmin, vmax
 
     def _on_lut_change(self, idx: int) -> None:
         if idx < 0:

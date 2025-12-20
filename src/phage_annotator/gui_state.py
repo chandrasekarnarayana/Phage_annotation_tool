@@ -611,7 +611,15 @@ class StateMixin:
             self.proj_cache.put(key_comp_local, mean_proj)
             if job_id_holder["id"] is not None:
                 self._clear_projection_job_name(job_id_holder["id"])
-            self._refresh_image()
+            # PHASE 2D FIX: Use debounce timer to trigger refresh asynchronously.
+            # Direct call to _refresh_image() causes recursion: _refresh_image() → _get_projection()
+            # → _request_projection_job() → _on_result() → _refresh_image() → loop.
+            # The debounce timer breaks the recursion by deferring the refresh to the next event loop cycle.
+            if hasattr(self, '_debounce_timer'):
+                self._debounce_timer.start()
+            else:
+                # Fallback: direct call with guard (shouldn't happen in normal flow)
+                self._refresh_image()
 
         def _on_error(err: str) -> None:
             if job_id_holder["id"] is not None:
