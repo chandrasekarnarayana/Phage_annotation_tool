@@ -239,20 +239,43 @@ class KeypointAnnotator(
         self.density_panel = None
         self._roi_controls_layout = None
         
+        # ==================== ARCHITECTURAL DEBT: Widget Initialization Ordering ====================
+        # ISSUE: GUI fails during initialization due to widget initialization ordering dependencies.
+        # - Some widgets are created in _setup_status_bar() (status bar widgets, progress, labels)
+        # - Other widgets are created in _init_panels() -> make_*_widget() factories (hist_chk, profile_chk)
+        # - These factories reference self.status which may not exist yet if _init_panels() runs before _setup_status_bar()
+        # 
+        # ROOT CAUSE: The mixin-based architecture lacks explicit state dependency ordering.
+        # Each mixin method assumes certain attributes exist, but there's no enforced initialization sequence.
+        # 
+        # MITIGATION (Current): Pre-initialize all widget stubs to None here. This prevents AttributeError
+        # but masks the real architectural problem: scattered, implicit self.* attributes with no clear ownership.
+        # 
+        # SOLUTION (Phase 2D): Refactor into explicit state dataclasses:
+        #   1. Create RenderContext(status, progress_label, progress_bar, progress_cancel_btn)
+        #   2. Create ViewState(vmin, vmax, contrast_params, zoom_state, downsample_factor)
+        #   3. Create OverlayState(tool, annotations, roi, density_overlay)
+        # Then pass these explicitly to methods instead of relying on self.* lookups.
+        # This will eliminate 400+ implicit self.* references and make initialization order irrelevant.
+        # 
+        # TEST IMPACT: GUI tests currently skip until Phase 2D completes (see test_gui_basic.py).
+        # Once state dataclasses are in place, tests will pass because factories will receive
+        # explicit RenderContext/ViewState objects rather than searching for self.status/self.hist_chk.
+        # 
         # Pre-initialize GUI widget stubs (will be properly set during _setup_ui)
-        self.status = None
-        self.hist_chk = None
-        self.profile_chk = None
-        self.show_hist_chk = None
-        self.show_profile_chk = None
-        self.hist_canvas = None
-        self.profile_canvas = None
-        self.hist_fig = None
-        self.profile_fig = None
-        self.ax_hist = None
-        self.ax_line = None
-        self.log_view = None
-        self.cache_stats_label = None
+        self.status = None  # Created in _setup_status_bar() but used in make_logs_widget()
+        self.hist_chk = None  # Created in make_hist_widget() but checked in init_panels()
+        self.profile_chk = None  # Created in make_profile_widget() but checked in init_panels()
+        self.show_hist_chk = None  # Alias for hist_chk
+        self.show_profile_chk = None  # Alias for profile_chk
+        self.hist_canvas = None  # Created in make_hist_widget()
+        self.profile_canvas = None  # Created in make_profile_widget()
+        self.hist_fig = None  # Matplotlib figure for histogram
+        self.profile_fig = None  # Matplotlib figure for profile (line plot)
+        self.ax_hist = None  # Matplotlib axes for histogram
+        self.ax_line = None  # Matplotlib axes for profile line plot
+        self.log_view = None  # QPlainTextEdit for debug logs
+        self.cache_stats_label = None  # Status label for cache statistics
         self.controller = SessionController(
             self,
             images,

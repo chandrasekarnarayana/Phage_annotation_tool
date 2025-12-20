@@ -20,7 +20,30 @@ class UiSetupMixin:
     """Mixin containing UI construction and dock wiring."""
 
     def _setup_ui(self) -> None:
-        """Create menus, toolbars, dock panels, and central widgets."""
+        """Create menus, toolbars, dock panels, and central widgets.
+        
+        ARCHITECTURAL FLOW (fragile due to ordering):
+        1. _setup_ui() called from __init__ of parent
+        2. Calls _setup_status_bar() -> creates self.status and progress widgets
+        3. Calls _init_panels() -> builds dock panel factories
+        4. Panel factories (make_logs_widget, etc.) reference self.status, self.hist_chk, etc.
+        
+        ISSUE: If _init_panels() called BEFORE _setup_status_bar(), self.status=None,
+        causing make_logs_widget() to skip adding status widget (defensive guard exists).
+        
+        PHASE 2D FIX:
+        Create RenderContext and ViewState dataclasses that encapsulate all UI state.
+        Instead of:
+            def make_logs_widget(self) -> QWidget:
+                if self.status is not None:  # <-- defensive guard due to ordering fragility
+                    logs_layout.addWidget(self.status)
+        
+        Do:
+            def make_logs_widget(self, ctx: RenderContext) -> QWidget:
+                logs_layout.addWidget(ctx.status)  # <-- guaranteed to exist by type system
+        
+        This eliminates the need for defensive guards and makes dependencies explicit.
+        """
         self.setWindowTitle("Phage Annotator - Microscopy Keypoints")
         self.resize(1700, 1000)
         self.setDockOptions(
@@ -57,6 +80,16 @@ class UiSetupMixin:
         show_roi_handles_act = self.show_roi_handles_act
         clear_roi_act = self.clear_roi_act
 
+        # ===== ORDERING FIX: _setup_status_bar() MUST run BEFORE _init_panels() =====
+        # RATIONALE: make_logs_widget() called from init_panels() checks if self.status exists.
+        # If _setup_status_bar() hasn't run yet, self.status=None and logs widget lacks status bar.
+        # By forcing this order, we ensure self.status exists when panel factories need it.
+        # 
+        # ARCHITECTURAL DEBT: This is a symptom of implicit state dependencies.
+        # Phase 2D solution: Pass RenderContext(status, progress_bar, etc.) to _init_panels()
+        # instead of having _init_panels() reach into self.* attributes.
+        self._setup_status_bar()
+        
         self._init_tool_bar()
         show_roi_handles_act.setChecked(bool(self.show_roi_handles))
 

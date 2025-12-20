@@ -21,7 +21,50 @@ from phage_annotator.threshold_panel import ThresholdPanel
 
 
 def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
-    """Create dock widgets and View menu actions from the registry."""
+    """Create dock widgets and View menu actions from the registry.
+    
+    ARCHITECTURAL ISSUE (Widget Creation Factory Pattern):
+    Each panel spec has a widget_factory() method that creates UI widgets.
+    These factories (make_logs_widget, make_hist_widget, make_profile_widget, etc.)
+    implicitly reference self.status, self.hist_chk, self.profile_chk, etc.
+    
+    PROBLEM:
+    - Factories are called from here without passing explicit state
+    - make_logs_widget() checks if self.status exists (line: if self.status is not None)
+    - make_profile_widget() creates self.profile_chk, but init_panels() also looks for it
+    - Circular dependency: init_panels() needs to find checkboxes created by factories,
+      but factories expect those checkboxes to already exist from prior calls
+    
+    DEFENSIVE MITIGATIONS (Current):
+    - getattr(self, "hist_chk", None) to safely check if checkbox exists
+    - Pre-initialize all widget stubs to None in __init__ to prevent AttributeError
+    - Stub initialization at top of gui_mpl.py __init__
+    - Defensive None checks in make_logs_widget (if self.status is not None)
+    
+    PHASE 2D SOLUTION:
+    Create a WidgetFactory interface that receives explicit WidgetContext dataclass:
+    
+        @dataclass
+        class WidgetContext:
+            status: QWidget
+            progress: QProgressBar
+            hist_config: HistogramConfig
+            profile_config: ProfileConfig
+            cache: ProjectionCache
+        
+        @dataclass
+        class HistogramConfig:
+            is_enabled: bool
+            checkbox: Optional[QCheckBox] = None
+            figure: Optional[Figure] = None
+        
+        def make_logs_widget(ctx: WidgetContext) -> QWidget:
+            # No need for defensive checks; ctx.status is guaranteed to exist
+            logs_layout.addWidget(ctx.status)
+    
+    This eliminates 40+ getattr() calls and makes factory dependencies explicit.
+    Tests will pass once factories receive explicit WidgetContext objects.
+    """
     self.panel_specs = build_panel_registry(self)
     self.panel_docks.clear()
     self.dock_actions.clear()
@@ -37,6 +80,9 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         if spec.shortcut:
             action.setShortcut(spec.shortcut)
         self.dock_actions[spec.id] = action
+        # DEFENSIVE: Use getattr() with fallback to None instead of direct attribute access.
+        # This is because checkboxes may not have been created yet by the factories.
+        # Phase 2D: Pass explicit state to avoid this defensive pattern.
         checkbox = None
         if spec.id == "hist":
             checkbox = getattr(self, "hist_chk", None)
@@ -328,6 +374,25 @@ def make_hist_widget(self) -> QtWidgets.QWidget:
 
 
 def make_profile_widget(self) -> QtWidgets.QWidget:
+    """Create the profile (line plot) widget and its checkbox control.
+    
+    ARCHITECTURAL ISSUE: Creating self.profile_chk here, but init_panels() also expects
+    to find self.profile_chk afterward via getattr(self, "profile_chk", None).
+    This is a circular dependency that couples widget creation with checkbox management.
+    
+    PHASE 2D FIX:
+    Return both the widget and metadata (checkbox reference, figure, axes) via dataclass:
+    
+        @dataclass
+        class ProfileWidgetResult:
+            widget: QWidget
+            checkbox: QCheckBox
+            figure: Figure
+            axes: Axes
+            canvas: FigureCanvasQTAgg
+    
+    Then init_panels() receives explicit ProfileWidgetResult and doesn't need getattr().
+    """
     if self.profile_canvas is None:
         self.profile_fig = plt.figure(figsize=(4, 3))
         self.profile_canvas = FigureCanvasQTAgg(self.profile_fig)
@@ -337,9 +402,11 @@ def make_profile_widget(self) -> QtWidgets.QWidget:
     profile_layout.setContentsMargins(8, 8, 8, 8)
     profile_layout.setSpacing(6)
     controls = QtWidgets.QHBoxLayout()
+    # NOTE: self.profile_chk created here and expected to be found by init_panels() later.
+    # This is an implicit dependency. Phase 2D: return checkbox in dataclass instead.
     self.profile_chk = QtWidgets.QCheckBox("Profile")
     self.profile_chk.setChecked(True)
-    self.show_profile_chk = self.profile_chk
+    self.show_profile_chk = self.profile_chk  # Alias for backward compatibility
     controls.addWidget(self.profile_chk)
     controls.addStretch(1)
     profile_layout.addLayout(controls)
@@ -372,10 +439,29 @@ def make_particles_widget(self) -> QtWidgets.QWidget:
 
 
 def make_logs_widget(self) -> QtWidgets.QWidget:
+    """Create the logs and cache statistics widget.
+    
+    ARCHITECTURAL ISSUE: Defensive guard 'if self.status is not None' is required
+    because self.status is created in _setup_status_bar(), which may be called
+    before or after make_logs_widget() depending on initialization order in _setup_ui().
+    
+    This defensive pattern is a code smell indicating missing architectural enforcement
+    of initialization order.
+    
+    PHASE 2D FIX:
+    Pass explicit RenderContext(status=..., progress_bar=..., etc.) to make_logs_widget().
+    Then:
+        def make_logs_widget(self, ctx: RenderContext) -> QWidget:
+            logs_layout.addWidget(ctx.status)  # Always defined, no guard needed
+    
+    The type system will enforce that status exists before make_logs_widget() is called.
+    """
     logs_widget = QtWidgets.QWidget()
     logs_layout = QtWidgets.QVBoxLayout(logs_widget)
     logs_layout.setContentsMargins(8, 8, 8, 8)
     logs_layout.setSpacing(6)
+    # DEFENSIVE: Check if status was created by _setup_status_bar().
+    # This guard should not be necessary if initialization order was enforced at the type level.
     if self.status is not None:
         logs_layout.addWidget(self.status)
     self.cache_stats_label = QtWidgets.QLabel("Cache: 0 MB | Items: 0")
@@ -400,7 +486,34 @@ def make_density_widget(self) -> QtWidgets.QWidget:
 
 
 def setup_status_bar(self) -> None:
-    """Initialize the status bar widgets (progress + tool indicator)."""
+    """Initialize the status bar widgets (progress + tool indicator).
+    
+    ARCHITECTURAL NOTE: This method must be called BEFORE init_panels() / make_logs_widget(),
+    otherwise make_logs_widget() will see self.status=None and skip adding the status bar
+    to the logs dock (due to the defensive guard).
+    
+    This ordering requirement is implicit and not enforced by the type system.
+    
+    PHASE 2D IMPROVEMENT:
+    Instead of relying on method call order, use a dependency injection pattern:
+    
+        @dataclass
+        class ApplicationContext:
+            status_bar: QStatusBar
+            progress_widgets: ProgressWidgets
+            settings: QSettings
+        
+        class UiSetupMixin:
+            def _setup_ui(self, ctx: ApplicationContext) -> None:
+                # ctx is guaranteed to have all components in correct state
+                self._init_panels(ctx)  # No hidden ordering dependencies
+    
+    This eliminates the need for defensive guards and makes dependencies explicit in signatures.
+    """
+    # CRITICAL: This self.status assignment is depended upon by make_logs_widget().
+    # If setup_status_bar() runs after init_panels(), make_logs_widget() will have
+    # already checked 'if self.status is not None' and found it to be None.
+    # Phase 2D: Pass status explicitly as RenderContext(status=...) to avoid this ordering issue.
     status = self.statusBar()
     self.status = status
     status.setSizeGripEnabled(True)
