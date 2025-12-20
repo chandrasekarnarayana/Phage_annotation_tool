@@ -72,9 +72,7 @@ jobs:
         run: |
           python -c "import sys,platform; print(sys.version); print(platform.platform())"
           python -c "import matplotlib; print('matplotlib', matplotlib.get_backend())"
-          python -c "import importlib,sys; \
-          spec=importlib.util.find_spec('PyQt5'); \
-          print('PyQt5', 'available' if spec else 'not available')"
+          python -c "import pkgutil; print('PyQt5', 'available' if pkgutil.find_loader('PyQt5') else 'not available')"
       - name: Run core tests
         run: >
           python -m pytest -m "not gui" --ignore=tests/test_gui_basic.py
@@ -117,9 +115,7 @@ jobs:
         run: |
           python -c "import sys,platform; print(sys.version); print(platform.platform())"
           python -c "import matplotlib; print('matplotlib', matplotlib.get_backend())"
-          python -c "import importlib,sys; \
-          spec=importlib.util.find_spec('PyQt5'); \
-          print('PyQt5', 'available' if spec else 'not available')"
+          python -c "import pkgutil; print('PyQt5', 'available' if pkgutil.find_loader('PyQt5') else 'not available')"
       - name: Run GUI tests (Linux)
         if: runner.os == 'Linux'
         env:
