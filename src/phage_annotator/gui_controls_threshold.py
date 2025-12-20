@@ -11,7 +11,6 @@ from matplotlib.backends.qt_compat import QtWidgets
 from phage_annotator.analysis import roi_mask_for_shape
 from phage_annotator.particles import ParticleOptions, analyze_particles
 from phage_annotator.thresholding import (
-    AUTO_METHODS,
     PostprocessOptions,
     compute_threshold,
     make_mask,

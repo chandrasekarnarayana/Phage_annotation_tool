@@ -9,6 +9,7 @@ from phage_annotator.lut_manager import lut_names
 
 class PreferencesControlsMixin:
     """Mixin for preferences and configuration handlers."""
+
     def _show_preferences_dialog(self) -> None:
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("Preferences")
@@ -66,54 +67,64 @@ class PreferencesControlsMixin:
         layout.addRow("Prefetch inflight blocks", inflight_spin)
         layout.addRow("Throttle analysis (Hz)", throttle_spin)
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
-            )
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
         layout.addRow(buttons)
-    def _apply() -> None:
-        self._settings.setValue("cacheMaxMB", cache_spin.value())
-        self._settings.setValue("keepRecentImages", recent_spin.value())
-        self._settings.setValue("defaultLayoutPreset", preset_combo.currentText())
-        self._settings.setValue("defaultColormap", cmap_combo.currentText())
-        self._settings.setValue("defaultFPS", fps_spin.value())
-        self._settings.setValue("autosaveRecoveryEnabled", autosave_chk.isChecked())
-        self._settings.setValue("autoLoadAnnotations", autoload_ann_chk.isChecked())
-        self._settings.setValue("applyAnnotationMetaOnLoad", apply_meta_chk.isChecked())
-        self._settings.setValue("encodeAnnotationMetaFilename", encode_meta_chk.isChecked())
-        self._settings.setValue("pyramidEnabled", pyramid_chk.isChecked())
-        self._settings.setValue("pyramidMaxLevels", pyramid_levels_spin.value())
-        self._settings.setValue("prefetchBlockSizeFrames", block_spin.value())
-        self._settings.setValue("prefetchMaxInflightBlocks", inflight_spin.value())
-        self._settings.setValue("throttleAnalysisHzDuringPlayback", throttle_spin.value())
-        self.cache_budget_spin.setValue(cache_spin.value())
-        self.speed_slider.setValue(fps_spin.value())
-        if cmap_combo.currentText() in lut_names():
-            self.current_cmap_idx = lut_names().index(cmap_combo.currentText())
-            self.pyramid_enabled = pyramid_chk.isChecked()
-            self.pyramid_max_levels = pyramid_levels_spin.value()
-            if self.pyramid_chk is not None:
-                self.pyramid_chk.setChecked(self.pyramid_enabled)
+
+        def _apply() -> None:
+            self._settings.setValue("cacheMaxMB", cache_spin.value())
+            self._settings.setValue("keepRecentImages", recent_spin.value())
+            self._settings.setValue("defaultLayoutPreset", preset_combo.currentText())
+            self._settings.setValue("defaultColormap", cmap_combo.currentText())
+            self._settings.setValue("defaultFPS", fps_spin.value())
+            self._settings.setValue("autosaveRecoveryEnabled", autosave_chk.isChecked())
+            self._settings.setValue("autoLoadAnnotations", autoload_ann_chk.isChecked())
+            self._settings.setValue("applyAnnotationMetaOnLoad", apply_meta_chk.isChecked())
+            self._settings.setValue(
+                "encodeAnnotationMetaFilename", encode_meta_chk.isChecked()
+            )
+            self._settings.setValue("pyramidEnabled", pyramid_chk.isChecked())
+            self._settings.setValue("pyramidMaxLevels", pyramid_levels_spin.value())
+            self._settings.setValue("prefetchBlockSizeFrames", block_spin.value())
+            self._settings.setValue("prefetchMaxInflightBlocks", inflight_spin.value())
+            self._settings.setValue(
+                "throttleAnalysisHzDuringPlayback", throttle_spin.value()
+            )
+            self.cache_budget_spin.setValue(cache_spin.value())
+            self.speed_slider.setValue(fps_spin.value())
+            if cmap_combo.currentText() in lut_names():
+                self.current_cmap_idx = lut_names().index(cmap_combo.currentText())
+                self.pyramid_enabled = pyramid_chk.isChecked()
+                self.pyramid_max_levels = pyramid_levels_spin.value()
+                if self.pyramid_chk is not None:
+                    self.pyramid_chk.setChecked(self.pyramid_enabled)
                 if self.pyramid_levels_spin is not None:
                     self.pyramid_levels_spin.setValue(self.pyramid_max_levels)
-                    if preset_combo.currentText() != "Default":
-                        self.apply_preset(preset_combo.currentText())
-                        self._refresh_image()
-                        dlg.accept()
-                        buttons.accepted.connect(_apply)
-                        buttons.rejected.connect(dlg.reject)
-                        dlg.exec()
+            if preset_combo.currentText() != "Default":
+                self.apply_preset(preset_combo.currentText())
+            self._refresh_image()
+            dlg.accept()
+
+        buttons.accepted.connect(_apply)
+        buttons.rejected.connect(dlg.reject)
+        dlg.exec()
     def _on_pixel_size_change(self, val: float) -> None:
         self.pixel_size_um_per_px = float(val)
         self._settings.setValue("defaultPixelSizeUmPerPx", self.pixel_size_um_per_px)
         self._update_status()
         self._refresh_image()
+
     def _on_cache_budget_change(self, val: int) -> None:
         self._settings.setValue("cacheMaxMB", int(val))
         self.proj_cache.set_budget_mb(int(val))
         self._update_status()
+
     def _on_downsample_factor_change(self, val: int) -> None:
         self.downsample_factor = max(1, int(val))
         self._settings.setValue("downsampleFactor", self.downsample_factor)
         self._refresh_image()
+
     def _on_downsample_toggle(self) -> None:
         self.downsample_images = self.downsample_images_chk.isChecked()
         self.downsample_hist = self.downsample_hist_chk.isChecked()
@@ -122,16 +133,19 @@ class PreferencesControlsMixin:
         self._settings.setValue("downsampleHist", self.downsample_hist)
         self._settings.setValue("downsampleProfile", self.downsample_profile)
         self._refresh_image()
+
     def _on_pyramid_toggle(self) -> None:
         self.pyramid_enabled = self.pyramid_chk.isChecked()
         self._settings.setValue("pyramidEnabled", self.pyramid_enabled)
         self._last_render_level = 0
         self._refresh_image()
+
     def _on_pyramid_levels_change(self, val: int) -> None:
         self.pyramid_max_levels = max(1, int(val))
         self._settings.setValue("pyramidMaxLevels", self.pyramid_max_levels)
         self._last_render_level = min(self._last_render_level, self.pyramid_max_levels)
         self._refresh_image()
+
     def _on_scalebar_change(self) -> None:
         self.scale_bar_enabled = self.scalebar_chk.isChecked()
         self.scale_bar_length_um = float(self.scalebar_length_spin.value())

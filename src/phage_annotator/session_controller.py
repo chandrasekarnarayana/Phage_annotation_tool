@@ -9,9 +9,9 @@ to state updates.
 from __future__ import annotations
 
 import pathlib
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, TYPE_CHECKING
 
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtCore
 
 from phage_annotator.density_config import DensityConfig
 from phage_annotator.density_model import DensityPredictor
@@ -24,6 +24,9 @@ from phage_annotator.session_controller_playback import SessionPlaybackMixin
 from phage_annotator.session_controller_project import SessionProjectMixin
 from phage_annotator.session_controller_view import SessionViewMixin
 from phage_annotator.session_state import SessionState, ViewState
+
+if TYPE_CHECKING:
+    from phage_annotator.image_models import LazyImage
 
 
 class SessionController(

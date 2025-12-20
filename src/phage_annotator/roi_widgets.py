@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 

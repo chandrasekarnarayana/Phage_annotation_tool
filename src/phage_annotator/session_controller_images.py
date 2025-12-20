@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import pathlib
-from typing import Iterable, List, Optional, Tuple
+from typing import List, Optional, TYPE_CHECKING
 
 import numpy as np
 
 from phage_annotator.calibration import CalibrationState, resolve_calibration
 from phage_annotator.io import read_metadata_bundle
 from phage_annotator.session_state import ImageState
+
+if TYPE_CHECKING:
+    from phage_annotator.image_models import LazyImage
 
 
 class SessionImageMixin:

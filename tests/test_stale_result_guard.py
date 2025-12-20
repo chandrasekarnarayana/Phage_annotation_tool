@@ -1,7 +1,5 @@
 """Unit tests for stale-result guard module."""
 
-import pytest
-
 from phage_annotator.stale_result_guard import (clear_job_id, gen_job_id, is_current_job,
                                                 store_current_job_id)
 

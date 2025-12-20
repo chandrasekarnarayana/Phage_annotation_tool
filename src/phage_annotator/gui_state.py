@@ -30,7 +30,7 @@ Thread Safety
 from __future__ import annotations
 
 import pathlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 from matplotlib.backends.qt_compat import QtCore
@@ -43,6 +43,9 @@ from phage_annotator.gui_debug import debug_log
 from phage_annotator.gui_image_io import load_array
 from phage_annotator.io import read_contiguous_block
 from phage_annotator.pyramid import downsample_mean_pool, pyramid_level_factor
+
+if TYPE_CHECKING:
+    from phage_annotator.image_models import LazyImage
 
 
 class StateMixin:

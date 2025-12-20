@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pathlib
 from matplotlib.backends.qt_compat import QtWidgets
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtWidgets
 
 
 class DensityPanel(QtWidgets.QWidget):

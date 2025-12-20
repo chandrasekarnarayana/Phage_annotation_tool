@@ -12,7 +12,7 @@ Dependencies:
 from __future__ import annotations
 
 import pathlib
-from typing import List, Optional
+from typing import List
 
 from matplotlib.backends.qt_compat import QtWidgets
 

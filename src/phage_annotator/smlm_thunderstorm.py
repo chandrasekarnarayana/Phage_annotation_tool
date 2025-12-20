@@ -152,7 +152,7 @@ def merge_localizations(locs: Sequence[Localization], radius_px: float) -> List[
     """Greedy merge of close localizations within the same frame."""
     if radius_px <= 0 or not locs:
         return list(locs)
-    remaining = sorted(locs, key=lambda l: l.photons, reverse=True)
+    remaining = sorted(locs, key=lambda loc: loc.photons, reverse=True)
     merged: List[Localization] = []
     r2 = float(radius_px) ** 2
     while remaining:

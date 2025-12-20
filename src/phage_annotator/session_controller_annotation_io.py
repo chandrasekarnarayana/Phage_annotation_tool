@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from matplotlib.backends.qt_compat import QtWidgets
 

@@ -16,7 +16,7 @@ import json
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable
 
 import pandas as pd
 

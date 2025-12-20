@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from phage_annotator.session_state import RoiSpec
+
+if TYPE_CHECKING:
+    from phage_annotator.display_mapping import DisplayMapping
 
 
 class SessionViewMixin:

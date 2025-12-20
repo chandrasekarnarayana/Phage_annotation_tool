@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 
 from phage_annotator.io import ImageMeta, load_images, standardize_axes

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import pathlib
 import time
-from matplotlib.backends.qt_compat import QtWidgets
+from typing import Optional
+
+import numpy as np
+from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 from phage_annotator.roi_manager import Roi, save_rois_json, load_rois_json
-from phage_annotator.analysis import roi_mask_from_points, roi_mean_timeseries, roi_stats
+from phage_annotator.analysis import roi_mask_from_points, roi_mean_timeseries
 
 
 class RoiControlsMixin:

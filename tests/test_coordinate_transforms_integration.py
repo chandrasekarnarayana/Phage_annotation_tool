@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 
 from phage_annotator.coordinate_transforms import (
-    crop_to_full,
     display_to_full,
     full_to_crop,
     full_to_display,
@@ -160,7 +159,6 @@ class TestCropDownsampleComposition:
 
     def test_crop_then_downsample(self):
         """Verify downsample scaling works after crop."""
-        crop_rect = (100.0, 50.0, 400.0, 300.0)
         downsample = 2.0
         
         y_crop, x_crop = 100.0, 200.0

@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from phage_annotator.annotation_index import AnnotationIndexEntry
+    from phage_annotator.annotations import Keypoint
+    from phage_annotator.image_models import LazyImage
 
 
 @dataclass

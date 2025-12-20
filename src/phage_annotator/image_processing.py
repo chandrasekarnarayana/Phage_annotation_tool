@@ -27,7 +27,7 @@ def load_image(path: pathlib.Path) -> "Image.Image":
 
 def save_image(image: "Image.Image", path: pathlib.Path, **kwargs: Any) -> None:
     """Save an image to disk."""
-    Image = _ensure_pillow()
+    _ensure_pillow()
     image.save(path, **kwargs)
 
 

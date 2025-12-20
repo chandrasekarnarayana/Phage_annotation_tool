@@ -7,8 +7,6 @@ Tests cover:
 """
 
 import numpy as np
-import pytest
-
 from phage_annotator.analysis import roi_mask_for_polygon, roi_mask_for_shape, roi_mask_from_points
 from phage_annotator.projection_cache import ProjectionCache
 

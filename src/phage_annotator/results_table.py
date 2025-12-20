@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import csv
 from io import StringIO
-from typing import Dict, Iterable, List
+from typing import Dict
 
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtWidgets
 
 RESULT_COLUMNS = [
     "image_name",

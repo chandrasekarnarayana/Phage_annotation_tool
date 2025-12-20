@@ -1,7 +1,5 @@
 """Unit tests for coordinate transformation module."""
 
-import pytest
-
 from phage_annotator.coordinate_transforms import (canvas_to_display, crop_rect_intersection,
                                                    crop_to_full, display_to_canvas, display_to_full,
                                                    full_to_crop, full_to_display,
