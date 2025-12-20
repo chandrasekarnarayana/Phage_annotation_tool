@@ -39,9 +39,9 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         self.dock_actions[spec.id] = action
         checkbox = None
         if spec.id == "hist":
-            checkbox = self.hist_chk
+            checkbox = getattr(self, "hist_chk", None)
         elif spec.id == "profile":
-            checkbox = self.profile_chk
+            checkbox = getattr(self, "profile_chk", None)
         wire_dock_action(self, dock, action, checkbox)
         dock.setVisible(spec.default_visible)
 
@@ -376,7 +376,8 @@ def make_logs_widget(self) -> QtWidgets.QWidget:
     logs_layout = QtWidgets.QVBoxLayout(logs_widget)
     logs_layout.setContentsMargins(8, 8, 8, 8)
     logs_layout.setSpacing(6)
-    logs_layout.addWidget(self.status)
+    if self.status is not None:
+        logs_layout.addWidget(self.status)
     self.cache_stats_label = QtWidgets.QLabel("Cache: 0 MB | Items: 0")
     logs_layout.addWidget(self.cache_stats_label)
     self.log_view = QtWidgets.QPlainTextEdit()

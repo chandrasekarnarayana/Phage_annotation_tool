@@ -238,6 +238,21 @@ class KeypointAnnotator(
         self.metadata_widget = None
         self.density_panel = None
         self._roi_controls_layout = None
+        
+        # Pre-initialize GUI widget stubs (will be properly set during _setup_ui)
+        self.status = None
+        self.hist_chk = None
+        self.profile_chk = None
+        self.show_hist_chk = None
+        self.show_profile_chk = None
+        self.hist_canvas = None
+        self.profile_canvas = None
+        self.hist_fig = None
+        self.profile_fig = None
+        self.ax_hist = None
+        self.ax_line = None
+        self.log_view = None
+        self.cache_stats_label = None
         self.controller = SessionController(
             self,
             images,
