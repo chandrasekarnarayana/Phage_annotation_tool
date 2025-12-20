@@ -647,6 +647,29 @@ class UiExtrasMixin:
         """Apply a named layout preset without overwriting saved custom layout."""
         self._preset_active = True
         if name == "Default":
+                        # Default: sidebar on EXPLORE (index 0), Annotation Table visible right
+                        self._set_sidebar_mode(0)  # Explore panel
+                        self._expand_sidebar()
+                        if self.dock_annotations is not None:
+                            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
+                            self.dock_annotations.setVisible(True)
+                        # Hide other docks
+                        for dock in [
+                            self.dock_roi,
+                            self.dock_roi_manager,
+                            self.dock_results,
+                            self.dock_hist,
+                            self.dock_profile,
+                            self.dock_logs,
+                            self.dock_threshold,
+                            self.dock_particles,
+                        ]:
+                            if dock is not None:
+                                dock.setVisible(False)
+                        return
+
+                    # Legacy Default behavior: restore saved geometry/state
+                    if name == "Default_Legacy":
             if self._default_geometry is not None:
                 self.restoreGeometry(self._default_geometry)
             if self._default_state is not None:
@@ -658,58 +681,73 @@ class UiExtrasMixin:
             self.dock_sidebar.setVisible(True)
 
         if name == "Minimal":
+                        # Minimal: sidebar collapsed, annotation table hidden, only Frame panel visible
+                        self._collapse_sidebar()
+                        if self.dock_annotations is not None:
+                            self.dock_annotations.setVisible(False)
+                        # Hide all other docks
             for dock in [
-                self.dock_annotations,
                 self.dock_roi,
+                                self.dock_roi_manager,
+                                self.dock_results,
+                                self.dock_threshold,
+                                self.dock_particles,
                 self.dock_hist,
                 self.dock_profile,
                 self.dock_logs,
-                self.dock_orthoview,
             ]:
                 if dock is not None:
                     dock.setVisible(False)
             return
 
         if name == "Annotate":
+                        # Annotate: sidebar on ANNOTATE (index 1), Annotation Table visible right, others hidden
+                        self._set_sidebar_mode(1)  # Annotate panel
+                        self._expand_sidebar()
             if self.dock_annotations is not None:
                 self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
                 self.dock_annotations.setVisible(True)
-            if self.dock_roi is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_roi)
-                self.dock_roi.setVisible(True)
-                if self.dock_annotations is not None:
-                    self.tabifyDockWidget(self.dock_annotations, self.dock_roi)
-            if self.dock_hist is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_hist)
-                self.dock_hist.setVisible(True)
-            if self.dock_profile is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_profile)
-                self.dock_profile.setVisible(True)
-                if self.dock_hist is not None:
-                    self.tabifyDockWidget(self.dock_hist, self.dock_profile)
-            if self.dock_logs is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_logs)
-                self.dock_logs.setVisible(True)
-            if self.dock_orthoview is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_orthoview)
-                self.dock_orthoview.setVisible(True)
+            # Hide all other docks (annotate panel has tools inside sidebar)
+            for dock in [
+                self.dock_roi,
+                self.dock_roi_manager,
+                self.dock_results,
+                self.dock_threshold,
+                self.dock_particles,
+                self.dock_hist,
+                self.dock_profile,
+                self.dock_logs,
+            ]:
+                if dock is not None:
+                    dock.setVisible(False)
             return
 
         if name == "Analyze":
+            # Analyze: sidebar on ANALYZE (index 5), Results + Threshold bottom, Annotation Table visible
+            self._set_sidebar_mode(5)  # Analyze panel
+            self._expand_sidebar()
             if self.dock_annotations is not None:
-                self.dock_annotations.setVisible(False)
-            if self.dock_roi is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_roi)
-                self.dock_roi.setVisible(True)
-            if self.dock_hist is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_hist)
-                self.dock_hist.setVisible(True)
-            if self.dock_profile is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_profile)
-                self.dock_profile.setVisible(True)
-                if self.dock_hist is not None:
-                    self.tabifyDockWidget(self.dock_hist, self.dock_profile)
-            if self.dock_logs is not None:
+                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
+                self.dock_annotations.setVisible(True)
+            # Show Results and Threshold in bottom area
+            if self.dock_results is not None:
+                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_results)
+                self.dock_results.setVisible(True)
+            if self.dock_threshold is not None:
+                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_threshold)
+                self.dock_threshold.setVisible(True)
+                if self.dock_results is not None:
+                    self.tabifyDockWidget(self.dock_results, self.dock_threshold)
+            # Hide histogram/profile/logs
+            for dock in [
+                self.dock_roi,
+                self.dock_roi_manager,
+                self.dock_particles,
+                self.dock_hist,
+                self.dock_profile,
+                            ]:
+                                if dock is not None:
+                                    dock.setVisible(False)
                 self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_logs)
                 self.dock_logs.setVisible(True)
             if self.dock_orthoview is not None:
