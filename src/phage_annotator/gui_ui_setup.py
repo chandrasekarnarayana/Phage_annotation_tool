@@ -432,6 +432,92 @@ class UiSetupMixin:
         adv_layout.addWidget(self.axis_mode_combo, r, 1)
         r += 1
 
+        # PHASE 2D FIX: Add marker and click radius controls (were missing, causing AttributeError)
+        self.marker_size_spin = QtWidgets.QSpinBox()
+        self.marker_size_spin.setRange(1, 100)
+        self.marker_size_spin.setValue(self.marker_size)
+        self.click_radius_spin = QtWidgets.QDoubleSpinBox()
+        self.click_radius_spin.setRange(1, 50)
+        self.click_radius_spin.setValue(self.click_radius_px)
+        adv_layout.addWidget(QtWidgets.QLabel("Marker size"), r, 0)
+        adv_layout.addWidget(self.marker_size_spin, r, 1)
+        adv_layout.addWidget(QtWidgets.QLabel("Click radius (px)"), r, 2)
+        adv_layout.addWidget(self.click_radius_spin, r, 3)
+        r += 1
+
+        # PHASE 2D FIX: Add annotation visibility controls
+        vis_opts = QtWidgets.QHBoxLayout()
+        self.show_ann_master_chk = QtWidgets.QCheckBox("Show annotations")
+        self.show_ann_master_chk.setChecked(True)
+        self.show_frame_chk = QtWidgets.QCheckBox("Frame")
+        self.show_mean_chk = QtWidgets.QCheckBox("Mean")
+        self.show_comp_chk = QtWidgets.QCheckBox("Composite")
+        self.show_support_chk = QtWidgets.QCheckBox("Support")
+        self.show_frame_chk.setChecked(True)
+        self.show_mean_chk.setChecked(True)
+        self.show_comp_chk.setChecked(True)
+        self.show_support_chk.setChecked(False)
+        vis_opts.addWidget(self.show_ann_master_chk)
+        vis_opts.addWidget(self.show_frame_chk)
+        vis_opts.addWidget(self.show_mean_chk)
+        vis_opts.addWidget(self.show_comp_chk)
+        vis_opts.addWidget(self.show_support_chk)
+        adv_layout.addWidget(QtWidgets.QLabel("Annotation visibility"), r, 0)
+        adv_layout.addLayout(vis_opts, r, 1, 1, 3)
+        r += 1
+
+        # PHASE 2D FIX: Add profile controls (profile_clear_btn was missing)
+        profile_controls = QtWidgets.QHBoxLayout()
+        # Note: self.profile_chk already created in make_profile_widget(), but we need profile_clear_btn
+        self.profile_clear_btn = QtWidgets.QPushButton("Clear profile")
+        profile_controls.addWidget(self.profile_clear_btn)
+        adv_layout.addWidget(QtWidgets.QLabel("Line profile actions"), r, 0)
+        adv_layout.addLayout(profile_controls, r, 1, 1, 3)
+        r += 1
+
+        # PHASE 2D FIX: Add histogram controls (hist_region_combo, hist_scope_combo were missing)
+        hist_controls = QtWidgets.QHBoxLayout()
+        self.hist_region_combo = QtWidgets.QComboBox()
+        self.hist_region_combo.addItems(["ROI", "Full"])
+        self.hist_scope_combo = QtWidgets.QComboBox()
+        self.hist_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
+        self.hist_bins_spin = QtWidgets.QSpinBox()
+        self.hist_bins_spin.setRange(10, 512)
+        self.hist_bins_spin.setValue(64)
+        hist_controls.addWidget(QtWidgets.QLabel("Region:"))
+        hist_controls.addWidget(self.hist_region_combo)
+        hist_controls.addWidget(QtWidgets.QLabel("Scope:"))
+        hist_controls.addWidget(self.hist_scope_combo)
+        hist_controls.addWidget(QtWidgets.QLabel("Bins:"))
+        hist_controls.addWidget(self.hist_bins_spin)
+        adv_layout.addWidget(QtWidgets.QLabel("Histogram"), r, 0)
+        adv_layout.addLayout(hist_controls, r, 1, 1, 3)
+        r += 1
+
+        # PHASE 2D FIX: Add correction checkboxes
+        corr_controls = QtWidgets.QHBoxLayout()
+        self.illum_corr_chk = QtWidgets.QCheckBox("Illumination correction")
+        self.bleach_corr_chk = QtWidgets.QCheckBox("Photobleaching correction")
+        corr_controls.addWidget(self.illum_corr_chk)
+        corr_controls.addWidget(self.bleach_corr_chk)
+        adv_layout.addWidget(QtWidgets.QLabel("Corrections"), r, 0)
+        adv_layout.addLayout(corr_controls, r, 1, 1, 3)
+        r += 1
+
+        # PHASE 2D FIX: Add ROI shape controls (roi_shape_group was missing)
+        self.roi_shape_group = QtWidgets.QButtonGroup()
+        roi_rect = QtWidgets.QRadioButton("Rectangle")
+        roi_circle = QtWidgets.QRadioButton("Circle")
+        roi_rect.setChecked(True)
+        self.roi_shape_group.addButton(roi_rect)
+        self.roi_shape_group.addButton(roi_circle)
+        roi_shape_layout = QtWidgets.QHBoxLayout()
+        roi_shape_layout.addWidget(roi_rect)
+        roi_shape_layout.addWidget(roi_circle)
+        adv_layout.addWidget(QtWidgets.QLabel("ROI shape"), r, 0)
+        adv_layout.addLayout(roi_shape_layout, r, 1, 1, 3)
+        r += 1
+
         self.cache_budget_spin = QtWidgets.QSpinBox()
         self.cache_budget_spin.setRange(64, 8192)
         self.cache_budget_spin.setValue(int(self._settings.value("cacheMaxMB", 1024, type=int)))

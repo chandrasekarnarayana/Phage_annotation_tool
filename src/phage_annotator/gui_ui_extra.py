@@ -99,6 +99,14 @@ class UiExtrasMixin:
         tool_layout = QtWidgets.QVBoxLayout(tool_group)
         self.tool_label = QtWidgets.QLabel("Tool: Annotate")
         tool_layout.addWidget(self.tool_label)
+        
+        # ARCHITECTURAL FIX: Add profile_mode_chk to prevent AttributeError in _set_profile_mode()
+        # This checkbox enables click-two-points line profile mode
+        # Phase 2D: This should be part of ToolState dataclass
+        self.profile_mode_chk = QtWidgets.QCheckBox("Profile mode (click two points)")
+        self.profile_mode_chk.setChecked(False)
+        tool_layout.addWidget(self.profile_mode_chk)
+        
         layout.addWidget(tool_group)
 
         layout.addStretch(1)

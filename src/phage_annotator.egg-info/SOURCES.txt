@@ -8,6 +8,7 @@ src/phage_annotator/analyze_particles_panel.py
 src/phage_annotator/annotation_index.py
 src/phage_annotator/annotation_metadata.py
 src/phage_annotator/annotations.py
+src/phage_annotator/auto_roi.py
 src/phage_annotator/calibration.py
 src/phage_annotator/cli.py
 src/phage_annotator/config.py
@@ -36,6 +37,7 @@ src/phage_annotator/gui_controls_threshold.py
 src/phage_annotator/gui_debug.py
 src/phage_annotator/gui_events.py
 src/phage_annotator/gui_export.py
+src/phage_annotator/gui_file_actions.py
 src/phage_annotator/gui_image_io.py
 src/phage_annotator/gui_jobs.py
 src/phage_annotator/gui_mpl.py
@@ -95,7 +97,10 @@ src/phage_annotator.egg-info/requires.txt
 src/phage_annotator.egg-info/top_level.txt
 tests/test_annotations.py
 tests/test_annotations_roundtrip.py
+tests/test_auto_roi.py
 tests/test_coordinate_transforms.py
+tests/test_coordinate_transforms_integration.py
+tests/test_critical_logic.py
 tests/test_gui_basic.py
 tests/test_io.py
 tests/test_io_axes.py

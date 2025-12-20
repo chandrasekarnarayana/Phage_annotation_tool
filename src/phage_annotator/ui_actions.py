@@ -29,6 +29,47 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
 
     view_menu = menubar.addMenu("&View")
     dock_panels_menu = view_menu.addMenu("Dock Panels")
+    
+    # ARCHITECTURAL FIX: Create missing toggle actions that are referenced in gui_ui_setup.py
+    # These were being connected but never created, causing AttributeError on GUI launch.
+    # Phase 2D: These should be part of an explicit ViewActions dataclass.
+    self.toggle_profile_act = view_menu.addAction("Toggle Line Profile")
+    self.toggle_profile_act.setCheckable(True)
+    self.toggle_profile_act.setChecked(True)
+    
+    self.toggle_hist_act = view_menu.addAction("Toggle Histogram")
+    self.toggle_hist_act.setCheckable(True)
+    self.toggle_hist_act.setChecked(True)
+    
+    self.toggle_left_act = view_menu.addAction("Toggle Left Pane")
+    self.toggle_left_act.setCheckable(True)
+    self.toggle_left_act.setChecked(True)
+    
+    self.toggle_settings_act = view_menu.addAction("Toggle Settings")
+    self.toggle_settings_act.setCheckable(True)
+    self.toggle_settings_act.setChecked(True)
+    
+    self.toggle_logs_act = view_menu.addAction("Toggle Logs")
+    self.toggle_logs_act.setCheckable(True)
+    self.toggle_logs_act.setChecked(True)
+    
+    self.overlay_act = view_menu.addAction("Overlay")
+    self.overlay_act.setCheckable(True)
+    self.overlay_act.setChecked(True)
+    
+    self.toggle_overlay_act = view_menu.addAction("Toggle Overlay (All)")
+    self.toggle_overlay_act.setCheckable(True)
+    self.toggle_overlay_act.setChecked(True)
+    
+    self.save_layout_act = view_menu.addAction("Save Layout")
+    
+    self.layout_preset_annotate_act = view_menu.addAction("Layout: Annotate")
+    self.layout_preset_analyze_act = view_menu.addAction("Layout: Analyze")
+    self.layout_preset_minimal_act = view_menu.addAction("Layout: Minimal")
+    self.layout_preset_default_act = view_menu.addAction("Layout: Default")
+    
+    view_menu.addSeparator()
+    
     overlays_menu = view_menu.addMenu("SMLM Overlays")
     self.show_smlm_points_act = overlays_menu.addAction("Localization Points")
     self.show_smlm_points_act.setCheckable(True)

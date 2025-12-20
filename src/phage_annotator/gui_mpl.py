@@ -276,6 +276,8 @@ class KeypointAnnotator(
         self.ax_line = None  # Matplotlib axes for profile line plot
         self.log_view = None  # QPlainTextEdit for debug logs
         self.cache_stats_label = None  # Status label for cache statistics
+        self.profile_mode_chk = None  # Checkbox for profile mode (created in annotation controls)
+        # ==============================================================================================
         self.controller = SessionController(
             self,
             images,
