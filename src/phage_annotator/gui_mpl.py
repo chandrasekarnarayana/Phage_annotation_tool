@@ -290,6 +290,7 @@ class KeypointAnnotator(
         self._particles_overlays: List[tuple] = []
         self._particles_selected: Optional[int] = None
         self._particles_job_id: Optional[str] = None
+        self._auto_roi_job_id: Optional[str] = None
         self._hist_cache = None
         self._hist_cache_key = None
         self._hist_last_time = 0.0

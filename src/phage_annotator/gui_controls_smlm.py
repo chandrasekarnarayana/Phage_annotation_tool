@@ -10,8 +10,7 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.analysis import roi_mask_for_shape
-from phage_annotator.deepstorm_infer import (DeepStormParams, is_torch_available,
-                                             run_deepstorm_stream)
+from phage_annotator.deepstorm_infer import DeepStormParams, is_torch_available, run_deepstorm_stream
 from phage_annotator.smlm_thunderstorm import SmlmParams, run_smlm_stream
 
 
@@ -61,9 +60,9 @@ class SmlmControlsMixin:
             return
         if warn:
             thunder.status_label.setText(warn)
+
         self.stop_playback_t()
         self._cancel_smlm()
-
         arr = self.primary_image.array
         t_count = int(arr.shape[0])
         _, z_idx = self._slice_indices(self.primary_image)
@@ -85,6 +84,7 @@ class SmlmControlsMixin:
         if not roi_mask.any():
             thunder.status_label.setText("ROI has no pixels in crop.")
             return
+
         cal = self._get_calibration_state(self.primary_image.id)
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
         job_gen = self._job_generation
@@ -120,12 +120,10 @@ class SmlmControlsMixin:
             return (locs, sr, roi_rect, crop_offset, image_id, job_gen, run_id, t_count)
 
         def _on_result(result) -> None:
+            if result is None:
+                return
             locs, sr, roi_rect_full, crop_off, img_id, gen, res_run_id, frames = result
-            if (
-                gen != self._job_generation
-                or img_id != self.primary_image.id
-                or res_run_id != self._smlm_run_id
-            ):
+            if gen != self._job_generation or img_id != self.primary_image.id or res_run_id != self._smlm_run_id:
                 return
             self._smlm_results = locs
             self._smlm_overlay = sr
@@ -148,15 +146,12 @@ class SmlmControlsMixin:
             self._refresh_image()
 
         def _on_error(err: str) -> None:
-            if self.smlm_panel is not None:
-                thunder.status_label.setText("Error (see Logs).")
+            thunder.status_label.setText("Error (see Logs).")
             thunder.run_btn.setEnabled(True)
             thunder.cancel_btn.setEnabled(False)
             self._append_log(f"[SMLM] Error\n{err}")
 
         def _on_progress(val: int, msg: str) -> None:
-            if self.smlm_panel is None:
-                return
             thunder.progress.setValue(val)
             if msg:
                 thunder.status_label.setText(msg)
@@ -176,7 +171,7 @@ class SmlmControlsMixin:
         self._append_log(f"[SMLM] ThunderSTORM started job={self._smlm_job_id} frames={t_count}")
 
     def _cancel_smlm(self) -> None:
-        if getattr(self, "_smlm_job_id", None) is None:
+        if self._smlm_job_id is None:
             return
         self.jobs.cancel(self._smlm_job_id)
         self._smlm_job_id = None
@@ -187,13 +182,11 @@ class SmlmControlsMixin:
             thunder.run_btn.setEnabled(True)
 
     def _export_smlm_csv(self) -> None:
-        if not getattr(self, "_smlm_results", None):
+        if not self._smlm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("No SMLM results to export.")
             return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export SMLM CSV", "", "CSV Files (*.csv)"
-        )
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export SMLM CSV", "", "CSV Files (*.csv)")
         if not path:
             return
         with open(path, "w", newline="") as f:
@@ -227,7 +220,7 @@ class SmlmControlsMixin:
             self.smlm_panel.thunder.status_label.setText(f"Exported CSV: {path}")
 
     def _export_smlm_hdf5(self) -> None:
-        if not getattr(self, "_smlm_results", None):
+        if not self._smlm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("No SMLM results to export.")
             return
@@ -237,9 +230,7 @@ class SmlmControlsMixin:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("h5py not available.")
             return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export SMLM HDF5", "", "HDF5 Files (*.h5)"
-        )
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export SMLM HDF5", "", "HDF5 Files (*.h5)")
         if not path:
             return
         data = np.zeros(
@@ -255,22 +246,14 @@ class SmlmControlsMixin:
             ],
         )
         for i, loc in enumerate(self._smlm_results):
-            data[i] = (
-                loc.frame_index,
-                loc.x_px,
-                loc.y_px,
-                loc.sigma_px,
-                loc.photons,
-                loc.background,
-                loc.uncertainty_px,
-            )
+            data[i] = (loc.frame_index, loc.x_px, loc.y_px, loc.sigma_px, loc.photons, loc.background, loc.uncertainty_px)
         with h5py.File(path, "w") as f:
             f.create_dataset("localizations", data=data, compression="gzip")
         if self.smlm_panel is not None:
             self.smlm_panel.thunder.status_label.setText(f"Exported HDF5: {path}")
 
     def _smlm_to_annotations(self) -> None:
-        if not getattr(self, "_smlm_results", None):
+        if not self._smlm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("No SMLM results to add.")
             return
@@ -345,9 +328,9 @@ class SmlmControlsMixin:
             return
         if warn:
             deep.status_label.setText(warn)
+
         self.stop_playback_t()
         self._cancel_deepstorm()
-
         arr = self.primary_image.array
         t_count = int(arr.shape[0])
         _, z_idx = self._slice_indices(self.primary_image)
@@ -398,7 +381,7 @@ class SmlmControlsMixin:
                     if x0 != 0 or y0 != 0 or x1 != full_w or y1 != full_h:
                         frame = frame[y0:y1, x0:x1]
                     if rx0 > 0 or ry0 > 0 or rx1 < crop_w or ry1 < crop_h:
-                        frame = frame[int(ry0) : int(ry1), int(rx0) : int(rx1)]
+                        frame = frame[int(ry0):int(ry1), int(rx0):int(rx1)]
                     yield (t, frame)
 
             def _progress_cb(val: int, msg: str) -> None:
@@ -416,12 +399,10 @@ class SmlmControlsMixin:
             return (sr, locs, eff_roi_full, crop_offset, image_id, job_gen, run_id, t_count)
 
         def _on_result(result) -> None:
+            if result is None:
+                return
             sr, locs, roi_rect_full, crop_off, img_id, gen, res_run_id, frames = result
-            if (
-                gen != self._job_generation
-                or img_id != self.primary_image.id
-                or res_run_id != self._deepstorm_run_id
-            ):
+            if gen != self._job_generation or img_id != self.primary_image.id or res_run_id != self._deepstorm_run_id:
                 return
             self._deepstorm_results = locs
             self._deepstorm_overlay = sr
@@ -444,15 +425,12 @@ class SmlmControlsMixin:
             self._refresh_image()
 
         def _on_error(err: str) -> None:
-            if self.smlm_panel is not None:
-                deep.status_label.setText("Error (see Logs).")
+            deep.status_label.setText("Error (see Logs).")
             deep.run_btn.setEnabled(True)
             deep.cancel_btn.setEnabled(False)
             self._append_log(f"[Deep-STORM] Error\n{err}")
 
         def _on_progress(val: int, msg: str) -> None:
-            if self.smlm_panel is None:
-                return
             deep.progress.setValue(val)
             if msg:
                 deep.status_label.setText(msg)
@@ -472,7 +450,7 @@ class SmlmControlsMixin:
         self._append_log(f"[SMLM] Deep-STORM started job={self._deepstorm_job_id} frames={t_count}")
 
     def _cancel_deepstorm(self) -> None:
-        if getattr(self, "_deepstorm_job_id", None) is None:
+        if self._deepstorm_job_id is None:
             return
         self.jobs.cancel(self._deepstorm_job_id)
         self._deepstorm_job_id = None
@@ -483,13 +461,11 @@ class SmlmControlsMixin:
             deep.run_btn.setEnabled(True)
 
     def _export_deepstorm_csv(self) -> None:
-        if not getattr(self, "_deepstorm_results", None):
+        if not self._deepstorm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.deep.status_label.setText("No Deep-STORM results.")
             return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export Deep-STORM CSV", "", "CSV Files (*.csv)"
-        )
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export Deep-STORM CSV", "", "CSV Files (*.csv)")
         if not path:
             return
         with open(path, "w", newline="") as f:
@@ -501,7 +477,7 @@ class SmlmControlsMixin:
             self.smlm_panel.deep.status_label.setText(f"Exported CSV: {path}")
 
     def _export_deepstorm_sr(self) -> None:
-        if getattr(self, "_deepstorm_overlay", None) is None:
+        if self._deepstorm_overlay is None:
             if self.smlm_panel is not None:
                 self.smlm_panel.deep.status_label.setText("No SR image to export.")
             return
@@ -522,7 +498,7 @@ class SmlmControlsMixin:
             self.smlm_panel.deep.status_label.setText(f"Exported SR image: {path}")
 
     def _deepstorm_to_annotations(self) -> None:
-        if not getattr(self, "_deepstorm_results", None):
+        if not self._deepstorm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.deep.status_label.setText("No Deep-STORM results to add.")
             return
@@ -573,9 +549,7 @@ class SmlmControlsMixin:
             warn = "Fit radius outside recommended range (3–5 px)."
         return None, warn
 
-    def _validate_deepstorm_params(
-        self, params: DeepStormParams
-    ) -> Tuple[Optional[str], Optional[str]]:
+    def _validate_deepstorm_params(self, params: DeepStormParams) -> Tuple[Optional[str], Optional[str]]:
         if params.patch_size not in (64, 96, 128):
             return "Patch size must be 64/96/128.", None
         if params.overlap < 0 or params.overlap >= params.patch_size:
@@ -615,11 +589,11 @@ class SmlmControlsMixin:
         if not path:
             return None
         try:
-            import hashlib
-
             p = pathlib.Path(path)
             if not p.exists():
                 return None
+            import hashlib
+
             h = hashlib.sha256()
             with p.open("rb") as f:
                 for chunk in iter(lambda: f.read(1024 * 1024), b""):
@@ -629,7 +603,7 @@ class SmlmControlsMixin:
             return None
 
     def _rerun_last_smlm(self) -> None:
-        if not getattr(self, "_last_smlm_run", None):
+        if not self._last_smlm_run:
             self._set_status("No SMLM run to re-run.")
             return
         method = self._last_smlm_run.get("method")
@@ -640,53 +614,35 @@ class SmlmControlsMixin:
             thunder = self.smlm_panel.thunder
             self.smlm_panel.tabs.setCurrentIndex(0)
             thunder.sigma_spin.setValue(float(params.get("sigma_px", thunder.sigma_spin.value())))
-            thunder.fit_radius_spin.setValue(
-                int(params.get("fit_radius_px", thunder.fit_radius_spin.value()))
-            )
-            thunder.det_thr_spin.setValue(
-                float(params.get("detection_thr_sigma", thunder.det_thr_spin.value()))
-            )
+            thunder.fit_radius_spin.setValue(int(params.get("fit_radius_px", thunder.fit_radius_spin.value())))
+            thunder.det_thr_spin.setValue(float(params.get("detection_thr_sigma", thunder.det_thr_spin.value())))
             thunder.max_candidates_spin.setValue(
                 int(params.get("max_candidates_per_frame", thunder.max_candidates_spin.value()))
             )
-            thunder.merge_radius_spin.setValue(
-                float(params.get("merge_radius_px", thunder.merge_radius_spin.value()))
-            )
-            thunder.min_photons_spin.setValue(
-                float(params.get("min_photons", thunder.min_photons_spin.value()))
-            )
-            thunder.render_combo.setCurrentText(
-                str(params.get("render_mode", thunder.render_combo.currentText()))
-            )
+            thunder.merge_radius_spin.setValue(float(params.get("merge_radius_px", thunder.merge_radius_spin.value())))
+            thunder.min_photons_spin.setValue(float(params.get("min_photons", thunder.min_photons_spin.value())))
+            thunder.render_combo.setCurrentText(str(params.get("render_mode", thunder.render_combo.currentText())))
             self._run_smlm()
         elif method == "Deep-STORM":
             deep = self.smlm_panel.deep
             self.smlm_panel.tabs.setCurrentIndex(1)
             deep.model_path_edit.setText(str(params.get("model_path", deep.model_path_edit.text())))
-            deep.patch_combo.setCurrentText(
-                str(params.get("patch_size", deep.patch_combo.currentText()))
-            )
+            deep.patch_combo.setCurrentText(str(params.get("patch_size", deep.patch_combo.currentText())))
             deep.overlap_spin.setValue(int(params.get("overlap", deep.overlap_spin.value())))
             deep.upsample_spin.setValue(int(params.get("upsample", deep.upsample_spin.value())))
             deep.sigma_spin.setValue(float(params.get("sigma_px", deep.sigma_spin.value())))
-            deep.normalize_combo.setCurrentText(
-                str(params.get("normalize_mode", deep.normalize_combo.currentText()))
-            )
-            deep.output_combo.setCurrentText(
-                str(params.get("output_mode", deep.output_combo.currentText()))
-            )
+            deep.normalize_combo.setCurrentText(str(params.get("normalize_mode", deep.normalize_combo.currentText())))
+            deep.output_combo.setCurrentText(str(params.get("output_mode", deep.output_combo.currentText())))
             deep.window_spin.setValue(int(params.get("window_size", deep.window_spin.value())))
-            deep.agg_combo.setCurrentText(
-                str(params.get("aggregation_mode", deep.agg_combo.currentText()))
-            )
+            deep.agg_combo.setCurrentText(str(params.get("aggregation_mode", deep.agg_combo.currentText())))
             self._run_deepstorm()
 
     def _toggle_smlm_points(self) -> None:
         if getattr(self, "show_smlm_points_act", None) is not None:
             self.show_smlm_points = self.show_smlm_points_act.isChecked()
-        self._refresh_image()
+            self._refresh_image()
 
     def _toggle_smlm_sr(self) -> None:
         if getattr(self, "show_smlm_sr_act", None) is not None:
             self.show_sr_overlay = self.show_smlm_sr_act.isChecked()
-        self._refresh_image()
+            self._refresh_image()

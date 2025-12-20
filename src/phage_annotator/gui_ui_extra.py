@@ -298,6 +298,8 @@ class UiExtrasMixin:
         }
 
     def _set_roi_shape(self, shape: str) -> None:
+        if hasattr(self, "controller") and self.controller is not None:
+            self.controller.set_roi(self.roi_rect, shape=shape)
         self.roi_shape = shape
         buttons = self.roi_shape_group.buttons()
         if buttons:

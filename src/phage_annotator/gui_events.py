@@ -73,6 +73,21 @@ class EventsMixin:
         self.crop_y_spin.valueChanged.connect(self._on_crop_change)
         self.crop_w_spin.valueChanged.connect(self._on_crop_change)
         self.crop_h_spin.valueChanged.connect(self._on_crop_change)
+        if getattr(self, "auto_roi_btn", None) is not None:
+            self.auto_roi_btn.clicked.connect(self._run_auto_roi)
+        if getattr(self, "auto_roi_mode_combo", None) is not None:
+            self.auto_roi_mode_combo.currentTextChanged.connect(self._auto_roi_mode_changed)
+            self._auto_roi_mode_changed(self.auto_roi_mode_combo.currentText())
+        if getattr(self, "auto_roi_shape_combo", None) is not None:
+            self.auto_roi_shape_combo.currentTextChanged.connect(self._persist_auto_roi_settings)
+        if getattr(self, "auto_roi_mode_combo", None) is not None:
+            self.auto_roi_mode_combo.currentTextChanged.connect(self._persist_auto_roi_settings)
+        if getattr(self, "auto_roi_w_spin", None) is not None:
+            self.auto_roi_w_spin.valueChanged.connect(self._persist_auto_roi_settings)
+        if getattr(self, "auto_roi_h_spin", None) is not None:
+            self.auto_roi_h_spin.valueChanged.connect(self._persist_auto_roi_settings)
+        if getattr(self, "auto_roi_area_spin", None) is not None:
+            self.auto_roi_area_spin.valueChanged.connect(self._persist_auto_roi_settings)
         self.annot_table.itemSelectionChanged.connect(self._on_table_selection)
         self.annot_table.itemChanged.connect(self._on_table_item_changed)
         self.show_ann_master_chk.stateChanged.connect(self._refresh_image)

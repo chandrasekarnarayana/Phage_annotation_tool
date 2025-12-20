@@ -40,6 +40,8 @@ class AnnotationsMixin:
         self._mark_dirty()
 
     def _set_roi_rect(self, rect: Tuple[float, float, float, float]) -> None:
+        if hasattr(self, "controller") and self.controller is not None:
+            self.controller.set_roi(rect, shape=self.roi_shape)
         self.roi_rect = rect
         self.roi_x_spin.blockSignals(True)
         self.roi_y_spin.blockSignals(True)

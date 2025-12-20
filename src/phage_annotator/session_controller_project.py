@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import pathlib
 from datetime import datetime
+import pathlib
 from typing import Dict, Iterable, List, Optional
 
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.annotations import Keypoint, keypoints_from_json, save_keypoints_json
-from phage_annotator.density_config import DensityConfig
 from phage_annotator.display_mapping import DisplayMapping, mapping_from_dict, mapping_to_dict
+from phage_annotator.density_config import DensityConfig
 from phage_annotator.project_io import load_project, save_project
 from phage_annotator.roi_manager import Roi, roi_from_dict
-from phage_annotator.session_state import SessionState
 
 
 class SessionProjectMixin:
@@ -61,9 +60,7 @@ class SessionProjectMixin:
     ) -> None:
         display_mappings: Dict[int, Dict[str, dict]] = {}
         for image_id, panels in self.display_mapping.per_image.items():
-            display_mappings[image_id] = {
-                panel: mapping_to_dict(mapping) for panel, mapping in panels.items()
-            }
+            display_mappings[image_id] = {panel: mapping_to_dict(mapping) for panel, mapping in panels.items()}
         save_project(
             path,
             self.session_state.images,
@@ -81,9 +78,7 @@ class SessionProjectMixin:
 
     def load_project(self, parent: QtWidgets.QWidget, path: pathlib.Path, read_metadata) -> bool:
         try:
-            image_entries, settings, ann_map, roi_map, thr_map, part_map, import_map = load_project(
-                path
-            )
+            image_entries, settings, ann_map, roi_map, thr_map, part_map, import_map = load_project(path)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Load project failed", str(exc))
             return False
@@ -106,17 +101,14 @@ class SessionProjectMixin:
                 }
             if idx in roi_map:
                 rois_by_image[idx] = [
-                    roi_from_dict(r, ridx)
-                    for ridx, r in enumerate(roi_map[idx])
-                    if isinstance(r, dict)
+                    roi_from_dict(r, ridx) for ridx, r in enumerate(roi_map[idx]) if isinstance(r, dict)
                 ]
         for idx, ann_path in ann_map.items():
             if ann_path and ann_path.exists():
                 try:
-                    annotations[idx] = keypoints_from_json(ann_path)
+                    annotations[int(idx)] = keypoints_from_json(ann_path)
                 except Exception:
-                    annotations[idx] = []
-
+                    annotations[int(idx)] = []
         self.session_state.images = images
         self.session_state.annotations = annotations
         self.session_state.annotation_index = {}
@@ -124,6 +116,7 @@ class SessionProjectMixin:
             img.id: bool(self.session_state.annotations.get(img.id)) for img in images
         }
         self.session_state.image_states = {img.id: self._build_image_state(img) for img in images}
+
         if display_per_image:
             self.display_mapping.per_image = display_per_image
         if rois_by_image:
@@ -134,21 +127,15 @@ class SessionProjectMixin:
             self.session_state.particles_configs_by_image = {int(k): v for k, v in part_map.items()}
         if import_map:
             self.session_state.annotation_imports = {int(k): v for k, v in import_map.items()}
+
         self.session_state.project_path = path
         self.session_state.project_save_time = path.stat().st_mtime if path.exists() else None
         self.session_state.active_primary_id = int(settings.get("last_fov_index", 0))
-        self.session_state.active_support_id = int(
-            settings.get("last_support_index", min(1, len(images) - 1))
-        )
+        self.session_state.active_support_id = int(settings.get("last_support_index", min(1, len(images) - 1)))
         self.session_state.smlm_runs = list(settings.get("smlm_runs", []))
         self.session_state.threshold_settings = dict(settings.get("threshold_settings", {}))
-        self.session_state.threshold_configs_by_image = dict(
-            settings.get("threshold_configs_by_image", {})
-        )
-        self.session_state.particles_configs_by_image = dict(
-            settings.get("particles_configs_by_image", {})
-        )
-
+        self.session_state.threshold_configs_by_image = dict(settings.get("threshold_configs_by_image", {}))
+        self.session_state.particles_configs_by_image = dict(settings.get("particles_configs_by_image", {}))
         density_cfg = settings.get("density_config")
         if isinstance(density_cfg, dict):
             self.density_config = DensityConfig(**density_cfg)
@@ -160,11 +147,16 @@ class SessionProjectMixin:
         self.density_model_path = settings.get("density_model_path")
         self.density_device = settings.get("density_device", "auto")
         self.density_target_panel = settings.get("density_target_panel", "frame")
+        self._settings.setValue("autoRoiShape", settings.get("auto_roi_shape", "box"))
+        self._settings.setValue("autoRoiMode", settings.get("auto_roi_mode", "W/H"))
+        self._settings.setValue("autoRoiW", int(settings.get("auto_roi_w", 100)))
+        self._settings.setValue("autoRoiH", int(settings.get("auto_roi_h", 100)))
+        self._settings.setValue("autoRoiArea", int(settings.get("auto_roi_area", 100 * 100)))
 
         self._undo_stack.clear()
         self._redo_stack.clear()
         lut = settings.get("lut", 0)
-        if isinstance(lut, str) and hasattr(self, "_colormaps") and lut in self._colormaps:
+        if isinstance(lut, str) and lut in self._colormaps:
             self.set_lut(self._colormaps.index(lut))
         else:
             try:
@@ -177,9 +169,7 @@ class SessionProjectMixin:
         self.annotations_changed.emit()
         return True
 
-    def autosave_if_needed(
-        self, parent: QtWidgets.QWidget, current_keypoints
-    ) -> Optional[pathlib.Path]:
+    def autosave_if_needed(self, parent: QtWidgets.QWidget, current_keypoints) -> Optional[pathlib.Path]:
         if not self._settings.value("autosaveRecoveryEnabled", True, type=bool):
             return None
         if not self.session_state.dirty:
@@ -190,9 +180,7 @@ class SessionProjectMixin:
         recovery_dir = project_dir / ".recovery"
         recovery_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        primary_name = pathlib.Path(
-            self.session_state.images[self.session_state.active_primary_id].name
-        ).stem
+        primary_name = pathlib.Path(self.session_state.images[self.session_state.active_primary_id].name).stem
         recovery_path = recovery_dir / f"{ts}_{primary_name}.annotations.json"
         points = current_keypoints()
         save_keypoints_json(points, recovery_path)
@@ -206,11 +194,7 @@ class SessionProjectMixin:
         recovery_dir = self.session_state.project_path.parent / ".recovery"
         if not recovery_dir.exists():
             return
-        candidates = sorted(
-            recovery_dir.glob("*.annotations.json"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
+        candidates = sorted(recovery_dir.glob("*.annotations.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not candidates:
             return
         latest = candidates[0]
@@ -230,6 +214,29 @@ class SessionProjectMixin:
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Recovery failed", str(exc))
 
+    def find_recovery_file(self, current_keypoints) -> Optional[pathlib.Path]:
+        """Return the newest recovery file if it is newer than the project save."""
+        if not self._settings.value("autosaveRecoveryEnabled", True, type=bool):
+            return None
+        if self.session_state.project_path is None or self.session_state.project_save_time is None:
+            return None
+        recovery_dir = self.session_state.project_path.parent / ".recovery"
+        if not recovery_dir.exists():
+            return None
+        candidates = sorted(recovery_dir.glob("*.annotations.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not candidates:
+            return None
+        latest = candidates[0]
+        if latest.stat().st_mtime <= self.session_state.project_save_time:
+            return None
+        return latest
+
+    def restore_recovery(self, path: pathlib.Path) -> None:
+        """Load a recovery file and apply annotations."""
+        kps = keypoints_from_json(path)
+        self.apply_recovery_points(kps)
+        self.set_dirty(True)
+
     def apply_recovery_points(self, kps: Iterable[Keypoint]) -> None:
         """Apply recovered annotations by matching image names."""
         by_name: Dict[str, List[Keypoint]] = {}
@@ -242,4 +249,4 @@ class SessionProjectMixin:
                     kp.image_id = img.id
                     updated.append(kp)
                 self.session_state.annotations[img.id] = updated
-                self.annotations_changed.emit()
+        self.annotations_changed.emit()

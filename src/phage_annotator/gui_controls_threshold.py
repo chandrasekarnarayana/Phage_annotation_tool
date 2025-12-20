@@ -10,8 +10,14 @@ from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.analysis import roi_mask_for_shape
 from phage_annotator.particles import ParticleOptions, analyze_particles
-from phage_annotator.thresholding import (AUTO_METHODS, PostprocessOptions, compute_threshold,
-                                          make_mask, postprocess_mask, smooth_image)
+from phage_annotator.thresholding import (
+    AUTO_METHODS,
+    PostprocessOptions,
+    compute_threshold,
+    make_mask,
+    postprocess_mask,
+    smooth_image,
+)
 
 
 class ThresholdControlsMixin:
@@ -42,6 +48,7 @@ class ThresholdControlsMixin:
             self._threshold_preview_extent = None
             self._refresh_image()
             return
+
         image = self._threshold_source_image(values.target)
         if image is None:
             self.threshold_panel.status_label.setText("No image data.")
@@ -51,6 +58,7 @@ class ThresholdControlsMixin:
         if data is None:
             self.threshold_panel.status_label.setText("ROI empty.")
             return
+
         smooth = smooth_image(data, values.smooth_sigma)
         if values.method == "Manual":
             low, high = self._threshold_percentile_bounds(smooth, values, roi_mask)
@@ -60,8 +68,9 @@ class ThresholdControlsMixin:
             thr = self._threshold_auto_value
             if thr is None or np.isnan(thr):
                 return
-            thr_low = thr
+            thr_low = float(thr)
             thr_high = None
+
         mask = make_mask(smooth, thr_low, thr_high, invert=values.invert_mask)
         opts = PostprocessOptions(
             min_area_px=values.min_area_px,
@@ -77,9 +86,7 @@ class ThresholdControlsMixin:
         self._threshold_mask_full = self._threshold_to_full_mask(mask, crop_offset, image.shape)
         self._threshold_settings = values.__dict__
         self.controller.session_state.threshold_settings = dict(self._threshold_settings)
-        self.controller.session_state.threshold_configs_by_image[self.primary_image.id] = dict(
-            self._threshold_settings
-        )
+        self.controller.session_state.threshold_configs_by_image[self.primary_image.id] = dict(self._threshold_settings)
         self._append_log(self._threshold_log_message(values, self._threshold_auto_value))
         self.recorder.record("threshold_preview", self._threshold_settings)
         self._refresh_image()
@@ -90,9 +97,10 @@ class ThresholdControlsMixin:
         values = self.threshold_panel.values()
         if values.method == "Manual":
             return
-        if getattr(self, "_threshold_job_id", None) is not None:
+        if self._threshold_job_id is not None:
             self.jobs.cancel(self._threshold_job_id)
             self._threshold_job_id = None
+
         image = self._threshold_source_image(values.target)
         if image is None:
             self.threshold_panel.status_label.setText("No image data.")
@@ -108,7 +116,7 @@ class ThresholdControlsMixin:
             if cancel_token.is_cancelled():
                 return float("nan")
             thr = compute_threshold(pixels, values.method, background=values.background)
-            return thr
+            return float(thr)
 
         def _on_result(result: float) -> None:
             self._threshold_auto_value = result
@@ -132,9 +140,7 @@ class ThresholdControlsMixin:
             self.threshold_panel.status_label.setText("Auto threshold failed.")
             self._append_log(f"[Threshold] Error\n{err}")
 
-        handle = self.jobs.submit(
-            _job, name="Threshold Auto", on_result=_on_result, on_error=_on_error
-        )
+        handle = self.jobs.submit(_job, name="Threshold Auto", on_result=_on_result, on_error=_on_error)
         self._threshold_job_id = handle.job_id
         self.threshold_panel.status_label.setText(f"Computing {values.method}…")
 
@@ -159,7 +165,7 @@ class ThresholdControlsMixin:
     def _threshold_crop_offset(self, shape: Tuple[int, int]) -> Tuple[int, int]:
         if not self.crop_rect:
             return (0, 0)
-        x, y, w, h = self.crop_rect
+        x, y, _, _ = self.crop_rect
         return (int(max(0, x)), int(max(0, y)))
 
     def _threshold_apply_roi(
@@ -171,12 +177,9 @@ class ThresholdControlsMixin:
         roi_mask = None
         if values.region_roi:
             x0, y0 = crop_offset
-            roi_rect = (
-                self.roi_rect[0] - x0,
-                self.roi_rect[1] - y0,
-                self.roi_rect[2],
-                self.roi_rect[3],
-            )
+            if self.roi_rect is None:
+                return None, None
+            roi_rect = (self.roi_rect[0] - x0, self.roi_rect[1] - y0, self.roi_rect[2], self.roi_rect[3])
             roi_mask = roi_mask_for_shape(data.shape, roi_rect, self.roi_shape)
             if not roi_mask.any():
                 return None, None
@@ -190,15 +193,11 @@ class ThresholdControlsMixin:
         high = float(np.percentile(sample, values.manual_high_pct))
         return low, high
 
-    def _threshold_sample_pixels(
-        self, values, roi_mask: Optional[np.ndarray], data: np.ndarray
-    ) -> np.ndarray:
+    def _threshold_sample_pixels(self, values, roi_mask: Optional[np.ndarray], data: np.ndarray) -> np.ndarray:
         if values.scope == "Current slice":
-            sample = data
-            if roi_mask is not None:
-                sample = sample[roi_mask]
+            sample = data[roi_mask] if roi_mask is not None else data
             return sample.ravel()
-        # Sampled stack: pick frames and sample pixels
+
         prim = self.primary_image
         if prim.array is None:
             return data.ravel()
@@ -240,12 +239,8 @@ class ThresholdControlsMixin:
         }
         self._set_status("Threshold mask stored for current slice.")
         if self.threshold_panel is not None:
-            self._append_log(
-                self._threshold_log_message(
-                    self.threshold_panel.values(), self._threshold_auto_value
-                )
-            )
-        self.recorder.record("threshold_create_mask", self._threshold_settings)
+            self._append_log(self._threshold_log_message(self.threshold_panel.values(), self._threshold_auto_value))
+            self.recorder.record("threshold_create_mask", self._threshold_settings)
 
     def _threshold_create_roi(self) -> None:
         if self._threshold_mask_full is None:
@@ -273,8 +268,10 @@ class ThresholdControlsMixin:
             ys, xs = np.nonzero(labeled == idx)
             x0, x1 = xs.min(), xs.max()
             y0, y1 = ys.min(), ys.max()
+        rect = (float(x0), float(y0), float(x1 - x0), float(y1 - y0))
+        self.controller.set_roi(rect, shape="box")
         self.roi_shape = "box"
-        self.roi_rect = (float(x0), float(y0), float(x1 - x0), float(y1 - y0))
+        self.roi_rect = rect
         self._sync_roi_controls()
         self._refresh_image()
 
@@ -311,9 +308,7 @@ class ThresholdControlsMixin:
         self._sr_overlay_extent = None
         self._set_status("Binary mask applied to view.")
         self.recorder.record("threshold_apply", self._threshold_settings)
-        self._append_log(
-            self._threshold_log_message(self.threshold_panel.values(), self._threshold_auto_value)
-        )
+        self._append_log(self._threshold_log_message(self.threshold_panel.values(), self._threshold_auto_value))
         self._refresh_image()
 
     def _run_analyze_particles(self) -> None:
@@ -336,9 +331,8 @@ class ThresholdControlsMixin:
             include_holes=values.include_holes,
             watershed_split=values.watershed_split,
         )
-        self.controller.session_state.particles_configs_by_image[self.primary_image.id] = (
-            values.__dict__
-        )
+        self.controller.session_state.particles_configs_by_image[self.primary_image.id] = values.__dict__
+
         if values.scope == "Current slice":
             if mask_entry.get("t") != int(self.t_slider.value()) or mask_entry.get("z") != int(
                 self.z_slider.value()
@@ -348,10 +342,9 @@ class ThresholdControlsMixin:
             mask = mask_entry.get("mask")
             if mask is None:
                 return
-            roi_mask = None
             if values.region_roi:
                 roi_mask = roi_mask_for_shape(mask.shape, self.roi_rect, self.roi_shape)
-                mask = mask & roi_mask if roi_mask is not None else mask
+                mask = mask & roi_mask
             particles = analyze_particles(mask, int(self.t_slider.value()), opts)
             self._particles_results.extend(particles)
             self._populate_particles_table()
@@ -361,14 +354,13 @@ class ThresholdControlsMixin:
             self.recorder.record("analyze_particles", values.__dict__)
             return
 
-        # All frames: recompute masks using stored threshold settings.
         settings = dict(self._threshold_settings)
         if not settings:
             self.particles_panel.status_label.setText("No threshold settings stored.")
             return
-        if getattr(self, "_particles_job_id", None) is not None:
+        if self._particles_job_id is not None:
             self.jobs.cancel(self._particles_job_id)
-
+            self._particles_job_id = None
         arr = self.primary_image.array
         if arr is None:
             return
@@ -394,7 +386,7 @@ class ThresholdControlsMixin:
                 if settings.get("smooth_sigma", 0.0) > 0:
                     frame = smooth_image(frame, float(settings.get("smooth_sigma", 0.0)))
                 roi_mask = None
-                if region_roi:
+                if region_roi and roi_rect is not None:
                     if crop_rect:
                         roi_local = (
                             roi_rect[0] - crop_off_x,
@@ -418,24 +410,21 @@ class ThresholdControlsMixin:
                             settings.get("manual_high_pct", 99),
                         )
                     )
-                    mask = make_mask(
-                        frame, low, high, invert=bool(settings.get("invert_mask", False))
-                    )
+                    mask = make_mask(frame, low, high, invert=bool(settings.get("invert_mask", False)))
                 else:
                     thr = compute_threshold(
                         frame[roi_mask] if roi_mask is not None else frame.ravel(),
                         settings.get("method", "Otsu"),
                         background=settings.get("background", "dark"),
                     )
-                    mask = make_mask(
-                        frame, float(thr), None, invert=bool(settings.get("invert_mask", False))
-                    )
+                    mask = make_mask(frame, float(thr), None, invert=bool(settings.get("invert_mask", False)))
                 post = PostprocessOptions(
                     min_area_px=int(settings.get("min_area_px", 5)),
                     fill_holes=bool(settings.get("fill_holes", False)),
                     open_radius_px=int(settings.get("open_radius_px", 1)),
                     close_radius_px=int(settings.get("close_radius_px", 1)),
                     despeckle=bool(settings.get("despeckle", False)),
+                    watershed_split=bool(settings.get("watershed_split", False)),
                 )
                 mask = postprocess_mask(mask, post)
                 parts = analyze_particles(mask, t, opts)
@@ -459,9 +448,7 @@ class ThresholdControlsMixin:
             self.particles_panel.status_label.setText("Analyze failed.")
             self._append_log(f"[Particles] Error\n{err}")
 
-        handle = self.jobs.submit(
-            _job, name="Analyze Particles", on_result=_on_result, on_error=_on_error
-        )
+        handle = self.jobs.submit(_job, name="Analyze Particles", on_result=_on_result, on_error=_on_error)
         self._particles_job_id = handle.job_id
         self.particles_panel.status_label.setText("Running…")
 
@@ -509,22 +496,12 @@ class ThresholdControlsMixin:
             if show_boxes:
                 x, y, w, h = p.bbox
                 self._particles_overlays.append(
-                    (
-                        "box",
-                        ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale),
-                        color,
-                        selected,
-                    )
+                    ("box", ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale), color, selected)
                 )
             if show_ellipse:
                 x, y, w, h = p.bbox
                 self._particles_overlays.append(
-                    (
-                        "ellipse",
-                        ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale),
-                        color,
-                        selected,
-                    )
+                    ("ellipse", ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale), color, selected)
                 )
         self._refresh_image()
 
@@ -532,9 +509,7 @@ class ThresholdControlsMixin:
         if not self._particles_results:
             self.particles_panel.status_label.setText("No particle results.")
             return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Export Particles CSV", "", "CSV Files (*.csv)"
-        )
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export Particles CSV", "", "CSV Files (*.csv)")
         if not path:
             return
         with open(path, "w", newline="") as f:
@@ -578,8 +553,10 @@ class ThresholdControlsMixin:
             ys.extend([y, y + h])
         x0, x1 = min(xs), max(xs)
         y0, y1 = min(ys), max(ys)
+        rect = (float(x0), float(y0), float(x1 - x0), float(y1 - y0))
+        self.controller.set_roi(rect, shape="box")
         self.roi_shape = "box"
-        self.roi_rect = (float(x0), float(y0), float(x1 - x0), float(y1 - y0))
+        self.roi_rect = rect
         self._sync_roi_controls()
         self._refresh_image()
 
@@ -633,28 +610,3 @@ class ThresholdControlsMixin:
             holes=values.fill_holes,
             ws=values.watershed_split,
         )
-
-    def _apply_threshold_settings(self, settings: dict) -> None:
-        if self.threshold_panel is None:
-            return
-        tp = self.threshold_panel
-        tp.target_combo.setCurrentText(str(settings.get("target", tp.target_combo.currentText())))
-        tp.region_chk.setChecked(bool(settings.get("region_roi", tp.region_chk.isChecked())))
-        tp.scope_combo.setCurrentText(str(settings.get("scope", tp.scope_combo.currentText())))
-        tp.sample_spin.setValue(int(settings.get("sample_count", tp.sample_spin.value())))
-        tp.method_combo.setCurrentText(str(settings.get("method", tp.method_combo.currentText())))
-        tp.low_slider.setValue(int(settings.get("manual_low_pct", tp.low_slider.value())))
-        tp.high_slider.setValue(int(settings.get("manual_high_pct", tp.high_slider.value())))
-        tp.invert_chk.setChecked(bool(settings.get("invert_mask", tp.invert_chk.isChecked())))
-        tp.background_combo.setCurrentText(
-            str(settings.get("background", tp.background_combo.currentText()))
-        )
-        tp.smooth_spin.setValue(float(settings.get("smooth_sigma", tp.smooth_spin.value())))
-        tp.preview_chk.setChecked(bool(settings.get("preview", tp.preview_chk.isChecked())))
-        tp.min_area_spin.setValue(int(settings.get("min_area_px", tp.min_area_spin.value())))
-        tp.fill_holes_chk.setChecked(
-            bool(settings.get("fill_holes", tp.fill_holes_chk.isChecked()))
-        )
-        tp.open_spin.setValue(int(settings.get("open_radius_px", tp.open_spin.value())))
-        tp.close_spin.setValue(int(settings.get("close_radius_px", tp.close_spin.value())))
-        tp.despeckle_chk.setChecked(bool(settings.get("despeckle", tp.despeckle_chk.isChecked())))

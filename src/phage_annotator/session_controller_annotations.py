@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
-
+from typing import List
+import numpy as np
 from phage_annotator.annotations import Keypoint
 
 
 class SessionAnnotationsMixin:
     """Mixin for annotation mutations and undo/redo helpers."""
-
     def add_annotation(
         self,
         image_id: int,
@@ -20,23 +19,23 @@ class SessionAnnotationsMixin:
         x: float,
         label: str,
         scope: str,
-    ) -> Keypoint:
-        """Add an annotation to the session."""
-        kp = Keypoint(
-            image_id=image_id,
-            image_name=image_name,
-            t=t if scope == "current" else -1,
-            z=z if scope == "current" else -1,
-            y=float(y),
-            x=float(x),
-            label=label,
-        )
-        self.session_state.annotations.setdefault(image_id, []).append(kp)
-        self.session_state.annotations_loaded[image_id] = True
-        self._push_undo({"type": "add_point", "point": kp, "image_id": image_id})
-        self.set_dirty(True)
-        self.annotations_changed.emit()
-        return kp
+        ) -> Keypoint:
+            """Add an annotation to the session."""
+            kp = Keypoint(
+                image_id=image_id,
+                image_name=image_name,
+                t=t if scope == "current" else -1,
+                z=z if scope == "current" else -1,
+                y=float(y),
+                x=float(x),
+                label=label,
+                )
+            self.session_state.annotations.setdefault(image_id, []).append(kp)
+            self.session_state.annotations_loaded[image_id] = True
+            self._push_undo({"type": "add_point", "point": kp, "image_id": image_id})
+            self.set_dirty(True)
+            self.annotations_changed.emit()
+            return kp
 
     def delete_annotations(self, image_id: int, points: Iterable[Keypoint]) -> int:
         """Delete explicit points from an image's annotation list."""
@@ -49,10 +48,10 @@ class SessionAnnotationsMixin:
                 continue
             self._push_undo({"type": "delete_point", "point": kp, "image_id": image_id})
             removed += 1
-        if removed:
-            self.set_dirty(True)
-            self.annotations_changed.emit()
-        return removed
+            if removed:
+                self.set_dirty(True)
+                self.annotations_changed.emit()
+                return removed
 
     def update_annotation(self, image_id: int, old: Keypoint, new: Keypoint) -> bool:
         """Replace a single annotation with an updated version."""
@@ -85,7 +84,6 @@ class SessionAnnotationsMixin:
             self._redo_stack.append(inverse)
             self.annotations_changed.emit()
             return True
-        return False
 
     def redo(self) -> bool:
         if not self._redo_stack:
@@ -96,7 +94,6 @@ class SessionAnnotationsMixin:
             self._undo_stack.append(inverse)
             self.annotations_changed.emit()
             return True
-        return False
 
     def _apply_action(self, action: dict, undo: bool) -> Optional[dict]:
         atype = action.get("type")

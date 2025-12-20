@@ -741,7 +741,9 @@ class ActionsMixin:
             shape = roi.get("shape", "box")
             rect = roi.get("rect")
             if rect and len(rect) == 4:
-                self.roi_rect = tuple(float(v) for v in rect)
+                rect = tuple(float(v) for v in rect)
+                self.controller.set_roi(rect, shape=str(shape))
+                self.roi_rect = rect
                 self.roi_shape = str(shape)
             elif shape == "circle":
                 center = roi.get("center")
@@ -754,11 +756,16 @@ class ActionsMixin:
                         float(radius * 2),
                         float(radius * 2),
                     )
+                    self.controller.set_roi(rect, shape="circle")
                     self.roi_rect = rect
                     self.roi_shape = "circle"
         crop = meta.get("crop")
         if crop and len(crop) == 4 and image_id == active_primary:
             self.crop_rect = tuple(float(v) for v in crop)
+            self.controller.set_crop(self.crop_rect)
+            self._sync_crop_controls()
+        if image_id == active_primary and roi is not None:
+            self._sync_roi_controls()
         display = meta.get("display")
         if isinstance(display, dict):
             non_active_mapping = None

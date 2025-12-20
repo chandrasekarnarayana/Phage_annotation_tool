@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
-
 from phage_annotator.session_state import RoiSpec
 
 
 class SessionViewMixin:
     """Mixin for view and display state mutations."""
-
     def set_current_label(self, label: str) -> None:
         """Set the active label for new annotations."""
         if self.session_state.current_label == label:
@@ -64,7 +62,7 @@ class SessionViewMixin:
         mapping.set_window(float(vmin), float(vmax))
         if gamma is not None:
             mapping.gamma = float(gamma)
-        self.display_changed.emit()
+            self.display_changed.emit()
 
     def set_lut(self, index: int) -> None:
         """Set the active LUT index."""
@@ -90,15 +88,13 @@ class SessionViewMixin:
         mapping.gamma = float(gamma)
         self.display_changed.emit()
 
-    def set_display_for_image(self, image_id: int, panel: str, mapping) -> None:
+    def set_display_for_image(self, image_id: int, panel: str, mapping: DisplayMapping) -> None:
         """Store a display mapping override for an image/panel."""
         per_image = self.display_mapping.per_image.setdefault(image_id, {})
         per_image[panel] = mapping
         self.display_changed.emit()
 
-    def set_profile_line(
-        self, line: Optional[Tuple[Tuple[float, float], Tuple[float, float]]]
-    ) -> None:
+    def set_profile_line(self, line: Optional[Tuple[Tuple[float, float], Tuple[float, float]]]) -> None:
         """Update the active profile line."""
         self.view_state.profile_line = line
         self.view_changed.emit()

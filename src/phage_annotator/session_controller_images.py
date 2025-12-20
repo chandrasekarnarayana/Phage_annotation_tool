@@ -36,17 +36,14 @@ class SessionImageMixin:
             has_time=img.has_time,
             has_z=img.has_z,
             pixel_size_um=getattr(img, "pixel_size_um", 0.0),
-            memmap_flag=bool(
-                getattr(img, "array", None) is not None and isinstance(img.array, np.memmap)
-            ),
+            memmap_flag=bool(getattr(img, "array", None) is not None and isinstance(img.array, np.memmap)),
             metadata_summary=dict(getattr(img, "metadata_summary", {}) or {}),
         )
 
     def refresh_image_state(self, img: "LazyImage") -> None:
         """Rebuild ImageState metadata after loading or axis changes."""
         self.session_state.image_states[img.id] = self._build_image_state(img)
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
+        self.state_changed.emit()
 
     def get_metadata_summary(self, image_id: int) -> dict:
         """Return cached metadata summary for an image."""
@@ -88,10 +85,8 @@ class SessionImageMixin:
         self.session_state.image_states = {img.id: self._build_image_state(img) for img in images}
         self.session_state.active_primary_id = 0
         self.session_state.active_support_id = 0 if len(images) == 1 else 1
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
-        if hasattr(self, "annotations_changed"):
-            self.annotations_changed.emit()
+        self.state_changed.emit()
+        self.annotations_changed.emit()
 
     def add_images(self, images: List["LazyImage"]) -> None:
         """Append images to the session and initialize empty annotations."""
@@ -104,10 +99,8 @@ class SessionImageMixin:
             self.session_state.annotations[img.id] = []
             self.session_state.annotations_loaded[img.id] = False
             self.session_state.image_states[img.id] = self._build_image_state(img)
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
-        if hasattr(self, "annotations_changed"):
-            self.annotations_changed.emit()
+        self.state_changed.emit()
+        self.annotations_changed.emit()
 
     def retain_single_image(self, keep_idx: int) -> None:
         """Keep only the selected image and its annotations."""
@@ -119,19 +112,13 @@ class SessionImageMixin:
         keep_img.id = 0
         self.session_state.images = [keep_img]
         self.session_state.annotations = {0: keep_annotations}
-        self.session_state.annotation_index = {
-            0: self.session_state.annotation_index.get(old_id, [])
-        }
-        self.session_state.annotations_loaded = {
-            0: self.session_state.annotations_loaded.get(old_id, False)
-        }
+        self.session_state.annotation_index = {0: self.session_state.annotation_index.get(old_id, [])}
+        self.session_state.annotations_loaded = {0: self.session_state.annotations_loaded.get(old_id, False)}
         self.session_state.image_states = {0: self._build_image_state(keep_img)}
         self.session_state.active_primary_id = 0
         self.session_state.active_support_id = 0
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
-        if hasattr(self, "annotations_changed"):
-            self.annotations_changed.emit()
+        self.state_changed.emit()
+        self.annotations_changed.emit()
 
     def set_primary(self, index: int) -> None:
         """Set the active primary image index."""
@@ -140,8 +127,7 @@ class SessionImageMixin:
         if self.session_state.active_primary_id == index:
             return
         self.session_state.active_primary_id = index
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
+        self.state_changed.emit()
 
     def set_support(self, index: int) -> None:
         """Set the active support image index."""
@@ -150,8 +136,7 @@ class SessionImageMixin:
         if self.session_state.active_support_id == index:
             return
         self.session_state.active_support_id = index
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
+        self.state_changed.emit()
 
     def set_axis_interpretation(self, image_id: int, mode: str) -> None:
         """Set 3D axis interpretation for a specific image."""
@@ -163,14 +148,13 @@ class SessionImageMixin:
                 if mode != "auto":
                     img.axis_auto_used = False
                     img.axis_auto_mode = None
+                elif img.ome_axes is None and len(img.shape) == 3:
+                    axis0 = img.shape[0]
+                    img.axis_auto_used = True
+                    img.axis_auto_mode = "time" if axis0 <= 5 else "depth"
                 else:
-                    if img.ome_axes is None and len(img.shape) == 3:
-                        axis0 = img.shape[0]
-                        img.axis_auto_used = True
-                        img.axis_auto_mode = "time" if axis0 <= 5 else "depth"
-                    else:
-                        img.axis_auto_used = False
-                        img.axis_auto_mode = None
+                    img.axis_auto_used = False
+                    img.axis_auto_mode = None
                 break
         state = self.session_state.image_states.get(image_id)
         if state is not None:
@@ -185,5 +169,4 @@ class SessionImageMixin:
                 memmap_flag=state.memmap_flag,
                 metadata_summary=state.metadata_summary,
             )
-        if hasattr(self, "state_changed"):
-            self.state_changed.emit()
+        self.state_changed.emit()

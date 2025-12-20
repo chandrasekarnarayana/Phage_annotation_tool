@@ -83,6 +83,21 @@ class ExportMixin:
             "density_model_path": self.controller.density_model_path,
             "density_device": self.controller.density_device,
             "density_target_panel": self._density_last_panel,
+            "auto_roi_shape": self.auto_roi_shape_combo.currentText()
+            if getattr(self, "auto_roi_shape_combo", None) is not None
+            else "box",
+            "auto_roi_mode": self.auto_roi_mode_combo.currentText()
+            if getattr(self, "auto_roi_mode_combo", None) is not None
+            else "W/H",
+            "auto_roi_w": int(self.auto_roi_w_spin.value())
+            if getattr(self, "auto_roi_w_spin", None) is not None
+            else 100,
+            "auto_roi_h": int(self.auto_roi_h_spin.value())
+            if getattr(self, "auto_roi_h_spin", None) is not None
+            else 100,
+            "auto_roi_area": int(self.auto_roi_area_spin.value())
+            if getattr(self, "auto_roi_area_spin", None) is not None
+            else 100 * 100,
         }
         self.controller.save_project(
             self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
@@ -122,6 +137,8 @@ class ExportMixin:
             self.lut_combo.setCurrentIndex(idx)
         if self.lut_invert_chk is not None:
             self.lut_invert_chk.setChecked(mapping.invert)
+        if hasattr(self, "_sync_auto_roi_controls_from_settings"):
+            self._sync_auto_roi_controls_from_settings()
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         if self.controller.rois_by_image:
