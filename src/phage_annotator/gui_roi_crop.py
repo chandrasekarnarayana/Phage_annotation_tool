@@ -96,12 +96,47 @@ class RoiCropMixin:
         self.roi_h_spin.blockSignals(False)
 
     def _on_roi_change(self) -> None:
-        rect = (
-            float(self.roi_x_spin.value()),
-            float(self.roi_y_spin.value()),
-            float(self.roi_w_spin.value()),
-            float(self.roi_h_spin.value()),
-        )
+        """Handle ROI spinbox changes with validation and clamping to image bounds."""
+        # Get current values from spinboxes
+        x = float(self.roi_x_spin.value())
+        y = float(self.roi_y_spin.value())
+        w = float(self.roi_w_spin.value())
+        h = float(self.roi_h_spin.value())
+        
+        # Get image bounds
+        img = self.primary_image
+        if img.array is not None:
+            img_h, img_w = img.array.shape[2], img.array.shape[3]
+        else:
+            img_h, img_w = img.shape[-2], img.shape[-1]
+        
+        # Clamp to image bounds
+        x_clamped = max(0.0, min(x, img_w - 1))
+        y_clamped = max(0.0, min(y, img_h - 1))
+        w_clamped = max(1.0, min(w, img_w - x_clamped))
+        h_clamped = max(1.0, min(h, img_h - y_clamped))
+        
+        # Update spinboxes if values were clamped
+        if x_clamped != x or y_clamped != y or w_clamped != w or h_clamped != h:
+            self.roi_x_spin.blockSignals(True)
+            self.roi_y_spin.blockSignals(True)
+            self.roi_w_spin.blockSignals(True)
+            self.roi_h_spin.blockSignals(True)
+            
+            self.roi_x_spin.setValue(x_clamped)
+            self.roi_y_spin.setValue(y_clamped)
+            self.roi_w_spin.setValue(w_clamped)
+            self.roi_h_spin.setValue(h_clamped)
+            
+            self.roi_x_spin.blockSignals(False)
+            self.roi_y_spin.blockSignals(False)
+            self.roi_w_spin.blockSignals(False)
+            self.roi_h_spin.blockSignals(False)
+            
+            # Show feedback to user
+            self._set_status("ROI clamped to image bounds")
+        
+        rect = (x_clamped, y_clamped, w_clamped, h_clamped)
         self.controller.set_roi(rect, shape=self.roi_shape)
         self.roi_rect = rect
         self.recorder.record("roi_change", {"rect": self.roi_rect, "shape": self.roi_shape})
@@ -262,16 +297,53 @@ class RoiCropMixin:
         self._refresh_image()
 
     def _on_crop_change(self) -> None:
-        rect = (
-            float(self.crop_x_spin.value()),
-            float(self.crop_y_spin.value()),
-            float(self.crop_w_spin.value()),
-            float(self.crop_h_spin.value()),
-        )
-        if rect[2] <= 0 or rect[3] <= 0:
+        """Handle crop spinbox changes with validation and clamping to image bounds."""
+        # Get current values from spinboxes
+        x = float(self.crop_x_spin.value())
+        y = float(self.crop_y_spin.value())
+        w = float(self.crop_w_spin.value())
+        h = float(self.crop_h_spin.value())
+        
+        # Handle zero/negative dimensions
+        if w <= 0 or h <= 0:
             self.crop_rect = None
+            self._refresh_image()
+            return
+        
+        # Get image bounds
+        img = self.primary_image
+        if img.array is not None:
+            img_h, img_w = img.array.shape[2], img.array.shape[3]
         else:
-            self.crop_rect = rect
+            img_h, img_w = img.shape[-2], img.shape[-1]
+        
+        # Clamp to image bounds
+        x_clamped = max(0.0, min(x, img_w - 1))
+        y_clamped = max(0.0, min(y, img_h - 1))
+        w_clamped = max(1.0, min(w, img_w - x_clamped))
+        h_clamped = max(1.0, min(h, img_h - y_clamped))
+        
+        # Update spinboxes if values were clamped
+        if x_clamped != x or y_clamped != y or w_clamped != w or h_clamped != h:
+            self.crop_x_spin.blockSignals(True)
+            self.crop_y_spin.blockSignals(True)
+            self.crop_w_spin.blockSignals(True)
+            self.crop_h_spin.blockSignals(True)
+            
+            self.crop_x_spin.setValue(x_clamped)
+            self.crop_y_spin.setValue(y_clamped)
+            self.crop_w_spin.setValue(w_clamped)
+            self.crop_h_spin.setValue(h_clamped)
+            
+            self.crop_x_spin.blockSignals(False)
+            self.crop_y_spin.blockSignals(False)
+            self.crop_w_spin.blockSignals(False)
+            self.crop_h_spin.blockSignals(False)
+            
+            # Show feedback to user
+            self._set_status("Crop clamped to image bounds")
+        
+        self.crop_rect = (x_clamped, y_clamped, w_clamped, h_clamped)
         self._refresh_image()
 
     def _sync_crop_controls(self) -> None:
