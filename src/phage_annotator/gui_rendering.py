@@ -227,7 +227,10 @@ class RenderingMixin:
                 if self._sr_overlay is not None
                 else self._smlm_overlay_extent
             )
-        if self._density_overlay is not None:
+        # Validate density overlay is for current image
+        current_img_id = self.primary_image.id if hasattr(self, 'primary_image') else -1
+        density_img_id = getattr(self, '_density_image_id', None)
+        if self._density_overlay is not None and density_img_id == current_img_id:
             density = self._density_overlay
             if self.crop_rect:
                 x, y, w, h = self.crop_rect
@@ -243,10 +246,15 @@ class RenderingMixin:
             overlay_frame = overlay_frame[::stride, ::stride]
         loc_points = []
         if self.show_smlm_points and self.ax_frame is not None:
+            # Validate that results are for the current image
+            current_img_id = self.primary_image.id if hasattr(self, 'primary_image') else -1
+            smlm_img_id = getattr(self, '_smlm_image_id', None)
+            deepstorm_img_id = getattr(self, '_deepstorm_image_id', None)
+            
             scale = self._axis_scale(self.ax_frame)
             off_x = self.crop_rect[0] if self.crop_rect else 0.0
             off_y = self.crop_rect[1] if self.crop_rect else 0.0
-            if self._smlm_results:
+            if self._smlm_results and smlm_img_id == current_img_id:
                 color_mode = getattr(self.smlm_panel, "thunder", None)
                 color_field = "photons"
                 if color_mode is not None and hasattr(color_mode, "color_mode_combo"):
@@ -260,7 +268,7 @@ class RenderingMixin:
                             float(val),
                         )
                     )
-            elif self._deepstorm_results:
+            elif self._deepstorm_results and deepstorm_img_id == current_img_id:
                 for loc in self._deepstorm_results:
                     loc_points.append(
                         (

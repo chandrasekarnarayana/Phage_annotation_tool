@@ -106,6 +106,7 @@ class DensityControlsMixin:
                 self.density_panel.cancel_btn.setEnabled(False)
                 return
             self._density_last_result = result
+            self._density_image_id = self.primary_image.id  # Track which image results are for
             if self.density_panel.overlay_chk.isChecked():
                 self._density_overlay = result.density_map
                 self._density_overlay_extent = (0, result.density_map.shape[1], result.density_map.shape[0], 0)

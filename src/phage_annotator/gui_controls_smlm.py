@@ -126,6 +126,7 @@ class SmlmControlsMixin:
             if gen != self._job_generation or img_id != self.primary_image.id or res_run_id != self._smlm_run_id:
                 return
             self._smlm_results = locs
+            self._smlm_image_id = img_id  # Track which image these results are for
             self._smlm_overlay = sr
             off_x, off_y = crop_off
             self._smlm_overlay_extent = (
@@ -405,6 +406,7 @@ class SmlmControlsMixin:
             if gen != self._job_generation or img_id != self.primary_image.id or res_run_id != self._deepstorm_run_id:
                 return
             self._deepstorm_results = locs
+            self._deepstorm_image_id = img_id  # Track which image these results are for
             self._deepstorm_overlay = sr
             off_x, off_y = crop_off
             self._deepstorm_overlay_extent = (

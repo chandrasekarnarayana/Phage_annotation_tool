@@ -17,12 +17,15 @@ class DisplayControlsMixin:
         if idx < 0 or idx >= len(self.images):
             return
         self.stop_playback_t()
+        # Clear all analysis overlays when changing images to prevent stale results
         self._smlm_overlay = None
         self._smlm_overlay_extent = None
         self._smlm_results = []
+        self._smlm_image_id = None  # Track that results are cleared
         self._deepstorm_overlay = None
         self._deepstorm_overlay_extent = None
         self._deepstorm_results = []
+        self._deepstorm_image_id = None  # Track that results are cleared
         self._sr_overlay = None
         self._sr_overlay_extent = None
         self._particles_results = []
