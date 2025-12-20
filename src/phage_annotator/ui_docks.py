@@ -514,9 +514,16 @@ def setup_status_bar(self) -> None:
     # If setup_status_bar() runs after init_panels(), make_logs_widget() will have
     # already checked 'if self.status is not None' and found it to be None.
     # Phase 2D: Pass status explicitly as RenderContext(status=...) to avoid this ordering issue.
-    status = self.statusBar()
-    self.status = status
-    status.setSizeGripEnabled(True)
+    #
+    # NAMING FIX: self.status should be a QLabel for status text, not the QStatusBar itself.
+    # Create a QLabel for status text display and add it to the status bar.
+    status_bar = self.statusBar()
+    status_bar.setSizeGripEnabled(True)
+    
+    # Create status label widget (this is what self.status should be)
+    self.status = QtWidgets.QLabel("")
+    status_bar.addWidget(self.status, stretch=1)
+    
     self.progress_label = QtWidgets.QLabel("Working:")
     self.progress_bar = QtWidgets.QProgressBar()
     self.progress_bar.setRange(0, 100)
@@ -527,13 +534,13 @@ def setup_status_bar(self) -> None:
     self.progress_cancel_btn.clicked.connect(self._cancel_active_job)
     for w in (self.progress_label, self.progress_bar, self.progress_cancel_btn):
         w.setVisible(False)
-        status.addPermanentWidget(w)
+        status_bar.addPermanentWidget(w)
     self.buffer_stats_label = QtWidgets.QLabel("Buffer: 0/0 | Prefetch: 64 | Underruns: 0")
-    status.addPermanentWidget(self.buffer_stats_label)
+    status_bar.addPermanentWidget(self.buffer_stats_label)
     self.render_level_label = QtWidgets.QLabel("Render: L0")
-    status.addPermanentWidget(self.render_level_label)
+    status_bar.addPermanentWidget(self.render_level_label)
     self.tool_label = QtWidgets.QLabel("Tool: Annotate")
-    status.addPermanentWidget(self.tool_label)
+    status_bar.addPermanentWidget(self.tool_label)
     self.annotation_meta_widget = QtWidgets.QWidget()
     meta_layout = QtWidgets.QHBoxLayout(self.annotation_meta_widget)
     meta_layout.setContentsMargins(6, 0, 6, 0)
@@ -547,4 +554,4 @@ def setup_status_bar(self) -> None:
     meta_layout.addWidget(self.annotation_meta_apply_btn)
     meta_layout.addWidget(self.annotation_meta_close_btn)
     self.annotation_meta_widget.setVisible(False)
-    status.addWidget(self.annotation_meta_widget)
+    status_bar.addWidget(self.annotation_meta_widget)

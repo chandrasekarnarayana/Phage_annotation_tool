@@ -672,8 +672,13 @@ def _update_or_create(
 ) -> Optional[matplotlib.image.AxesImage]:
     if data is None:
         return artist
+    # MATPLOTLIB API FIX: Cannot pass both norm and vmin/vmax to imshow()
+    # If norm is provided, it should contain the vmin/vmax. Otherwise use vmin/vmax directly.
     if artist is None:
-        artist = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, extent=extent, norm=norm)
+        if norm is not None:
+            artist = ax.imshow(data, cmap=cmap, extent=extent, norm=norm)
+        else:
+            artist = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, extent=extent)
     else:
         artist.set_data(data)
         artist.set_cmap(cmap)
