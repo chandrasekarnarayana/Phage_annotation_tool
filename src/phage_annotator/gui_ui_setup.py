@@ -460,9 +460,9 @@ class UiSetupMixin:
         self.profile_canvas = FigureCanvasQTAgg(self.profile_fig)
         self.ax_line = self.profile_fig.add_subplot(111)
 
-        # Panels/docks + sidebar
-        self._init_panels(dock_panels_menu)
+        # Panels/docks + sidebar (status bar must be set up first for logs widget)
         self._setup_status_bar()
+        self._init_panels(dock_panels_menu)
 
         left_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         left_splitter.addWidget(self._build_sidebar_stack())

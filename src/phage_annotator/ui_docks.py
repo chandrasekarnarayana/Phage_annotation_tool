@@ -336,6 +336,13 @@ def make_profile_widget(self) -> QtWidgets.QWidget:
     profile_layout = QtWidgets.QVBoxLayout(profile_container)
     profile_layout.setContentsMargins(8, 8, 8, 8)
     profile_layout.setSpacing(6)
+    controls = QtWidgets.QHBoxLayout()
+    self.profile_chk = QtWidgets.QCheckBox("Profile")
+    self.profile_chk.setChecked(True)
+    self.show_profile_chk = self.profile_chk
+    controls.addWidget(self.profile_chk)
+    controls.addStretch(1)
+    profile_layout.addLayout(controls)
     profile_layout.addWidget(self.profile_canvas)
     return profile_container
 
@@ -394,6 +401,7 @@ def make_density_widget(self) -> QtWidgets.QWidget:
 def setup_status_bar(self) -> None:
     """Initialize the status bar widgets (progress + tool indicator)."""
     status = self.statusBar()
+    self.status = status
     status.setSizeGripEnabled(True)
     self.progress_label = QtWidgets.QLabel("Working:")
     self.progress_bar = QtWidgets.QProgressBar()

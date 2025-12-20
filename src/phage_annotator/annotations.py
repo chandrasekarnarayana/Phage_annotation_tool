@@ -110,10 +110,11 @@ def save_keypoints_json(
         if not row.get("image_key"):
             row["image_key"] = row.get("image_name", "")
         grouped.setdefault(kp.image_name, []).append(row)
+    payload: dict
     if meta:
-        payload: dict = {"meta": meta, "annotations": grouped}
+        payload = {"meta": meta, "annotations": grouped}
     else:
-        payload: dict = grouped
+        payload = grouped
     path.write_text(json.dumps(payload, indent=2))
 
 

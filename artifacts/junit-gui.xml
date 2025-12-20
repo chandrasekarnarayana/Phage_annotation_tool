@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="2.011" timestamp="2025-12-20T15:00:35.554464+01:00" hostname="cs"><testcase classname="tests.test_gui_basic" name="test_gui_launch" time="0.089"><failure message="TypeError: SessionState() takes no arguments">qtbot = &lt;pytestqt.qtbot.QtBot object at 0x72e38b7a3770&gt;
+tmp_path = PosixPath('/tmp/pytest-of-cs/pytest-1/test_gui_launch0')
+
+    @pytest.mark.gui
+    def test_gui_launch(qtbot, tmp_path) -&gt; None:
+        pytest.importorskip("PyQt5")
+        from phage_annotator.demo import generate_dummy_image
+        from phage_annotator.gui_mpl import create_app
+    
+        path = generate_dummy_image(tmp_path / "dummy_gui.tif", mode="2d")
+&gt;       win = create_app([path])
+              ^^^^^^^^^^^^^^^^^^
+
+tests/test_gui_basic.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/phage_annotator/gui_mpl.py:345: in create_app
+    return KeypointAnnotator(images)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+src/phage_annotator/gui_mpl.py:241: in __init__
+    self.controller = SessionController(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;phage_annotator.session_controller.SessionController object at 0x72e38b773380&gt;
+parent = &lt;phage_annotator.gui_mpl.KeypointAnnotator object at 0x72e38b772cc0&gt;
+images = [LazyImage(path=PosixPath('/tmp/pytest-of-cs/pytest-1/test_gui_launch0/dummy_gui.tif'), name='dummy_gui.tif', shape=(6...X', 'shape': (64, 64), 'dims': {'T': 1, 'Z': 1, 'Y': 64, 'X': 64}, 'dtype': 'float32'}, mean_proj=None, std_proj=None)]
+labels = ('phage', 'artifact', 'other')
+settings = &lt;PyQt5.QtCore.QSettings object at 0x72e38b772f90&gt;
+
+    def __init__(
+        self,
+        parent: QtCore.QObject,
+        images: List["LazyImage"],
+        labels: Sequence[str],
+        settings: QtCore.QSettings,
+        *,
+        proj_cache=None,
+        pyramid_cache=None,
+        ring_buffer=None,
+        colormaps: Optional[Sequence[str]] = None,
+    ) -&gt; None:
+        super().__init__(parent)
+        if not images:
+            raise ValueError("No images provided.")
+        for idx, img in enumerate(images):
+            img.id = idx
+        label_list = list(labels)
+        annotations = {img.id: [] for img in images}
+        image_states = {img.id: self._build_image_state(img) for img in images}
+        annotations_loaded = {img.id: False for img in images}
+&gt;       self.session_state = SessionState(
+            project_path=None,
+            project_save_time=None,
+            dirty=False,
+            last_folder=None,
+            recent_images=[],
+            active_primary_id=0,
+            active_support_id=0 if len(images) == 1 else 1,
+            images=images,
+            image_states=image_states,
+            annotations=annotations,
+            labels=label_list,
+            current_label=label_list[0] if label_list else "",
+            fps=int(settings.value("defaultFPS", 12, type=int)),
+            annotations_loaded=annotations_loaded,
+        )
+E       TypeError: SessionState() takes no arguments
+
+src/phage_annotator/session_controller.py:79: TypeError</failure></testcase><testcase classname="tests.test_gui_basic" name="test_gui_visual_regression" time="0.002"><failure message="TypeError: SessionState() takes no arguments">qtbot = &lt;pytestqt.qtbot.QtBot object at 0x72e38b830590&gt;
+tmp_path = PosixPath('/tmp/pytest-of-cs/pytest-1/test_gui_visual_regression0')
+
+    @pytest.mark.gui
+    def test_gui_visual_regression(qtbot, tmp_path) -&gt; None:
+        pytest.importorskip("PyQt5")
+        from phage_annotator.demo import generate_dummy_image
+        from phage_annotator.gui_mpl import create_app
+    
+        path = generate_dummy_image(tmp_path / "dummy_gui_vis.tif", mode="2d")
+&gt;       win = create_app([path])
+              ^^^^^^^^^^^^^^^^^^
+
+tests/test_gui_basic.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/phage_annotator/gui_mpl.py:345: in create_app
+    return KeypointAnnotator(images)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+src/phage_annotator/gui_mpl.py:241: in __init__
+    self.controller = SessionController(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;phage_annotator.session_controller.SessionController object at 0x72e38b773800&gt;
+parent = &lt;phage_annotator.gui_mpl.KeypointAnnotator object at 0x72e38b7735c0&gt;
+images = [LazyImage(path=PosixPath('/tmp/pytest-of-cs/pytest-1/test_gui_visual_regression0/dummy_gui_vis.tif'), name='dummy_gui...X', 'shape': (64, 64), 'dims': {'T': 1, 'Z': 1, 'Y': 64, 'X': 64}, 'dtype': 'float32'}, mean_proj=None, std_proj=None)]
+labels = ('phage', 'artifact', 'other')
+settings = &lt;PyQt5.QtCore.QSettings object at 0x72e38b773f50&gt;
+
+    def __init__(
+        self,
+        parent: QtCore.QObject,
+        images: List["LazyImage"],
+        labels: Sequence[str],
+        settings: QtCore.QSettings,
+        *,
+        proj_cache=None,
+        pyramid_cache=None,
+        ring_buffer=None,
+        colormaps: Optional[Sequence[str]] = None,
+    ) -&gt; None:
+        super().__init__(parent)
+        if not images:
+            raise ValueError("No images provided.")
+        for idx, img in enumerate(images):
+            img.id = idx
+        label_list = list(labels)
+        annotations = {img.id: [] for img in images}
+        image_states = {img.id: self._build_image_state(img) for img in images}
+        annotations_loaded = {img.id: False for img in images}
+&gt;       self.session_state = SessionState(
+            project_path=None,
+            project_save_time=None,
+            dirty=False,
+            last_folder=None,
+            recent_images=[],
+            active_primary_id=0,
+            active_support_id=0 if len(images) == 1 else 1,
+            images=images,
+            image_states=image_states,
+            annotations=annotations,
+            labels=label_list,
+            current_label=label_list[0] if label_list else "",
+            fps=int(settings.value("defaultFPS", 12, type=int)),
+            annotations_loaded=annotations_loaded,
+        )
+E       TypeError: SessionState() takes no arguments
+
+src/phage_annotator/session_controller.py:79: TypeError</failure></testcase></testsuite></testsuites>

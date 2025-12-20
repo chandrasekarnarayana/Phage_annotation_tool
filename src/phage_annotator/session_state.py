@@ -28,6 +28,7 @@ class RoiSpec:
     shape: str = "circle"
 
 
+@dataclass
 class ViewState:
     """View-specific state for the active session.
 
@@ -58,6 +59,7 @@ class ViewState:
     loop_playback: bool = False
 
 
+@dataclass
 class ImageState:
     """Image metadata tracked by the session.
 
@@ -92,6 +94,7 @@ class ImageState:
     metadata_summary: dict = field(default_factory=dict)
 
 
+@dataclass
 class SessionState:
     """Project/session state that persists across views.
 
@@ -101,6 +104,7 @@ class SessionState:
     attributes. Annotation coordinates are stored in full-resolution space.
     """
 
+    # Non-default fields first (required by dataclasses)
     project_path: Optional[pathlib.Path]
     project_save_time: Optional[float]
     dirty: bool
@@ -108,6 +112,14 @@ class SessionState:
     recent_images: List[str]
     active_primary_id: int
     active_support_id: int
+    images: List["LazyImage"]
+    image_states: Dict[int, ImageState]
+    annotations: Dict[int, List[Keypoint]]
+    labels: List[str]
+    current_label: str
+
+    # Defaults
+    fps: int = 12
     smlm_runs: List[dict] = field(default_factory=list)
     threshold_settings: Dict[str, object] = field(default_factory=dict)
     threshold_masks: Dict[int, dict] = field(default_factory=dict)
@@ -116,9 +128,3 @@ class SessionState:
     annotation_imports: Dict[int, List[Dict[str, object]]] = field(default_factory=dict)
     annotation_index: Dict[int, List[AnnotationIndexEntry]] = field(default_factory=dict)
     annotations_loaded: Dict[int, bool] = field(default_factory=dict)
-    images: List["LazyImage"]
-    image_states: Dict[int, ImageState]
-    annotations: Dict[int, List[Keypoint]]
-    labels: List[str]
-    current_label: str
-    fps: int = 12
