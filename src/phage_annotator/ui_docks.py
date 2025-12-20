@@ -164,7 +164,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             id="roi",
             title="ROI Controls",
             default_area=QtCore.Qt.LeftDockWidgetArea,
-            default_visible=True,
+            default_visible=False,  # Hidden by default, opened from ROI/Crop panel
             widget_factory=self._make_roi_widget,
             toggle_action_text="ROI Controls",
         ),
@@ -196,7 +196,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             id="hist",
             title="Histogram",
             default_area=QtCore.Qt.BottomDockWidgetArea,
-            default_visible=True,
+            default_visible=False,  # Hidden by default per Task G
             widget_factory=self._make_hist_widget,
             toggle_action_text="Histogram",
         ),
@@ -204,7 +204,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             id="profile",
             title="Line Profile",
             default_area=QtCore.Qt.BottomDockWidgetArea,
-            default_visible=True,
+            default_visible=False,  # Hidden by default per Task G
             widget_factory=self._make_profile_widget,
             toggle_action_text="Line Profile",
         ),
@@ -250,11 +250,11 @@ def build_panel_registry(self) -> List[PanelSpec]:
         ),
         PanelSpec(
             id="logs",
-            title="Logs",
+            title="Diagnostics",
             default_area=QtCore.Qt.BottomDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_logs_widget,
-            toggle_action_text="Toggle Logs",
+            toggle_action_text="Diagnostics",
         ),
         PanelSpec(
             id="metadata",
