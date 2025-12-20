@@ -73,11 +73,44 @@ class JobsMixin:
 
     def _cancel_all_jobs(self) -> None:
         """Cancel all known background jobs."""
+        try:
+            # Brief status toast for user feedback
+            if hasattr(self, "statusBar"):
+                try:
+                    self.statusBar().showMessage("Cancelling all jobs…", 3000)
+                except Exception:
+                    pass
+            # Subtle audio + visual pulse to reinforce action
+            try:
+                from matplotlib.backends.qt_compat import QtWidgets  # already available
+                QtWidgets.QApplication.beep()
+            except Exception:
+                pass
+            try:
+                if getattr(self, "progress_bar", None) is not None:
+                    old_style = self.progress_bar.styleSheet()
+                    pulse_style = (
+                        "QProgressBar {border: 1px solid #f0ad4e; padding: 1px; border-radius: 3px;} "
+                        "QProgressBar::chunk {background-color: #f0ad4e;}"
+                    )
+                    self.progress_bar.setStyleSheet(pulse_style)
+                    # Restore after 500 ms
+                    from matplotlib.backends.qt_compat import QtCore
+                    QtCore.QTimer.singleShot(500, lambda: self.progress_bar.setStyleSheet(old_style))
+            except Exception:
+                pass
+            self._append_log("[JOB] Cancel All requested")
+        except Exception:
+            # Best-effort logging; continue to cancel
+            pass
         self.jobs.cancel_all()
 
     def _append_log(self, text: str) -> None:
         if self.log_view is None:
             return
+        # Store in full logs list for filtering
+        if hasattr(self, '_all_logs'):
+            self._all_logs.append(text)
         self.log_view.appendPlainText(text)
 
     def _install_exception_hook(self) -> None:
@@ -153,6 +186,23 @@ class JobsMixin:
         self.progress_label.setVisible(visible)
         self.progress_bar.setVisible(visible)
         self.progress_cancel_btn.setVisible(visible)
+        # Show/hide and enable/disable the "Cancel All" button alongside progress widgets (P5.4)
+        if hasattr(self, "progress_cancel_all_btn") and self.progress_cancel_all_btn is not None:
+            self.progress_cancel_all_btn.setVisible(visible)
+            if visible:
+                try:
+                    count = int(self.jobs.active_job_count())
+                except Exception:
+                    count = 1
+                self.progress_cancel_all_btn.setEnabled(count > 1)
+                # P5.4: Show active job count badge in button text
+                btn_text = f"Cancel All ({count})" if count > 1 else "Cancel All"
+                self.progress_cancel_all_btn.setText(btn_text)
+                tip_suffix = f" - {count} active jobs" if count > 1 else ""
+                self.progress_cancel_all_btn.setToolTip("Cancel all running background jobs" + tip_suffix)
+            else:
+                self.progress_cancel_all_btn.setEnabled(False)
+                self.progress_cancel_all_btn.setText("Cancel All")
         if visible:
             self.progress_bar.setValue(0)
 

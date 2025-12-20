@@ -120,11 +120,18 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.undo_act.setEnabled(False)
     self.redo_act.setEnabled(False)
     self.copy_display_act = edit_menu.addAction("Copy Display Settings…")
+    self.reset_confirms_act = edit_menu.addAction("Reset confirmations")
     self.measure_act = edit_menu.addAction("Measure (Results)")
     self.measure_act.setShortcut("Ctrl+M")
 
     tools_menu = menubar.addMenu("&Tools")
     self.clear_roi_act = tools_menu.addAction("Clear ROI")
+    # P5.2: Multi-image ROI management
+    self.copy_roi_to_all_act = tools_menu.addAction("Copy ROI to all images")
+    self.save_roi_template_act = tools_menu.addAction("Save ROI as template")
+    self.apply_roi_template_act = tools_menu.addAction("Apply ROI template…")
+    tools_menu.addSeparator()
+    self.clear_hist_cache_act = tools_menu.addAction("Clear histogram cache")
     reload_ann_act = tools_menu.addAction("Reload annotations for current image")
 
     analyze_menu = menubar.addMenu("&Analyze")
@@ -140,6 +147,8 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
 
     help_menu = menubar.addMenu("&Help")
     about_act = help_menu.addAction("About")
+    shortcuts_act = help_menu.addAction("Keyboard Shortcuts…")
+    shortcuts_act.setShortcut("F1")
     self.command_palette_act = QtWidgets.QAction("Command Palette", self)
     self.command_palette_act.setShortcut("Ctrl+Shift+P")
     self.command_palette_act.triggered.connect(self._show_command_palette)
@@ -166,8 +175,11 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "prefs": prefs_act,
         "exit": exit_act,
         "about": about_act,
+        "shortcuts": shortcuts_act,
         "copy_display": self.copy_display_act,
+        "reset_confirms": self.reset_confirms_act,
         "measure": self.measure_act,
         "show_recorder": self.show_recorder_act,
+        "clear_hist_cache": self.clear_hist_cache_act,
     }
     return actions, dock_panels_menu

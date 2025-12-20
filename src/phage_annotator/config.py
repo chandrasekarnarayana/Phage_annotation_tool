@@ -23,7 +23,8 @@ class AppConfig:
     pixel_size_nm: float = 1.0
     supported_suffixes: Tuple[str, ...] = SUPPORTED_SUFFIXES
     config_dir: Path = field(default_factory=lambda: Path.home() / ".phage_annotator")
-    default_labels: Tuple[str, ...] = ("phage", "artifact", "other")
+    # P3.5: Default label classes for empty projects
+    default_labels: Tuple[str, ...] = ("Point", "Region")
 
 
 DEFAULT_CONFIG = AppConfig()

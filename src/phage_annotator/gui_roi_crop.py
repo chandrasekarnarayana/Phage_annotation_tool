@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Tuple
 
 import numpy as np
+from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.auto_roi import propose_roi
 
@@ -33,7 +34,18 @@ class RoiCropMixin:
         return slice_data[mask]
 
     def _clear_roi(self) -> None:
-        """Clear the active ROI selection."""
+        """Clear the active ROI selection (P3.3: confirmation added)."""
+        # Check if confirmation is needed
+        if self._settings.value("confirmClearROI", True, type=bool):
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Clear ROI",
+                "Clear the current ROI selection?",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
         self.controller.clear_roi()
         self._sync_roi_controls()
         self._refresh_image()
@@ -403,3 +415,131 @@ class RoiCropMixin:
         self._bind_axis_callbacks()
         if self.tool_router is not None:
             self._set_roi_interactor_tool(self.tool_router.tool)
+
+    def _copy_roi_to_all_images(self) -> None:
+        """Copy the current ROI to all open images (P5.2).
+        
+        Requires user confirmation and copies the current ROI shape and position
+        to all other open images. The copied ROIs will have new IDs but retain
+        the same shape, position, color, and visibility settings.
+        """
+        active_roi = self.roi_manager.get_active(self.primary_image.id)
+        if active_roi is None or self.roi_rect == (0, 0, 0, 0):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No ROI to copy",
+                "Please define an ROI before copying to all images."
+            )
+            return
+
+        # Confirm with user
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Copy ROI to all images",
+            f"Copy ROI '{active_roi.name}' to all {len(self.images) - 1} other open images?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+
+        # Copy to all images
+        target_ids = [img.id for img in self.images if img.id != self.primary_image.id]
+        count = self.roi_manager.copy_roi_to_images(
+            self.primary_image.id,
+            active_roi.roi_id,
+            target_ids
+        )
+
+        self.recorder.record("copy_roi_to_all_images", {"count": count})
+        QtWidgets.QMessageBox.information(
+            self,
+            "ROI copied",
+            f"Copied ROI to {count} image{'s' if count != 1 else ''}."
+        )
+
+    def _save_roi_template(self) -> None:
+        """Save the current ROI as a reusable template (P5.2).
+        
+        Opens a dialog to name the template, then saves it for later
+        application to other images via _apply_roi_template().
+        """
+        active_roi = self.roi_manager.get_active(self.primary_image.id)
+        if active_roi is None or self.roi_rect == (0, 0, 0, 0):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No ROI to save",
+                "Please define an ROI before saving as template."
+            )
+            return
+
+        # Get template name from user
+        name, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Save ROI Template",
+            "Template name:",
+            text=active_roi.name
+        )
+        if not ok or not name:
+            return
+
+        self.roi_manager.save_roi_template(name, active_roi)
+        self.recorder.record("save_roi_template", {"name": name})
+        QtWidgets.QMessageBox.information(
+            self,
+            "Template saved",
+            f"ROI template '{name}' saved successfully."
+        )
+
+    def _apply_roi_template(self, template_name: str = None) -> None:
+        """Apply a saved ROI template to the current image (P5.2).
+        
+        If template_name is None, opens a dialog to select from available templates.
+        Otherwise applies the named template directly.
+        """
+        available = self.roi_manager.list_templates()
+        if not available:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No templates available",
+                "Create a template first by saving an ROI."
+            )
+            return
+
+        # Select template if not provided
+        if template_name is None:
+            template_name, ok = QtWidgets.QInputDialog.getItem(
+                self,
+                "Apply ROI Template",
+                "Select template:",
+                available
+            )
+            if not ok or not template_name:
+                return
+
+        # Apply template
+        if self.roi_manager.apply_template_to_image(template_name, self.primary_image.id):
+            # Update UI
+            new_roi = self.roi_manager.get_active(self.primary_image.id)
+            if new_roi:
+                rect = (
+                    new_roi.points[0][0] if new_roi.points else 0,
+                    new_roi.points[0][1] if new_roi.points else 0,
+                    new_roi.points[1][0] - new_roi.points[0][0] if len(new_roi.points) > 1 else 100,
+                    new_roi.points[1][1] - new_roi.points[0][1] if len(new_roi.points) > 1 else 100,
+                )
+                self.controller.set_roi(rect, shape=new_roi.roi_type)
+                self._sync_roi_controls()
+                self._refresh_image()
+                self.recorder.record("apply_roi_template", {"template": template_name})
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Template applied",
+                    f"Applied template '{template_name}' to current image."
+                )
+        else:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Template not found",
+                f"Template '{template_name}' could not be found."
+            )

@@ -92,6 +92,9 @@ class ResultsControlsMixin:
             on_progress=self._results_on_progress,
             on_result=self._results_on_result,
             on_error=self._results_on_error,
+            timeout_sec=300.0,
+            retries=1,
+            retry_delay_sec=0.5,
         )
 
     def _results_job(self, progress, cancel_token) -> int | None:

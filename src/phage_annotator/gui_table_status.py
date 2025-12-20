@@ -67,6 +67,7 @@ class TableStatusMixin:
         self._refresh_image()
 
     def _delete_selected_annotations(self) -> None:
+        """Delete selected annotations with confirmation (P3.3)."""
         if self.annot_table.selectionModel() is None:
             return
         rows = sorted({idx.row() for idx in self.annot_table.selectionModel().selectedRows()})
@@ -76,13 +77,26 @@ class TableStatusMixin:
         for row in reversed(rows):
             if 0 <= row < len(self._table_rows):
                 removed.append(self._table_rows[row])
-        if removed:
-            self.controller.delete_annotations(self.primary_image.id, removed)
-            self.undo_act.setEnabled(self.controller.can_undo())
-            self.redo_act.setEnabled(self.controller.can_redo())
-            self._refresh_image()
-            self._update_status()
-            self._mark_dirty()
+        if not removed:
+            return
+        # Confirmation dialog (P3.3)
+        if self._settings.value("confirmDeleteAnnotations", True, type=bool):
+            count = len(removed)
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Delete Annotations",
+                f"Delete {count} annotation{'s' if count != 1 else ''}?",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+        self.controller.delete_annotations(self.primary_image.id, removed)
+        self.undo_act.setEnabled(self.controller.can_undo())
+        self.redo_act.setEnabled(self.controller.can_redo())
+        self._refresh_image()
+        self._update_status()
+        self._mark_dirty()
 
     def _update_status(self) -> None:
         total = sum(len(v) for v in self.annotations.values())

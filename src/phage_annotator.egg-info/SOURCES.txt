@@ -11,6 +11,7 @@ src/phage_annotator/annotations.py
 src/phage_annotator/auto_roi.py
 src/phage_annotator/calibration.py
 src/phage_annotator/cli.py
+src/phage_annotator/commands.py
 src/phage_annotator/config.py
 src/phage_annotator/coordinate_transforms.py
 src/phage_annotator/deepstorm_infer.py
@@ -22,6 +23,7 @@ src/phage_annotator/density_model.py
 src/phage_annotator/density_panel.py
 src/phage_annotator/display_mapping.py
 src/phage_annotator/export_view.py
+src/phage_annotator/gpu_utils.py
 src/phage_annotator/gui_actions.py
 src/phage_annotator/gui_annotations.py
 src/phage_annotator/gui_constants.py
@@ -53,6 +55,7 @@ src/phage_annotator/image_processing.py
 src/phage_annotator/io.py
 src/phage_annotator/io_annotations.py
 src/phage_annotator/jobs.py
+src/phage_annotator/keyboard_shortcuts_dialog.py
 src/phage_annotator/logger.py
 src/phage_annotator/lut_manager.py
 src/phage_annotator/metadata_dock.py
@@ -60,6 +63,7 @@ src/phage_annotator/metadata_reader.py
 src/phage_annotator/orthoview.py
 src/phage_annotator/panels.py
 src/phage_annotator/particles.py
+src/phage_annotator/performance_panel.py
 src/phage_annotator/project_io.py
 src/phage_annotator/projection_cache.py
 src/phage_annotator/pyramid.py
@@ -101,10 +105,12 @@ tests/test_auto_roi.py
 tests/test_coordinate_transforms.py
 tests/test_coordinate_transforms_integration.py
 tests/test_critical_logic.py
+tests/test_export.py
 tests/test_gui_basic.py
 tests/test_io.py
 tests/test_io_axes.py
 tests/test_perf.py
 tests/test_smoke_dummy.py
 tests/test_stale_result_guard.py
+tests/test_ui_wiring.py
 tests/test_utils_core.py

@@ -89,11 +89,11 @@ class KeypointAnnotator(
         # scaleBarBackgroundBox, scaleBarIncludeInExport, densityModelPath, densityDevice,
         # densityConfig, densityInferOptions, densityTargetPanel,
         # prefetchBlockSizeFrames, prefetchMaxInflightBlocks, throttleAnalysisHzDuringPlayback,
-        # pyramidEnabled, pyramidMaxLevels, showRoiHandles.
+        # pyramidEnabled, pyramidMaxLevels, showRoiHandles, markerSize, clickRadiusPx, activeTool.
         self._settings = QtCore.QSettings("PhageAnnotator", "PhageAnnotator")
         # Marker size controls visual size only; click_radius_px controls selection tolerance.
-        self.marker_size = 40
-        self.click_radius_px = 6.0
+        self.marker_size = self._settings.value("markerSize", 40, type=int)
+        self.click_radius_px = self._settings.value("clickRadiusPx", 6.0, type=float)
         self.play_timer = QtCore.QTimer()
         self._last_zoom_linked: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None
         self._axis_zoom: Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = {}
@@ -353,6 +353,7 @@ class KeypointAnnotator(
         )
 
         self._setup_ui()
+        self._cleanup_recent_images()  # Remove missing paths from recent files list
         if hasattr(self, "show_smlm_points_act"):
             self.show_smlm_points = self.show_smlm_points_act.isChecked()
         if hasattr(self, "show_smlm_sr_act"):

@@ -72,7 +72,8 @@ class SessionController(
             raise ValueError("No images provided.")
         for idx, img in enumerate(images):
             img.id = idx
-        label_list = list(labels)
+        # P3.5: Ensure label list always has defaults if empty
+        label_list = list(labels) if labels else ["Point", "Region"]
         annotations = {img.id: [] for img in images}
         image_states = {img.id: self._build_image_state(img) for img in images}
         annotations_loaded = {img.id: False for img in images}
@@ -96,6 +97,7 @@ class SessionController(
             t=0,
             z=0,
             crop_rect=(300.0, 300.0, 600.0, 600.0),
+            hist_bins=int(settings.value("histBinsDefault", 100, type=int)),
         )
         self.display_mapping = DisplayMapping(0.0, 1.0)
         self.display_mapping.ensure_panels(("frame", "mean", "composite", "support", "std"))

@@ -13,6 +13,7 @@ from phage_annotator import ui_actions, ui_docks
 from phage_annotator.gui_constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.panels import PanelSpec
+from phage_annotator.performance_panel import PerformancePanel
 from phage_annotator.render_mpl import Renderer
 
 
@@ -72,7 +73,9 @@ class UiSetupMixin:
         save_proj_act = actions["save_proj"]
         load_proj_act = actions["load_proj"]
         prefs_act = actions["prefs"]
+        reset_confirms_act = actions["reset_confirms"]
         reload_ann_act = actions["reload_ann"]
+        clear_hist_cache_act = actions.get("clear_hist_cache")
         exit_act = actions["exit"]
         about_act = actions["about"]
         copy_display_act = actions["copy_display"]
@@ -604,10 +607,23 @@ class UiSetupMixin:
         save_proj_act.triggered.connect(self._save_project)
         load_proj_act.triggered.connect(self._load_project)
         prefs_act.triggered.connect(self._show_preferences_dialog)
+        reset_confirms_act.triggered.connect(self._reset_confirmations)
         about_act.triggered.connect(self._show_about)
+        shortcuts_act = actions.get("shortcuts")
+        if shortcuts_act is not None:
+            shortcuts_act.triggered.connect(self._show_keyboard_shortcuts)
         exit_act.triggered.connect(self.close)
         show_roi_handles_act.toggled.connect(self._toggle_roi_handles)
         clear_roi_act.triggered.connect(self._clear_roi)
+        # P5.2: Multi-image ROI management
+        if hasattr(self, "copy_roi_to_all_act"):
+            self.copy_roi_to_all_act.triggered.connect(self._copy_roi_to_all_images)
+        if hasattr(self, "save_roi_template_act"):
+            self.save_roi_template_act.triggered.connect(self._save_roi_template)
+        if hasattr(self, "apply_roi_template_act"):
+            self.apply_roi_template_act.triggered.connect(self._apply_roi_template)
+        if clear_hist_cache_act is not None:
+            clear_hist_cache_act.triggered.connect(self._clear_histogram_cache)
 
         self.toggle_profile_act.triggered.connect(self._toggle_profile_panel)
         self.toggle_hist_act.triggered.connect(self._toggle_hist_panel)
@@ -764,7 +780,14 @@ class UiSetupMixin:
     def _make_metadata_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_metadata_widget(self)
 
-    def _build_roi_controls_layout(self) -> None:
+    def _make_performance_widget(self) -> QtWidgets.QWidget:
+        """Create the performance monitoring panel (P5.1)."""
+        panel = PerformancePanel(parent=self)
+        panel.set_cache(self.proj_cache)
+        panel.set_ring_buffer(self._playback_ring)
+        self.performance_panel = panel
+        return panel
+
         """Build ROI/crop controls used by the ROI dock."""
         layout = QtWidgets.QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)

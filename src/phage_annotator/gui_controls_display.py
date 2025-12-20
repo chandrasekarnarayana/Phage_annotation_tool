@@ -13,6 +13,7 @@ from phage_annotator.lut_manager import LUTS, lut_names
 
 class DisplayControlsMixin:
     """Mixin for display, playback, and general control handlers."""
+
     def _set_fov(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.images):
             return
@@ -44,6 +45,7 @@ class DisplayControlsMixin:
                 self._refresh_metadata_dock(self.primary_image.id)
                 self._maybe_autoload_annotations(self.primary_image.id)
                 self._refresh_image()
+
     def _set_primary_combo(self, idx: int) -> None:
         if 0 <= idx < len(self.images):
             self.stop_playback_t()
@@ -66,11 +68,14 @@ class DisplayControlsMixin:
                     self._apply_threshold_settings(cfg)
                     self.current_image_idx = idx
                     self.fov_list.setCurrentRow(idx)
-                    self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
+                    self.axis_mode_combo.setCurrentText(
+                        self.primary_image.interpret_3d_as
+                    )
                     self._refresh_roi_manager()
                     self._refresh_metadata_dock(self.primary_image.id)
                     self._maybe_autoload_annotations(self.primary_image.id)
                     self._refresh_image()
+
     def _set_support_combo(self, idx: int) -> None:
         if 0 <= idx < len(self.images):
             self.stop_playback_t()
@@ -78,25 +83,32 @@ class DisplayControlsMixin:
             self.support_combo.setCurrentIndex(idx)
             self._maybe_autoload_annotations(self.support_image.id)
             self._refresh_image()
+
     def _toggle_play(self, axis: str) -> None:
         if self.play_mode == axis:
             self.stop_playback_t()
             return
         self.start_playback_t()
+
     def _on_play_tick(self) -> None:
         if self._playback_mode:
             return
         self._refresh_image()
+
     def _on_loop_change(self) -> None:
         self.loop_playback = self.loop_chk.isChecked()
+
     def _on_axis_mode_change(self, mode: str) -> None:
         self.stop_playback_t()
         self.controller.set_axis_interpretation(self.primary_image.id, mode)
         # Force reload for current primary to honor new interpretation.
         self._evict_image_cache(self.primary_image)
         self.proj_cache.invalidate_image(self.primary_image.id)
-        self.recorder.record("set_axis_interpretation", {"image": self.primary_image.name, "mode": mode})
+        self.recorder.record(
+            "set_axis_interpretation", {"image": self.primary_image.name, "mode": mode}
+        )
         self._refresh_image()
+
     def _on_vminmax_change(self) -> None:
         if self.vmin_slider.value() > self.vmax_slider.value():
             self.vmax_slider.setValue(self.vmin_slider.value())
@@ -112,23 +124,43 @@ class DisplayControlsMixin:
                     mapping.set_window(vmin, vmax)
                     if self._interactive:
                         self._contrast_drag_active = True
-                        self.recorder.record("set_minmax", {"vmin": f"{self._last_vmin:.4f}", "vmax": f"{self._last_vmax:.4f}"})
+                        self.recorder.record(
+                            "set_minmax",
+                            {
+                                "vmin": f"{self._last_vmin:.4f}",
+                                "vmax": f"{self._last_vmax:.4f}",
+                            },
+                        )
                         self._schedule_refresh()
+
     def _apply_display_mapping(self) -> None:
         """Destructively apply the current display mapping to pixel data."""
         prim = self.primary_image
         if prim.array is None:
             return
         mapping = self._get_display_mapping(prim.id, "frame", prim.array)
-        resp = QtWidgets.QMessageBox.warning(
-            self,
-            "Apply display mapping",
-            "This will permanently rescale pixel values for the current image.\n"
-            "This cannot be undone. Proceed?",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+        # P1.4: Confirmation with "Don't show again" toggle stored in settings
+        if self._settings.value("confirmApplyDisplayMapping", True, type=bool):
+            mbox = QtWidgets.QMessageBox(
+                QtWidgets.QMessageBox.Icon.Warning,
+                "Apply display mapping",
+                (
+                    "This will permanently rescale pixel values for the current image.\n"
+                    "This cannot be undone. Proceed?"
+                ),
+                parent=self,
             )
-        if resp != QtWidgets.QMessageBox.StandardButton.Yes:
-            return
+            mbox.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+            )
+            dont = QtWidgets.QCheckBox("Don't show again")
+            mbox.setCheckBox(dont)
+            resp = mbox.exec()
+            if resp != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            if dont.isChecked():
+                self._settings.setValue("confirmApplyDisplayMapping", False)
         data = prim.array.astype(np.float32, copy=True)
         if mapping.max_val == mapping.min_val:
             return
@@ -156,7 +188,10 @@ class DisplayControlsMixin:
         if idx < 0:
             return
         self.current_cmap_idx = idx
-        self.recorder.record("set_lut", {"index": idx, "name": lut_names()[idx] if idx < len(lut_names()) else idx})
+        self.recorder.record(
+            "set_lut",
+            {"index": idx, "name": lut_names()[idx] if idx < len(lut_names()) else idx},
+        )
         if self.lut_invert_chk is not None:
             invert_supported = True
             if 0 <= idx < len(LUTS):
@@ -168,12 +203,16 @@ class DisplayControlsMixin:
 
     def _on_lut_invert(self) -> None:
         self.controller.set_invert(self.lut_invert_chk.isChecked())
-        self.recorder.record("set_lut_invert", {"invert": self.lut_invert_chk.isChecked()})
+        self.recorder.record(
+            "set_lut_invert", {"invert": self.lut_invert_chk.isChecked()}
+        )
         self._refresh_image()
 
     def _on_gamma_change(self, value: int) -> None:
         gamma = max(0.2, min(5.0, value / 10.0))
-        mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
+        mapping = self.controller.display_mapping.mapping_for(
+            self.primary_image.id, "frame"
+        )
         mapping.gamma = gamma
         if self.gamma_label is not None:
             self.gamma_label.setText(f"{gamma:.2f}")
@@ -182,7 +221,9 @@ class DisplayControlsMixin:
             self._refresh_image()
 
     def _on_log_toggle(self) -> None:
-        mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
+        mapping = self.controller.display_mapping.mapping_for(
+            self.primary_image.id, "frame"
+        )
         mapping.mode = "log" if self.log_chk.isChecked() else "linear"
         self.recorder.record("set_log", {"enabled": self.log_chk.isChecked()})
         self.controller.display_changed.emit()
@@ -190,7 +231,9 @@ class DisplayControlsMixin:
 
     def _copy_display_settings(self) -> None:
         """Copy LUT/min/max/gamma from primary to another target."""
-        mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
+        mapping = self.controller.display_mapping.mapping_for(
+            self.primary_image.id, "frame"
+        )
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("Copy Display Settings")
         layout = QtWidgets.QFormLayout(dlg)
@@ -198,7 +241,8 @@ class DisplayControlsMixin:
         target_combo.addItems(["Support image", "All images"])
         layout.addRow("Target", target_combo)
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         layout.addRow(buttons)
 
@@ -232,7 +276,9 @@ class DisplayControlsMixin:
             self._update_status()
 
     def _on_scope_change(self) -> None:
-        self.annotation_scope = "current" if self.scope_group.buttons()[0].isChecked() else "all"
+        self.annotation_scope = (
+            "current" if self.scope_group.buttons()[0].isChecked() else "all"
+        )
 
     def _on_target_change(self) -> None:
         buttons = self.target_group.buttons()
@@ -247,10 +293,12 @@ class DisplayControlsMixin:
 
     def _on_marker_size_change(self, val: int) -> None:
         self.marker_size = float(val)
+        self._settings.setValue("markerSize", int(val))
         self._refresh_image()
 
     def _on_click_radius_change(self, val: float) -> None:
         self.click_radius_px = float(val)
+        self._settings.setValue("clickRadiusPx", float(val))
 
     def _on_profile_mode(self) -> None:
         self.profile_enabled = self.profile_mode_chk.isChecked()
@@ -319,7 +367,8 @@ class DisplayControlsMixin:
         layout.addRow("Low percentile (%)", low_spin)
         layout.addRow("High percentile (%)", high_spin)
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         layout.addRow(buttons)
 
@@ -327,7 +376,9 @@ class DisplayControlsMixin:
             low = float(low_spin.value())
             high = float(high_spin.value())
             if high <= low:
-                QtWidgets.QMessageBox.warning(self, "Invalid range", "High percentile must be greater than low.")
+                QtWidgets.QMessageBox.warning(
+                    self, "Invalid range", "High percentile must be greater than low."
+                )
                 return
             self._settings.setValue("autoLowPct", low)
             self._settings.setValue("autoHighPct", high)
@@ -358,7 +409,9 @@ class DisplayControlsMixin:
         if target == "Current panel":
             panel_ids = [_current_panel_id()]
         else:
-            panel_ids = [panel for panel, visible in self._panel_visibility.items() if visible]
+            panel_ids = [
+                panel for panel, visible in self._panel_visibility.items() if visible
+            ]
 
         if not panel_ids:
             return
@@ -429,7 +482,8 @@ class DisplayControlsMixin:
                 return np.array([], dtype=np.float32)
             sample = np.concatenate(samples)
             if sample.size > 200000:
-                rng = np.random.default_rng(0)
+                # Deterministic sampling for reproducibility (P3.2)
+                rng = np.random.default_rng(42)
                 idx = rng.choice(sample.size, size=200000, replace=False)
                 sample = sample[idx]
             return sample
@@ -462,10 +516,18 @@ class DisplayControlsMixin:
         )
         self._auto_job_id = handle.job_id
 
-    def _apply_auto_to_panels(self, panel_ids: List[str], vmin: float, vmax: float) -> None:
+    def _apply_auto_to_panels(
+        self, panel_ids: List[str], vmin: float, vmax: float
+    ) -> None:
         for panel in panel_ids:
-            image_id = self.support_image.id if panel == "support" else self.primary_image.id
-            data = self.support_image.array if panel == "support" else self.primary_image.array
+            image_id = (
+                self.support_image.id if panel == "support" else self.primary_image.id
+            )
+            data = (
+                self.support_image.array
+                if panel == "support"
+                else self.primary_image.array
+            )
             mapping = self._get_display_mapping(image_id, panel, data)
             mapping.set_window(vmin, vmax)
 
@@ -487,8 +549,9 @@ class DisplayControlsMixin:
             self,
             "Recovery found",
             "A newer recovery file was found. Restore annotations?",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            )
+            QtWidgets.QMessageBox.StandardButton.Yes
+            | QtWidgets.QMessageBox.StandardButton.No,
+        )
         if resp == QtWidgets.QMessageBox.StandardButton.Yes:
             self.controller.restore_recovery(recovery)
             self._refresh_image()
@@ -519,7 +582,9 @@ class DisplayControlsMixin:
                 t, z, y, x = shape[0], shape[1], shape[2], shape[3]
 
         interp = img.interpret_3d_as
-        self.axes_info_label.setText(f"T: {t}  Z: {z}  Y: {y}  X: {x}  | Interpretation: {interp}")
+        self.axes_info_label.setText(
+            f"T: {t}  Z: {z}  Y: {y}  X: {x}  | Interpretation: {interp}"
+        )
         if img.ome_axes:
             tooltip = f"OME metadata axes: {img.ome_axes}"
         elif img.axis_auto_used and img.axis_auto_mode:
@@ -533,13 +598,21 @@ class DisplayControlsMixin:
         img = self.primary_image
         if img.interpret_3d_as == "auto" and img.axis_auto_used and img.axis_auto_mode:
             mode = img.axis_auto_mode.upper()
-            self.axis_warning.setText(f'<a href="axes">3D axis interpreted as {mode} (auto). Click to change.</a>')
+            self.axis_warning.setText(
+                f'<a href="axes">3D axis interpreted as {mode} (auto). Click to change.</a>'
+            )
             self.axis_warning.setVisible(True)
         else:
             self.axis_warning.setVisible(False)
 
     def _on_limits_changed(self, ax) -> None:
-        if ax not in {self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std}:
+        if ax not in {
+            self.ax_frame,
+            self.ax_mean,
+            self.ax_comp,
+            self.ax_support,
+            self.ax_std,
+        }:
             return
         if self._suppress_limits:
             return

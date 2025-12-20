@@ -47,6 +47,23 @@ from phage_annotator.scalebar import ScaleBarSpec, compute_scalebar
 class RenderingMixin:
     """Mixin for image rendering and overlay composition."""
 
+    def _clear_histogram_cache(self) -> None:
+        try:
+            if self._hist_job_id is not None:
+                self.jobs.cancel(self._hist_job_id)
+                self._hist_job_id = None
+            self._hist_cache = None
+            self._hist_cache_key = None
+            if hasattr(self, "statusBar"):
+                try:
+                    self.statusBar().showMessage("Histogram cache cleared.", 2500)
+                except Exception:
+                    pass
+            # Redraw to reflect cleared cache; will recompute on demand
+            self._refresh_image()
+        except Exception as exc:
+            self._append_log(f"[Hist] Clear cache error: {exc}")
+
     def _refresh_image(self) -> None:
         """Refresh the image display using current state."""
         if not self.images:
@@ -831,7 +848,8 @@ class RenderingMixin:
                 return None
             sample = np.concatenate(samples)
             if sample.size > 200000:
-                rng = np.random.default_rng(0)
+                # Deterministic sampling for reproducibility (P3.2)
+                rng = np.random.default_rng(42)
                 idx = rng.choice(sample.size, size=200000, replace=False)
                 sample = sample[idx]
             return sample, job_gen, cache_key

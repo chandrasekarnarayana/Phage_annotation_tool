@@ -65,7 +65,9 @@ class UiExtrasMixin:
         label_group = QtWidgets.QGroupBox("Labels")
         label_layout = QtWidgets.QVBoxLayout(label_group)
         self.label_buttons = QtWidgets.QButtonGroup()
-        for label in self.labels:
+        # P3.5: Guard against empty label lists
+        labels_to_display = self.labels if self.labels else ["Point", "Region"]
+        for label in labels_to_display:
             btn = QtWidgets.QRadioButton(label)
             if label == self.current_label:
                 btn.setChecked(True)
@@ -193,7 +195,13 @@ class UiExtrasMixin:
             set_status=self._set_status,
         )
         self.tool_router = ToolRouter(callbacks)
-        self._set_tool(Tool.ANNOTATE_POINT)
+        # Restore last active tool from QSettings
+        saved_tool_str = self._settings.value("activeTool", "ANNOTATE_POINT", type=str)
+        try:
+            saved_tool = Tool(saved_tool_str)
+        except ValueError:
+            saved_tool = Tool.ANNOTATE_POINT
+        self._set_tool(saved_tool)
 
     def _init_tool_bar(self) -> None:
         toolbar = QtWidgets.QToolBar("Tools", self)
@@ -253,6 +261,7 @@ class UiExtrasMixin:
         if self.tool_router is not None:
             self.tool_router.set_tool(tool)
         self.controller.set_tool(tool.value)
+        self._settings.setValue("activeTool", tool.value)
         act = self.tool_actions.get(tool)
         if act is not None:
             act.setChecked(True)

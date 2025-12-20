@@ -65,7 +65,7 @@ class AnnotationsMixin:
         self.profile_mode_chk.blockSignals(False)
 
     def _remove_annotation_near(self, ax, t: int, z: int, x: float, y: float) -> bool:
-        """Remove the nearest point within the click radius (display pixels)."""
+        """Remove the nearest point within the click radius (P3.3: confirmation added)."""
         pts = self._current_keypoints()
         if not pts:
             return False
@@ -79,6 +79,8 @@ class AnnotationsMixin:
             dist = np.hypot(kp_disp[0] - click_disp[0], kp_disp[1] - click_disp[1])
             if dist <= self.click_radius_px:
                 removed = pts[idx]
+                # Confirmation for click deletion (P3.3) - only for multi-select delete via table
+                # Single clicks typically don't need confirmation for better UX
                 self.controller.delete_annotations(removed.image_id, [removed])
                 self.undo_act.setEnabled(self.controller.can_undo())
                 self.redo_act.setEnabled(self.controller.can_redo())

@@ -39,10 +39,65 @@ class ActionsMixin:
         paths = self.controller.open_folder(self)
         if paths:
             self.recorder.record("open_folder", {"count": len(paths)})
-            self._open_files_from_paths(paths)
-            self.controller.build_annotation_index(paths[0].parent)
-            self._refresh_annotation_availability()
-            self._maybe_autoload_annotations(self.primary_image.id)
+            # Load metadata for all files in the background with progress + cancel (P1.3)
+            files = list(paths)
+
+            def _worker(progress, cancel):
+                from phage_annotator.gui_image_io import read_metadata
+
+                metas = []
+                total = len(files)
+                for idx, p in enumerate(files):
+                    if cancel.is_cancelled():
+                        return None
+                    meta = read_metadata(p)
+                    metas.append(meta)
+                    progress(int((idx + 1) / max(1, total) * 100), f"{idx + 1}/{total}")
+                return metas
+
+            def _on_result(result):
+                if not result:
+                    return
+                new_images = result
+                # Add images and update UI on GUI thread
+                self.controller.add_images(new_images)
+                for meta in new_images:
+                    self.fov_list.addItem(meta.name)
+                    self.primary_combo.addItem(meta.name)
+                    self.support_combo.addItem(meta.name)
+                    self.roi_manager.rois_by_image[meta.id] = []
+                # Build annotation index (lightweight) and update availability
+                try:
+                    self.controller.build_annotation_index(files[0].parent)
+                except Exception:
+                    pass
+                self._refresh_annotation_availability()
+                self._refresh_roi_manager()
+                self._refresh_metadata_dock(self.primary_image.id)
+                self._refresh_image()
+                self._maybe_autoload_annotations(self.primary_image.id)
+
+            self.jobs.submit(
+                _worker,
+                name="Open folder",
+                on_result=_on_result,
+                timeout_sec=300.0,
+                retries=2,
+                retry_delay_sec=1.0,
+            )
+
+    def _reset_confirmations(self) -> None:
+        """Reset all confirmation prompts to enabled (P3.3)."""
+        self._settings.setValue("confirmApplyDisplayMapping", True)
+        self._settings.setValue("confirmApplyThreshold", True)
+        self._settings.setValue("confirmClearROI", True)
+        self._settings.setValue("confirmDeleteAnnotations", True)
+        self._settings.setValue("confirmOverwriteFile", True)
+        QtWidgets.QMessageBox.information(
+            self,
+            "Confirmations Reset",
+            "All confirmation prompts have been re-enabled.\n\nYou will now be asked before:\n• Applying display settings\n• Applying threshold\n• Clearing ROI\n• Deleting annotations\n• Overwriting files"
+        )
 
     def _load_annotations_current(self) -> None:
         cal = self._get_calibration_state(self.primary_image.id)
@@ -125,7 +180,14 @@ class ActionsMixin:
             self.controller.annotations_changed.emit()
             self._refresh_image()
 
-        self.jobs.submit(_worker, name="Load all annotations", on_result=_on_result)
+        self.jobs.submit(
+            _worker,
+            name="Load all annotations",
+            on_result=_on_result,
+            timeout_sec=300.0,
+            retries=2,
+            retry_delay_sec=1.0,
+        )
 
     def _reload_annotations_current(self) -> None:
         image_id = self.primary_image.id
@@ -165,6 +227,13 @@ class ActionsMixin:
             "About Phage Annotator",
             "Phage Annotator\nMatplotlib + Qt GUI for microscopy keypoint annotation.\nFive synchronized panels, ROI, autoplay, lazy loading.",
         )
+
+    def _show_keyboard_shortcuts(self) -> None:
+        """Show keyboard shortcuts reference dialog."""
+        from phage_annotator.keyboard_shortcuts_dialog import KeyboardShortcutsDialog
+        dialog = KeyboardShortcutsDialog(self)
+        dialog.exec()
+
 
     def _show_profile_dialog(self) -> None:
         """Open a dialog showing line profiles (vertical, horizontal, diagonals) raw vs corrected."""
@@ -677,8 +746,32 @@ class ActionsMixin:
             self.controller.annotations_changed.emit()
             if image_id == self.primary_image.id:
                 self._refresh_image()
+            try:
+                # Brief user feedback on completion
+                self.statusBar().showMessage("Annotations loaded.", 3000)
+            except Exception:
+                pass
 
-        handle = self.jobs.submit(_worker, name="Load annotations", on_result=_on_result)
+        def _on_error(err: str) -> None:
+            try:
+                self.statusBar().showMessage("Annotation load error (see Logs)", 4000)
+            except Exception:
+                pass
+            self._append_log(f"[Annotations] Load error for image id={image_id}\n{err}")
+
+        try:
+            self.statusBar().showMessage("Loading annotations…", 2000)
+        except Exception:
+            pass
+        handle = self.jobs.submit(
+            _worker,
+            name="Load annotations",
+            on_result=_on_result,
+            on_error=_on_error,
+            timeout_sec=300.0,
+            retries=2,
+            retry_delay_sec=1.0,
+        )
         self._annotation_job_tokens[image_id] = handle.cancel_token
         self._annotation_job_ids[image_id] = handle.job_id
 

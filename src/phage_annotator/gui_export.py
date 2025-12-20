@@ -11,7 +11,7 @@ from matplotlib.backends.qt_compat import QtWidgets
 from phage_annotator.analysis import compute_mean_std
 from phage_annotator.annotation_metadata import format_tokens
 from phage_annotator.display_mapping import build_norm
-from phage_annotator.export_view import ExportOptions, render_view_to_array
+from phage_annotator.export_view import ExportOptions, render_view_to_array, render_layer_to_array
 from phage_annotator.gui_image_io import read_metadata
 from phage_annotator.lut_manager import cmap_for
 from phage_annotator.scalebar import ScaleBarSpec
@@ -182,43 +182,66 @@ class ExportMixin:
             return
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("Export View")
+        dlg.setObjectName("export_dialog")
         layout = QtWidgets.QFormLayout(dlg)
         panel_combo = QtWidgets.QComboBox()
+        panel_combo.setObjectName("export_dialog_combo_panel")
         panel_combo.addItems(["Frame", "Mean", "Composite", "Support", "Std"])
         scope_combo = QtWidgets.QComboBox()
+        scope_combo.setObjectName("export_dialog_combo_scope")
         scope_combo.addItems(["Current slice", "T range", "All frames"])
         t_start = QtWidgets.QSpinBox()
+        t_start.setObjectName("export_dialog_spinbox_t_start")
         t_end = QtWidgets.QSpinBox()
+        t_end.setObjectName("export_dialog_spinbox_t_end")
         t_start.setRange(0, max(0, self.primary_image.array.shape[0] - 1))
         t_end.setRange(0, max(0, self.primary_image.array.shape[0] - 1))
         t_start.setValue(self.t_slider.value())
         t_end.setValue(self.t_slider.value())
         region_combo = QtWidgets.QComboBox()
+        region_combo.setObjectName("export_dialog_combo_region")
         region_combo.addItems(["Full view", "Crop", "ROI bounds", "ROI mask-clipped"])
         roi_outline_chk = QtWidgets.QCheckBox("ROI outline")
+        roi_outline_chk.setObjectName("export_dialog_checkbox_roi_outline")
         roi_outline_chk.setChecked(bool(self.roi_rect))
         roi_fill_chk = QtWidgets.QCheckBox("ROI fill")
+        roi_fill_chk.setObjectName("export_dialog_checkbox_roi_fill")
         ann_chk = QtWidgets.QCheckBox("Annotation points")
+        ann_chk.setObjectName("export_dialog_checkbox_annotations")
         ann_chk.setChecked(True)
         ann_label_chk = QtWidgets.QCheckBox("Annotation labels")
+        ann_label_chk.setObjectName("export_dialog_checkbox_annotation_labels")
         particle_chk = QtWidgets.QCheckBox("Particle outlines")
+        particle_chk.setObjectName("export_dialog_checkbox_particles")
         scalebar_chk = QtWidgets.QCheckBox("Scale bar")
+        scalebar_chk.setObjectName("export_dialog_checkbox_scalebar")
         scalebar_chk.setChecked(self.scale_bar_enabled and self.scale_bar_include_in_export)
         overlay_text_chk = QtWidgets.QCheckBox("Overlay text")
+        overlay_text_chk.setObjectName("export_dialog_checkbox_overlay_text")
         marker_spin = QtWidgets.QDoubleSpinBox()
+        marker_spin.setObjectName("export_dialog_spinbox_marker_size")
         marker_spin.setRange(1.0, 200.0)
         marker_spin.setValue(float(self.marker_size))
         roi_lw_spin = QtWidgets.QDoubleSpinBox()
+        roi_lw_spin.setObjectName("export_dialog_spinbox_roi_linewidth")
         roi_lw_spin.setRange(0.5, 6.0)
         roi_lw_spin.setValue(1.5)
         dpi_spin = QtWidgets.QSpinBox()
+        dpi_spin.setObjectName("export_dialog_spinbox_dpi")
         dpi_spin.setRange(72, 600)
         dpi_spin.setValue(150)
         fmt_combo = QtWidgets.QComboBox()
+        fmt_combo.setObjectName("export_dialog_combo_format")
         fmt_combo.addItems(["PNG", "TIFF"])
         overlay_only_chk = QtWidgets.QCheckBox("Overlay only (transparent)")
+        overlay_only_chk.setObjectName("export_dialog_checkbox_overlay_only")
         transparent_chk = QtWidgets.QCheckBox("Transparent background")
+        transparent_chk.setObjectName("export_dialog_checkbox_transparent")
         transparent_chk.setChecked(True)
+        # P3.4: Export as separate layer files
+        export_layers_chk = QtWidgets.QCheckBox("Export as separate layers")
+        export_layers_chk.setObjectName("export_dialog_checkbox_layers")
+        export_layers_chk.setToolTip("Generate separate PNG files for base image, annotations, ROI, particles, and scalebar with alpha channel")
 
         layout.addRow("Panel", panel_combo)
         layout.addRow("Scope", scope_combo)
@@ -242,10 +265,12 @@ class ExportMixin:
         layout.addRow("Format", fmt_combo)
         layout.addRow(overlay_only_chk)
         layout.addRow(transparent_chk)
+        layout.addRow(export_layers_chk)  # P3.4
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
             | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
+        buttons.setObjectName("export_dialog_buttonbox")
         layout.addRow(buttons)
         buttons.accepted.connect(dlg.accept)
         buttons.rejected.connect(dlg.reject)
@@ -254,9 +279,6 @@ class ExportMixin:
 
         fmt = fmt_combo.currentText().lower()
         default_name = pathlib.Path(self.primary_image.path).with_suffix(f".export.{fmt}")
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export View", str(default_name))
-        if not path:
-            return
         opts = ExportOptions(
             panel=panel_combo.currentText().lower(),
             region=region_combo.currentText().lower(),
@@ -273,10 +295,61 @@ class ExportMixin:
             fmt=fmt,
             overlay_only=overlay_only_chk.isChecked(),
             transparent_bg=transparent_chk.isChecked(),
+            export_as_layers=export_layers_chk.isChecked(),  # P3.4
             roi_mask_clip=region_combo.currentText().lower() == "roi mask-clipped",
         )
         scope = scope_combo.currentText()
         t_values = self._export_t_values(scope, t_start.value(), t_end.value())
+
+        # P1.5: Export guardrails and preflight validation
+        # 1) Support panel requires a loaded support image
+        if opts.panel == "support":
+            if self.support_image is None or self.support_image.array is None:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Export blocked",
+                    "Support image is not loaded. Choose a different panel or load a support image.",
+                )
+                return
+        # 2) ROI-based region requires a valid ROI
+        if opts.region in ("roi bounds", "roi mask-clipped"):
+            if self.roi_shape == "none" or self.roi_rect[2] <= 0 or self.roi_rect[3] <= 0:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Export blocked",
+                    "ROI region requested but no valid ROI is set.",
+                )
+                return
+        # 3) Overlay-only requires at least one overlay to be selected
+        if opts.overlay_only:
+            has_any_overlay = (
+                opts.include_roi_outline
+                or opts.include_roi_fill
+                or opts.include_annotations
+                or opts.include_annotation_labels
+                or opts.include_particles
+                or opts.include_scalebar
+                or opts.include_overlay_text
+            )
+            if not has_any_overlay:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    "Export blocked",
+                    "Overlay-only is selected but no overlays are enabled.",
+                )
+                return
+        # 4) Ensure we actually have frames to export
+        if not t_values:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Export blocked",
+                "No frames selected for export.",
+            )
+            return
+
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export View", str(default_name))
+        if not path:
+            return
         self._export_view_job(pathlib.Path(path), t_values, opts)
 
     def _export_t_values(self, scope: str, t_start: int, t_end: int) -> list[int]:
@@ -355,11 +428,30 @@ class ExportMixin:
                 out_path = self._export_frame_path(
                     base_path, t_idx, opts, multiple=len(t_values) > 1
                 )
-                _save_image(out_path, image, opts)
+                
+                # P3.4: Export as separate layers if requested
+                if opts.export_as_layers:
+                    self._export_layers(
+                        out_path,
+                        frame,
+                        cmap,
+                        norm,
+                        annotation_points,
+                        annotation_labels,
+                        roi_overlays,
+                        particle_overlays,
+                        overlay_text,
+                        scalebar_spec,
+                        cal.pixel_size_um_per_px,
+                        opts,
+                    )
+                else:
+                    _save_image(out_path, image, opts)
+                
                 progress(int((idx + 1) / max(1, total) * 100), f"{idx + 1}/{total}")
             return True
 
-        self.jobs.submit(_job, name="Export view")
+        self.jobs.submit(_job, name="Export view", timeout_sec=600.0)
 
     def _export_panel_frame(self, prim, support, t_idx: int, z_idx: int, panel: str, crop_rect):
         if prim.array is None:
@@ -457,6 +549,104 @@ class ExportMixin:
             else:
                 image[~mask] = 0
         return image
+
+    def _export_layers(
+        self,
+        base_path: pathlib.Path,
+        frame: np.ndarray,
+        cmap,
+        norm,
+        annotation_points,
+        annotation_labels,
+        roi_overlays,
+        particle_overlays,
+        overlay_text,
+        scalebar_spec,
+        pixel_size_um,
+        opts: ExportOptions,
+    ) -> None:
+        """Export each overlay as a separate PNG file with alpha channel (P3.4).
+        
+        Creates files like:
+        - base_t0000_base.png (base image)
+        - base_t0000_annotations.png (annotations with alpha)
+        - base_t0000_roi.png (ROI with alpha)
+        - base_t0000_particles.png (particles with alpha)
+        - base_t0000_scalebar.png (scalebar with alpha)
+        """
+        stem = base_path.stem
+        parent = base_path.parent
+        image_shape = frame.shape[:2]
+        
+        # Always export base layer
+        if not opts.overlay_only:
+            base_layer = render_layer_to_array(
+                image_shape,
+                layer_type="base",
+                cmap=cmap,
+                norm=norm,
+                image=frame,
+                options=opts,
+            )
+            base_file = parent / f"{stem}_base.png"
+            _save_image(base_file, base_layer, opts)
+        
+        # Export annotations layer
+        if opts.include_annotations and annotation_points:
+            ann_layer = render_layer_to_array(
+                image_shape,
+                layer_type="annotations",
+                annotations=annotation_points,
+                annotation_labels=annotation_labels if opts.include_annotation_labels else [],
+                options=opts,
+            )
+            ann_file = parent / f"{stem}_annotations.png"
+            _save_image(ann_file, ann_layer, opts)
+        
+        # Export ROI layer
+        if (opts.include_roi_outline or opts.include_roi_fill) and roi_overlays:
+            roi_layer = render_layer_to_array(
+                image_shape,
+                layer_type="roi",
+                roi_overlays=roi_overlays,
+                options=opts,
+            )
+            roi_file = parent / f"{stem}_roi.png"
+            _save_image(roi_file, roi_layer, opts)
+        
+        # Export particles layer
+        if opts.include_particles and particle_overlays:
+            particles_layer = render_layer_to_array(
+                image_shape,
+                layer_type="particles",
+                particle_overlays=particle_overlays,
+                options=opts,
+            )
+            particles_file = parent / f"{stem}_particles.png"
+            _save_image(particles_file, particles_layer, opts)
+        
+        # Export scalebar layer
+        if opts.include_scalebar and scalebar_spec:
+            scalebar_layer = render_layer_to_array(
+                image_shape,
+                layer_type="scalebar",
+                scalebar_spec=scalebar_spec,
+                pixel_size_um=pixel_size_um,
+                options=opts,
+            )
+            scalebar_file = parent / f"{stem}_scalebar.png"
+            _save_image(scalebar_file, scalebar_layer, opts)
+        
+        # Export text overlay layer
+        if opts.include_overlay_text and overlay_text:
+            text_layer = render_layer_to_array(
+                image_shape,
+                layer_type="text",
+                overlay_text=overlay_text,
+                options=opts,
+            )
+            text_file = parent / f"{stem}_text.png"
+            _save_image(text_file, text_layer, opts)
 
     def _export_frame_path(
         self, base: pathlib.Path, t_idx: int, opts: ExportOptions, *, multiple: bool

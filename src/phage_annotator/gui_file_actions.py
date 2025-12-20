@@ -100,6 +100,22 @@ class FileActionsMixin:
         # Menu updates are handled by the UI setup; this ensures consistency
         LOGGER.debug(f"Recent images menu updated: {len(recent)} items")
 
+    def _cleanup_recent_images(self) -> None:
+        """Remove non-existent paths from recent images list.
+        
+        Called on startup to clean up missing files.
+        """
+        recent = self._load_recent_images()
+        before_count = len(recent)
+        recent_cleaned = [p for p in recent if pathlib.Path(p).exists()]
+        
+        if len(recent_cleaned) < before_count:
+            removed = before_count - len(recent_cleaned)
+            self.session_controller.state.recent_images = recent_cleaned
+            self._update_recent_menu()
+            LOGGER.info(f"Cleaned recent files: removed {removed} missing paths")
+
+
     def _clear_cache(self) -> None:
         """Clear all cached projections and pyramids from memory."""
         self.session_controller.clear_caches()

@@ -202,6 +202,7 @@ class ThresholdControlsMixin:
             return data.ravel()
         t_count = int(prim.array.shape[0])
         n = min(values.sample_count, t_count)
+        # Deterministic frame selection for reproducibility (P3.2)
         idxs = np.linspace(0, t_count - 1, n).astype(int)
         pixels = []
         for t in idxs:
@@ -283,14 +284,25 @@ class ThresholdControlsMixin:
         if self._threshold_preview_mask is None:
             self._set_status("No threshold preview to apply.")
             return
-        resp = QtWidgets.QMessageBox.question(
-            self,
-            "Apply Threshold",
-            "Replace the current view with a binary mask layer?",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-        )
-        if resp != QtWidgets.QMessageBox.StandardButton.Yes:
-            return
+        # P1.4: Confirmation with "Don't show again" toggle stored in settings
+        if self._settings.value("confirmApplyThreshold", True, type=bool):
+            mbox = QtWidgets.QMessageBox(
+                QtWidgets.QMessageBox.Icon.Question,
+                "Apply Threshold",
+                "Replace the current view with a binary mask layer?",
+                parent=self,
+            )
+            mbox.setStandardButtons(
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+            )
+            dont = QtWidgets.QCheckBox("Don't show again")
+            mbox.setCheckBox(dont)
+            resp = mbox.exec()
+            if resp != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+            if dont.isChecked():
+                self._settings.setValue("confirmApplyThreshold", False)
         if self._threshold_mask_full is None:
             image = self._threshold_source_image(self.threshold_panel.values().target)
             if image is None:

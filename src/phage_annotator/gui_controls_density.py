@@ -53,6 +53,23 @@ class DensityControlsMixin:
         if self.primary_image.array is None:
             self.density_panel.model_status.setText("Load an image first.")
             return
+        
+        # Check GPU availability before running inference
+        from phage_annotator.gpu_utils import check_cuda_available
+        device = self.controller.density_device or "auto"
+        if device in ("cuda", "auto"):
+            cuda_ok, cuda_msg = check_cuda_available()
+            if not cuda_ok and device == "cuda":
+                from matplotlib.backends.qt_compat import QtWidgets
+                QtWidgets.QMessageBox.warning(
+                    self, 
+                    "CUDA Not Available",
+                    f"Cannot run density inference on GPU:\n\n{cuda_msg}\n\nPlease select 'CPU' device or install CUDA support."
+                )
+                return
+            elif not cuda_ok and device == "auto":
+                self.density_panel.model_status.setText(f"Running on CPU (CUDA unavailable)")
+        
         opts = self._density_infer_options_from_ui()
         cfg = self._density_config_from_ui()
         panel = self.density_panel.target_combo.currentText().lower()
@@ -126,7 +143,13 @@ class DensityControlsMixin:
 
         self.density_panel.run_btn.setEnabled(False)
         self.density_panel.cancel_btn.setEnabled(True)
-        handle = self.jobs.submit(_job, name="Density inference", on_result=_on_result)
+        handle = self.jobs.submit(
+            _job,
+            name="Density inference",
+            on_result=_on_result,
+            timeout_sec=900.0,
+            retries=2,  # P5.3: Increased from 1 to handle transient errors
+        )
         self._density_job_id = handle.job_id
         self.density_panel.model_status.setText("Running…")
 

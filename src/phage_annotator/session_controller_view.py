@@ -7,10 +7,62 @@ from phage_annotator.session_state import RoiSpec
 
 if TYPE_CHECKING:
     from phage_annotator.display_mapping import DisplayMapping
+    from phage_annotator.commands import Command
 
 
 class SessionViewMixin:
-    """Mixin for view and display state mutations."""
+    """Mixin for view and display state mutations (P3.1: extended for undo/redo)."""
+    
+    def execute_view_command(self, command: "Command") -> bool:
+        """Execute a view command and add to undo stack (P3.1)."""
+        if command.execute():
+            self._push_undo_view(command.to_dict())
+            self.state_changed.emit()
+            return True
+        return False
+    
+    def _push_undo_view(self, command_dict: dict) -> None:
+        """Push a view command to the undo stack (P3.1)."""
+        self._undo_stack.append(command_dict)
+        self._redo_stack.clear()
+    
+    def undo_view_command(self) -> bool:
+        """Undo the last view command (P3.1)."""
+        if not self._undo_stack:
+            return False
+        
+        # Get the last command
+        cmd_dict = self._undo_stack[-1]
+        
+        # Check if it's a view command (has 'before'/'after' mementos)
+        if cmd_dict.get("before") and cmd_dict.get("after"):
+            from phage_annotator.commands import command_from_dict
+            cmd = command_from_dict(cmd_dict, self)
+            if cmd and cmd.undo():
+                self._undo_stack.pop()
+                self._redo_stack.append(cmd_dict)
+                self.state_changed.emit()
+                return True
+        return False
+    
+    def redo_view_command(self) -> bool:
+        """Redo the last undone view command (P3.1)."""
+        if not self._redo_stack:
+            return False
+        
+        cmd_dict = self._redo_stack[-1]
+        
+        # Check if it's a view command
+        if cmd_dict.get("before") and cmd_dict.get("after"):
+            from phage_annotator.commands import command_from_dict
+            cmd = command_from_dict(cmd_dict, self)
+            if cmd and cmd.redo():
+                self._redo_stack.pop()
+                self._undo_stack.append(cmd_dict)
+                self.state_changed.emit()
+                return True
+        return False
+    
     def set_current_label(self, label: str) -> None:
         """Set the active label for new annotations."""
         if self.session_state.current_label == label:

@@ -163,6 +163,8 @@ class SmlmControlsMixin:
             on_result=_on_result,
             on_error=_on_error,
             on_progress=_on_progress,
+            timeout_sec=600.0,
+            retries=2,  # P5.3: Increased from 1 to handle transient errors
         )
         self._smlm_job_id = handle.job_id
         thunder.progress.setValue(0)
@@ -309,6 +311,23 @@ class SmlmControlsMixin:
         if not is_torch_available():
             deep.status_label.setText("PyTorch not available.")
             return
+        
+        # Check GPU availability before running inference
+        from phage_annotator.gpu_utils import check_cuda_available
+        params_check = self._deepstorm_params_from_ui()
+        if params_check and params_check.device in ("cuda", "auto"):
+            cuda_ok, cuda_msg = check_cuda_available()
+            if not cuda_ok and params_check.device == "cuda":
+                from matplotlib.backends.qt_compat import QtWidgets
+                QtWidgets.QMessageBox.warning(
+                    self, 
+                    "CUDA Not Available",
+                    f"Cannot run Deep-STORM on GPU:\n\n{cuda_msg}\n\nPlease select 'CPU' device or install CUDA support."
+                )
+                return
+            elif not cuda_ok and params_check.device == "auto":
+                deep.status_label.setText("Running on CPU (CUDA unavailable)")
+        
         self._ensure_loaded(self.current_image_idx)
         if self.primary_image.array is None:
             deep.status_label.setText("Load an image first.")
@@ -443,6 +462,8 @@ class SmlmControlsMixin:
             on_result=_on_result,
             on_error=_on_error,
             on_progress=_on_progress,
+            timeout_sec=900.0,
+            retries=2,  # P5.3: Increased from 1 to handle transient errors
         )
         self._deepstorm_job_id = handle.job_id
         deep.progress.setValue(0)

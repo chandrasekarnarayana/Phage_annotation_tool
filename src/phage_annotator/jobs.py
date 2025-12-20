@@ -104,6 +104,8 @@ class JobRunnable(QtCore.QRunnable):
         self.signals = signals
 
     def run(self) -> None:
+        import time as _time
+        start_ts = _time.monotonic()
         self.signals.started.emit(self.name, self.job_id)
         LOGGER.info("Job started: %s", self.name, extra={"job_id": self.job_id})
         if self.cancel_token.is_cancelled():
@@ -129,6 +131,8 @@ class JobRunnable(QtCore.QRunnable):
             self.signals.error.emit(self.name, self.job_id, err)
             LOGGER.error("Job error: %s\n%s", self.name, err, extra={"job_id": self.job_id})
         finally:
+            dur = _time.monotonic() - start_ts
+            LOGGER.info("Job finished (%.2fs): %s", dur, self.name, extra={"job_id": self.job_id})
             self.signals.finished.emit(self.name, self.job_id)
 
 
@@ -170,6 +174,10 @@ class JobManager(QtCore.QObject):
         on_error: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[int, str], None]] = None,
         cancel_token: Optional[CancelToken] = None,
+        timeout_sec: Optional[float] = None,
+        retries: int = 0,
+        retry_delay_sec: float = 0.5,
+        retry_on: Tuple[type[BaseException], ...] = (Exception,),
     ) -> JobHandle:
         job_name = name or getattr(fn, "__name__", "Job")
         token = cancel_token or CancelToken()
@@ -196,9 +204,51 @@ class JobManager(QtCore.QObject):
         signals.progress.connect(self._dispatch_progress)
         signals.finished.connect(lambda _name, jid: self._callbacks.pop(jid, None))
 
-        runnable = JobRunnable(job_name, job_id, fn, token, signals)
+        # Wrap function with retry logic if requested
+        wrapped_fn = fn
+        if retries and retries > 0:
+            def _with_retries(progress_cb, cancel_tok):
+                import time as _time
+                attempt = 0
+                while True:
+                    if cancel_tok.is_cancelled():
+                        return None
+                    try:
+                        return _call_job(fn, progress_cb, cancel_tok)
+                    except retry_on as exc:  # type: ignore[misc]
+                        attempt += 1
+                        if attempt > retries or cancel_tok.is_cancelled():
+                            raise
+                        wait = max(0.0, float(retry_delay_sec))
+                        try:
+                            progress_cb(None, f"Retry {attempt}/{retries} in {wait:.1f}s: {type(exc).__name__}")
+                        except Exception:
+                            pass
+                        _time.sleep(wait)
+            wrapped_fn = _with_retries  # type: ignore[assignment]
+
+        runnable = JobRunnable(job_name, job_id, wrapped_fn, token, signals)
         self._tokens[job_id] = token
         self._pool.start(runnable)
+        # Optional timeout: cooperatively cancel after timeout_sec
+        if timeout_sec is not None and timeout_sec > 0:
+            def _timeout_cancel() -> None:
+                # If still active, request cancellation
+                if job_id in self._tokens:
+                    self.cancel(job_id)
+            timer = QtCore.QTimer()
+            timer.setSingleShot(True)
+            timer.setInterval(int(timeout_sec * 1000))
+            # Keep timer alive until job finishes
+            def _cleanup(_name: str, jid: str) -> None:
+                if jid == job_id:
+                    try:
+                        timer.stop()
+                    except Exception:
+                        pass
+            signals.finished.connect(_cleanup)
+            timer.timeout.connect(_timeout_cancel)
+            timer.start()
         return JobHandle(job_name, token, job_id)
 
     def cancel(self, job_id: str) -> None:
@@ -211,6 +261,10 @@ class JobManager(QtCore.QObject):
         """Request cancellation for all tracked jobs."""
         for token in list(self._tokens.values()):
             token.cancel()
+
+    def active_job_count(self) -> int:
+        """Return the number of currently tracked (active) jobs."""
+        return len(self._tokens)
 
     def _dispatch_result(self, _name: str, job_id: str, result: object) -> None:
         cb = self._callbacks.get(job_id)

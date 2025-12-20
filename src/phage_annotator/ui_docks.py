@@ -13,6 +13,7 @@ from phage_annotator.density_panel import DensityPanel
 from phage_annotator.metadata_dock import MetadataDock
 from phage_annotator.orthoview import OrthoViewWidget
 from phage_annotator.panels import PanelSpec
+from phage_annotator.performance_panel import PerformancePanel
 from phage_annotator.recorder import RecorderWidget
 from phage_annotator.results_table import ResultsTableWidget
 from phage_annotator.roi_widgets import RoiManagerWidget
@@ -104,6 +105,7 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_recorder = self.panel_docks.get("recorder")
     self.dock_metadata = self.panel_docks.get("metadata")
     self.dock_density = self.panel_docks.get("density")
+    self.dock_performance = self.panel_docks.get("performance")
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
@@ -243,6 +245,14 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_metadata_widget,
             toggle_action_text="Metadata",
+        ),
+        PanelSpec(
+            id="performance",
+            title="Performance",
+            default_area=QtCore.Qt.BottomDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_performance_widget,
+            toggle_action_text="Performance Monitor",
         ),
     ]
 
@@ -464,12 +474,82 @@ def make_logs_widget(self) -> QtWidgets.QWidget:
     # This guard should not be necessary if initialization order was enforced at the type level.
     if self.status is not None:
         logs_layout.addWidget(self.status)
+    # Header row: cache stats + filter + actions
+    header_row = QtWidgets.QHBoxLayout()
     self.cache_stats_label = QtWidgets.QLabel("Cache: 0 MB | Items: 0")
-    logs_layout.addWidget(self.cache_stats_label)
+    header_row.addWidget(self.cache_stats_label)
+    
+    # Severity filter
+    filter_label = QtWidgets.QLabel(" Level:")
+    self.log_level_combo = QtWidgets.QComboBox()
+    self.log_level_combo.addItems(["ALL", "DEBUG", "INFO", "WARNING", "ERROR"])
+    self.log_level_combo.setCurrentText("ALL")
+    self.log_level_combo.setToolTip("Filter log messages by severity level")
+    self.log_level_combo.setMaximumWidth(100)
+    header_row.addWidget(filter_label)
+    header_row.addWidget(self.log_level_combo)
+    
+    header_row.addStretch(1)
+    copy_btn = QtWidgets.QToolButton()
+    copy_btn.setText("Copy")
+    copy_btn.setToolTip("Copy logs to clipboard")
+    save_btn = QtWidgets.QToolButton()
+    save_btn.setText("Save…")
+    save_btn.setToolTip("Save logs to file")
+    clear_btn = QtWidgets.QToolButton()
+    clear_btn.setText("Clear")
+    clear_btn.setToolTip("Clear log view")
+    header_row.addWidget(copy_btn)
+    header_row.addWidget(save_btn)
+    header_row.addWidget(clear_btn)
+    logs_layout.addLayout(header_row)
     self.log_view = QtWidgets.QPlainTextEdit()
     self.log_view.setReadOnly(True)
-    self.log_view.setMaximumBlockCount(500)
+    self.log_view.setMaximumBlockCount(1000)
+    self.log_view.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
     logs_layout.addWidget(self.log_view)
+
+    # Store full logs for filtering
+    self._all_logs = []
+    
+    # Wire actions
+    def _copy_logs() -> None:
+        QtWidgets.QApplication.clipboard().setText(self.log_view.toPlainText())
+    
+    def _clear_logs() -> None:
+        self.log_view.clear()
+        self._all_logs.clear()
+
+    def _save_logs() -> None:
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Logs", str(pathlib.Path.cwd() / "phage_annotator.log"), "Log Files (*.log);;Text Files (*.txt)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.log_view.toPlainText())
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Save Logs failed", str(exc))
+    
+    def _filter_logs() -> None:
+        """Filter logs based on selected severity level."""
+        level = self.log_level_combo.currentText()
+        self.log_view.clear()
+        
+        if level == "ALL":
+            for log_entry in self._all_logs:
+                self.log_view.appendPlainText(log_entry)
+        else:
+            # Filter by level keyword
+            for log_entry in self._all_logs:
+                if f"[{level}]" in log_entry or (level == "ERROR" and "[EXCEPTION]" in log_entry):
+                    self.log_view.appendPlainText(log_entry)
+
+    copy_btn.clicked.connect(_copy_logs)
+    save_btn.clicked.connect(_save_logs)
+    clear_btn.clicked.connect(_clear_logs)
+    self.log_level_combo.currentTextChanged.connect(_filter_logs)
     return logs_widget
 
 
@@ -532,7 +612,11 @@ def setup_status_bar(self) -> None:
     self.progress_cancel_btn = QtWidgets.QToolButton()
     self.progress_cancel_btn.setText("Cancel")
     self.progress_cancel_btn.clicked.connect(self._cancel_active_job)
-    for w in (self.progress_label, self.progress_bar, self.progress_cancel_btn):
+    # Add a 'Cancel All' button to stop all background jobs
+    self.progress_cancel_all_btn = QtWidgets.QToolButton()
+    self.progress_cancel_all_btn.setText("Cancel All")
+    self.progress_cancel_all_btn.clicked.connect(self._cancel_all_jobs)
+    for w in (self.progress_label, self.progress_bar, self.progress_cancel_btn, self.progress_cancel_all_btn):
         w.setVisible(False)
         status_bar.addPermanentWidget(w)
     self.buffer_stats_label = QtWidgets.QLabel("Buffer: 0/0 | Prefetch: 64 | Underruns: 0")
