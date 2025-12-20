@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 import numpy as np
-from matplotlib.backends.qt_compat import QtGui, QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.analysis import compute_auto_window
 from phage_annotator.lut_manager import LUTS, lut_names
@@ -223,26 +223,29 @@ class DisplayControlsMixin:
         pm = QtGui.QPixmap(width, height)
         pm.fill(QtGui.QColor("#ffffff"))
         painter = QtGui.QPainter(pm)
-        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
-        rect = QtGui.QRect(4, 4, width - 8, height - 8)
-        painter.setPen(QtGui.QPen(QtGui.QColor("#111111"), 1))
-        painter.drawRect(rect)
-        if data_max == data_min:
+        try:
+            painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+            rect = QtCore.QRect(4, 4, width - 8, height - 8)
+            painter.setPen(QtGui.QPen(QtGui.QColor("#111111"), 1))
+            painter.drawRect(rect)
+            if data_max == data_min:
+                return
+            def _x(val: float) -> int:
+                return int(
+                    rect.left()
+                    + (val - data_min) / (data_max - data_min) * rect.width()
+                )
+            x1 = _x(min_val)
+            x2 = _x(max_val)
+            y0 = rect.bottom()
+            y1 = rect.top()
+            painter.setPen(QtGui.QPen(QtGui.QColor("#333333"), 2))
+            painter.drawLine(rect.left(), y0, x1, y0)
+            painter.drawLine(x1, y0, x2, y1)
+            painter.drawLine(x2, y1, rect.right(), y1)
+        finally:
             painter.end()
             label.setPixmap(pm)
-            return
-        def _x(val: float) -> int:
-            return int(rect.left() + (val - data_min) / (data_max - data_min) * rect.width())
-        x1 = _x(min_val)
-        x2 = _x(max_val)
-        y0 = rect.bottom()
-        y1 = rect.top()
-        painter.setPen(QtGui.QPen(QtGui.QColor("#333333"), 2))
-        painter.drawLine(rect.left(), y0, x1, y0)
-        painter.drawLine(x1, y0, x2, y1)
-        painter.drawLine(x2, y1, rect.right(), y1)
-        painter.end()
-        label.setPixmap(pm)
 
     def _set_fov(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.images):

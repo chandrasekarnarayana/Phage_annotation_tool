@@ -25,7 +25,7 @@ def generate_dummy_image(path: Path, mode: DummyMode = "tz") -> Path:
         data = rng.random((4, 64, 64), dtype=np.float32)  # (Z, Y, X)
     elif mode == "t":
         # 16-bit-like range with offset: intensities in [100, 300].
-        data = (rng.random((20, 1200, 1200), dtype=np.float32) * 200.0 + 100.0).astype(np.uint16)
+        data = rng.integers(100, 301, size=(20, 1200, 1200), dtype=np.uint16)
     elif mode == "tz":
         data = rng.random((2, 3, 64, 64), dtype=np.float32)  # (T, Z, Y, X)
     else:

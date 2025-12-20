@@ -73,6 +73,8 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     for spec in self.panel_specs:
         widget = spec.widget_factory()
         dock = create_dock(self, spec.id, spec.title, widget)
+        if spec.id == "annotations":
+            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.panel_docks[spec.id] = dock
         self.addDockWidget(spec.default_area, dock)
         action = dock_menu.addAction(spec.toggle_action_text)
@@ -111,6 +113,20 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
+    if self.dock_roi and self.dock_roi_manager:
+        self.tabifyDockWidget(self.dock_roi, self.dock_roi_manager)
+    if self.dock_roi and self.dock_results:
+        self.tabifyDockWidget(self.dock_roi, self.dock_results)
+    if self.dock_roi and self.dock_orthoview:
+        self.tabifyDockWidget(self.dock_roi, self.dock_orthoview)
+    if self.dock_roi and self.dock_metadata:
+        self.tabifyDockWidget(self.dock_roi, self.dock_metadata)
+    if self.dock_smlm is not None:
+        self.dock_smlm.setFloating(True)
+        self.dock_smlm.setVisible(False)
+    if self.dock_orthoview is not None:
+        self.dock_orthoview.setFloating(True)
+        self.dock_orthoview.setVisible(False)
     if self.dock_metadata is not None:
         self.dock_metadata.visibilityChanged.connect(self._on_metadata_dock_visibility)
 
@@ -147,7 +163,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="roi",
             title="ROI Controls",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=True,
             widget_factory=self._make_roi_widget,
             toggle_action_text="ROI Controls",
@@ -155,7 +171,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="roi_manager",
             title="ROI Manager",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_roi_manager_widget,
             toggle_action_text="ROI Manager",
@@ -195,15 +211,15 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="orthoview",
             title="Ortho Views",
-            default_area=QtCore.Qt.RightDockWidgetArea,
-            default_visible=True,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
+            default_visible=False,
             widget_factory=self._make_orthoview_widget,
             toggle_action_text="Ortho Views",
         ),
         PanelSpec(
             id="smlm",
             title="SMLM (ROI)",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_smlm_widget,
             toggle_action_text="SMLM (ROI)",
@@ -211,7 +227,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="threshold",
             title="Threshold",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_threshold_widget,
             toggle_action_text="Threshold",
@@ -219,7 +235,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="particles",
             title="Analyze Particles",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_particles_widget,
             toggle_action_text="Analyze Particles",
@@ -227,7 +243,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="density",
             title="Density",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_density_widget,
             toggle_action_text="Density",
@@ -236,14 +252,14 @@ def build_panel_registry(self) -> List[PanelSpec]:
             id="logs",
             title="Logs",
             default_area=QtCore.Qt.BottomDockWidgetArea,
-            default_visible=True,
+            default_visible=False,
             widget_factory=self._make_logs_widget,
             toggle_action_text="Toggle Logs",
         ),
         PanelSpec(
             id="metadata",
             title="Metadata",
-            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_area=QtCore.Qt.LeftDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_metadata_widget,
             toggle_action_text="Metadata",
@@ -674,10 +690,13 @@ def setup_status_bar(self) -> None:
         w.setVisible(False)
         status_bar.addPermanentWidget(w)
     self.buffer_stats_label = QtWidgets.QLabel("Buffer: 0/0 | Prefetch: 64 | Underruns: 0")
+    self.buffer_stats_label.setVisible(False)
     status_bar.addPermanentWidget(self.buffer_stats_label)
     self.render_level_label = QtWidgets.QLabel("Render: L0")
+    self.render_level_label.setVisible(False)
     status_bar.addPermanentWidget(self.render_level_label)
     self.tool_label = QtWidgets.QLabel("Tool: Annotate")
+    self.tool_label.setVisible(False)
     status_bar.addPermanentWidget(self.tool_label)
     self.annotation_meta_widget = QtWidgets.QWidget()
     meta_layout = QtWidgets.QHBoxLayout(self.annotation_meta_widget)

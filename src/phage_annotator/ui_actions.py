@@ -49,9 +49,6 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.toggle_settings_act.setCheckable(True)
     self.toggle_settings_act.setChecked(True)
     
-    self.toggle_logs_act = view_menu.addAction("Toggle Logs")
-    self.toggle_logs_act.setCheckable(True)
-    self.toggle_logs_act.setChecked(True)
     
     self.overlay_act = view_menu.addAction("Overlay")
     self.overlay_act.setCheckable(True)
@@ -149,6 +146,11 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     about_act = help_menu.addAction("About")
     shortcuts_act = help_menu.addAction("Keyboard Shortcuts…")
     shortcuts_act.setShortcut("F1")
+    help_menu.addSeparator()
+    diagnostics_menu = help_menu.addMenu("Diagnostics")
+    self.toggle_logs_act = diagnostics_menu.addAction("Toggle Diagnostics Dock")
+    self.toggle_logs_act.setCheckable(True)
+    self.toggle_logs_act.setChecked(False)
     self.command_palette_act = QtWidgets.QAction("Command Palette", self)
     self.command_palette_act.setShortcut("Ctrl+Shift+P")
     self.command_palette_act.triggered.connect(self._show_command_palette)

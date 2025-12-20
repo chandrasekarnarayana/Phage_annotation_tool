@@ -6,6 +6,7 @@ from typing import List, Set, Tuple
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
+from phage_annotator.panel_registry import build_sidebar_panel_registry
 from phage_annotator.tools import Tool, ToolCallbacks, ToolRouter
 
 
@@ -13,21 +14,40 @@ class UiExtrasMixin:
     """Mixin for sidebar pages, tools, and layout/command palette actions."""
 
     def _build_sidebar_stack(self) -> QtWidgets.QWidget:
-        """Create the stacked sidebar and activity bar for mode switching."""
+        """Create the 10-panel stacked sidebar with activity bar and toggle behavior.
+        
+        Toggle behavior:
+        - Clicking a different icon switches panel and expands sidebar if collapsed
+        - Clicking the same icon collapses sidebar to slim bar (or expands if already collapsed)
+        """
+        # Initialize state tracking
         self._sidebar_expanded = True
         self._sidebar_last_width = None
         self._sidebar_stack_min_width = 260
         self._sidebar_bar_width = 36
+        self._sidebar_collapsed = False
+        
+        # Create the stacked widget for panels
         self.sidebar_stack = QtWidgets.QStackedWidget()
-        use_controls = getattr(self, "controls_sidebar_panel", None) is not None
-        if use_controls:
-            self.sidebar_stack.addWidget(self.controls_sidebar_panel)
+        self.sidebar_stack.setObjectName("sidebar_stack")
+        
+        # Use the 10-panel registry if sidebar_pages are built
+        pages = getattr(self, "sidebar_pages", None)
+        if pages:
+            # Add all panel widgets to the stack (skip Playback since it's bottom bar only)
+            for idx, (label, icon, widget) in enumerate(pages):
+                if label != "Playback":  # Playback is bottom bar only
+                    self.sidebar_stack.addWidget(widget)
+                    widget.setObjectName(f"sidebar_panel_{idx}")
         else:
+            # Fallback to 3-panel (should not reach here with proper setup)
             self.sidebar_stack.addWidget(self.explore_panel)
             self.sidebar_stack.addWidget(self.annotate_panel)
             self.sidebar_stack.addWidget(self._build_analyze_panel())
 
+        # Create the activity bar (vertical toolbar)
         bar = QtWidgets.QToolBar("Activity Bar", self)
+        bar.setObjectName("activity_bar")
         bar.setOrientation(QtCore.Qt.Orientation.Vertical)
         bar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         bar.setMovable(False)
@@ -35,19 +55,35 @@ class UiExtrasMixin:
         bar.setFixedWidth(self._sidebar_bar_width)
         self.sidebar_bar = bar
 
+        # Create actions for each panel
         self.sidebar_actions = []
-        if use_controls:
-            controls_act = QtWidgets.QAction(
-                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ComputerIcon),
-                "Controls",
-                self,
-            )
-            controls_act.setCheckable(True)
-            controls_act.triggered.connect(lambda checked, i=0: self._set_sidebar_mode(i))
-            self.sidebar_actions.append(controls_act)
-            bar.addAction(controls_act)
-            controls_act.setChecked(True)
+        self.sidebar_panel_indices = {}  # Map action index to stack index
+        
+        if pages:
+            stack_idx = 0
+            for page_idx, (label, icon, widget) in enumerate(pages):
+                act = QtWidgets.QAction(self.style().standardIcon(icon), label, self)
+                act.setObjectName(f"sidebar_action_{label.lower().replace('/', '_').replace(' ', '_')}")
+                act.setCheckable(True)
+                act.setToolTip(label)
+                
+                # Connect with toggle behavior
+                act.triggered.connect(lambda checked, i=page_idx: self._on_sidebar_action_triggered(i))
+                self.sidebar_actions.append(act)
+                bar.addAction(act)
+                
+                # Map to stack index (skip Playback)
+                if label != "Playback":
+                    self.sidebar_panel_indices[page_idx] = stack_idx
+                    stack_idx += 1
+                else:
+                    self.sidebar_panel_indices[page_idx] = -1  # Not in stack
+            
+            # Check first action by default
+            if self.sidebar_actions:
+                self.sidebar_actions[0].setChecked(True)
         else:
+            # Fallback actions
             explore_act = QtWidgets.QAction(
                 self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
                 "Explore",
@@ -65,24 +101,75 @@ class UiExtrasMixin:
             )
             for idx, act in enumerate([explore_act, annotate_act, analyze_act]):
                 act.setCheckable(True)
-                act.triggered.connect(lambda checked, i=idx: self._set_sidebar_mode(i))
+                act.triggered.connect(lambda checked, i=idx: self._on_sidebar_action_triggered(i))
                 self.sidebar_actions.append(act)
                 bar.addAction(act)
+                self.sidebar_panel_indices[idx] = idx
             explore_act.setChecked(True)
 
+        # Create container with bar + stack
         sidebar_container = QtWidgets.QWidget()
+        sidebar_container.setObjectName("sidebar_container")
         sidebar_layout = QtWidgets.QHBoxLayout(sidebar_container)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
         sidebar_layout.addWidget(bar)
+        
         self.sidebar_stack.setMinimumWidth(self._sidebar_stack_min_width)
         self.sidebar_stack.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
         sidebar_layout.addWidget(self.sidebar_stack)
+        
         self._restore_sidebar_mode()
         return sidebar_container
+    
+    def _on_sidebar_action_triggered(self, action_idx: int) -> None:
+        """Handle sidebar action trigger with toggle behavior.
+        
+        Toggle logic:
+        - If clicking the currently active action: collapse/expand sidebar
+        - If clicking a different action: switch to that panel (and expand if collapsed)
+        """
+        if not self.sidebar_actions or action_idx >= len(self.sidebar_actions):
+            return
+        
+        # Get the stack index for this action
+        stack_idx = self.sidebar_panel_indices.get(action_idx, -1)
+        if stack_idx == -1:  # Playback panel (no stack widget)
+            # Just check the action, don't change stack
+            for i, act in enumerate(self.sidebar_actions):
+                act.setChecked(i == action_idx)
+            return
+        
+        # Check if this is the currently active panel
+        current_stack_idx = self.sidebar_stack.currentIndex()
+        is_current_panel = (stack_idx == current_stack_idx)
+        is_visible = self.sidebar_stack.isVisible()
+        
+        if is_current_panel and is_visible:
+            # Clicking same panel: collapse sidebar
+            self._collapse_sidebar()
+        else:
+            # Clicking different panel or sidebar is collapsed: switch and expand
+            if not is_visible:
+                self._expand_sidebar()
+            self._set_sidebar_mode(action_idx)
+    
+    def _collapse_sidebar(self) -> None:
+        """Collapse sidebar to slim activity bar only."""
+        if self.sidebar_stack and self.sidebar_stack.isVisible():
+            self.sidebar_stack.setVisible(False)
+            self._sidebar_collapsed = True
+            self._settings.setValue("sidebarCollapsed", True)
+    
+    def _expand_sidebar(self) -> None:
+        """Expand sidebar to show active panel."""
+        if self.sidebar_stack and not self.sidebar_stack.isVisible():
+            self.sidebar_stack.setVisible(True)
+            self._sidebar_collapsed = False
+            self._settings.setValue("sidebarCollapsed", False)
 
     def _build_annotate_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
@@ -252,6 +339,7 @@ class UiExtrasMixin:
 
     def _init_tool_bar(self) -> None:
         toolbar = QtWidgets.QToolBar("Tools", self)
+        toolbar.setObjectName("tools_toolbar")
         toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         toolbar.setMovable(True)
         self.addToolBar(QtCore.Qt.TopToolBarArea, toolbar)
@@ -372,36 +460,47 @@ class UiExtrasMixin:
                 buttons[1].setChecked(shape == "circle")
 
     def _set_sidebar_mode(self, idx: int) -> None:
-        if self.sidebar_stack is None:
+        """Switch to the specified sidebar panel and update action states."""
+        if not self.sidebar_stack or not self.sidebar_actions:
             return
-        current_idx = self.sidebar_stack.currentIndex()
-        if self.sidebar_stack.isVisible() and current_idx == idx:
-            self._set_sidebar_expanded(False)
-            self._settings.setValue("sidebarExpanded", False)
-            for act in self.sidebar_actions:
-                act.setChecked(False)
+        
+        # Map action index to stack index (skip Playback)
+        stack_idx = self.sidebar_panel_indices.get(idx, -1)
+        if stack_idx == -1:
+            # Playback panel (no stack widget), just update checked state
+            for i, act in enumerate(self.sidebar_actions):
+                act.setChecked(i == idx)
             return
-        self.sidebar_stack.setCurrentIndex(idx)
+        
+        # Switch to the panel
+        self.sidebar_stack.setCurrentIndex(stack_idx)
         self._settings.setValue("sidebarMode", idx)
-        self._set_sidebar_expanded(True)
-        self._settings.setValue("sidebarExpanded", True)
+        
+        # Update action checked states
         for i, act in enumerate(self.sidebar_actions):
             act.setChecked(i == idx)
 
     def _restore_sidebar_mode(self) -> None:
-        idx = self._settings.value("sidebarMode", 0, type=int)
-        if self.sidebar_stack is None or not self.sidebar_actions:
+        """Restore sidebar panel and collapsed/expanded state from settings."""
+        if not self.sidebar_stack or not self.sidebar_actions:
             return
-        idx = max(0, min(idx, self.sidebar_stack.count() - 1))
-        expanded = self._settings.value("sidebarExpanded", True, type=bool)
-        if expanded:
-            self.sidebar_actions[idx].setChecked(True)
-            self.sidebar_stack.setCurrentIndex(idx)
+        
+        # Restore panel index
+        idx = self._settings.value("sidebarMode", 0, type=int)
+        idx = max(0, min(idx, len(self.sidebar_actions) - 1))
+        
+        # Restore collapsed state
+        collapsed = self._settings.value("sidebarCollapsed", False, type=bool)
+        
+        if collapsed:
+            self._collapse_sidebar()
+            # Still set the current index so it's ready when expanded
+            stack_idx = self.sidebar_panel_indices.get(idx, 0)
+            if stack_idx >= 0:
+                self.sidebar_stack.setCurrentIndex(stack_idx)
         else:
-            for act in self.sidebar_actions:
-                act.setChecked(False)
-            self.sidebar_stack.setCurrentIndex(idx)
-        self._set_sidebar_expanded(bool(expanded))
+            self._expand_sidebar()
+            self._set_sidebar_mode(idx)
 
     def _set_sidebar_expanded(self, expanded: bool) -> None:
         if self.sidebar_stack is None:
@@ -523,6 +622,8 @@ class UiExtrasMixin:
             self.restoreGeometry(geometry)
         if state:
             self.restoreState(state)
+        if self.dock_sidebar is not None and not self.dock_sidebar.isVisible():
+            self.dock_sidebar.setVisible(True)
 
     def _save_layout(self) -> None:
         """Persist the current layout unless a preset is active."""

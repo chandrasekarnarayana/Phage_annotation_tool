@@ -527,7 +527,7 @@ class UiSetupMixin:
         self.axis_warning.setVisible(False)
         self.axes_info_label = QtWidgets.QLabel("T: ?  Z: ?  Y: ?  X: ?  | Interpretation: auto")
 
-        self.controls_sidebar_panel = self._build_controls_sidebar_panel(display_group)
+        self.sidebar_pages = self._build_sidebar_pages(display_group)
 
         # Diagnostics panels (histogram/profile)
         self.hist_fig = plt.figure(figsize=(5, 3))
@@ -738,28 +738,16 @@ class UiSetupMixin:
         self.performance_panel = panel
         return panel
 
-    def _build_controls_sidebar_panel(
+    def _build_sidebar_pages(
         self, display_group: QtWidgets.QGroupBox
-    ) -> QtWidgets.QWidget:
-        panel = QtWidgets.QWidget()
-        panel_layout = QtWidgets.QVBoxLayout(panel)
-        panel_layout.setContentsMargins(0, 0, 0, 0)
-        panel_layout.setSpacing(0)
+    ) -> List[Tuple[str, QtWidgets.QStyle.StandardPixmap, QtWidgets.QWidget]]:
+        pages: List[Tuple[str, QtWidgets.QStyle.StandardPixmap, QtWidgets.QWidget]] = []
 
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(content)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(10)
-
-        def _wrap(title: str, widget: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
-            box = QtWidgets.QGroupBox(title)
-            box_layout = QtWidgets.QVBoxLayout(box)
-            box_layout.setContentsMargins(6, 6, 6, 6)
-            box_layout.setSpacing(6)
-            box_layout.addWidget(widget)
-            return box
+        def _make_scroll(widget: QtWidgets.QWidget) -> QtWidgets.QWidget:
+            scroll = QtWidgets.QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(widget)
+            return scroll
 
         def _dock_button(text: str, dock_attr: str) -> QtWidgets.QPushButton:
             btn = QtWidgets.QPushButton(text)
@@ -772,73 +760,117 @@ class UiSetupMixin:
             )
             return btn
 
-        # 1) Explore / Data
-        explore_section = QtWidgets.QWidget()
-        explore_layout = QtWidgets.QVBoxLayout(explore_section)
-        explore_layout.setContentsMargins(0, 0, 0, 0)
-        explore_layout.setSpacing(6)
+        # Explore
+        explore_panel = QtWidgets.QWidget()
+        explore_layout = QtWidgets.QVBoxLayout(explore_panel)
+        explore_layout.setContentsMargins(8, 8, 8, 8)
+        explore_layout.setSpacing(8)
         explore_layout.addWidget(QtWidgets.QLabel("Lazy loading: enabled"))
         explore_layout.addWidget(self.explore_panel)
-        layout.addWidget(_wrap("Explore / Data", explore_section))
+        explore_layout.addStretch(1)
+        pages.append(("Explore", QtWidgets.QStyle.StandardPixmap.SP_DirIcon, _make_scroll(explore_panel)))
 
-        # 2) Navigate & Playback (info only; controls in bottom bar)
-        nav_section = QtWidgets.QWidget()
-        nav_layout = QtWidgets.QVBoxLayout(nav_section)
-        nav_layout.setContentsMargins(0, 0, 0, 0)
-        nav_layout.setSpacing(6)
-        nav_layout.addWidget(QtWidgets.QLabel("Playback controls are in the bottom bar."))
-        nav_layout.addWidget(self.axis_warning)
-        nav_layout.addWidget(self.axes_info_label)
-        layout.addWidget(_wrap("Navigate & Playback", nav_section))
+        # Annotate
+        annotate_panel = QtWidgets.QWidget()
+        annotate_layout = QtWidgets.QVBoxLayout(annotate_panel)
+        annotate_layout.setContentsMargins(8, 8, 8, 8)
+        annotate_layout.setSpacing(8)
+        annotate_layout.addWidget(self.annotate_panel)
+        annotate_layout.addStretch(1)
+        pages.append(
+            (
+                "Annotate",
+                QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView,
+                _make_scroll(annotate_panel),
+            )
+        )
 
-        # 3) Display & Contrast
-        display_section = QtWidgets.QWidget()
-        display_layout = QtWidgets.QVBoxLayout(display_section)
-        display_layout.setContentsMargins(0, 0, 0, 0)
-        display_layout.setSpacing(6)
+        # Display
+        display_panel = QtWidgets.QWidget()
+        display_layout = QtWidgets.QVBoxLayout(display_panel)
+        display_layout.setContentsMargins(8, 8, 8, 8)
+        display_layout.setSpacing(8)
         self.reset_view_btn = QtWidgets.QPushButton("Reset view")
         self.reset_view_btn.setToolTip("Reset zoom and contrast")
-        display_header = QtWidgets.QHBoxLayout()
-        display_header.addWidget(_dock_button("Show Histogram/B&C", "dock_hist"))
-        display_header.addWidget(self.reset_view_btn)
-        display_layout.addLayout(display_header)
+        display_layout.addWidget(_dock_button("Show Histogram/B&C", "dock_hist"))
+        display_layout.addWidget(self.reset_view_btn)
         display_layout.addWidget(display_group)
-        layout.addWidget(_wrap("Display & Contrast", display_section))
+        display_layout.addStretch(1)
+        pages.append(
+            (
+                "Display",
+                QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView,
+                _make_scroll(display_panel),
+            )
+        )
 
-        # 4) ROI & Tools
-        roi_section = QtWidgets.QWidget()
-        roi_layout = QtWidgets.QVBoxLayout(roi_section)
-        roi_layout.setContentsMargins(0, 0, 0, 0)
-        roi_layout.setSpacing(6)
+        # Playback
+        playback_panel = QtWidgets.QWidget()
+        playback_layout = QtWidgets.QVBoxLayout(playback_panel)
+        playback_layout.setContentsMargins(8, 8, 8, 8)
+        playback_layout.setSpacing(8)
+        playback_layout.addWidget(QtWidgets.QLabel("Playback controls are in the bottom bar."))
+        playback_layout.addWidget(self.axis_warning)
+        playback_layout.addWidget(self.axes_info_label)
+        playback_layout.addStretch(1)
+        pages.append(("Playback", QtWidgets.QStyle.StandardPixmap.SP_MediaPlay, _make_scroll(playback_panel)))
+
+        # ROI/Crop
+        roi_panel = QtWidgets.QWidget()
+        roi_layout = QtWidgets.QVBoxLayout(roi_panel)
+        roi_layout.setContentsMargins(8, 8, 8, 8)
+        roi_layout.setSpacing(8)
         roi_layout.addWidget(_dock_button("Show ROI Controls", "dock_roi"))
         roi_layout.addWidget(_dock_button("Show ROI Manager", "dock_roi_manager"))
         clear_roi_btn = QtWidgets.QPushButton("Clear ROI")
         clear_roi_btn.clicked.connect(self._clear_roi)
         roi_layout.addWidget(clear_roi_btn)
         roi_layout.addWidget(QtWidgets.QLabel("ROI tools are available in the ROI dock."))
-        layout.addWidget(_wrap("ROI & Tools", roi_section))
+        roi_layout.addStretch(1)
+        pages.append(("ROI/Crop", QtWidgets.QStyle.StandardPixmap.SP_ArrowUp, _make_scroll(roi_panel)))
 
-        # 5) Annotate
-        layout.addWidget(_wrap("Annotate", self.annotate_panel))
-
-        # 6) Analysis
-        analysis_section = QtWidgets.QWidget()
-        analysis_layout = QtWidgets.QVBoxLayout(analysis_section)
-        analysis_layout.setContentsMargins(0, 0, 0, 0)
-        analysis_layout.setSpacing(6)
+        # Analysis
+        analysis_panel = QtWidgets.QWidget()
+        analysis_layout = QtWidgets.QVBoxLayout(analysis_panel)
+        analysis_layout.setContentsMargins(8, 8, 8, 8)
+        analysis_layout.setSpacing(8)
         analysis_layout.addWidget(_dock_button("Results", "dock_results"))
         analysis_layout.addWidget(_dock_button("Threshold", "dock_threshold"))
         analysis_layout.addWidget(_dock_button("Analyze Particles", "dock_particles"))
         analysis_layout.addWidget(_dock_button("SMLM", "dock_smlm"))
         analysis_layout.addWidget(_dock_button("Density", "dock_density"))
         analysis_layout.addWidget(_dock_button("Ortho Views", "dock_orthoview"))
-        layout.addWidget(_wrap("Analysis", analysis_section))
+        analysis_layout.addStretch(1)
+        pages.append(("Analyze", QtWidgets.QStyle.StandardPixmap.SP_ComputerIcon, _make_scroll(analysis_panel)))
 
-        # 7) Export
-        export_section = QtWidgets.QWidget()
-        export_layout = QtWidgets.QVBoxLayout(export_section)
-        export_layout.setContentsMargins(0, 0, 0, 0)
-        export_layout.setSpacing(6)
+        # Results
+        results_panel = QtWidgets.QWidget()
+        results_layout = QtWidgets.QVBoxLayout(results_panel)
+        results_layout.setContentsMargins(8, 8, 8, 8)
+        results_layout.setSpacing(8)
+        results_layout.addWidget(_dock_button("Show Results Table", "dock_results"))
+        results_layout.addStretch(1)
+        pages.append(("Results", QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton, _make_scroll(results_panel)))
+
+        # Project
+        project_panel = QtWidgets.QWidget()
+        project_layout = QtWidgets.QVBoxLayout(project_panel)
+        project_layout.setContentsMargins(8, 8, 8, 8)
+        project_layout.setSpacing(8)
+        save_proj_btn = QtWidgets.QPushButton("Save Project")
+        save_proj_btn.clicked.connect(self._save_project)
+        project_layout.addWidget(save_proj_btn)
+        load_proj_btn = QtWidgets.QPushButton("Load Project")
+        load_proj_btn.clicked.connect(self._load_project)
+        project_layout.addWidget(load_proj_btn)
+        project_layout.addStretch(1)
+        pages.append(("Project", QtWidgets.QStyle.StandardPixmap.SP_DirLinkIcon, _make_scroll(project_panel)))
+
+        # Export
+        export_panel = QtWidgets.QWidget()
+        export_layout = QtWidgets.QVBoxLayout(export_panel)
+        export_layout.setContentsMargins(8, 8, 8, 8)
+        export_layout.setSpacing(8)
         export_csv_btn = QtWidgets.QPushButton("Save CSV")
         export_csv_btn.clicked.connect(self._save_csv)
         export_layout.addWidget(export_csv_btn)
@@ -848,19 +880,14 @@ class UiSetupMixin:
         export_view_btn = QtWidgets.QPushButton("Export View")
         export_view_btn.clicked.connect(self._export_view_dialog)
         export_layout.addWidget(export_view_btn)
-        save_proj_btn = QtWidgets.QPushButton("Save Project")
-        save_proj_btn.clicked.connect(self._save_project)
-        export_layout.addWidget(save_proj_btn)
-        load_proj_btn = QtWidgets.QPushButton("Load Project")
-        load_proj_btn.clicked.connect(self._load_project)
-        export_layout.addWidget(load_proj_btn)
-        layout.addWidget(_wrap("Export", export_section))
+        export_layout.addStretch(1)
+        pages.append(("Export", QtWidgets.QStyle.StandardPixmap.SP_DialogSaveButton, _make_scroll(export_panel)))
 
-        # 8) Preferences / Debug
-        prefs_section = QtWidgets.QWidget()
-        prefs_layout = QtWidgets.QVBoxLayout(prefs_section)
-        prefs_layout.setContentsMargins(0, 0, 0, 0)
-        prefs_layout.setSpacing(6)
+        # Preferences / Debug
+        prefs_panel = QtWidgets.QWidget()
+        prefs_layout = QtWidgets.QVBoxLayout(prefs_panel)
+        prefs_layout.setContentsMargins(8, 8, 8, 8)
+        prefs_layout.setSpacing(8)
         self.pixel_size_spin = QtWidgets.QDoubleSpinBox()
         self.pixel_size_spin.setDecimals(4)
         self.pixel_size_spin.setRange(1e-4, 100.0)
@@ -876,12 +903,10 @@ class UiSetupMixin:
         prefs_layout.addWidget(_dock_button("Logs", "dock_logs"))
         prefs_layout.addWidget(_dock_button("Performance", "dock_performance"))
         prefs_layout.addWidget(_dock_button("Metadata", "dock_metadata"))
-        layout.addWidget(_wrap("Preferences / Debug", prefs_section))
+        prefs_layout.addStretch(1)
+        pages.append(("Preferences", QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView, _make_scroll(prefs_panel)))
 
-        layout.addStretch(1)
-        scroll.setWidget(content)
-        panel_layout.addWidget(scroll)
-        return panel
+        return pages
 
     def _build_roi_controls_layout(self) -> None:
         """Build ROI/crop controls used by the ROI dock."""
