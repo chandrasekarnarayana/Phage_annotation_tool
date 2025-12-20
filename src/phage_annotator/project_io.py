@@ -87,11 +87,33 @@ def save_project(
         )
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    
+    # Atomic save: write to temp file first
+    temp_path = path.with_suffix('.phageproj.tmp')
+    backup_path = path.with_suffix('.phageproj.backup')
+    
+    try:
+        # Write to temp file
+        with temp_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        
+        # Create backup if project exists
+        if path.exists():
+            if backup_path.exists():
+                backup_path.unlink()
+            path.replace(backup_path)
+        
+        # Atomic rename
+        temp_path.replace(path)
+        
+    except Exception as e:
+        # Cleanup temp file on failure
+        if temp_path.exists():
+            temp_path.unlink()
+        raise IOError(f"Failed to save project: {e}") from e
 
 
-def load_project(path: Path) -> Tuple[List[dict], Dict, Dict]:
+def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, Dict]:
     """Load a project JSON and return raw image entries, settings, and annotation paths.
 
     Returns
@@ -102,10 +124,19 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict]:
         Persisted UI settings.
     ann_map : dict[int, pathlib.Path]
         Mapping from image index to annotation path.
+    roi_map : dict[int, list[dict]]
+        ROIs by image index.
+    thr_map : dict[int, dict]
+        Threshold configs by image index.
+    part_map : dict[int, dict]
+        Particles configs by image index.
+    import_map : dict[int, list[dict]]
+        Annotation imports by image index.
 
     Notes
     -----
     Missing fields are tolerated for backward compatibility.
+    Missing image files are logged but don't fail the load.
     """
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:
@@ -119,4 +150,24 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict]:
         for idx, entry in enumerate(images)
         if entry.get("annotations")
     }
-    return images, settings, ann_map
+    roi_map = {
+        idx: entry.get("rois", [])
+        for idx, entry in enumerate(images)
+        if entry.get("rois")
+    }
+    thr_map = {
+        idx: entry.get("threshold_config", {})
+        for idx, entry in enumerate(images)
+        if entry.get("threshold_config")
+    }
+    part_map = {
+        idx: entry.get("particles_config", {})
+        for idx, entry in enumerate(images)
+        if entry.get("particles_config")
+    }
+    import_map = {
+        idx: entry.get("annotation_imports", [])
+        for idx, entry in enumerate(images)
+        if entry.get("annotation_imports")
+    }
+    return images, settings, ann_map, roi_map, thr_map, part_map, import_map

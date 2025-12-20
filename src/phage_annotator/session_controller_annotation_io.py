@@ -180,6 +180,16 @@ class SessionAnnotationIOMixin:
             return None
         meta = entries[-1].get("meta")
         return meta if isinstance(meta, dict) and meta else None
+    
+    def clear_stale_analysis_results(self, image_id: int) -> None:
+        """Clear SMLM/density results when image changes to prevent stale overlays."""
+        # Mark results as stale - GUI will check and clear overlays
+        if hasattr(self, "_last_smlm_image_id") and self._last_smlm_image_id != image_id:
+            if hasattr(self, "smlm_result"):
+                self.smlm_result = None
+        if hasattr(self, "_last_density_image_id") and self._last_density_image_id != image_id:
+            if hasattr(self, "density_result"):
+                self.density_result = None
 
     def _merge_annotations(self, image_id: int, new_points: List[Keypoint]) -> None:
         pts = list(self.session_state.annotations.get(image_id, []))

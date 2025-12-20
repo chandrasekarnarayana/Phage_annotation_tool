@@ -23,6 +23,44 @@ from phage_annotator.roi_manager import Roi, roi_from_dict
 class SessionProjectMixin:
     """Mixin for project persistence and recovery helpers."""
 
+    def build_annotation_metadata(self, image_id: int) -> Dict[str, object]:
+        """Build metadata dict from current ROI, crop, and display settings."""
+        meta: Dict[str, object] = {}
+        
+        # Add ROI if set
+        roi = self.view_state.roi
+        if roi and roi.shape != "none":
+            meta["roi"] = {
+                "shape": roi.shape,
+            }
+            if roi.shape == "box":
+                meta["roi"]["rect"] = (roi.x, roi.y, roi.w, roi.h)
+            elif roi.shape == "circle":
+                center_x = roi.x + roi.w / 2
+                center_y = roi.y + roi.h / 2
+                radius = roi.w / 2
+                meta["roi"]["center"] = (center_x, center_y)
+                meta["roi"]["radius"] = radius
+        
+        # Add crop if set
+        crop = self.view_state.crop_rect
+        if crop and crop != (0, 0, 0, 0):
+            meta["crop"] = crop
+        
+        # Add display settings for the current image
+        if image_id in self.session_state.images:
+            mapping = self.display_mapping.get_for_panel("frame")  # Use frame panel as default
+            meta["display"] = {
+                "win": {
+                    "min": mapping.vmin,
+                    "max": mapping.vmax,
+                },
+                "gamma": mapping.gamma,
+                "lut": mapping.lut_name,
+            }
+        
+        return meta
+
     def save_csv(self, parent: QtWidgets.QWidget, path: pathlib.Path) -> None:
         """Save annotations for the active image to CSV."""
         image_id = self.session_state.active_primary_id
@@ -113,29 +151,64 @@ class SessionProjectMixin:
         annotations: Dict[int, List[Keypoint]] = {}
         display_per_image: Dict[int, Dict[str, DisplayMapping]] = {}
         rois_by_image: Dict[int, List[Roi]] = {}
+        missing_images = []
+        
         for idx, entry in enumerate(image_entries):
-            meta = read_metadata(pathlib.Path(entry["path"]))
-            meta.id = idx
+            img_path = pathlib.Path(entry["path"])
+            # Check if image exists before trying to load
+            if not img_path.exists():
+                missing_images.append(str(img_path))
+                continue
+                
+            try:
+                meta = read_metadata(img_path)
+            except Exception as e:
+                missing_images.append(f"{img_path} (error: {e})")
+                continue
+                
+            meta.id = len(images)  # Use actual index, not entry index
             meta.interpret_3d_as = entry.get("interpret_3d_as", meta.interpret_3d_as)
             images.append(meta)
-            annotations[idx] = []
+            annotations[meta.id] = []
             entry_mapping = entry.get("display_mapping", {})
             if isinstance(entry_mapping, dict) and entry_mapping:
-                display_per_image[idx] = {
+                display_per_image[meta.id] = {
                     panel: mapping_from_dict(mdict, self.display_mapping.clone())
                     for panel, mdict in entry_mapping.items()
                     if isinstance(mdict, dict)
                 }
+            # Use entry idx for roi_map lookup, but store with actual image id
             if idx in roi_map:
-                rois_by_image[idx] = [
+                rois_by_image[meta.id] = [
                     roi_from_dict(r, ridx) for ridx, r in enumerate(roi_map[idx]) if isinstance(r, dict)
                 ]
+        
+        # Show warning if any images are missing
+        if missing_images:
+            msg = f"Loaded {len(images)} images, but {len(missing_images)} could not be found:\n\n"
+            msg += "\n".join(missing_images[:10])  # Show first 10
+            if len(missing_images) > 10:
+                msg += f"\n... and {len(missing_images) - 10} more"
+            QtWidgets.QMessageBox.warning(parent, "Some images not found", msg)
+        
+        # If no images loaded at all, fail
+        if not images:
+            QtWidgets.QMessageBox.critical(parent, "Load failed", "No images could be loaded from the project.")
+            return False
+            
         for idx, ann_path in ann_map.items():
-            if ann_path and ann_path.exists():
-                try:
-                    annotations[int(idx)] = keypoints_from_json(ann_path)
-                except Exception:
-                    annotations[int(idx)] = []
+            # Map entry idx to actual image id by matching paths
+            if idx < len(image_entries):
+                actual_id = None
+                for img in images:
+                    if pathlib.Path(img.path) == pathlib.Path(image_entries[idx]["path"]):
+                        actual_id = img.id
+                        break
+                if actual_id is not None and ann_path and ann_path.exists():
+                    try:
+                        annotations[actual_id] = keypoints_from_json(ann_path)
+                    except Exception:
+                        annotations[actual_id] = []
         self.session_state.images = images
         self.session_state.annotations = annotations
         self.session_state.annotation_index = {}

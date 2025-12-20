@@ -85,7 +85,7 @@ def test_project_roundtrip_and_backward_compat(tmp_path) -> None:
     }
     proj = tmp_path / "session.phageproj"
     save_project(proj, [img1, img2], ann, {"last_fov_index": 0})
-    images, settings, ann_map = load_project(proj)
+    images, settings, ann_map, roi_map, thr_map, part_map, import_map = load_project(proj)
     assert images[0]["interpret_3d_as"] == "time"
     assert images[1]["interpret_3d_as"] == "depth"
     assert settings["last_fov_index"] == 0
@@ -102,7 +102,7 @@ def test_project_roundtrip_and_backward_compat(tmp_path) -> None:
             }
         )
     )
-    images2, settings2, ann_map2 = load_project(legacy)
+    images2, settings2, ann_map2, roi_map2, thr_map2, part_map2, import_map2 = load_project(legacy)
     assert images2[0]["path"] == "x.tif"
     assert settings2 == {}
     assert ann_map2 == {}
