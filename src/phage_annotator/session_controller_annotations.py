@@ -2,26 +2,26 @@
 
 from __future__ import annotations
 
-from typing import List
-import numpy as np
+from typing import Iterable, Optional
+
 from phage_annotator.annotations import Keypoint
 
 
 class SessionAnnotationsMixin:
     """Mixin for annotation mutations and undo/redo helpers."""
-    
+
     def add_annotation(
-    self,
-    image_id: int,
-    image_name: str,
-    t: int,
-    z: int,
-    y: float,
-    x: float,
-    label: str,
-    scope: str,
+        self,
+        image_id: int,
+        image_name: str,
+        t: int,
+        z: int,
+        y: float,
+        x: float,
+        label: str,
+        scope: str,
     ) -> Keypoint:
-    """Add an annotation to the session."""
+        """Add an annotation to the session."""
         kp = Keypoint(
             image_id=image_id,
             image_name=image_name,
@@ -47,12 +47,12 @@ class SessionAnnotationsMixin:
                 pts.remove(kp)
             except ValueError:
                 continue
-                self._push_undo({"type": "delete_point", "point": kp, "image_id": image_id})
-                removed += 1
-                if removed:
-                    self.set_dirty(True)
-                    self.annotations_changed.emit()
-                    return removed
+            self._push_undo({"type": "delete_point", "point": kp, "image_id": image_id})
+            removed += 1
+        if removed:
+            self.set_dirty(True)
+            self.annotations_changed.emit()
+        return removed
 
     def update_annotation(self, image_id: int, old: Keypoint, new: Keypoint) -> bool:
         """Replace a single annotation with an updated version."""
@@ -61,10 +61,10 @@ class SessionAnnotationsMixin:
             idx = pts.index(old)
         except ValueError:
             return False
-            pts[idx] = new
-            self.set_dirty(True)
-            self.annotations_changed.emit()
-            return True
+        pts[idx] = new
+        self.set_dirty(True)
+        self.annotations_changed.emit()
+        return True
 
     def can_undo(self) -> bool:
         return bool(self._undo_stack)
@@ -79,22 +79,24 @@ class SessionAnnotationsMixin:
     def undo(self) -> bool:
         if not self._undo_stack:
             return False
-            action = self._undo_stack.pop()
-            inverse = self._apply_action(action, undo=True)
-            if inverse:
-                self._redo_stack.append(inverse)
-                self.annotations_changed.emit()
-                return True
+        action = self._undo_stack.pop()
+        inverse = self._apply_action(action, undo=True)
+        if inverse:
+            self._redo_stack.append(inverse)
+            self.annotations_changed.emit()
+            return True
+        return False
 
     def redo(self) -> bool:
         if not self._redo_stack:
             return False
-            action = self._redo_stack.pop()
-            inverse = self._apply_action(action, undo=False)
-            if inverse:
-                self._undo_stack.append(inverse)
-                self.annotations_changed.emit()
-                return True
+        action = self._redo_stack.pop()
+        inverse = self._apply_action(action, undo=False)
+        if inverse:
+            self._undo_stack.append(inverse)
+            self.annotations_changed.emit()
+            return True
+        return False
 
     def _apply_action(self, action: dict, undo: bool) -> Optional[dict]:
         atype = action.get("type")
@@ -104,15 +106,15 @@ class SessionAnnotationsMixin:
             if undo:
                 self._remove_point(point, image_id)
                 return {"type": "delete_point", "point": point, "image_id": image_id}
+            self.session_state.annotations.setdefault(image_id, []).append(point)
+            return {"type": "add_point", "point": point, "image_id": image_id}
+        if atype == "delete_point":
+            if undo:
                 self.session_state.annotations.setdefault(image_id, []).append(point)
                 return {"type": "add_point", "point": point, "image_id": image_id}
-                if atype == "delete_point":
-                    if undo:
-                        self.session_state.annotations.setdefault(image_id, []).append(point)
-                        return {"type": "add_point", "point": point, "image_id": image_id}
-                        self._remove_point(point, image_id)
-                        return {"type": "delete_point", "point": point, "image_id": image_id}
-                        return None
+            self._remove_point(point, image_id)
+            return {"type": "delete_point", "point": point, "image_id": image_id}
+        return None
 
     def _remove_point(self, point: Keypoint, image_id: int) -> None:
         pts = self.session_state.annotations.get(image_id, [])

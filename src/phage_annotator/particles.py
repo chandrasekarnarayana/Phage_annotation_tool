@@ -66,7 +66,7 @@ def analyze_particles(mask: np.ndarray, frame_index: int, opts: ParticleOptions)
         if opts.max_area_px and area > opts.max_area_px:
             continue
         perimeter = _perimeter(component, include_holes=opts.include_holes)
-        circularity = 0.0 if perimeter <= 0 else float(4 * np.pi * area / (perimeter ** 2))
+        circularity = 0.0 if perimeter <= 0 else float(4 * np.pi * area / (perimeter**2))
         if circularity < opts.min_circularity or circularity > opts.max_circularity:
             continue
         if opts.exclude_edges and _touches_edge(component):
@@ -121,7 +121,12 @@ def _perimeter(component: np.ndarray, include_holes: bool) -> float:
 
 
 def _touches_edge(component: np.ndarray) -> bool:
-    return bool(component[0, :].any() or component[-1, :].any() or component[:, 0].any() or component[:, -1].any())
+    return bool(
+        component[0, :].any()
+        or component[-1, :].any()
+        or component[:, 0].any()
+        or component[:, -1].any()
+    )
 
 
 def _outline(component: np.ndarray) -> Optional[List[Tuple[float, float]]]:

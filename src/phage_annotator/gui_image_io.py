@@ -58,7 +58,9 @@ def read_metadata(path: Path) -> LazyImage:
     )
 
 
-def load_array(path: Path, interpret_3d_as: str = "auto", ome_axes: Optional[str] = None) -> Tuple[object, bool, bool]:
+def load_array(
+    path: Path, interpret_3d_as: str = "auto", ome_axes: Optional[str] = None
+) -> Tuple[object, bool, bool]:
     """Load image data and standardize to (T, Z, Y, X)."""
     with tif.TiffFile(str(path)) as tf:
         nbytes = tf.asarray().nbytes

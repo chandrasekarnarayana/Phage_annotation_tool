@@ -6,6 +6,7 @@ from typing import Dict, Tuple
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
+
 def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     """Build menus, actions, and shortcuts for the main window."""
     menubar = self.menuBar()

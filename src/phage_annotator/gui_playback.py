@@ -61,7 +61,9 @@ class PlaybackMixin:
             if frame is None:
                 self._playback_underruns += 1
                 self._flash_status("Buffer underrun")
-                QtCore.QMetaObject.invokeMethod(self, "_update_buffer_stats", QtCore.Qt.QueuedConnection)
+                QtCore.QMetaObject.invokeMethod(
+                    self, "_update_buffer_stats", QtCore.Qt.QueuedConnection
+                )
                 time.sleep(sleep_time)
                 continue
             self._playback_cursor += 1
@@ -103,7 +105,9 @@ class PlaybackMixin:
                     self._fps_times.append(1.0 / dt)
         self._playback_frame_counter += 1
         if self._fps_text is None and self.ax_frame is not None:
-            self._fps_text = self.ax_frame.text(0.02, 0.98, "", transform=self.ax_frame.transAxes, color="w")
+            self._fps_text = self.ax_frame.text(
+                0.02, 0.98, "", transform=self.ax_frame.transAxes, color="w"
+            )
         if self._fps_text is not None and self._fps_times:
             fps = sum(self._fps_times) / len(self._fps_times)
             self._fps_text.set_text(f"FPS: {fps:.1f}")

@@ -51,7 +51,11 @@ def _rss_mb() -> float:
 
 def _files_from_dir(folder: pathlib.Path, num: int) -> List[pathlib.Path]:
     candidates = sorted(
-        [p for p in folder.iterdir() if p.suffix.lower() in SUPPORTED_SUFFIXES or p.name.lower().endswith(".ome.tif")]
+        [
+            p
+            for p in folder.iterdir()
+            if p.suffix.lower() in SUPPORTED_SUFFIXES or p.name.lower().endswith(".ome.tif")
+        ]
     )
     if not candidates:
         raise FileNotFoundError(f"No TIFFs found in {folder}")
@@ -155,7 +159,9 @@ def _run(args: argparse.Namespace) -> None:
     print(f"Avg FOV switch: {_avg(fov_switch):.4f}s over {len(fov_switch)} switches")
     print(f"Avg T-step: {_avg(t_times):.4f}s over {len(t_times)} steps")
     print(f"Avg Z-step: {_avg(z_times):.4f}s over {len(z_times)} steps")
-    print(f"Clear cache: {clear_time:.4f}s | RSS {rss_before_clear:.1f} -> {rss_after_clear:.1f} MB")
+    print(
+        f"Clear cache: {clear_time:.4f}s | RSS {rss_before_clear:.1f} -> {rss_after_clear:.1f} MB"
+    )
     if playback_fps is not None:
         print(f"Theoretical disk-limited playback FPS (no GUI): {playback_fps:.1f}")
         if args.fps:
@@ -163,12 +169,27 @@ def _run(args: argparse.Namespace) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Stress test memory + navigation without showing the full GUI.")
-    parser.add_argument("--data-dir", type=pathlib.Path, required=True, help="Folder containing TIFF/OME-TIFF stacks")
+    parser = argparse.ArgumentParser(
+        description="Stress test memory + navigation without showing the full GUI."
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=pathlib.Path,
+        required=True,
+        help="Folder containing TIFF/OME-TIFF stacks",
+    )
     parser.add_argument("--num-fovs", type=int, default=2, help="Number of fields of view to test")
-    parser.add_argument("--loop", type=int, default=1, help="How many times to iterate slider sweeps")
-    parser.add_argument("--playback-test", action="store_true", help="Measure sequential playback read FPS (headless)")
-    parser.add_argument("--fps", type=int, default=30, help="Target GUI playback FPS for comparison")
+    parser.add_argument(
+        "--loop", type=int, default=1, help="How many times to iterate slider sweeps"
+    )
+    parser.add_argument(
+        "--playback-test",
+        action="store_true",
+        help="Measure sequential playback read FPS (headless)",
+    )
+    parser.add_argument(
+        "--fps", type=int, default=30, help="Target GUI playback FPS for comparison"
+    )
     return parser
 
 

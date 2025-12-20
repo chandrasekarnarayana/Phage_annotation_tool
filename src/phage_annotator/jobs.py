@@ -20,6 +20,7 @@ from phage_annotator.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
+
 class CancelToken:
     """Thread-safe cancellation token.
 
@@ -47,6 +48,7 @@ class JobSignals(QtCore.QObject):
     Signals are emitted from the worker thread and delivered on the GUI thread
     by Qt's queued connection mechanism.
     """
+
     started = QtCore.pyqtSignal(str, str)
     progress = QtCore.pyqtSignal(str, str, int, str)
     result = QtCore.pyqtSignal(str, str, object)
@@ -73,6 +75,7 @@ class JobHandle:
     job_id : str
         Unique identifier for job tracking and logging.
     """
+
     name: str
     cancel_token: CancelToken
     job_id: str
@@ -84,7 +87,15 @@ class JobRunnable(QtCore.QRunnable):
     All signals are emitted from the worker thread but delivered to the GUI
     thread via Qt's signal/slot mechanism.
     """
-    def __init__(self, name: str, job_id: str, fn: Callable[..., Any], cancel_token: CancelToken, signals: JobSignals) -> None:
+
+    def __init__(
+        self,
+        name: str,
+        job_id: str,
+        fn: Callable[..., Any],
+        cancel_token: CancelToken,
+        signals: JobSignals,
+    ) -> None:
         super().__init__()
         self.name = name
         self.job_id = job_id
@@ -129,6 +140,7 @@ class JobManager(QtCore.QObject):
     - Callbacks are executed on the GUI thread via Qt signals.
     - Cancellation is cooperative via CancelToken.
     """
+
     job_started = QtCore.pyqtSignal(str, str)
     job_progress = QtCore.pyqtSignal(str, str, int, str)
     job_result = QtCore.pyqtSignal(str, str, object)
@@ -140,7 +152,14 @@ class JobManager(QtCore.QObject):
         super().__init__(parent)
         self._pool = QtCore.QThreadPool.globalInstance()
         self._tokens: dict[str, CancelToken] = {}
-        self._callbacks: dict[str, Tuple[Optional[Callable[[Any], None]], Optional[Callable[[str], None]], Optional[Callable[[int, str], None]]]] = {}
+        self._callbacks: dict[
+            str,
+            Tuple[
+                Optional[Callable[[Any], None]],
+                Optional[Callable[[str], None]],
+                Optional[Callable[[int, str], None]],
+            ],
+        ] = {}
 
     def submit(
         self,
@@ -218,7 +237,9 @@ class JobManager(QtCore.QObject):
             on_progress(value, msg)
 
 
-def _call_job(fn: Callable[..., Any], progress: Callable[..., Any], cancel_token: CancelToken) -> Any:
+def _call_job(
+    fn: Callable[..., Any], progress: Callable[..., Any], cancel_token: CancelToken
+) -> Any:
     """Invoke a job function with an optional (progress, cancel_token) signature.
 
     The helper inspects the function signature to support:

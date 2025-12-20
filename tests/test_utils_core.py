@@ -4,10 +4,10 @@ from types import SimpleNamespace
 import numpy as np
 
 from phage_annotator.analysis import apply_crop_rect, map_point_to_crop, roi_mask_for_shape
+from phage_annotator.annotations import Keypoint
 from phage_annotator.io import standardize_axes
 from phage_annotator.project_io import load_project, save_project
 from phage_annotator.projection_cache import ProjectionCache
-from phage_annotator.annotations import Keypoint
 
 
 def test_standardize_axes_2d_3d_4d_heuristic() -> None:
@@ -94,7 +94,12 @@ def test_project_roundtrip_and_backward_compat(tmp_path) -> None:
     legacy = tmp_path / "legacy.phageproj"
     legacy.write_text(
         json.dumps(
-            {"tool": "PhageAnnotator", "version": "0.9.0", "images": [{"path": "x.tif"}], "settings": {}}
+            {
+                "tool": "PhageAnnotator",
+                "version": "0.9.0",
+                "images": [{"path": "x.tif"}],
+                "settings": {},
+            }
         )
     )
     images2, settings2, ann_map2 = load_project(legacy)

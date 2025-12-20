@@ -35,13 +35,17 @@ def build_index(folder: pathlib.Path) -> Dict[str, List[AnnotationIndexEntry]]:
         if path.suffix.lower() not in ANNOTATION_SUFFIXES:
             continue
         base_candidates = _annotation_base_candidates(path.name)
-        entry = AnnotationIndexEntry(path=path, size_bytes=path.stat().st_size, mtime=path.stat().st_mtime)
+        entry = AnnotationIndexEntry(
+            path=path, size_bytes=path.stat().st_size, mtime=path.stat().st_mtime
+        )
         for base in base_candidates:
             index.setdefault(base, []).append(entry)
     return index
 
 
-def match(image_path: pathlib.Path, index: Dict[str, List[AnnotationIndexEntry]]) -> List[AnnotationIndexEntry]:
+def match(
+    image_path: pathlib.Path, index: Dict[str, List[AnnotationIndexEntry]]
+) -> List[AnnotationIndexEntry]:
     """Return annotation entries that match an image path."""
     base = _normalize_image_basename(image_path)
     return list(index.get(base, []))
@@ -81,7 +85,13 @@ def _strip_tokens(name: str) -> str:
 
 def _strip_annotation_suffixes(name: str) -> str:
     lowered = name.lower()
-    for suffix in ("annotations", "annotation", "thunderstorm", "locs", "localizations"):
+    for suffix in (
+        "annotations",
+        "annotation",
+        "thunderstorm",
+        "locs",
+        "localizations",
+    ):
         for sep in ("_", "-", "."):
             token = f"{sep}{suffix}"
             if lowered.endswith(token):

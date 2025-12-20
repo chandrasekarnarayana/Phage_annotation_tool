@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
 import json
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
 import tifffile as tif
 
@@ -53,7 +53,11 @@ def read_metadata_summary(path: str) -> Dict[str, Any]:
     return summary
 
 
-def _build_summary(series: tif.TiffSeries, ome_parsed: Optional[Dict[str, Any]], mm: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _build_summary(
+    series: tif.TiffSeries,
+    ome_parsed: Optional[Dict[str, Any]],
+    mm: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
     axes = series.axes
     shape = series.shape
     dims = _axes_to_tzyx(axes, shape)
@@ -114,7 +118,12 @@ def _parse_ome_metadata(ome_xml: Optional[str]) -> Optional[Dict[str, Any]]:
         parsed["pixel_size_um"] = {"x": px_x, "y": px_y, "z": px_z}
     channels = []
     for chan in pixels.findall(".//ome:Channel", ns):
-        channels.append({"name": chan.get("Name"), "samples": _int_or_none(chan.get("SamplesPerPixel"))})
+        channels.append(
+            {
+                "name": chan.get("Name"),
+                "samples": _int_or_none(chan.get("SamplesPerPixel")),
+            }
+        )
     if channels:
         parsed["channels"] = channels
     image = root.find(".//ome:Image", ns)

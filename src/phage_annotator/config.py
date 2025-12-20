@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple
 
-
 SUPPORTED_SUFFIXES: Tuple[str, ...] = (".tif", ".tiff", ".ome.tif", ".ome.tiff")
 
 

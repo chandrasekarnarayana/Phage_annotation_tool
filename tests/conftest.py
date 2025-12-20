@@ -1,6 +1,7 @@
-import pytest
 import os
+
 import matplotlib
+import pytest
 
 
 def pytest_addoption(parser):
@@ -28,6 +29,7 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "gui" in item.keywords:
             item.add_marker(skip_gui)
+
 
 # Ensure a safe backend/environment for GUI tests under CI/headless
 if "CI" in os.environ:

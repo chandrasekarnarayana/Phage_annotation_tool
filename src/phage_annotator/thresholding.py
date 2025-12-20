@@ -70,7 +70,12 @@ def compute_threshold(pixels: np.ndarray, method: str, *, background: str = "dar
     return float(fn(data))
 
 
-def make_mask(image2d: np.ndarray, thr_low: float, thr_high: Optional[float] = None, invert: bool = False) -> np.ndarray:
+def make_mask(
+    image2d: np.ndarray,
+    thr_low: float,
+    thr_high: Optional[float] = None,
+    invert: bool = False,
+) -> np.ndarray:
     """Create a binary mask from a 2D image using low/high thresholds."""
     data = np.asarray(image2d)
     if thr_high is None or np.isnan(thr_high):

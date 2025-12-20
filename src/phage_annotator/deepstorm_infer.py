@@ -14,7 +14,6 @@ import numpy as np
 
 from phage_annotator.analysis import local_maxima, mad_sigma
 
-
 try:  # Optional dependency
     import torch
 except Exception:  # pragma: no cover - optional import
@@ -123,7 +122,10 @@ def run_deepstorm_stream(
             _blend_patch(sr_accum, weight_accum, sr_patch, y0 * upsample, x0 * upsample)
             if progress_cb is not None:
                 pct = int((idx * total_tiles + tile_idx) / max(1, total_frames * total_tiles) * 100)
-                progress_cb(pct, f"Frame {idx + 1}/{total_frames} | Tile {tile_idx}/{total_tiles}")
+                progress_cb(
+                    pct,
+                    f"Frame {idx + 1}/{total_frames} | Tile {tile_idx}/{total_tiles}",
+                )
 
     sr = _finalize_sr(sr_accum, weight_accum)
     locs = localizations_from_sr(sr, roi_rect, upsample)
@@ -184,10 +186,10 @@ def _tile_starts(h: int, w: int, patch: int, step: int) -> List[Tuple[int, int]]
 def _extract_patch(arr: np.ndarray, y0: int, x0: int, size: int) -> np.ndarray:
     if arr.ndim == 2:
         h, w = arr.shape
-        patch = arr[y0:y0 + size, x0:x0 + size]
+        patch = arr[y0 : y0 + size, x0 : x0 + size]
     else:
         _, h, w = arr.shape
-        patch = arr[:, y0:y0 + size, x0:x0 + size]
+        patch = arr[:, y0 : y0 + size, x0 : x0 + size]
     pad_h = max(0, size - patch.shape[-2])
     pad_w = max(0, size - patch.shape[-1])
     if pad_h or pad_w:
@@ -218,7 +220,9 @@ def _infer_patch(model, patch: np.ndarray, device: str, upsample: int) -> np.nda
     return np.zeros((patch.shape[-2] * upsample, patch.shape[-1] * upsample), dtype=np.float32)
 
 
-def _blend_patch(sr_accum: np.ndarray, weight_accum: np.ndarray, patch: np.ndarray, y0: int, x0: int) -> None:
+def _blend_patch(
+    sr_accum: np.ndarray, weight_accum: np.ndarray, patch: np.ndarray, y0: int, x0: int
+) -> None:
     ph, pw = patch.shape
     y1 = min(sr_accum.shape[0], y0 + ph)
     x1 = min(sr_accum.shape[1], x0 + pw)

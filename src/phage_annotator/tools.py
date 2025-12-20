@@ -9,6 +9,7 @@ from typing import Callable, Optional, Set, Tuple
 
 class Tool(Enum):
     """Interactive tool modes for the canvas."""
+
     PAN_ZOOM = "PAN_ZOOM"
     ANNOTATE_POINT = "ANNOTATE_POINT"
     ROI_BOX = "ROI_BOX"
@@ -21,6 +22,7 @@ class Tool(Enum):
 @dataclass
 class ToolCallbacks:
     """Callback interface for ToolRouter to interact with the GUI."""
+
     get_target_ax: Callable[[], object]
     get_image_axes: Callable[[], Set[object]]
     get_tz: Callable[[], Tuple[int, int]]
@@ -41,6 +43,7 @@ class ToolCallbacks:
 
 class ToolRouter:
     """Route Matplotlib mouse events to the active tool behavior."""
+
     def __init__(self, callbacks: ToolCallbacks) -> None:
         self._cb = callbacks
         self.tool = Tool.ANNOTATE_POINT

@@ -3,12 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from phage_annotator.annotations import (
-    Keypoint,
-    keypoints_to_dataframe,
-    save_keypoints_csv,
-    save_keypoints_json,
-)
+from phage_annotator.annotations import (Keypoint, keypoints_to_dataframe, save_keypoints_csv,
+                                         save_keypoints_json)
 
 
 def _sample_keypoints() -> list[Keypoint]:

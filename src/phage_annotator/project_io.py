@@ -55,7 +55,12 @@ def save_project(
     -----
     Per-image ``interpret_3d_as`` values are stored to preserve axis overrides.
     """
-    payload = {"tool": "PhageAnnotator", "version": "0.9.0", "images": [], "settings": settings}
+    payload = {
+        "tool": "PhageAnnotator",
+        "version": "0.9.0",
+        "images": [],
+        "settings": settings,
+    }
     for img in images:
         ann_path = Path(img.path).with_suffix(".annotations.json")
         save_keypoints_json(annotations.get(img.id, []), ann_path)
@@ -64,11 +69,19 @@ def save_project(
                 "path": str(Path(img.path).resolve()),
                 "annotations": str(ann_path.resolve()),
                 "interpret_3d_as": getattr(img, "interpret_3d_as", "auto"),
-                "display_mapping": display_mappings.get(img.id, {}) if display_mappings else {},
-                "rois": [roi_to_dict(r) for r in rois_by_image.get(img.id, [])] if rois_by_image else [],
-                "threshold_config": threshold_configs.get(img.id, {}) if threshold_configs else {},
-                "particles_config": particles_configs.get(img.id, {}) if particles_configs else {},
-                "annotation_imports": annotation_imports.get(img.id, []) if annotation_imports else [],
+                "display_mapping": (display_mappings.get(img.id, {}) if display_mappings else {}),
+                "rois": (
+                    [roi_to_dict(r) for r in rois_by_image.get(img.id, [])] if rois_by_image else []
+                ),
+                "threshold_config": (
+                    threshold_configs.get(img.id, {}) if threshold_configs else {}
+                ),
+                "particles_config": (
+                    particles_configs.get(img.id, {}) if particles_configs else {}
+                ),
+                "annotation_imports": (
+                    annotation_imports.get(img.id, []) if annotation_imports else []
+                ),
             }
         )
     path = Path(path)
@@ -100,9 +113,25 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, 
         raise ValueError("Not a PhageAnnotator project file.")
     images = data.get("images", [])
     settings = data.get("settings", {})
-    ann_map = {idx: Path(entry.get("annotations")) for idx, entry in enumerate(images) if entry.get("annotations")}
+    ann_map = {
+        idx: Path(entry.get("annotations"))
+        for idx, entry in enumerate(images)
+        if entry.get("annotations")
+    }
     roi_map = {idx: entry.get("rois", []) for idx, entry in enumerate(images) if entry.get("rois")}
-    thr_map = {idx: entry.get("threshold_config", {}) for idx, entry in enumerate(images) if entry.get("threshold_config")}
-    part_map = {idx: entry.get("particles_config", {}) for idx, entry in enumerate(images) if entry.get("particles_config")}
-    import_map = {idx: entry.get("annotation_imports", []) for idx, entry in enumerate(images) if entry.get("annotation_imports")}
+    thr_map = {
+        idx: entry.get("threshold_config", {})
+        for idx, entry in enumerate(images)
+        if entry.get("threshold_config")
+    }
+    part_map = {
+        idx: entry.get("particles_config", {})
+        for idx, entry in enumerate(images)
+        if entry.get("particles_config")
+    }
+    import_map = {
+        idx: entry.get("annotation_imports", [])
+        for idx, entry in enumerate(images)
+        if entry.get("annotation_imports")
+    }
     return images, settings, ann_map, roi_map, thr_map, part_map, import_map

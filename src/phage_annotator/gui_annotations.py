@@ -17,7 +17,9 @@ class AnnotationsMixin:
         if self.tool_router is not None:
             self.tool_router.on_click(event)
 
-    def _add_annotation(self, image_id: int, t: int, z: int, y: float, x: float, label: str, scope: str) -> None:
+    def _add_annotation(
+        self, image_id: int, t: int, z: int, y: float, x: float, label: str, scope: str
+    ) -> None:
         """Append a new annotation in full-resolution coordinates.
 
         Coordinates are stored in image space regardless of crop or downsample.

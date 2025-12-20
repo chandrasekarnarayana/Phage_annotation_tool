@@ -22,6 +22,7 @@ PyramidKey = Tuple[int, str, int, int, Tuple[float, float, float, float], int]
 @dataclass
 class CacheItem:
     """Cached projection and its byte size."""
+
     data: np.ndarray
     nbytes: int
 

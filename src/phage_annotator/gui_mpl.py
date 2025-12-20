@@ -25,29 +25,29 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 from phage_annotator.annotations import Keypoint
 from phage_annotator.config import DEFAULT_CONFIG
+from phage_annotator.gui_actions import ActionsMixin
+from phage_annotator.gui_annotations import AnnotationsMixin
 from phage_annotator.gui_constants import INTERACTIVE_DOWNSAMPLE, PLAYBACK_BUFFER_SIZE
-from phage_annotator.gui_image_io import read_metadata
+from phage_annotator.gui_controls import ControlsMixin
 from phage_annotator.gui_events import EventsMixin
+from phage_annotator.gui_export import ExportMixin
+from phage_annotator.gui_image_io import read_metadata
 from phage_annotator.gui_jobs import JobsMixin
-from phage_annotator.gui_ui_setup import UiSetupMixin
-from phage_annotator.gui_ui_extra import UiExtrasMixin
-from phage_annotator.gui_state import StateMixin
 from phage_annotator.gui_playback import PlaybackMixin
 from phage_annotator.gui_rendering import RenderingMixin
 from phage_annotator.gui_roi_crop import RoiCropMixin
-from phage_annotator.gui_annotations import AnnotationsMixin
-from phage_annotator.gui_actions import ActionsMixin
-from phage_annotator.gui_controls import ControlsMixin
+from phage_annotator.gui_state import StateMixin
 from phage_annotator.gui_table_status import TableStatusMixin
-from phage_annotator.gui_export import ExportMixin
+from phage_annotator.gui_ui_extra import UiExtrasMixin
+from phage_annotator.gui_ui_setup import UiSetupMixin
 from phage_annotator.image_models import LazyImage
 from phage_annotator.jobs import JobManager
-from phage_annotator.roi_manager import RoiManager
-from phage_annotator.recorder import ActionRecorder
 from phage_annotator.lut_manager import lut_names
 from phage_annotator.panels import PanelSpec
 from phage_annotator.projection_cache import ProjectionCache
+from phage_annotator.recorder import ActionRecorder
 from phage_annotator.ring_buffer import BlockPrefetcher, FrameRingBuffer
+from phage_annotator.roi_manager import RoiManager
 from phage_annotator.session_controller import SessionController
 from phage_annotator.tools import Tool
 
@@ -118,11 +118,19 @@ class KeypointAnnotator(
         self._last_frame_time: Optional[float] = None
         self._playback_underruns = 0
         # Panel visibility controls which axes exist; at least one must remain visible.
-        self._panel_visibility = {"frame": True, "mean": True, "composite": True, "support": True, "std": True}
+        self._panel_visibility = {
+            "frame": True,
+            "mean": True,
+            "composite": True,
+            "support": True,
+            "std": True,
+        }
         # Skip the next zoom capture when layout is rebuilt to preserve previous zoom.
         self._skip_capture_once = False
         # Pixel size (um per pixel) for density calculations.
-        self.pixel_size_um_per_px = float(self._settings.value("defaultPixelSizeUmPerPx", 0.069, type=float))
+        self.pixel_size_um_per_px = float(
+            self._settings.value("defaultPixelSizeUmPerPx", 0.069, type=float)
+        )
         self._status_base = ""
         self._status_extra = ""
         self._default_geometry: Optional[QtCore.QByteArray] = None
@@ -133,12 +141,16 @@ class KeypointAnnotator(
         self._debounce_timer.setSingleShot(True)
         self._debounce_timer.setInterval(80)
         self._debounce_timer.timeout.connect(self._refresh_image)
-        self.downsample_factor = int(self._settings.value("downsampleFactor", INTERACTIVE_DOWNSAMPLE, type=int))
+        self.downsample_factor = int(
+            self._settings.value("downsampleFactor", INTERACTIVE_DOWNSAMPLE, type=int)
+        )
         self.downsample_images = bool(self._settings.value("downsampleImages", True, type=bool))
         self.downsample_hist = bool(self._settings.value("downsampleHist", True, type=bool))
         self.downsample_profile = bool(self._settings.value("downsampleProfile", True, type=bool))
         self._job_generation = 0
-        self._projection_jobs: Dict[Tuple[int, str, Tuple[float, float, float, float], int, int], str] = {}
+        self._projection_jobs: Dict[
+            Tuple[int, str, Tuple[float, float, float, float], int, int], str
+        ] = {}
         cache_max_mb = self._settings.value("cacheMaxMB", 1024, type=int)
         self.proj_cache = ProjectionCache(max_mb=cache_max_mb)
         self._diag_hist_source = None
@@ -185,7 +197,9 @@ class KeypointAnnotator(
         self.overlay_text = None
         self.render_level_label = None
         self._render_scales: Dict[object, float] = {}
-        self._pyramid_jobs: Dict[Tuple[int, str, int, int, Tuple[float, float, float, float], int], str] = {}
+        self._pyramid_jobs: Dict[
+            Tuple[int, str, int, int, Tuple[float, float, float, float], int], str
+        ] = {}
         self._annotation_job_ids: Dict[int, str] = {}
         self._annotation_job_tokens: Dict[int, object] = {}
         self._pending_annotation_meta: Optional[dict] = None
@@ -196,9 +210,15 @@ class KeypointAnnotator(
         self.scale_bar_location = self._settings.value("scaleBarLocation", "bottom_right", type=str)
         self.scale_bar_padding_px = int(self._settings.value("scaleBarPaddingPx", 12, type=int))
         self.scale_bar_show_text = bool(self._settings.value("scaleBarShowText", True, type=bool))
-        self.scale_bar_text_offset_px = int(self._settings.value("scaleBarTextOffsetPx", 6, type=int))
-        self.scale_bar_background_box = bool(self._settings.value("scaleBarBackgroundBox", True, type=bool))
-        self.scale_bar_include_in_export = bool(self._settings.value("scaleBarIncludeInExport", True, type=bool))
+        self.scale_bar_text_offset_px = int(
+            self._settings.value("scaleBarTextOffsetPx", 6, type=int)
+        )
+        self.scale_bar_background_box = bool(
+            self._settings.value("scaleBarBackgroundBox", True, type=bool)
+        )
+        self.scale_bar_include_in_export = bool(
+            self._settings.value("scaleBarIncludeInExport", True, type=bool)
+        )
         self.show_roi_handles = bool(self._settings.value("showRoiHandles", True, type=bool))
         self._density_job_id: Optional[str] = None
         self._density_overlay = None
@@ -297,7 +317,9 @@ class KeypointAnnotator(
         if hasattr(self, "show_smlm_sr_act"):
             self.show_sr_overlay = self.show_smlm_sr_act.isChecked()
         if self.orthoview_widget is not None:
-            self.orthoview_widget.set_callbacks(self._on_orthoview_xz_click, self._on_orthoview_yz_click)
+            self.orthoview_widget.set_callbacks(
+                self._on_orthoview_xz_click, self._on_orthoview_yz_click
+            )
         self._attach_recorder()
         self._install_exception_hook()
         self._setup_tool_router()

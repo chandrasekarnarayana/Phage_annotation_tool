@@ -7,8 +7,8 @@ from typing import List, Tuple
 import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
-from phage_annotator.tools import Tool
 from phage_annotator.annotations import Keypoint
+from phage_annotator.tools import Tool
 
 
 class TableStatusMixin:
@@ -49,9 +49,13 @@ class TableStatusMixin:
             elif col == 1:
                 new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, int(text), kp.y, kp.x, kp.label)
             elif col == 2:
-                new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, kp.z, float(text), kp.x, kp.label)
+                new_kp = Keypoint(
+                    kp.image_id, kp.image_name, kp.t, kp.z, float(text), kp.x, kp.label
+                )
             elif col == 3:
-                new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, kp.z, kp.y, float(text), kp.label)
+                new_kp = Keypoint(
+                    kp.image_id, kp.image_name, kp.t, kp.z, kp.y, float(text), kp.label
+                )
             elif col == 4:
                 new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, kp.z, kp.y, kp.x, text)
             else:
@@ -82,7 +86,9 @@ class TableStatusMixin:
 
     def _update_status(self) -> None:
         total = sum(len(v) for v in self.annotations.values())
-        current = len([kp for kp in self._current_keypoints() if kp.t == self.t_slider.value() or kp.t == -1])
+        current = len(
+            [kp for kp in self._current_keypoints() if kp.t == self.t_slider.value() or kp.t == -1]
+        )
         pts_view, area_um2 = self._view_density_stats()
         density_txt = ""
         if area_um2 > 0:
@@ -90,9 +96,7 @@ class TableStatusMixin:
             density_txt = f" | View pts: {pts_view} | Area: {area_um2:.2f} um^2 | Density: {density:.3f} /um^2"
         cache_mb, cache_items = self.proj_cache.stats()
         cache_txt = f" | Cache: {cache_mb} MB | Items: {cache_items}"
-        self._status_base = (
-            f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} | Speed {self.speed_slider.value()} fps{density_txt}{cache_txt}"
-        )
+        self._status_base = f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} | Speed {self.speed_slider.value()} fps{density_txt}{cache_txt}"
         self._render_status()
         if self.tool_label is not None and self.tool_router is not None:
             self.tool_label.setText(f"Tool: {self._tool_label(self.tool_router.tool)}")
@@ -136,7 +140,17 @@ class TableStatusMixin:
         return color
 
     def _view_density_stats(self) -> Tuple[int, float]:
-        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        axes = [
+            ax
+            for ax in [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+            if ax is not None
+        ]
         if not axes:
             return 0, 0.0
         scale = self._axis_scale(axes[0])
@@ -158,7 +172,9 @@ class TableStatusMixin:
                 continue
             if roi_active:
                 if circle_mode and circle_center and circle_r is not None:
-                    if (kp.x - circle_center[0]) ** 2 + (kp.y - circle_center[1]) ** 2 > circle_r**2:
+                    if (kp.x - circle_center[0]) ** 2 + (
+                        kp.y - circle_center[1]
+                    ) ** 2 > circle_r**2:
                         continue
                 else:
                     rx, ry, rw, rh = self.roi_rect
@@ -193,12 +209,25 @@ class TableStatusMixin:
         return pts
 
     def _restore_zoom(self, data_shape: Tuple[int, int]) -> None:
-        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        axes = [
+            ax
+            for ax in [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+            if ax is not None
+        ]
         if not axes:
             return
         if self.link_zoom:
             if self._last_zoom_linked is None:
-                self._last_zoom_linked = ((0.0, float(data_shape[1])), (float(data_shape[0]), 0.0))
+                self._last_zoom_linked = (
+                    (0.0, float(data_shape[1])),
+                    (float(data_shape[0]), 0.0),
+                )
             for ax in axes:
                 scale = self._axis_scale(ax)
                 default_xlim = (0, data_shape[1] / scale)
@@ -218,7 +247,17 @@ class TableStatusMixin:
                     ax.set_ylim(default_ylim)
 
     def _capture_zoom_state(self) -> None:
-        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        axes = [
+            ax
+            for ax in [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+            if ax is not None
+        ]
         if not axes:
             return
         ax = axes[0]

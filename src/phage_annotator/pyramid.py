@@ -41,5 +41,7 @@ def downsample_mean_pool(frame: np.ndarray, factor: int) -> np.ndarray:
     if h_trim == 0 or w_trim == 0:
         return frame
     trimmed = frame[:h_trim, :w_trim]
-    pooled = trimmed.reshape(h_trim // factor, factor, w_trim // factor, factor).mean(axis=(1, 3), dtype=np.float32)
+    pooled = trimmed.reshape(h_trim // factor, factor, w_trim // factor, factor).mean(
+        axis=(1, 3), dtype=np.float32
+    )
     return pooled

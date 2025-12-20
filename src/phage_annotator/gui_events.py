@@ -147,7 +147,17 @@ class EventsMixin:
 
     def _bind_axis_callbacks(self) -> None:
         """Bind zoom callbacks for current axes to keep zoom synced."""
-        axes = [ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None]
+        axes = [
+            ax
+            for ax in [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+            if ax is not None
+        ]
         for ax in axes:
             ax.callbacks.connect("xlim_changed", self._on_limits_changed)
             ax.callbacks.connect("ylim_changed", self._on_limits_changed)
@@ -155,7 +165,13 @@ class EventsMixin:
     def reset_view(self) -> None:
         """Reset zoom/pan to full extent of current frame."""
         self._last_zoom_linked = None
-        for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std]:
+        for ax in [
+            self.ax_frame,
+            self.ax_mean,
+            self.ax_comp,
+            self.ax_support,
+            self.ax_std,
+        ]:
             if ax is None:
                 continue
             ax.set_xlim(auto=True)
@@ -197,7 +213,10 @@ class EventsMixin:
     def keyPressEvent(self, event) -> None:
         """Qt-level shortcuts for fast navigation; ignored when editing text fields."""
         focused = QtWidgets.QApplication.focusWidget()
-        if isinstance(focused, (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit)):
+        if isinstance(
+            focused,
+            (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit),
+        ):
             return super().keyPressEvent(event)
         key = event.key()
         if key == QtCore.Qt.Key_Left:
@@ -211,14 +230,24 @@ class EventsMixin:
         elif key == QtCore.Qt.Key_Space:
             self._toggle_play("t")
         elif key in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
-            if self.tool_router and self.tool_router.tool in (Tool.ROI_BOX, Tool.ROI_CIRCLE, Tool.ROI_EDIT):
+            if self.tool_router and self.tool_router.tool in (
+                Tool.ROI_BOX,
+                Tool.ROI_CIRCLE,
+                Tool.ROI_EDIT,
+            ):
                 self._clear_roi()
             else:
                 self._delete_selected_annotations()
         elif key in (QtCore.Qt.Key_A, QtCore.Qt.Key_N):
             self._set_status("Click on the image to add an annotation point.")
-        elif key == QtCore.Qt.Key_R and event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier:
-            if self.tool_router and self.tool_router.tool in (Tool.ROI_BOX, Tool.ROI_CIRCLE, Tool.ROI_EDIT):
+        elif (
+            key == QtCore.Qt.Key_R and event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
+        ):
+            if self.tool_router and self.tool_router.tool in (
+                Tool.ROI_BOX,
+                Tool.ROI_CIRCLE,
+                Tool.ROI_EDIT,
+            ):
                 self._clear_roi()
             return
         elif key == QtCore.Qt.Key_R:

@@ -20,7 +20,9 @@ from typing import Iterable, List, Optional, Tuple
 import numpy as np
 import tifffile as tif
 
-from phage_annotator.metadata_reader import MetadataBundle, read_metadata as _read_metadata, read_metadata_summary as _read_summary
+from phage_annotator.metadata_reader import MetadataBundle
+from phage_annotator.metadata_reader import read_metadata as _read_metadata
+from phage_annotator.metadata_reader import read_metadata_summary as _read_summary
 
 __all__ = [
     "ImageMeta",

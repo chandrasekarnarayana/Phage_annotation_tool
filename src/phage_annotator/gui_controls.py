@@ -23,4 +23,3 @@ class ControlsMixin(
     ThresholdControlsMixin,
 ):
     """Composite mixin for GUI control handlers."""
-

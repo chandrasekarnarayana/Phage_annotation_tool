@@ -6,16 +6,15 @@ import pathlib
 from typing import Tuple
 
 import numpy as np
-
 from matplotlib.backends.qt_compat import QtWidgets
 
-from phage_annotator.annotation_metadata import format_tokens
 from phage_annotator.analysis import compute_mean_std
-from phage_annotator.export_view import ExportOptions, render_view_to_array
-from phage_annotator.scalebar import ScaleBarSpec
-from phage_annotator.gui_image_io import read_metadata
+from phage_annotator.annotation_metadata import format_tokens
 from phage_annotator.display_mapping import build_norm
+from phage_annotator.export_view import ExportOptions, render_view_to_array
+from phage_annotator.gui_image_io import read_metadata
 from phage_annotator.lut_manager import cmap_for
+from phage_annotator.scalebar import ScaleBarSpec
 
 
 class ExportMixin:
@@ -55,7 +54,10 @@ class ExportMixin:
     def _save_project(self) -> None:
         """Save a .phageproj plus per-image annotations."""
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save project", str(pathlib.Path.cwd() / "session.phageproj"), "Phage project (*.phageproj)"
+            self,
+            "Save project",
+            str(pathlib.Path.cwd() / "session.phageproj"),
+            "Phage project (*.phageproj)",
         )
         if not path:
             return
@@ -64,17 +66,27 @@ class ExportMixin:
             "last_support_index": self.support_image_idx,
             "smlm_runs": list(self._smlm_run_history),
             "threshold_settings": dict(self._threshold_settings),
-            "threshold_configs_by_image": dict(self.controller.session_state.threshold_configs_by_image),
-            "particles_configs_by_image": dict(self.controller.session_state.particles_configs_by_image),
-            "density_config": self.controller.density_config.__dict__ if self.controller.density_config else {},
-            "density_infer_options": self.controller.density_infer_options.__dict__
-            if self.controller.density_infer_options
-            else {},
+            "threshold_configs_by_image": dict(
+                self.controller.session_state.threshold_configs_by_image
+            ),
+            "particles_configs_by_image": dict(
+                self.controller.session_state.particles_configs_by_image
+            ),
+            "density_config": (
+                self.controller.density_config.__dict__ if self.controller.density_config else {}
+            ),
+            "density_infer_options": (
+                self.controller.density_infer_options.__dict__
+                if self.controller.density_infer_options
+                else {}
+            ),
             "density_model_path": self.controller.density_model_path,
             "density_device": self.controller.density_device,
             "density_target_panel": self._density_last_panel,
         }
-        self.controller.save_project(self, pathlib.Path(path), settings, self.roi_manager.rois_by_image)
+        self.controller.save_project(
+            self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
+        )
         self._set_status(f"Saved project to {path}")
         self._mark_dirty(False)
 
@@ -214,7 +226,8 @@ class ExportMixin:
         layout.addRow(overlay_only_chk)
         layout.addRow(transparent_chk)
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         layout.addRow(buttons)
         buttons.accepted.connect(dlg.accept)
@@ -258,7 +271,9 @@ class ExportMixin:
             t_start, t_end = t_end, t_start
         return list(range(t_start, t_end + 1))
 
-    def _export_view_job(self, base_path: pathlib.Path, t_values: list[int], opts: ExportOptions) -> None:
+    def _export_view_job(
+        self, base_path: pathlib.Path, t_values: list[int], opts: ExportOptions
+    ) -> None:
         prim = self.primary_image
         if prim.array is None:
             return
@@ -275,7 +290,9 @@ class ExportMixin:
             text_offset_px=self.scale_bar_text_offset_px,
             background_box=self.scale_bar_background_box,
         )
-        crop_rect = self.crop_rect if opts.region in ("crop", "roi bounds", "roi mask-clipped") else None
+        crop_rect = (
+            self.crop_rect if opts.region in ("crop", "roi bounds", "roi mask-clipped") else None
+        )
         roi_rect = self.roi_rect if opts.region in ("roi bounds", "roi mask-clipped") else None
         roi_shape = self.roi_shape
 
@@ -287,12 +304,18 @@ class ExportMixin:
                 frame = self._export_panel_frame(prim, support, t_idx, z_idx, opts.panel, crop_rect)
                 if frame is None:
                     continue
-                frame, offset = self._apply_roi_region(frame, roi_rect, roi_shape, opts.region, crop_rect)
+                frame, offset = self._apply_roi_region(
+                    frame, roi_rect, roi_shape, opts.region, crop_rect
+                )
                 annotations = self._export_annotations(t_idx, offset, opts)
                 annotation_labels = self._export_annotation_labels(annotations, opts)
                 annotation_points = [(x, y, color) for x, y, color, _ in annotations]
                 roi_overlays = self._export_roi_overlays(offset, opts)
-                particle_overlays = self._particles_overlays if opts.include_particles and t_idx == self.t_slider.value() else []
+                particle_overlays = (
+                    self._particles_overlays
+                    if opts.include_particles and t_idx == self.t_slider.value()
+                    else []
+                )
                 overlay_text = self._build_overlay_text() if opts.include_overlay_text else None
                 mapping = self._get_display_mapping(prim.id, opts.panel, frame)
                 norm = build_norm(mapping)
@@ -312,7 +335,9 @@ class ExportMixin:
                     options=opts,
                 )
                 image = self._apply_roi_mask_clip(image, frame, roi_rect, roi_shape, opts, offset)
-                out_path = self._export_frame_path(base_path, t_idx, opts, multiple=len(t_values) > 1)
+                out_path = self._export_frame_path(
+                    base_path, t_idx, opts, multiple=len(t_values) > 1
+                )
                 _save_image(out_path, image, opts)
                 progress(int((idx + 1) / max(1, total) * 100), f"{idx + 1}/{total}")
             return True
@@ -336,7 +361,9 @@ class ExportMixin:
             data = prim.array[t_idx, z_idx, :, :]
         return self._apply_crop_rect(data, crop_rect, data.shape)
 
-    def _apply_roi_region(self, frame: np.ndarray, roi_rect, roi_shape: str, region: str, crop_rect):
+    def _apply_roi_region(
+        self, frame: np.ndarray, roi_rect, roi_shape: str, region: str, crop_rect
+    ):
         offset = (crop_rect[0], crop_rect[1]) if crop_rect else (0.0, 0.0)
         if roi_rect is None:
             return frame, offset
@@ -378,7 +405,15 @@ class ExportMixin:
                 overlays.append(("box", rect, "#00c0ff"))
         return overlays
 
-    def _apply_roi_mask_clip(self, image: np.ndarray, frame: np.ndarray, roi_rect, roi_shape: str, opts: ExportOptions, offset):
+    def _apply_roi_mask_clip(
+        self,
+        image: np.ndarray,
+        frame: np.ndarray,
+        roi_rect,
+        roi_shape: str,
+        opts: ExportOptions,
+        offset,
+    ):
         if not opts.roi_mask_clip or roi_rect is None:
             return image
         mask = np.ones(frame.shape, dtype=bool)
@@ -390,7 +425,7 @@ class ExportMixin:
         if roi_shape == "circle":
             cx, cy = rx + rw / 2, ry + rh / 2
             r = min(rw, rh) / 2
-            yy, xx = np.ogrid[:frame.shape[0], :frame.shape[1]]
+            yy, xx = np.ogrid[: frame.shape[0], : frame.shape[1]]
             mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r**2
         else:
             x0 = int(max(0, rx))
@@ -406,7 +441,9 @@ class ExportMixin:
                 image[~mask] = 0
         return image
 
-    def _export_frame_path(self, base: pathlib.Path, t_idx: int, opts: ExportOptions, *, multiple: bool) -> pathlib.Path:
+    def _export_frame_path(
+        self, base: pathlib.Path, t_idx: int, opts: ExportOptions, *, multiple: bool
+    ) -> pathlib.Path:
         if not multiple:
             return base
         stem = base.stem

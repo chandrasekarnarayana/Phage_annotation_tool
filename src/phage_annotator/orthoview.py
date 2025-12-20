@@ -11,10 +11,10 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.qt_compat import QtWidgets
-import matplotlib.pyplot as plt
 
 
 class OrthoViewWidget(QtWidgets.QWidget):

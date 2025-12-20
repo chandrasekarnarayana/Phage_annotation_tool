@@ -26,7 +26,10 @@ def resolve_calibration(
     if user_value_um_per_px:
         return CalibrationState(pixel_size_um_per_px=float(user_value_um_per_px), source="user")
     if project_default_um_per_px:
-        return CalibrationState(pixel_size_um_per_px=float(project_default_um_per_px), source="project_default")
+        return CalibrationState(
+            pixel_size_um_per_px=float(project_default_um_per_px),
+            source="project_default",
+        )
     return CalibrationState(pixel_size_um_per_px=None, source="unknown")
 
 

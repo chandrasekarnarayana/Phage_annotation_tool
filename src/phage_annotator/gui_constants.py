@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 # Avoid pulling multi-GB TIFFs fully into RAM; switch to memmap beyond this.
 BIG_TIFF_BYTES_THRESHOLD = 512 * 1024 * 1024  # 512 MB
 # Toggle verbose cache logging for debugging (loading, projection caching, clearing).

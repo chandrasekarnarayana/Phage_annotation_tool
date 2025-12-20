@@ -32,7 +32,14 @@ class RoiManagerWidget(QtWidgets.QWidget):
         self.save_btn = QtWidgets.QPushButton("Save ROIs")
         self.load_btn = QtWidgets.QPushButton("Load ROIs")
         self.measure_btn = QtWidgets.QPushButton("Measure")
-        for btn in [self.add_btn, self.del_btn, self.rename_btn, self.dup_btn, self.save_btn, self.load_btn]:
+        for btn in [
+            self.add_btn,
+            self.del_btn,
+            self.rename_btn,
+            self.dup_btn,
+            self.save_btn,
+            self.load_btn,
+        ]:
             btn_row.addWidget(btn)
         btn_row.addWidget(self.measure_btn)
         layout.addLayout(btn_row)
@@ -45,7 +52,9 @@ class RoiManagerWidget(QtWidgets.QWidget):
             self.table.setItem(row, 1, QtWidgets.QTableWidgetItem(roi.roi_type))
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem(roi.color))
             chk = QtWidgets.QTableWidgetItem()
-            chk.setCheckState(QtCore.Qt.CheckState.Checked if roi.visible else QtCore.Qt.CheckState.Unchecked)
+            chk.setCheckState(
+                QtCore.Qt.CheckState.Checked if roi.visible else QtCore.Qt.CheckState.Unchecked
+            )
             self.table.setItem(row, 3, chk)
         self.table.resizeColumnsToContents()
         self.table.blockSignals(False)

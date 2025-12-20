@@ -249,7 +249,9 @@ class RoiInteractor:
             w = self._rect.w / self.mapper.scale
             h = self._rect.h / self.mapper.scale
             if self._rect_patch is None:
-                self._rect_patch = plt.Rectangle((x, y), w, h, fill=False, color="#00c0ff", linewidth=1.5)
+                self._rect_patch = plt.Rectangle(
+                    (x, y), w, h, fill=False, color="#00c0ff", linewidth=1.5
+                )
                 self._rect_patch.set_gid("roi_interactor")
                 self.ax.add_patch(self._rect_patch)
             else:
@@ -263,7 +265,9 @@ class RoiInteractor:
             cx, cy = self.mapper.to_display(self._circle.cx, self._circle.cy)
             r = self._circle.r / self.mapper.scale
             if self._circle_patch is None:
-                self._circle_patch = plt.Circle((cx, cy), r, fill=False, color="#00c0ff", linewidth=1.5)
+                self._circle_patch = plt.Circle(
+                    (cx, cy), r, fill=False, color="#00c0ff", linewidth=1.5
+                )
                 self._circle_patch.set_gid("roi_interactor")
                 self.ax.add_patch(self._circle_patch)
             else:
@@ -291,7 +295,9 @@ class RoiInteractor:
             ]
             for cx, cy in corners:
                 dx, dy = self.mapper.to_display(cx, cy)
-                h = self.ax.plot(dx, dy, marker="s", color="#00c0ff", markersize=6, linestyle="none")[0]
+                h = self.ax.plot(
+                    dx, dy, marker="s", color="#00c0ff", markersize=6, linestyle="none"
+                )[0]
                 h.set_gid("roi_interactor")
                 self._handles.append(h)
         elif self._circle is not None:

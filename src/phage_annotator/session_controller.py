@@ -17,13 +17,13 @@ from phage_annotator.density_config import DensityConfig
 from phage_annotator.density_model import DensityPredictor
 from phage_annotator.display_mapping import DisplayMapping
 from phage_annotator.roi_manager import Roi
-from phage_annotator.session_state import SessionState, ViewState
-from phage_annotator.session_controller_annotations import SessionAnnotationsMixin
 from phage_annotator.session_controller_annotation_io import SessionAnnotationIOMixin
+from phage_annotator.session_controller_annotations import SessionAnnotationsMixin
 from phage_annotator.session_controller_images import SessionImageMixin
 from phage_annotator.session_controller_playback import SessionPlaybackMixin
 from phage_annotator.session_controller_project import SessionProjectMixin
 from phage_annotator.session_controller_view import SessionViewMixin
+from phage_annotator.session_state import SessionState, ViewState
 
 
 class SessionController(

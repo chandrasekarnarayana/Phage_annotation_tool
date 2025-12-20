@@ -90,7 +90,9 @@ class DisplayMapping:
 
     def clone(self) -> "DisplayMapping":
         """Return a shallow clone without per-panel/per-image dicts."""
-        return DisplayMapping(self.min_val, self.max_val, self.gamma, self.mode, self.lut, self.invert)
+        return DisplayMapping(
+            self.min_val, self.max_val, self.gamma, self.mode, self.lut, self.invert
+        )
 
 
 def mapping_to_dict(mapping: DisplayMapping) -> dict:
@@ -130,6 +132,7 @@ def build_norm(mapping: DisplayMapping) -> mcolors.Normalize:
     vmin = float(mapping.min_val)
     vmax = float(mapping.max_val)
     if mapping.mode == "log":
+
         def _forward(x):
             return np.log1p(np.maximum(x - vmin, 0.0))
 

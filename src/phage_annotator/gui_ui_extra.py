@@ -26,12 +26,20 @@ class UiExtrasMixin:
         bar.setIconSize(QtCore.QSize(20, 20))
 
         self.sidebar_actions = []
-        explore_act = QtWidgets.QAction(self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon), "Explore", self)
+        explore_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
+            "Explore",
+            self,
+        )
         annotate_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView), "Annotate", self
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
+            "Annotate",
+            self,
         )
         analyze_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView), "Analyze", self
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
+            "Analyze",
+            self,
         )
         for idx, act in enumerate([explore_act, annotate_act, analyze_act]):
             act.setCheckable(True)
@@ -189,12 +197,22 @@ class UiExtrasMixin:
         group.setExclusive(True)
         icons = {
             Tool.PAN_ZOOM: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowUp),
-            Tool.ANNOTATE_POINT: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DialogYesButton),
+            Tool.ANNOTATE_POINT: self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_DialogYesButton
+            ),
             Tool.ROI_BOX: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
-            Tool.ROI_CIRCLE: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DriveNetIcon),
-            Tool.ROI_EDIT: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView),
-            Tool.PROFILE_LINE: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
-            Tool.ERASER: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DialogCancelButton),
+            Tool.ROI_CIRCLE: self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_DriveNetIcon
+            ),
+            Tool.ROI_EDIT: self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView
+            ),
+            Tool.PROFILE_LINE: self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView
+            ),
+            Tool.ERASER: self.style().standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_DialogCancelButton
+            ),
         }
         tool_specs = [
             (Tool.PAN_ZOOM, "Pan/Zoom"),
@@ -267,7 +285,17 @@ class UiExtrasMixin:
         return target_map.get(self.annotate_target, self.ax_frame)
 
     def _get_image_axes(self) -> Set[object]:
-        return {ax for ax in [self.ax_frame, self.ax_mean, self.ax_comp, self.ax_support, self.ax_std] if ax is not None}
+        return {
+            ax
+            for ax in [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+            if ax is not None
+        }
 
     def _set_roi_shape(self, shape: str) -> None:
         self.roi_shape = shape

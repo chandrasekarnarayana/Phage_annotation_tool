@@ -88,7 +88,9 @@ def parse_thunderstorm_csv(
     for row in df.itertuples(index=False):
         x_val = float(getattr(row, x_col))
         y_val = float(getattr(row, y_col))
-        meta: Dict[str, object] = {col: getattr(row, col) for col in df.columns if hasattr(row, col)}
+        meta: Dict[str, object] = {
+            col: getattr(row, col) for col in df.columns if hasattr(row, col)
+        }
         name = str(getattr(row, img_col)) if img_col else image_name
         if x_unit == "nm" or y_unit == "nm":
             if pixel_size_nm:

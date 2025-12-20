@@ -48,7 +48,10 @@ def parse_filename_tokens(path: pathlib.Path) -> Dict[str, object]:
         elif key == "pct":
             vals = _parse_pair(value)
             if vals:
-                meta.setdefault("display", {})["pct"] = {"low": vals[0], "high": vals[1]}
+                meta.setdefault("display", {})["pct"] = {
+                    "low": vals[0],
+                    "high": vals[1],
+                }
             else:
                 extra[key] = value
         elif key == "gamma":

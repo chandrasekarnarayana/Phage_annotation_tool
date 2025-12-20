@@ -143,7 +143,11 @@ class JobsMixin:
             self._active_job_name = None
 
     def _set_progress_visible(self, visible: bool, name: str) -> None:
-        if self.progress_label is None or self.progress_bar is None or self.progress_cancel_btn is None:
+        if (
+            self.progress_label is None
+            or self.progress_bar is None
+            or self.progress_cancel_btn is None
+        ):
             return
         self.progress_label.setText(f"Working: {name}")
         self.progress_label.setVisible(visible)

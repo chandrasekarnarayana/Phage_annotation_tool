@@ -1,11 +1,7 @@
 from pathlib import Path
 
-from phage_annotator.annotations import (
-    Keypoint,
-    keypoints_to_dataframe,
-    save_keypoints_csv,
-    save_keypoints_json,
-)
+from phage_annotator.annotations import (Keypoint, keypoints_to_dataframe, save_keypoints_csv,
+                                         save_keypoints_json)
 
 
 def sample_keypoints():

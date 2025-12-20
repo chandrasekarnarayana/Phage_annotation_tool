@@ -28,7 +28,12 @@ class DensityPredictor:
     def __init__(self) -> None:
         self._handle: Optional[ModelHandle] = None
 
-    def load(self, model_path: str, device: str = "auto", model_definition: Optional[str] = None) -> None:
+    def load(
+        self,
+        model_path: str,
+        device: str = "auto",
+        model_definition: Optional[str] = None,
+    ) -> None:
         """Load a torchscript model or state_dict with a provided definition."""
         import torch
 
@@ -46,7 +51,9 @@ class DensityPredictor:
                     raise
         if model is None:
             if model_definition is None:
-                raise ValueError("State_dict checkpoint requires a model_definition with build_model().")
+                raise ValueError(
+                    "State_dict checkpoint requires a model_definition with build_model()."
+                )
             model = _load_state_dict(path, model_definition, device)
             LOGGER.info("Loaded state_dict model: %s", path)
         model.eval()

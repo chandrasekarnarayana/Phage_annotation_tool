@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy.ndimage import gaussian_filter, convolve1d
+from scipy.ndimage import convolve1d, gaussian_filter
 
 from phage_annotator.analysis import fit_gaussian_2d, local_maxima, mad_sigma
 
@@ -54,12 +54,16 @@ def filter_frame(frame: np.ndarray, params: SmlmParams) -> np.ndarray:
     """Apply a band-pass filter to enhance spots."""
     frame_f = frame.astype(np.float32, copy=False)
     if params.filter_type == "dog":
-        return gaussian_filter(frame_f, params.dog_sigma1) - gaussian_filter(frame_f, params.dog_sigma2)
+        return gaussian_filter(frame_f, params.dog_sigma1) - gaussian_filter(
+            frame_f, params.dog_sigma2
+        )
     smooth = _bspline_smooth(frame_f)
     return frame_f - smooth
 
 
-def detect_candidates(filtered: np.ndarray, roi_mask: Optional[np.ndarray], params: SmlmParams) -> np.ndarray:
+def detect_candidates(
+    filtered: np.ndarray, roi_mask: Optional[np.ndarray], params: SmlmParams
+) -> np.ndarray:
     """Detect candidate peaks using local maxima and robust thresholding."""
     masked = filtered
     if roi_mask is not None:
@@ -103,7 +107,7 @@ def localize_candidates(
             continue
         if sigma <= 0:
             continue
-        photons = float(max(0.0, amp) * 2.0 * np.pi * sigma ** 2)
+        photons = float(max(0.0, amp) * 2.0 * np.pi * sigma**2)
         if photons <= 0:
             continue
         if cov is not None and cov.shape[0] >= 3:
@@ -200,7 +204,7 @@ def render_sr_image(
         y0 = int(max(0, y - radius))
         y1 = int(min(sr.shape[0], y + radius + 1))
         yy, xx = np.mgrid[y0:y1, x0:x1]
-        gauss = np.exp(-(((xx - x) ** 2 + (yy - y) ** 2) / (2 * sigma_sr ** 2)))
+        gauss = np.exp(-(((xx - x) ** 2 + (yy - y) ** 2) / (2 * sigma_sr**2)))
         sr[y0:y1, x0:x1] += gauss.astype(np.float32, copy=False)
     return sr
 
@@ -244,7 +248,14 @@ def run_smlm_stream(
         if progress_cb is not None:
             progress = int((idx + 1) / total_frames * 100)
             progress_cb(progress, f"Frames {idx + 1}/{total_frames}")
-    sr = render_sr_image(all_locs, roi_rect, params.upsample, pixel_size_nm, params.render_mode, params.render_sigma_nm)
+    sr = render_sr_image(
+        all_locs,
+        roi_rect,
+        params.upsample,
+        pixel_size_nm,
+        params.render_mode,
+        params.render_sigma_nm,
+    )
     return all_locs, sr
 
 

@@ -1,4 +1,35 @@
-"""Matplotlib rendering helpers decoupled from the main window."""
+"""Matplotlib rendering helpers decoupled from the main window.
+
+This module provides pure, testable rendering functions for displaying microscopy
+data in matplotlib figures. Key responsibilities:
+
+1. Projection rendering: Mean/composite/std projections over (T, Z) axes
+2. Coordinate transforms: Full image <-> display (cropped/downsampled)
+3. Overlay rendering: Annotations, ROI, particles, density maps, SMLM results
+4. Color mapping: Apply LUT, invert, gamma correction, log scaling
+
+Architecture
+------------
+- All functions are Qt-free and thread-safe
+- Coordinate conventions follow numpy (y, x) ordering
+- Downsampling uses mean pooling (fast, non-anti-aliased)
+- Overlay coordinates must be in display space (after crop/downsample)
+
+Key Functions
+-------------
+- render_2d_image(): Render single frame with all overlays
+- render_projection(): Render mean/composite/std projections
+- draw_*(): Low-level overlay drawing (annotations, ROI, particles)
+- coordinate_full_to_display(): Transform full-res coords to display space
+- coordinate_display_to_full(): Inverse transform
+
+Conventions
+-----------
+- All internal coordinates use (y, x) to match numpy
+- Display coords are post-crop, post-downsample
+- Overlays must be provided in display-space coordinates
+- Canvas/axes coords use matplotlib conventions (may be inverted)
+"""
 
 from __future__ import annotations
 
@@ -9,10 +40,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from phage_annotator.session_state import ViewState
 from phage_annotator.export_view import ExportOptions, render_view_to_array
+from phage_annotator.roi_interactor_mpl import CircleROI, RectROI, RoiInteractor
 from phage_annotator.scalebar import ScaleBarSpec
-from phage_annotator.roi_interactor_mpl import RoiInteractor, RectROI, CircleROI
+from phage_annotator.session_state import ViewState
 
 
 @dataclass(frozen=True)
@@ -137,7 +168,12 @@ class RenderContext:
 class Renderer:
     """Renderer responsible for figure layout and artist updates."""
 
-    def __init__(self, figure: matplotlib.figure.Figure, canvas, colormaps: Sequence[matplotlib.colors.Colormap]) -> None:
+    def __init__(
+        self,
+        figure: matplotlib.figure.Figure,
+        canvas,
+        colormaps: Sequence[matplotlib.colors.Colormap],
+    ) -> None:
         self.figure = figure
         self.canvas = canvas
         self.colormaps = list(colormaps)
@@ -156,13 +192,17 @@ class Renderer:
         self.scale_bar_text = None
         self.scale_bar_warning = None
         self.roi_interactor: Optional[RoiInteractor] = None
-        self._roi_callback: Optional[Callable[[str, Optional[RectROI], Optional[CircleROI]], None]] = None
+        self._roi_callback: Optional[
+            Callable[[str, Optional[RectROI], Optional[CircleROI]], None]
+        ] = None
         self._layout_key: Tuple[str, ...] = ()
 
     def request_layout_rebuild(self, layout_spec: Dict[str, object]) -> bool:
         """Return True if layout requires rebuilding based on panel visibility."""
         order = layout_spec.get("order", [])
-        visible = tuple([key for key in order if layout_spec.get("panel_visibility", {}).get(key, False)])
+        visible = tuple(
+            [key for key in order if layout_spec.get("panel_visibility", {}).get(key, False)]
+        )
         return visible != self._layout_key
 
     def init_figure(self, layout_spec: Dict[str, object]) -> Dict[str, matplotlib.axes.Axes]:
@@ -321,14 +361,42 @@ class Renderer:
             for shape, data, color in overlays:
                 if shape == "box":
                     x, y, w, h = data
-                    ax.add_patch(plt.Rectangle((x, y), w, h, color=color, fill=False, linewidth=1.5, alpha=0.9))
+                    ax.add_patch(
+                        plt.Rectangle(
+                            (x, y),
+                            w,
+                            h,
+                            color=color,
+                            fill=False,
+                            linewidth=1.5,
+                            alpha=0.9,
+                        )
+                    )
                 elif shape == "circle":
                     x, y, w, h = data
                     cx, cy = x + w / 2, y + h / 2
                     r = min(w, h) / 2
-                    ax.add_patch(plt.Circle((cx, cy), r, color=color, fill=False, linewidth=1.5, alpha=0.9))
+                    ax.add_patch(
+                        plt.Circle(
+                            (cx, cy),
+                            r,
+                            color=color,
+                            fill=False,
+                            linewidth=1.5,
+                            alpha=0.9,
+                        )
+                    )
                 elif shape == "polygon":
-                    ax.add_patch(plt.Polygon(data, closed=True, fill=False, color=color, linewidth=1.5, alpha=0.9))
+                    ax.add_patch(
+                        plt.Polygon(
+                            data,
+                            closed=True,
+                            fill=False,
+                            color=color,
+                            linewidth=1.5,
+                            alpha=0.9,
+                        )
+                    )
                 elif shape == "polyline":
                     xs = [p[0] for p in data]
                     ys = [p[1] for p in data]
@@ -350,14 +418,33 @@ class Renderer:
                     lw = 2.2 if selected else 1.3
                     if shape == "box":
                         x, y, w, h = data
-                        ax.add_patch(plt.Rectangle((x, y), w, h, color=color, fill=False, linewidth=lw, alpha=0.9))
+                        ax.add_patch(
+                            plt.Rectangle(
+                                (x, y),
+                                w,
+                                h,
+                                color=color,
+                                fill=False,
+                                linewidth=lw,
+                                alpha=0.9,
+                            )
+                        )
                     elif shape == "outline":
                         xs = [p[0] for p in data]
                         ys = [p[1] for p in data]
                         ax.plot(xs, ys, color=color, linewidth=lw, alpha=0.9)
                     elif shape == "ellipse":
                         x, y, w, h = data
-                        ax.add_patch(plt.Ellipse((x + w / 2, y + h / 2), w, h, fill=False, color=color, linewidth=lw))
+                        ax.add_patch(
+                            plt.Ellipse(
+                                (x + w / 2, y + h / 2),
+                                w,
+                                h,
+                                fill=False,
+                                color=color,
+                                linewidth=lw,
+                            )
+                        )
         if ctx.particle_labels:
             ax = self.axes.get("frame")
             if ax is not None:
@@ -391,7 +478,12 @@ class Renderer:
                         va="top",
                         fontsize=9,
                         color="white",
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor="black", alpha=0.4, edgecolor="none"),
+                        bbox=dict(
+                            boxstyle="round,pad=0.3",
+                            facecolor="black",
+                            alpha=0.4,
+                            edgecolor="none",
+                        ),
                     )
                 self.overlay_text.set_text(ctx.overlay_text)
                 self.overlay_text.set_visible(True)
@@ -416,10 +508,14 @@ class Renderer:
         else:
             self.roi_interactor.clear_roi(emit=False)
 
-    def _on_roi_change(self, roi_type: str, rect: Optional[RectROI], circle: Optional[CircleROI]) -> None:
+    def _on_roi_change(
+        self, roi_type: str, rect: Optional[RectROI], circle: Optional[CircleROI]
+    ) -> None:
         return
 
-    def set_roi_callback(self, fn: Callable[[str, Optional[RectROI], Optional[CircleROI]], None]) -> None:
+    def set_roi_callback(
+        self, fn: Callable[[str, Optional[RectROI], Optional[CircleROI]], None]
+    ) -> None:
         self._roi_callback = fn
         if self.roi_interactor is not None:
             self.roi_interactor.on_change = fn
@@ -450,7 +546,7 @@ class Renderer:
             scalebar_spec = ScaleBarSpec(
                 enabled=True,
                 length_um=0.0,
-                thickness_px=int(ctx.scale_bar["rect"][3]) if ctx.scale_bar.get("rect") else 4,
+                thickness_px=(int(ctx.scale_bar["rect"][3]) if ctx.scale_bar.get("rect") else 4),
                 location="bottom_right",
                 padding_px=12,
                 show_text=bool(ctx.scale_bar.get("text")),
@@ -487,7 +583,12 @@ class Renderer:
                     va="bottom",
                     fontsize=8,
                     color="white",
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.35, edgecolor="none"),
+                    bbox=dict(
+                        boxstyle="round,pad=0.2",
+                        facecolor="black",
+                        alpha=0.35,
+                        edgecolor="none",
+                    ),
                 )
                 self.scale_bar_warning.set_gid("scalebar")
             self.scale_bar_warning.set_text(ctx.scale_bar_warning)
@@ -537,7 +638,14 @@ class Renderer:
                 self.scale_bar_text.set_position(text_pos)
                 self.scale_bar_text.set_text(text)
             if background:
-                self.scale_bar_text.set_bbox(dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.35, edgecolor="none"))
+                self.scale_bar_text.set_bbox(
+                    dict(
+                        boxstyle="round,pad=0.2",
+                        facecolor="black",
+                        alpha=0.35,
+                        edgecolor="none",
+                    )
+                )
             else:
                 self.scale_bar_text.set_bbox(None)
             self.scale_bar_text.set_visible(True)

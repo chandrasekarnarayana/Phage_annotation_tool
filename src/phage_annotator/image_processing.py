@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -13,7 +13,9 @@ def _ensure_pillow() -> Any:
     try:
         from PIL import Image  # type: ignore
     except ImportError as exc:
-        raise ImportError("Pillow is required for image operations. Install with `pip install pillow`.") from exc
+        raise ImportError(
+            "Pillow is required for image operations. Install with `pip install pillow`."
+        ) from exc
     return Image
 
 

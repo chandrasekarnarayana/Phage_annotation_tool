@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
-import time
 
 import numpy as np
 
+from phage_annotator.analysis import roi_mask_for_shape
 from phage_annotator.density_config import DensityConfig
 from phage_annotator.density_model import DensityPredictor
-from phage_annotator.analysis import roi_mask_for_shape
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,9 @@ def run_density_inference(
         full[y0 : y0 + density_crop.shape[0], x0 : x0 + density_crop.shape[1]] = density_crop
         density_map = full
     count_total = float(density_crop.sum() * config.count_scale)
-    count_roi = float(density_crop[roi_mask].sum() * config.count_scale) if roi_mask is not None else None
+    count_roi = (
+        float(density_crop[roi_mask].sum() * config.count_scale) if roi_mask is not None else None
+    )
     runtime_ms = (time.perf_counter() - start) * 1000.0
     meta = {"roi_rect": roi_rect, "crop_rect": crop_rect}
     return DensityResult(
@@ -121,7 +123,9 @@ def _infer_tiled(
             tiles.append(padded[y : y + tile, x : x + tile])
             positions.append((y, x))
             if len(tiles) >= options.batch_tiles:
-                tiles_processed += _flush_tiles(tiles, positions, accum, weights, predictor, config, weight)
+                tiles_processed += _flush_tiles(
+                    tiles, positions, accum, weights, predictor, config, weight
+                )
                 tiles = []
                 positions = []
     if tiles:
@@ -140,7 +144,9 @@ def _flush_tiles(tiles, positions, accum, weights, predictor, config, weight) ->
     return len(tiles)
 
 
-def _predict_batch(predictor: DensityPredictor, tiles: np.ndarray, config: DensityConfig) -> np.ndarray:
+def _predict_batch(
+    predictor: DensityPredictor, tiles: np.ndarray, config: DensityConfig
+) -> np.ndarray:
     if hasattr(predictor, "predict_batch"):
         return predictor.predict_batch(tiles, config=config)
     outputs = []
@@ -168,7 +174,9 @@ def _weight_window(tile: int, mode: str) -> np.ndarray:
     return w2d
 
 
-def _apply_crop(image: np.ndarray, crop_rect: Optional[Tuple[float, float, float, float]]) -> Tuple[np.ndarray, Tuple[int, int]]:
+def _apply_crop(
+    image: np.ndarray, crop_rect: Optional[Tuple[float, float, float, float]]
+) -> Tuple[np.ndarray, Tuple[int, int]]:
     if crop_rect is None:
         return image, (0, 0)
     x, y, w, h = crop_rect
@@ -181,7 +189,9 @@ def _apply_crop(image: np.ndarray, crop_rect: Optional[Tuple[float, float, float
     return image[y0:y1, x0:x1], (x0, y0)
 
 
-def _parse_roi_spec(roi_spec: Optional[object]) -> Tuple[Optional[str], Optional[Tuple[float, float, float, float]]]:
+def _parse_roi_spec(
+    roi_spec: Optional[object],
+) -> Tuple[Optional[str], Optional[Tuple[float, float, float, float]]]:
     if roi_spec is None:
         return None, None
     if hasattr(roi_spec, "shape") and hasattr(roi_spec, "rect"):
@@ -206,6 +216,8 @@ def _mask_bbox(mask: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
     return (x0, y0, x1, y1)
 
 
-def _shift_rect(rect: Tuple[float, float, float, float], offset: Tuple[int, int]) -> Tuple[float, float, float, float]:
+def _shift_rect(
+    rect: Tuple[float, float, float, float], offset: Tuple[int, int]
+) -> Tuple[float, float, float, float]:
     x, y, w, h = rect
     return (x - offset[0], y - offset[1], w, h)

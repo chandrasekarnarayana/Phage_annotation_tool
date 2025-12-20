@@ -8,16 +8,16 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
-from phage_annotator.panels import PanelSpec
-from phage_annotator.roi_widgets import RoiManagerWidget
-from phage_annotator.results_table import ResultsTableWidget
-from phage_annotator.recorder import RecorderWidget
+from phage_annotator.analyze_particles_panel import AnalyzeParticlesPanel
+from phage_annotator.density_panel import DensityPanel
+from phage_annotator.metadata_dock import MetadataDock
 from phage_annotator.orthoview import OrthoViewWidget
+from phage_annotator.panels import PanelSpec
+from phage_annotator.recorder import RecorderWidget
+from phage_annotator.results_table import ResultsTableWidget
+from phage_annotator.roi_widgets import RoiManagerWidget
 from phage_annotator.smlm_ui import SmlmPanel
 from phage_annotator.threshold_panel import ThresholdPanel
-from phage_annotator.analyze_particles_panel import AnalyzeParticlesPanel
-from phage_annotator.metadata_dock import MetadataDock
-from phage_annotator.density_panel import DensityPanel
 
 
 def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
@@ -228,7 +228,10 @@ def create_dock(self, name: str, title: str, widget: QtWidgets.QWidget) -> QtWid
 
 
 def wire_dock_action(
-    self, dock: QtWidgets.QDockWidget, action: QtWidgets.QAction, checkbox: Optional[QtWidgets.QCheckBox] = None
+    self,
+    dock: QtWidgets.QDockWidget,
+    action: QtWidgets.QAction,
+    checkbox: Optional[QtWidgets.QCheckBox] = None,
 ) -> None:
     """Keep dock visibility, menu toggle, and optional checkbox in sync."""
 

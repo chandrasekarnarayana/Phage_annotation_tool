@@ -70,7 +70,9 @@ def _default_text(length_um: float) -> str:
     return f"{length_um:g} um"
 
 
-def _text_position(x: float, y: float, length_px: int, thickness_px: int, offset_px: int, loc: str) -> Tuple[float, float]:
+def _text_position(
+    x: float, y: float, length_px: int, thickness_px: int, offset_px: int, loc: str
+) -> Tuple[float, float]:
     if loc.startswith("top"):
         return (x + length_px / 2, y - offset_px)
     return (x + length_px / 2, y + thickness_px + offset_px)

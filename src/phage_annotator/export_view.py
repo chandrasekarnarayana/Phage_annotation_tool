@@ -67,19 +67,53 @@ def render_view_to_array(
                 r = min(w, h) / 2
                 ax.add_patch(plt.Circle((cx, cy), r, color=color, alpha=0.2, linewidth=0))
             elif shape == "polygon":
-                ax.add_patch(plt.Polygon(data, closed=True, fill=True, color=color, alpha=0.2, linewidth=0))
+                ax.add_patch(
+                    plt.Polygon(
+                        data,
+                        closed=True,
+                        fill=True,
+                        color=color,
+                        alpha=0.2,
+                        linewidth=0,
+                    )
+                )
     if options.include_roi_outline:
         for shape, data, color in roi_overlays:
             if shape == "box":
                 x, y, w, h = data
-                ax.add_patch(plt.Rectangle((x, y), w, h, color=color, fill=False, linewidth=options.roi_line_width))
+                ax.add_patch(
+                    plt.Rectangle(
+                        (x, y),
+                        w,
+                        h,
+                        color=color,
+                        fill=False,
+                        linewidth=options.roi_line_width,
+                    )
+                )
             elif shape == "circle":
                 x, y, w, h = data
                 cx, cy = x + w / 2, y + h / 2
                 r = min(w, h) / 2
-                ax.add_patch(plt.Circle((cx, cy), r, color=color, fill=False, linewidth=options.roi_line_width))
+                ax.add_patch(
+                    plt.Circle(
+                        (cx, cy),
+                        r,
+                        color=color,
+                        fill=False,
+                        linewidth=options.roi_line_width,
+                    )
+                )
             elif shape == "polygon":
-                ax.add_patch(plt.Polygon(data, closed=True, fill=False, color=color, linewidth=options.roi_line_width))
+                ax.add_patch(
+                    plt.Polygon(
+                        data,
+                        closed=True,
+                        fill=False,
+                        color=color,
+                        linewidth=options.roi_line_width,
+                    )
+                )
             elif shape == "polyline":
                 xs = [p[0] for p in data]
                 ys = [p[1] for p in data]
@@ -104,7 +138,16 @@ def render_view_to_array(
                 ax.plot(xs, ys, color=color, linewidth=lw)
             elif shape == "ellipse":
                 x, y, w, h = data
-                ax.add_patch(plt.Ellipse((x + w / 2, y + h / 2), w, h, fill=False, color=color, linewidth=lw))
+                ax.add_patch(
+                    plt.Ellipse(
+                        (x + w / 2, y + h / 2),
+                        w,
+                        h,
+                        fill=False,
+                        color=color,
+                        linewidth=lw,
+                    )
+                )
     if options.include_overlay_text and overlay_text:
         ax.text(
             0.01,
@@ -118,13 +161,24 @@ def render_view_to_array(
             bbox=dict(boxstyle="round,pad=0.3", facecolor="black", alpha=0.4, edgecolor="none"),
         )
     if options.include_scalebar and scalebar_spec:
-        geom = compute_scalebar((0, image.shape[1], image.shape[0], 0), pixel_size_um, scalebar_spec)
+        geom = compute_scalebar(
+            (0, image.shape[1], image.shape[0], 0), pixel_size_um, scalebar_spec
+        )
         if geom:
             rect = geom.get("rect")
             text = geom.get("text")
             text_pos = geom.get("text_pos")
             if rect:
-                ax.add_patch(plt.Rectangle((rect[0], rect[1]), rect[2], rect[3], color="white", linewidth=0, alpha=0.9))
+                ax.add_patch(
+                    plt.Rectangle(
+                        (rect[0], rect[1]),
+                        rect[2],
+                        rect[3],
+                        color="white",
+                        linewidth=0,
+                        alpha=0.9,
+                    )
+                )
             if text and text_pos:
                 ax.text(
                     text_pos[0],
@@ -134,9 +188,16 @@ def render_view_to_array(
                     va="bottom",
                     fontsize=8,
                     color="white",
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor="black", alpha=0.35, edgecolor="none")
-                    if scalebar_spec.background_box
-                    else None,
+                    bbox=(
+                        dict(
+                            boxstyle="round,pad=0.2",
+                            facecolor="black",
+                            alpha=0.35,
+                            edgecolor="none",
+                        )
+                        if scalebar_spec.background_box
+                        else None
+                    ),
                 )
     canvas.draw()
     buf = np.asarray(canvas.buffer_rgba())

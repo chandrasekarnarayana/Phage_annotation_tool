@@ -34,6 +34,7 @@ class PanelSpec:
     shortcut : str, optional
         Optional keyboard shortcut for the toggle action.
     """
+
     id: str
     title: str
     default_area: QtCore.Qt.DockWidgetArea

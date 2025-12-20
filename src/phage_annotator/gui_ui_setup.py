@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from PyQt5.QtWidgets import QSizePolicy
 
-import matplotlib.pyplot as plt
-
+from phage_annotator import ui_actions, ui_docks
 from phage_annotator.gui_constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.panels import PanelSpec
 from phage_annotator.render_mpl import Renderer
-from phage_annotator import ui_actions, ui_docks
 
 
 class UiSetupMixin:
@@ -98,7 +97,9 @@ class UiSetupMixin:
         # Annotation table (own dock)
         self.annot_table = QtWidgets.QTableWidget(0, 5)
         self.annot_table.setHorizontalHeaderLabels(["T", "Z", "Y", "X", "Label"])
-        self.annot_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.annot_table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.annot_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
         self.filter_current_chk = QtWidgets.QCheckBox("Show current slice only")
         self.annotation_table_panel = QtWidgets.QWidget()
@@ -139,7 +140,9 @@ class UiSetupMixin:
 
         self.axis_warning = QtWidgets.QLabel()
         self.axis_warning.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        self.axis_warning.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.axis_warning.setTextInteractionFlags(
+            QtCore.Qt.TextInteractionFlag.TextBrowserInteraction
+        )
         self.axis_warning.setOpenExternalLinks(False)
         self.axis_warning.linkActivated.connect(self._focus_axis_mode_control)
         self.axis_warning.setVisible(False)
@@ -341,7 +344,9 @@ class UiSetupMixin:
         self.scalebar_thickness_spin.setRange(1, 20)
         self.scalebar_thickness_spin.setValue(self.scale_bar_thickness_px)
         self.scalebar_location_combo = QtWidgets.QComboBox()
-        self.scalebar_location_combo.addItems(["bottom_right", "bottom_left", "top_right", "top_left"])
+        self.scalebar_location_combo.addItems(
+            ["bottom_right", "bottom_left", "top_right", "top_left"]
+        )
         self.scalebar_location_combo.setCurrentText(self.scale_bar_location)
         self.scalebar_text_chk = QtWidgets.QCheckBox("Show text")
         self.scalebar_text_chk.setChecked(self.scale_bar_show_text)
@@ -433,7 +438,9 @@ class UiSetupMixin:
         r += 1
 
         self.apply_display_btn = QtWidgets.QPushButton("Apply display mapping to pixels…")
-        self.apply_display_btn.setToolTip("Destructively rescales pixel values using the current mapping.")
+        self.apply_display_btn.setToolTip(
+            "Destructively rescales pixel values using the current mapping."
+        )
         adv_layout.addWidget(self.apply_display_btn, r, 0, 1, 2)
         r += 1
 
@@ -494,7 +501,9 @@ class UiSetupMixin:
         self.layout_preset_minimal_act.triggered.connect(lambda: self.apply_preset("Minimal"))
         self.layout_preset_default_act.triggered.connect(lambda: self.apply_preset("Default"))
         self.command_palette_act.triggered.connect(self._show_command_palette)
-        self.toggle_logs_act.triggered.connect(lambda checked: self.dock_logs.setVisible(checked) if self.dock_logs else None)
+        self.toggle_logs_act.triggered.connect(
+            lambda checked: (self.dock_logs.setVisible(checked) if self.dock_logs else None)
+        )
         self.overlay_act.triggered.connect(self._toggle_overlay)
         self.view_overlay_act.triggered.connect(self._toggle_overlay)
         self.view_overlay_act.setChecked(True)
@@ -537,7 +546,9 @@ class UiSetupMixin:
             self.density_panel.export_counts_btn.clicked.connect(self._density_export_counts)
             self.density_panel.overlay_chk.toggled.connect(self._density_overlay_toggle)
             self.density_panel.overlay_alpha.valueChanged.connect(self._density_overlay_changed)
-            self.density_panel.overlay_cmap.currentTextChanged.connect(self._density_overlay_changed)
+            self.density_panel.overlay_cmap.currentTextChanged.connect(
+                self._density_overlay_changed
+            )
             self.density_panel.contours_chk.toggled.connect(self._density_overlay_changed)
         if hasattr(self, "annotation_meta_apply_btn"):
             self.annotation_meta_apply_btn.clicked.connect(self._apply_annotation_metadata)
@@ -574,11 +585,16 @@ class UiSetupMixin:
     def _apply_panel_defaults(self) -> None:
         ui_docks.apply_panel_defaults(self)
 
-    def _create_dock(self, name: str, title: str, widget: QtWidgets.QWidget) -> QtWidgets.QDockWidget:
+    def _create_dock(
+        self, name: str, title: str, widget: QtWidgets.QWidget
+    ) -> QtWidgets.QDockWidget:
         return ui_docks.create_dock(self, name, title, widget)
 
     def _wire_dock_action(
-        self, dock: QtWidgets.QDockWidget, action: QtWidgets.QAction, checkbox: Optional[QtWidgets.QCheckBox] = None
+        self,
+        dock: QtWidgets.QDockWidget,
+        action: QtWidgets.QAction,
+        checkbox: Optional[QtWidgets.QCheckBox] = None,
     ) -> None:
         ui_docks.wire_dock_action(self, dock, action, checkbox)
 

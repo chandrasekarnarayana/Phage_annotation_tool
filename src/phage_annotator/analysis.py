@@ -15,8 +15,8 @@ from typing import Iterable, Optional, Tuple
 
 import numpy as np
 import tifffile as tif
-from scipy.optimize import curve_fit
 from scipy.ndimage import maximum_filter
+from scipy.optimize import curve_fit
 
 from phage_annotator.io import standardize_axes
 
@@ -120,7 +120,9 @@ def apply_crop_rect(frame: np.ndarray, crop_rect: Tuple[float, float, float, flo
     return frame[y0:y1, x0:x1]
 
 
-def roi_mask_for_shape(shape: Tuple[int, int], roi_rect: Tuple[float, float, float, float], roi_shape: str) -> np.ndarray:
+def roi_mask_for_shape(
+    shape: Tuple[int, int], roi_rect: Tuple[float, float, float, float], roi_shape: str
+) -> np.ndarray:
     """Return a boolean ROI mask for the given shape and ROI spec."""
     h, w = shape
     y = np.arange(h)[:, None]
@@ -129,17 +131,21 @@ def roi_mask_for_shape(shape: Tuple[int, int], roi_rect: Tuple[float, float, flo
     if roi_shape == "circle":
         cx, cy = rx + rw / 2, ry + rh / 2
         r = min(rw, rh) / 2
-        return (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2
+        return (x - cx) ** 2 + (y - cy) ** 2 <= r**2
     return (rx <= x) & (x <= rx + rw) & (ry <= y) & (y <= ry + rh)
 
 
-def map_point_to_crop(x: float, y: float, crop_rect: Tuple[float, float, float, float]) -> Tuple[float, float]:
+def map_point_to_crop(
+    x: float, y: float, crop_rect: Tuple[float, float, float, float]
+) -> Tuple[float, float]:
     """Map a full-frame point into cropped coordinates."""
     cx, cy, _, _ = crop_rect
     return x - cx, y - cy
 
 
-def roi_mask_for_polygon(shape: Tuple[int, int], points: Iterable[Tuple[float, float]]) -> np.ndarray:
+def roi_mask_for_polygon(
+    shape: Tuple[int, int], points: Iterable[Tuple[float, float]]
+) -> np.ndarray:
     """Return a polygon mask using matplotlib Path."""
     from matplotlib.path import Path
 
@@ -164,7 +170,7 @@ def roi_mask_from_points(
         h, w = shape
         y = np.arange(h)[:, None]
         x = np.arange(w)[None, :]
-        return (x - x0) ** 2 + (y - y0) ** 2 <= r ** 2
+        return (x - x0) ** 2 + (y - y0) ** 2 <= r**2
     if roi_type == "box" and len(pts) >= 2:
         (x0, y0), (x1, y1) = pts[0], pts[1]
         x_min, x_max = sorted([x0, x1])
@@ -195,8 +201,20 @@ def roi_stats(frame: np.ndarray, roi_mask: np.ndarray) -> Tuple[float, float, fl
     """Compute mean/std/min/max and area for an ROI mask."""
     vals = frame[roi_mask]
     if vals.size == 0:
-        return float("nan"), float("nan"), float("nan"), float("nan"), int(roi_mask.sum())
-    return float(vals.mean()), float(vals.std()), float(vals.min()), float(vals.max()), int(roi_mask.sum())
+        return (
+            float("nan"),
+            float("nan"),
+            float("nan"),
+            float("nan"),
+            int(roi_mask.sum()),
+        )
+    return (
+        float(vals.mean()),
+        float(vals.std()),
+        float(vals.min()),
+        float(vals.max()),
+        int(roi_mask.sum()),
+    )
 
 
 def compute_auto_window(
@@ -274,14 +292,23 @@ def local_maxima(masked: np.ndarray, threshold: float, footprint: int = 3) -> np
     return coords
 
 
-def gaussian_2d(coords: Tuple[np.ndarray, np.ndarray], amp: float, x0: float, y0: float, sigma: float, offset: float) -> np.ndarray:
+def gaussian_2d(
+    coords: Tuple[np.ndarray, np.ndarray],
+    amp: float,
+    x0: float,
+    y0: float,
+    sigma: float,
+    offset: float,
+) -> np.ndarray:
     """Evaluate a symmetric 2D Gaussian on a meshgrid."""
     x, y = coords
-    g = amp * np.exp(-(((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))) + offset
+    g = amp * np.exp(-(((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma**2))) + offset
     return g.ravel()
 
 
-def fit_gaussian_2d(patch: np.ndarray) -> Tuple[float, float, float, float, float, Optional[np.ndarray]]:
+def fit_gaussian_2d(
+    patch: np.ndarray,
+) -> Tuple[float, float, float, float, float, Optional[np.ndarray]]:
     """Fit a symmetric 2D Gaussian to a small patch.
 
     Returns

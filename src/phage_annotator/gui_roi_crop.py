@@ -51,7 +51,12 @@ class RoiCropMixin:
         elif roi_type == "circle" and circle is not None:
             if self.roi_shape != "circle":
                 self._set_roi_shape("circle")
-            rect = (circle.cx - circle.r, circle.cy - circle.r, circle.r * 2, circle.r * 2)
+            rect = (
+                circle.cx - circle.r,
+                circle.cy - circle.r,
+                circle.r * 2,
+                circle.r * 2,
+            )
             self._set_roi_rect(rect)
         else:
             self.controller.clear_roi()
@@ -176,7 +181,10 @@ class RoiCropMixin:
         return 2, 2
 
     def _rebuild_figure_layout(self) -> None:
-        layout_spec = {"order": ["frame", "mean", "composite", "support", "std"], "panel_visibility": self._panel_visibility}
+        layout_spec = {
+            "order": ["frame", "mean", "composite", "support", "std"],
+            "panel_visibility": self._panel_visibility,
+        }
         if not self.renderer.request_layout_rebuild(layout_spec):
             return
         axes = self.renderer.init_figure(layout_spec)

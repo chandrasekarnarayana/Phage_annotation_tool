@@ -12,13 +12,13 @@ Conventions
 
 from __future__ import annotations
 
+import json
+import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable, List
 
-import json
 import pandas as pd
-import uuid
 
 __all__ = [
     "Keypoint",
@@ -106,7 +106,9 @@ def save_keypoints_csv(keypoints: Iterable[Keypoint], path: Path, meta: dict | N
         df.to_csv(handle, index=False)
 
 
-def save_keypoints_json(keypoints: Iterable[Keypoint], path: Path, meta: dict | None = None) -> None:
+def save_keypoints_json(
+    keypoints: Iterable[Keypoint], path: Path, meta: dict | None = None
+) -> None:
     """Write keypoints to JSON grouped by image_name."""
     grouped: dict[str, list[dict[str, object]]] = {}
     for kp in keypoints:

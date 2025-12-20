@@ -6,9 +6,9 @@ import gc
 import pathlib
 from typing import List, Optional, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.backends.qt_compat import QtGui, QtWidgets
 
@@ -16,8 +16,8 @@ from phage_annotator.analysis import compute_roi_mean_for_path, fit_bleach_curve
 from phage_annotator.config import SUPPORTED_SUFFIXES
 from phage_annotator.gui_debug import debug_log
 from phage_annotator.gui_image_io import read_metadata
-from phage_annotator.metadata_reader import MetadataBundle
 from phage_annotator.lut_manager import lut_names
+from phage_annotator.metadata_reader import MetadataBundle
 
 
 class ActionsMixin:
@@ -75,7 +75,9 @@ class ActionsMixin:
             if self.controller.annotation_entries_for_image(img.id):
                 targets.append(img.id)
         if not targets:
-            QtWidgets.QMessageBox.information(self, "No annotations", "No indexed annotations were found.")
+            QtWidgets.QMessageBox.information(
+                self, "No annotations", "No indexed annotations were found."
+            )
             return
         cal = self._get_calibration_state(self.primary_image.id)
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
@@ -87,7 +89,9 @@ class ActionsMixin:
             for idx, image_id in enumerate(targets):
                 if cancel.is_cancelled():
                     return None
-                paths = [entry.path for entry in self.controller.annotation_entries_for_image(image_id)]
+                paths = [
+                    entry.path for entry in self.controller.annotation_entries_for_image(image_id)
+                ]
                 points, import_entries = self.controller._parse_annotations_from_paths(
                     paths,
                     image_id=image_id,
@@ -144,7 +148,9 @@ class ActionsMixin:
         self.dock_annotations.setVisible(not self.dock_annotations.isVisible())
 
     def _toggle_settings_pane(self) -> None:
-        self.settings_advanced_container.setVisible(not self.settings_advanced_container.isVisible())
+        self.settings_advanced_container.setVisible(
+            not self.settings_advanced_container.isVisible()
+        )
 
     def _on_link_zoom_menu(self) -> None:
         self.link_zoom = self.link_zoom_act.isChecked()
@@ -259,7 +265,7 @@ class ActionsMixin:
                 if roi_shape == "circle":
                     cx, cy = rx + rw / 2, ry + rh / 2
                     r = min(rw, rh) / 2
-                    return (xx - cx) ** 2 + (yy - cy) ** 2 <= r ** 2
+                    return (xx - cx) ** 2 + (yy - cy) ** 2 <= r**2
                 return (rx <= xx) & (xx <= rx + rw) & (ry <= yy) & (yy <= ry + rh)
 
             means = []
@@ -385,7 +391,10 @@ class ActionsMixin:
 
         def _export() -> None:
             path, _ = QtWidgets.QFileDialog.getSaveFileName(
-                self, "Export ROI means", str(pathlib.Path.cwd() / "roi_means.csv"), "CSV Files (*.csv)"
+                self,
+                "Export ROI means",
+                str(pathlib.Path.cwd() / "roi_means.csv"),
+                "CSV Files (*.csv)",
             )
             if path:
                 pd.DataFrame(rows).to_csv(path, index=False)
@@ -461,7 +470,9 @@ class ActionsMixin:
     def _compute_roi_mean_for_path(self, path: pathlib.Path) -> float:
         """Compute ROI mean for the given TIFF path with minimal memory use."""
         try:
-            return compute_roi_mean_for_path(str(path), self.roi_rect, self.roi_shape, self.crop_rect)
+            return compute_roi_mean_for_path(
+                str(path), self.roi_rect, self.roi_shape, self.crop_rect
+            )
         except Exception:
             return float("nan")
 
@@ -628,7 +639,9 @@ class ActionsMixin:
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
         self._start_annotation_load_job(image_id, replace=False, pixel_size_nm=pixel_size_nm)
 
-    def _start_annotation_load_job(self, image_id: int, *, replace: bool, pixel_size_nm: Optional[float]) -> None:
+    def _start_annotation_load_job(
+        self, image_id: int, *, replace: bool, pixel_size_nm: Optional[float]
+    ) -> None:
         existing = self._annotation_job_tokens.get(image_id)
         if existing is not None:
             existing.cancel()
@@ -735,7 +748,12 @@ class ActionsMixin:
                 radius = roi.get("radius")
                 if center and radius is not None:
                     cx, cy = center
-                    rect = (float(cx - radius), float(cy - radius), float(radius * 2), float(radius * 2))
+                    rect = (
+                        float(cx - radius),
+                        float(cy - radius),
+                        float(radius * 2),
+                        float(radius * 2),
+                    )
                     self.roi_rect = rect
                     self.roi_shape = "circle"
         crop = meta.get("crop")
@@ -747,13 +765,21 @@ class ActionsMixin:
             win = display.get("win")
             if isinstance(win, dict) and "min" in win and "max" in win:
                 if image_id == active_primary:
-                    self.controller.set_display_mapping(float(win["min"]), float(win["max"]), display.get("gamma"))
+                    self.controller.set_display_mapping(
+                        float(win["min"]), float(win["max"]), display.get("gamma")
+                    )
                 else:
-                    non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                    non_active_mapping = self.controller.display_mapping.mapping_for(
+                        image_id, "frame"
+                    )
                     non_active_mapping.set_window(float(win["min"]), float(win["max"]))
             else:
                 pct = display.get("pct")
-                if isinstance(pct, dict) and self.primary_image.array is not None and image_id == active_primary:
+                if (
+                    isinstance(pct, dict)
+                    and self.primary_image.array is not None
+                    and image_id == active_primary
+                ):
                     try:
                         low = float(pct.get("low", 2.0))
                         high = float(pct.get("high", 98.0))
@@ -770,7 +796,9 @@ class ActionsMixin:
                         self.controller.set_gamma(float(gamma))
                     else:
                         if non_active_mapping is None:
-                            non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                            non_active_mapping = self.controller.display_mapping.mapping_for(
+                                image_id, "frame"
+                            )
                         non_active_mapping.gamma = float(gamma)
                 except (TypeError, ValueError):
                     pass
@@ -782,7 +810,9 @@ class ActionsMixin:
                     self.controller.set_display_for_image(image_id, "frame", mapping)
                 else:
                     if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                        non_active_mapping = self.controller.display_mapping.mapping_for(
+                            image_id, "frame"
+                        )
                     non_active_mapping.mode = mode
             lut = display.get("lut")
             if isinstance(lut, str) and lut in lut_names():
@@ -790,14 +820,18 @@ class ActionsMixin:
                     self.controller.set_lut(lut_names().index(lut))
                 else:
                     if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                        non_active_mapping = self.controller.display_mapping.mapping_for(
+                            image_id, "frame"
+                        )
                     non_active_mapping.lut = lut_names().index(lut)
             elif isinstance(lut, int):
                 if image_id == active_primary:
                     self.controller.set_lut(lut)
                 else:
                     if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                        non_active_mapping = self.controller.display_mapping.mapping_for(
+                            image_id, "frame"
+                        )
                     non_active_mapping.lut = lut
             invert = display.get("invert")
             if invert is not None:
@@ -805,7 +839,9 @@ class ActionsMixin:
                     self.controller.set_invert(bool(invert))
                 else:
                     if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
+                        non_active_mapping = self.controller.display_mapping.mapping_for(
+                            image_id, "frame"
+                        )
                     non_active_mapping.invert = bool(invert)
             if non_active_mapping is not None and image_id != active_primary:
                 self.controller.set_display_for_image(image_id, "frame", non_active_mapping)

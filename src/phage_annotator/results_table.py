@@ -8,7 +8,6 @@ from typing import Dict, Iterable, List
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
-
 RESULT_COLUMNS = [
     "image_name",
     "t",
@@ -38,7 +37,13 @@ class ResultsTableWidget(QtWidgets.QWidget):
         self.clear_btn = QtWidgets.QPushButton("Clear")
         self.copy_btn = QtWidgets.QPushButton("Copy")
         self.export_btn = QtWidgets.QPushButton("Export CSV")
-        for btn in [self.measure_btn, self.measure_t_btn, self.clear_btn, self.copy_btn, self.export_btn]:
+        for btn in [
+            self.measure_btn,
+            self.measure_t_btn,
+            self.clear_btn,
+            self.copy_btn,
+            self.export_btn,
+        ]:
             btn_row.addWidget(btn)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
@@ -65,7 +70,9 @@ class ResultsTableWidget(QtWidgets.QWidget):
         writer = csv.writer(sio)
         writer.writerow(RESULT_COLUMNS)
         for row in range(self.table.rowCount()):
-            writer.writerow([self.table.item(row, col).text() for col in range(self.table.columnCount())])
+            writer.writerow(
+                [self.table.item(row, col).text() for col in range(self.table.columnCount())]
+            )
         QtWidgets.QApplication.clipboard().setText(sio.getvalue())
 
     def export_csv(self, path: str) -> None:
@@ -73,4 +80,6 @@ class ResultsTableWidget(QtWidgets.QWidget):
             writer = csv.writer(f)
             writer.writerow(RESULT_COLUMNS)
             for row in range(self.table.rowCount()):
-                writer.writerow([self.table.item(row, col).text() for col in range(self.table.columnCount())])
+                writer.writerow(
+                    [self.table.item(row, col).text() for col in range(self.table.columnCount())]
+                )

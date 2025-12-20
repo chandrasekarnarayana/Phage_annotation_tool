@@ -1,4 +1,31 @@
-"""State proxy and image helpers for the GUI."""
+"""State proxy and image helpers for the GUI.
+
+This module provides a mixin that centralizes access to session state via properties,
+simplifying GUI logic by abstracting controller calls. It also contains image loading
+and coordinate transformation utilities that bridge full-resolution and displayed data.
+
+Coordinate Conventions
+----------------------
+- Full-resolution: (y, x) in the original numpy array, 0-indexed
+- Display/crop: (y, x) after cropping but before downsampling
+- Downsampled: After pyramid downsampling; scale factor depends on level
+- Canvas (matplotlib): (x, y) with potential axis inversions
+
+All transforms are designed to be bijective; roundtrip errors <0.1 pixel expected.
+
+Key State Proxies
+-----------------
+- images: List of LazyImage objects (metadata + lazy-loaded arrays)
+- annotations: Dict[image_id] -> List[Keypoint] (observed keypoints)
+- axis_mode: Dict[image_id] -> "time" | "depth" (3D axis interpretation)
+- display_mapping: Per-image, per-panel brightness/contrast/LUT settings
+
+Thread Safety
+-------------
+- All state proxies delegate to SessionController (main thread)
+- Image array loading may occur in background (read_contiguous_block)
+- Projection caching is thread-aware via CancelTokenShim
+"""
 
 from __future__ import annotations
 
@@ -9,13 +36,13 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtCore
 
 from phage_annotator.analysis import compute_mean_std
+from phage_annotator.annotations import Keypoint
+from phage_annotator.calibration import CalibrationState
 from phage_annotator.gui_constants import PROJECTION_ASYNC_BYTES, CancelTokenShim
 from phage_annotator.gui_debug import debug_log
 from phage_annotator.gui_image_io import load_array
 from phage_annotator.io import read_contiguous_block
 from phage_annotator.pyramid import downsample_mean_pool, pyramid_level_factor
-from phage_annotator.annotations import Keypoint
-from phage_annotator.calibration import CalibrationState
 
 
 class StateMixin:
@@ -117,7 +144,9 @@ class StateMixin:
         return self.controller.view_state.profile_line
 
     @profile_line.setter
-    def profile_line(self, value: Optional[Tuple[Tuple[float, float], Tuple[float, float]]]) -> None:
+    def profile_line(
+        self, value: Optional[Tuple[Tuple[float, float], Tuple[float, float]]]
+    ) -> None:
         self.controller.set_profile_line(value)
 
     @property
@@ -331,12 +360,39 @@ class StateMixin:
             z_idx = max(0, min(z_idx, img.array.shape[1] - 1))
         return t_idx, z_idx
 
-    def _slice_data(self, img: "LazyImage", t_override: Optional[int] = None, z_override: Optional[int] = None) -> np.ndarray:
+    def _slice_data(
+        self,
+        img: "LazyImage",
+        t_override: Optional[int] = None,
+        z_override: Optional[int] = None,
+    ) -> np.ndarray:
+        """Extract a single (Y, X) frame from image array at given T and Z indices.
+
+        Parameters
+        ----------
+        img : LazyImage
+            Image with (T, Z, Y, X) shaped array.
+        t_override : Optional[int]
+            If provided, use this T index instead of self.t_slider. Clamped to valid range.
+        z_override : Optional[int]
+            If provided, use this Z index instead of self.z_slider. Clamped to valid range.
+
+        Returns
+        -------
+        np.ndarray
+            2D array of shape (Y, X) for the selected frame.
+        """
         t_idx, z_idx = self._slice_indices(img)
         if t_override is not None:
-            t_idx = max(0, t_override if img.array is None else min(t_override, img.array.shape[0] - 1))
+            t_idx = max(
+                0,
+                (t_override if img.array is None else min(t_override, img.array.shape[0] - 1)),
+            )
         if z_override is not None:
-            z_idx = max(0, z_override if img.array is None else min(z_override, img.array.shape[1] - 1))
+            z_idx = max(
+                0,
+                (z_override if img.array is None else min(z_override, img.array.shape[1] - 1)),
+            )
         assert img.array is not None
         return img.array[t_idx, z_idx, :, :]
 
@@ -345,7 +401,9 @@ class StateMixin:
         user_value = self.pixel_size_um_per_px if self.pixel_size_um_per_px else None
         return self.controller.resolve_calibration_state(image_id, user_value, project_default)
 
-    def _projection_key(self, img: "LazyImage", kind: str) -> Tuple[int, str, Tuple[float, float, float, float], int, int]:
+    def _projection_key(
+        self, img: "LazyImage", kind: str
+    ) -> Tuple[int, str, Tuple[float, float, float, float], int, int]:
         crop_rect = self._cache_crop_rect(img)
         # Projections are global over T/Z; keep selection fields for key shape.
         t_sel, z_sel = -1, -1
@@ -365,7 +423,12 @@ class StateMixin:
             return (0.0, 0.0, 0.0, 0.0)
         return crop_rect
 
-    def _apply_crop_rect(self, data: np.ndarray, crop_rect: Tuple[float, float, float, float], full_shape: Tuple[int, int]) -> np.ndarray:
+    def _apply_crop_rect(
+        self,
+        data: np.ndarray,
+        crop_rect: Tuple[float, float, float, float],
+        full_shape: Tuple[int, int],
+    ) -> np.ndarray:
         """Apply a crop rect (X, Y, W, H) to a 2D array."""
         x, y, w, h = crop_rect
         full_h, full_w = full_shape
@@ -499,7 +562,11 @@ class StateMixin:
         key_mean = (img.id, "mean", crop_rect, t_sel, z_sel)
         key_std = (img.id, "std", crop_rect, t_sel, z_sel)
         key_comp = (img.id, "composite", crop_rect, t_sel, z_sel)
-        if key_mean in self._projection_jobs or key_std in self._projection_jobs or key_comp in self._projection_jobs:
+        if (
+            key_mean in self._projection_jobs
+            or key_std in self._projection_jobs
+            or key_comp in self._projection_jobs
+        ):
             return
         if img.array is None:
             self._ensure_loaded(img.id)
@@ -565,7 +632,13 @@ class StateMixin:
             _on_result(result)
 
     def _update_image_artist(
-        self, artist, data: np.ndarray, cmap: str, vmin: float, vmax: float, extent: Optional[Tuple[float, float, float, float]] = None
+        self,
+        artist,
+        data: np.ndarray,
+        cmap: str,
+        vmin: float,
+        vmax: float,
+        extent: Optional[Tuple[float, float, float, float]] = None,
     ) -> None:
         artist.set_data(data)
         artist.set_cmap(cmap)

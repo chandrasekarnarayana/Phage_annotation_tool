@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+
 class RoiSpec:
     """ROI specification in full-resolution coordinates.
 
@@ -18,6 +19,7 @@ class RoiSpec:
 
     rect: Tuple[float, float, float, float]
     shape: str = "circle"
+
 
 class ViewState:
     """View-specific state for the active session.
@@ -47,6 +49,7 @@ class ViewState:
     hist_region: str = "roi"
     play_mode: Optional[str] = None
     loop_playback: bool = False
+
 
 class ImageState:
     """Image metadata tracked by the session.
@@ -80,6 +83,7 @@ class ImageState:
     pixel_size_um: float
     memmap_flag: bool
     metadata_summary: dict = field(default_factory=dict)
+
 
 class SessionState:
     """Project/session state that persists across views.
