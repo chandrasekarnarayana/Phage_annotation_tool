@@ -334,9 +334,20 @@ class KeypointAnnotator(
         self._autosave_timer.start()
 
 
+def create_app(image_paths: List[pathlib.Path]) -> "KeypointAnnotator":
+    """Create the Qt application and main window without starting the event loop."""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        QtWidgets.QApplication([])
+    images = [
+        img for img in (read_metadata(pathlib.Path(p)) for p in image_paths) if img is not None
+    ]
+    return KeypointAnnotator(images)
+
+
 def run_gui(image_paths: List[pathlib.Path]) -> None:
     images = [img for img in (read_metadata(p) for p in image_paths) if img is not None]
-    app = QtWidgets.QApplication([])
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = KeypointAnnotator(images)
     window.show()
     app.exec()

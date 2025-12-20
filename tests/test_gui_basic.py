@@ -1,12 +1,13 @@
 import numpy as np
 import pytest
 
-from phage_annotator.demo import generate_dummy_image
-from phage_annotator.gui_mpl import create_app
-
 
 @pytest.mark.gui
 def test_gui_launch(qtbot, tmp_path) -> None:
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.gui_mpl import create_app
+
     path = generate_dummy_image(tmp_path / "dummy_gui.tif", mode="2d")
     win = create_app([path])
     qtbot.addWidget(win)
@@ -17,6 +18,10 @@ def test_gui_launch(qtbot, tmp_path) -> None:
 
 @pytest.mark.gui
 def test_gui_visual_regression(qtbot, tmp_path) -> None:
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.gui_mpl import create_app
+
     path = generate_dummy_image(tmp_path / "dummy_gui_vis.tif", mode="2d")
     win = create_app([path])
     qtbot.addWidget(win)
