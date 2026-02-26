@@ -119,6 +119,12 @@ class PerformancePanel(QtWidgets.QWidget):
         self.cache_thrashing_label.setStyleSheet("font-family: monospace;")
         layout.addWidget(self.cache_thrashing_label, 5, 1)
 
+        # LOD mode indicator (P2a)
+        layout.addWidget(QtWidgets.QLabel("LOD mode:"), 6, 0)
+        self.cache_lod_mode_label = QtWidgets.QLabel("OFF")
+        self.cache_lod_mode_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.cache_lod_mode_label, 6, 1)
+
         return group
 
     def _create_jobs_group(self) -> QtWidgets.QGroupBox:
@@ -232,6 +238,19 @@ class PerformancePanel(QtWidgets.QWidget):
         else:
             self.cache_thrashing_label.setText("NO")
             self.cache_thrashing_label.setStyleSheet("font-family: monospace;")
+
+        # LOD mode indicator (P2a)
+        if self.main_window and hasattr(self.main_window, '_lod_mode_active'):
+            lod_active_count = sum(1 for v in self.main_window._lod_mode_active.values() if v)
+            if lod_active_count > 0:
+                self.cache_lod_mode_label.setText(f"ACTIVE ({lod_active_count})")
+                self.cache_lod_mode_label.setStyleSheet("font-family: monospace; color: #4dabf7; font-weight: bold;")
+            else:
+                self.cache_lod_mode_label.setText("OFF")
+                self.cache_lod_mode_label.setStyleSheet("font-family: monospace;")
+        else:
+            self.cache_lod_mode_label.setText("OFF")
+            self.cache_lod_mode_label.setStyleSheet("font-family: monospace;")
 
         # Progress bar
         percent = int((mb_used / mb_budget * 100)) if mb_budget > 0 else 0

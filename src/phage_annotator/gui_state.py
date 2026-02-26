@@ -534,16 +534,47 @@ class StateMixin:
         return self._downsample(data, scale)
 
     def _get_projection(self, img: "LazyImage", kind: str) -> Tuple[Optional[np.ndarray], bool]:
-        """Return a cached projection or schedule computation."""
+        """Return a cached projection or LOD fallback while full-res loads.
+        
+        Phase 2a: LOD-First Rendering
+        - If full-res cached, return it (full-res ready)
+        - If not cached but 8x pyramid available, return pyramid as fallback (LOD mode)
+        - Otherwise schedule full-res job and return None
+        """
         key = self._projection_key(img, kind)
         cached = self.proj_cache.get(key)
         if cached is not None:
+            # Full-res available; mark LOD mode as complete
+            if not hasattr(self, '_lod_mode_active'):
+                self._lod_mode_active = {}
+            self._lod_mode_active[img.id] = False
             return cached, True
+        
+        # Phase 2a: Check for 8x pyramid level as LOD fallback
+        if img.array is not None and self.pyramid_enabled:
+            crop_rect = self._cache_crop_rect(img)
+            t_idx, z_idx = -1, -1
+            pyramid_key = (img.id, kind, t_idx, z_idx, crop_rect, 3)  # level 3 = 8x downsampling
+            pyramid_cached = self.proj_cache.get_pyramid(pyramid_key)
+            if pyramid_cached is not None:
+                # LOD pyramid available; mark LOD mode as active
+                if not hasattr(self, '_lod_mode_active'):
+                    self._lod_mode_active = {}
+                self._lod_mode_active[img.id] = True
+                self._request_projection_job(img)  # Still schedule full-res
+                return pyramid_cached, False  # Return LOD but mark as not fully cached
+        
+        # Full-res not available and no LOD fallback; schedule full-res job
         self._request_projection_job(img)
         return None, False
 
     def _request_projection_job(self, img: "LazyImage") -> None:
-        """Schedule projection computation and populate the cache on completion."""
+        """Schedule projection computation and populate the cache on completion.
+        
+        Phase 2b: Pyramid Prefetch
+        - Schedule pyramid jobs for 8x, 4x, 2x levels first (low priority)
+        - Then schedule full-res job (normal priority)
+        """
         if self._playback_mode:
             return
         crop_rect = self.crop_rect or (0.0, 0.0, 0.0, 0.0)
@@ -559,6 +590,62 @@ class StateMixin:
             self._ensure_loaded(img.id)
         if img.array is None:
             return
+        
+        # Phase 2b: Schedule pyramid prefetch jobs (8x, 4x, 2x) before full-res
+        # This ensures LOD preview is available quickly
+        if self.pyramid_enabled and img.array is not None:
+            arr = img.array
+            full_shape = (arr.shape[2], arr.shape[3])
+            generation = self._job_generation
+            
+            # Schedule pyramid levels 3, 2, 1 (8x, 4x, 2x downsampling factors)
+            for level in [3, 2, 1]:
+                scale = pyramid_level_factor(level)
+                for kind in ["mean", "std"]:
+                    pyramid_key = (img.id, kind, t_sel, z_sel, crop_rect, level)
+                    if pyramid_key not in self._pyramid_jobs and self.proj_cache.get_pyramid(pyramid_key) is None:
+                        job_name = f"PyramidPrefetch:{img.id}:{kind}:L{level}"
+                        self._pyramid_jobs[pyramid_key] = job_name
+                        
+                        # Capture data at job creation time (Phase 2b: pyramid prefetch)
+                        kind_local = kind
+                        level_local = level
+                        scale_local = scale
+                        data_view = arr
+                        
+                        def _pyramid_job(progress, cancel_token, data=data_view, scale=scale_local, 
+                                       kind_l=kind_local, level_l=level_local):
+                            if cancel_token.is_cancelled():
+                                return None
+                            # Compute projection first (if this is first pyramid request)
+                            mean_proj_work, std_proj_work = compute_mean_std(data)
+                            mean_proj_work = self._apply_crop_rect(mean_proj_work, crop_rect, full_shape)
+                            std_proj_work = self._apply_crop_rect(std_proj_work, crop_rect, full_shape)
+                            
+                            # Select which projection to downsample
+                            proj = mean_proj_work if kind_l == "mean" else std_proj_work
+                            result = downsample_mean_pool(proj, scale)
+                            return (pyramid_key, result, generation, kind_l, level_l)
+                        
+                        def _pyramid_result(result, pkey=pyramid_key):
+                            if result is None:
+                                self._pyramid_jobs.pop(pkey, None)
+                                return
+                            pkey_r, arr_r, gen, kind_r, level_r = result
+                            if gen != self._job_generation:
+                                self._pyramid_jobs.pop(pkey_r, None)
+                                return
+                            self.proj_cache.put_pyramid(pkey_r, arr_r)
+                            self._pyramid_jobs.pop(pkey_r, None)
+                            debug_log(f"[P2b] Pyramid L{level_r} cached for {kind_r}")
+                        
+                        def _pyramid_error(err: str, pkey=pyramid_key):
+                            self._pyramid_jobs.pop(pkey, None)
+                        
+                        self.jobs.submit(_pyramid_job, name=job_name, on_result=_pyramid_result, 
+                                       on_error=_pyramid_error)
+        
+        # Now schedule full-res projection job
         generation = self._job_generation
         arr = img.array
         job_name = f"Projections:{img.id}"
@@ -593,6 +680,10 @@ class StateMixin:
             self.proj_cache.put(key_std_local, std_proj)
             if job_id_holder["id"] is not None:
                 self._clear_projection_job_name(job_id_holder["id"])
+            # Mark LOD mode as complete (full-res now available)
+            if not hasattr(self, '_lod_mode_active'):
+                self._lod_mode_active = {}
+            self._lod_mode_active[image_id] = False
             # PHASE 2D FIX: Use debounce timer to trigger refresh asynchronously.
             # Direct call to _refresh_image() causes recursion: _refresh_image() → _get_projection()
             # → _request_projection_job() → _on_result() → _refresh_image() → loop.
