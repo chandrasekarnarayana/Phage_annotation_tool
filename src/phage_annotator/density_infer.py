@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from phage_annotator.analysis import roi_mask_for_shape
+from phage_annotator.array_pool import acquire_array, release_array
 from phage_annotator.density_config import DensityConfig
 from phage_annotator.density_model import DensityPredictor
 
@@ -37,6 +38,9 @@ class DensityResult:
     tiles_processed: int
     runtime_ms: float
     metadata: Dict[str, Any]
+
+
+_WEIGHT_WINDOW_CACHE: Dict[Tuple[int, str], np.ndarray] = {}
 
 
 def run_density_inference(
@@ -113,27 +117,32 @@ def _infer_tiled(
     stride = max(1, tile - overlap)
     padded, pad = _pad_to_grid(image2d, tile, stride)
     weight = _weight_window(tile, mode=options.stitch_mode)
-    accum = np.zeros_like(padded, dtype=np.float32)
-    weights = np.zeros_like(padded, dtype=np.float32)
+    accum = acquire_array(padded.shape, np.float32, fill=0.0)
+    weights = acquire_array(padded.shape, np.float32, fill=0.0)
     tiles = []
     positions = []
     tiles_processed = 0
-    for y in range(0, padded.shape[0] - tile + 1, stride):
-        for x in range(0, padded.shape[1] - tile + 1, stride):
-            tiles.append(padded[y : y + tile, x : x + tile])
-            positions.append((y, x))
-            if len(tiles) >= options.batch_tiles:
-                tiles_processed += _flush_tiles(
-                    tiles, positions, accum, weights, predictor, config, weight
-                )
-                tiles = []
-                positions = []
-    if tiles:
-        tiles_processed += _flush_tiles(tiles, positions, accum, weights, predictor, config, weight)
-    weights = np.maximum(weights, 1e-6)
-    out = accum / weights
-    ypad, xpad = pad
-    return out[: image2d.shape[0], : image2d.shape[1]], tiles_processed
+    try:
+        for y in range(0, padded.shape[0] - tile + 1, stride):
+            for x in range(0, padded.shape[1] - tile + 1, stride):
+                tiles.append(padded[y : y + tile, x : x + tile])
+                positions.append((y, x))
+                if len(tiles) >= options.batch_tiles:
+                    tiles_processed += _flush_tiles(
+                        tiles, positions, accum, weights, predictor, config, weight
+                    )
+                    tiles = []
+                    positions = []
+        if tiles:
+            tiles_processed += _flush_tiles(
+                tiles, positions, accum, weights, predictor, config, weight
+            )
+        np.maximum(weights, 1e-6, out=weights)
+        out = accum / weights
+        return out[: image2d.shape[0], : image2d.shape[1]], tiles_processed
+    finally:
+        release_array(accum)
+        release_array(weights)
 
 
 def _flush_tiles(tiles, positions, accum, weights, predictor, config, weight) -> int:
@@ -166,12 +175,18 @@ def _pad_to_grid(image: np.ndarray, tile: int, stride: int) -> Tuple[np.ndarray,
 
 
 def _weight_window(tile: int, mode: str) -> np.ndarray:
+    key = (tile, mode)
+    cached = _WEIGHT_WINDOW_CACHE.get(key)
+    if cached is not None:
+        return cached
     if mode != "weighted" or tile <= 1:
-        return np.ones((tile, tile), dtype=np.float32)
-    x = np.linspace(0, np.pi, tile)
-    w = 0.5 - 0.5 * np.cos(x)
-    w2d = np.outer(w, w).astype(np.float32)
-    return w2d
+        window = np.ones((tile, tile), dtype=np.float32)
+    else:
+        x = np.linspace(0, np.pi, tile)
+        w = 0.5 - 0.5 * np.cos(x)
+        window = np.outer(w, w).astype(np.float32)
+    _WEIGHT_WINDOW_CACHE[key] = window
+    return window
 
 
 def _apply_crop(

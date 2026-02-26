@@ -13,6 +13,7 @@ from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 
 from phage_annotator.analysis import local_maxima, mad_sigma
+from phage_annotator.array_pool import acquire_array, release_array
 
 try:  # Optional dependency
     import torch
@@ -46,6 +47,9 @@ class DeepLocalization:
 
 def is_torch_available() -> bool:
     return torch is not None
+
+
+_WEIGHT_MASK_CACHE: dict[tuple[int, int], np.ndarray] = {}
 
 
 def load_model(model_path: str, device: str):
@@ -91,45 +95,51 @@ def run_deepstorm_stream(
     roi_w = max(1, int(round(rw)))
     sr_h = roi_h * upsample
     sr_w = roi_w * upsample
-    sr_accum = np.zeros((sr_h, sr_w), dtype=np.float32)
-    weight_accum = np.zeros((sr_h, sr_w), dtype=np.float32)
+    sr_accum = acquire_array((sr_h, sr_w), np.float32, fill=0.0)
+    weight_accum = acquire_array((sr_h, sr_w), np.float32, fill=0.0)
 
     tiles = _tile_starts(roi_h, roi_w, patch_size, step)
     total_tiles = len(tiles)
 
-    frame_buffer: List[np.ndarray] = []
-    for idx, frame in frames:
-        if is_cancelled is not None and is_cancelled():
-            break
-        frame_buffer.append(frame.astype(np.float32, copy=False))
-        if len(frame_buffer) < params.window_size:
-            continue
-        if len(frame_buffer) > params.window_size:
-            frame_buffer.pop(0)
-        agg = _aggregate_frames(frame_buffer, params.aggregation_mode)
-        if params.normalize_mode == "global_roi":
-            agg_norm = _normalize_global(agg)
-        else:
-            agg_norm = agg
-
-        for tile_idx, (y0, x0) in enumerate(tiles, start=1):
+    try:
+        frame_buffer: List[np.ndarray] = []
+        for idx, frame in frames:
             if is_cancelled is not None and is_cancelled():
                 break
-            patch = _extract_patch(agg_norm, y0, x0, patch_size)
-            if params.normalize_mode == "per_patch":
-                patch = _normalize_global(patch)
-            sr_patch = _infer_patch(model, patch, device, upsample)
-            _blend_patch(sr_accum, weight_accum, sr_patch, y0 * upsample, x0 * upsample)
-            if progress_cb is not None:
-                pct = int((idx * total_tiles + tile_idx) / max(1, total_frames * total_tiles) * 100)
-                progress_cb(
-                    pct,
-                    f"Frame {idx + 1}/{total_frames} | Tile {tile_idx}/{total_tiles}",
-                )
+            frame_buffer.append(frame.astype(np.float32, copy=False))
+            if len(frame_buffer) < params.window_size:
+                continue
+            if len(frame_buffer) > params.window_size:
+                frame_buffer.pop(0)
+            agg = _aggregate_frames(frame_buffer, params.aggregation_mode)
+            if params.normalize_mode == "global_roi":
+                agg_norm = _normalize_global(agg)
+            else:
+                agg_norm = agg
 
-    sr = _finalize_sr(sr_accum, weight_accum)
-    locs = localizations_from_sr(sr, roi_rect, upsample)
-    return sr, locs
+            for tile_idx, (y0, x0) in enumerate(tiles, start=1):
+                if is_cancelled is not None and is_cancelled():
+                    break
+                patch = _extract_patch(agg_norm, y0, x0, patch_size)
+                if params.normalize_mode == "per_patch":
+                    patch = _normalize_global(patch)
+                sr_patch = _infer_patch(model, patch, device, upsample)
+                _blend_patch(sr_accum, weight_accum, sr_patch, y0 * upsample, x0 * upsample)
+                if progress_cb is not None:
+                    pct = int(
+                        (idx * total_tiles + tile_idx) / max(1, total_frames * total_tiles) * 100
+                    )
+                    progress_cb(
+                        pct,
+                        f"Frame {idx + 1}/{total_frames} | Tile {tile_idx}/{total_tiles}",
+                    )
+
+        sr = _finalize_sr(sr_accum, weight_accum)
+        locs = localizations_from_sr(sr, roi_rect, upsample)
+        return sr, locs
+    finally:
+        release_array(sr_accum)
+        release_array(weight_accum)
 
 
 def localizations_from_sr(
@@ -233,11 +243,16 @@ def _blend_patch(
 
 
 def _weight_mask(h: int, w: int) -> np.ndarray:
+    key = (h, w)
+    cached = _WEIGHT_MASK_CACHE.get(key)
+    if cached is not None:
+        return cached
     wy = np.hanning(h) if h > 1 else np.ones((1,), dtype=np.float32)
     wx = np.hanning(w) if w > 1 else np.ones((1,), dtype=np.float32)
     mask = np.outer(wy, wx).astype(np.float32, copy=False)
     if mask.max() <= 0:
-        return np.ones((h, w), dtype=np.float32)
+        mask = np.ones((h, w), dtype=np.float32)
+    _WEIGHT_MASK_CACHE[key] = mask
     return mask
 
 

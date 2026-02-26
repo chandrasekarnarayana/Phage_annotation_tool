@@ -4,7 +4,7 @@
 
 Your codebase already implements **5 of 10** core Fiji principles well. This document identifies gaps, prioritizes improvements, and provides a phased implementation roadmap.
 
-**Current Maturity: Level 5/5** (feature-complete; Phases 1-3 delivered; production-ready with auto-mitigation)
+**Current Maturity: Level 5/5** (feature-complete; Phases 1-5 delivered; production-ready with auto-mitigation and pooled buffers)
 
 ---
 
@@ -18,6 +18,7 @@ Your codebase already implements **5 of 10** core Fiji principles well. This doc
 | **2b** | Pyramid Prefetch | ✅ COMPLETE | Fast preview while full-res loads |
 | **3a** | Memory Pressure Monitoring | ✅ COMPLETE | Real-time system RAM tracking |
 | **3b** | Adaptive Tile Sizing | ✅ COMPLETE | Auto-response to memory pressure |
+| **5a** | Object Pooling | ✅ COMPLETE | Reuse tile buffers to reduce allocations |
 
 ---
 
