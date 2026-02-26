@@ -26,7 +26,7 @@ class DisplayMapping:
     invert : bool
         Whether to display the LUT inverted.
     per_panel : dict[str, DisplayMapping]
-        Panel-specific mapping overrides (frame/mean/composite/support/std).
+        Panel-specific mapping overrides (frame/mean/support/std).
     per_image : dict[int, dict[str, DisplayMapping]]
         Per-image overrides keyed by image id, then panel id.
     """

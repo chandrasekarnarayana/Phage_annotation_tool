@@ -38,23 +38,7 @@ def save_project(
     particles_configs: Optional[Dict[int, Dict[str, object]]] = None,
     annotation_imports: Optional[Dict[int, List[dict]]] = None,
 ) -> None:
-    """Write a project JSON and persist per-image annotations.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Output project file path.
-    images : iterable
-        Collection of images with ``path`` and ``interpret_3d_as`` attributes.
-    annotations : dict[int, list[Keypoint]]
-        Annotation lists keyed by image id.
-    settings : dict
-        Serialized UI settings to restore on load.
-
-    Notes
-    -----
-    Per-image ``interpret_3d_as`` values are stored to preserve axis overrides.
-    """
+    """Write project JSON and save per-image annotations. Preserves axis overrides."""
     images_payload: List[dict] = []
     payload = {
         "tool": "PhageAnnotator",
@@ -114,29 +98,9 @@ def save_project(
 
 
 def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, Dict]:
-    """Load a project JSON and return raw image entries, settings, and annotation paths.
-
-    Returns
-    -------
-    images : list[dict]
-        List of image entries with path/annotations and optional overrides.
-    settings : dict
-        Persisted UI settings.
-    ann_map : dict[int, pathlib.Path]
-        Mapping from image index to annotation path.
-    roi_map : dict[int, list[dict]]
-        ROIs by image index.
-    thr_map : dict[int, dict]
-        Threshold configs by image index.
-    part_map : dict[int, dict]
-        Particles configs by image index.
-    import_map : dict[int, list[dict]]
-        Annotation imports by image index.
-
-    Notes
-    -----
-    Missing fields are tolerated for backward compatibility.
-    Missing image files are logged but don't fail the load.
+    """Load project JSON. Returns images, settings, annotation/ROI/threshold/particle/import maps.
+    
+    Handles backward compatibility gracefully - missing fields won't break the load.
     """
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:

@@ -2,7 +2,7 @@
 
 This module orchestrates the display of microscopy data in matplotlib figures:
 - Normalizes data (window/gamma/log transforms)
-- Caches projections (mean/composite/standard deviation)
+- Caches projections (mean/standard deviation)
 - Applies color lookup tables (LUT) and inversion
 - Manages overlay rendering (annotations, ROI, particles, SMLM results)
 - Handles downsampling and coordinate transforms between full/display spaces
@@ -97,20 +97,16 @@ class RenderingMixin:
 
         mean_data, mean_ready = self._get_projection(prim, "mean")
         std_data, std_ready = self._get_projection(prim, "std")
-        comp_data, comp_ready = self._get_projection(prim, "composite")
         if mean_data is None:
             mean_data = np.zeros_like(slice_data)
         if std_data is None:
             std_data = np.zeros_like(slice_data)
-        if comp_data is None:
-            comp_data = np.zeros_like(slice_data)
 
         # Interactive downsampling (display-only).
         slice_display = slice_data
         support_display = support_slice
         mean_display = mean_data
         std_display = std_data
-        comp_display = comp_data
         level = 0
         if self._interactive:
             level = self._select_pyramid_level(self.ax_frame, slice_data.shape)
@@ -144,15 +140,6 @@ class RenderingMixin:
                     self.crop_rect or (0, 0, 0, 0),
                     level,
                 )
-                comp_display = self._get_pyramid_display(
-                    prim.id,
-                    "composite",
-                    comp_data,
-                    -1,
-                    -1,
-                    self.crop_rect or (0, 0, 0, 0),
-                    level,
-                )
                 if support_slice is not None:
                     support_display = self._get_pyramid_display(
                         supp.id,
@@ -172,7 +159,6 @@ class RenderingMixin:
         titles = {
             "frame": f"Frame (T={t_idx}, Z={z_idx})",
             "mean": "Mean Projection",
-            "composite": "Composite",
             "support": f"Support (T={t_idx}, Z={z_idx})",
             "std": "Std Projection",
         }
@@ -180,7 +166,6 @@ class RenderingMixin:
         for key, data in [
             ("frame", slice_display),
             ("mean", mean_display),
-            ("composite", comp_display),
             ("support", support_display),
             ("std", std_display),
         ]:
@@ -200,7 +185,6 @@ class RenderingMixin:
         roi_offset = (self.crop_rect[0], self.crop_rect[1]) if self.crop_rect else (0.0, 0.0)
         frame_mapping = self._get_display_mapping(prim.id, "frame", slice_data)
         mean_mapping = self._get_display_mapping(prim.id, "mean", mean_data)
-        comp_mapping = self._get_display_mapping(prim.id, "composite", comp_data)
         std_mapping = self._get_display_mapping(prim.id, "std", std_data)
         support_mapping = self._get_display_mapping(supp.id, "support", support_slice)
         std_vmin, std_vmax = std_mapping.min_val, std_mapping.max_val
@@ -208,7 +192,6 @@ class RenderingMixin:
             norms = {
                 "frame": self._norm_cached("frame", frame_mapping),
                 "mean": self._norm_cached("mean", mean_mapping),
-                "composite": self._norm_cached("composite", comp_mapping),
                 "support": self._norm_cached("support", support_mapping),
                 "std": self._norm_cached("std", std_mapping),
             }
@@ -216,7 +199,6 @@ class RenderingMixin:
             norms = {
                 "frame": build_norm(frame_mapping),
                 "mean": build_norm(mean_mapping),
-                "composite": build_norm(comp_mapping),
                 "support": build_norm(support_mapping),
                 "std": build_norm(std_mapping),
             }
@@ -231,7 +213,6 @@ class RenderingMixin:
         panel_cmaps = {
             "frame": cmap_for(_spec(frame_mapping.lut), frame_mapping.invert),
             "mean": cmap_for(_spec(mean_mapping.lut), mean_mapping.invert),
-            "composite": cmap_for(_spec(comp_mapping.lut), comp_mapping.invert),
             "support": cmap_for(_spec(support_mapping.lut), support_mapping.invert),
             "std": cmap_for(_spec(std_mapping.lut), std_mapping.invert),
         }
@@ -297,7 +278,6 @@ class RenderingMixin:
         panel_ranges = {
             "frame": (frame_mapping.min_val, frame_mapping.max_val),
             "mean": (mean_mapping.min_val, mean_mapping.max_val),
-            "composite": (comp_mapping.min_val, comp_mapping.max_val),
             "support": (support_mapping.min_val, support_mapping.max_val),
             "std": (std_mapping.min_val, std_mapping.max_val),
         }
@@ -334,7 +314,6 @@ class RenderingMixin:
             projections={
                 "mean": mean_display,
                 "std": std_display,
-                "composite": comp_display,
             },
             view=self.controller.view_state,
             annotations=self._current_keypoints(),
@@ -382,7 +361,6 @@ class RenderingMixin:
         self.renderer.update_overlays(ctx)
         self.im_frame = self.renderer.image_artists.get("frame")
         self.im_mean = self.renderer.image_artists.get("mean")
-        self.im_comp = self.renderer.image_artists.get("composite")
         self.im_support = self.renderer.image_artists.get("support")
         self.im_std = self.renderer.image_artists.get("std")
         self._refresh_orthoview(prim, t_idx, z_idx, norms["frame"], panel_cmaps["frame"])
@@ -392,15 +370,6 @@ class RenderingMixin:
                 0.5,
                 "Computing mean...",
                 transform=self.ax_mean.transAxes,
-                ha="center",
-                va="center",
-            )
-        if self.ax_comp is not None and not comp_ready:
-            self.ax_comp.text(
-                0.5,
-                0.5,
-                "Computing composite...",
-                transform=self.ax_comp.transAxes,
                 ha="center",
                 va="center",
             )
@@ -551,14 +520,12 @@ class RenderingMixin:
                 return points if self.show_ann_frame else []
             if panel == "mean":
                 return points if self.show_ann_mean else []
-            if panel == "composite":
-                return points if self.show_ann_comp else []
             if panel == "support":
                 return points
             return []
 
         panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]] = {}
-        for panel in ["frame", "mean", "composite", "support"]:
+        for panel in ["frame", "mean", "support"]:
             pts = _filter(panel)
             if not pts:
                 panel_annotations[panel] = []
@@ -569,7 +536,7 @@ class RenderingMixin:
 
     def _build_roi_overlays(self) -> Dict[str, List[Tuple[str, object, str]]]:
         overlays: Dict[str, List[Tuple[str, object, str]]] = {
-            panel: [] for panel in ["frame", "mean", "composite", "support"]
+            panel: [] for panel in ["frame", "mean", "support"]
         }
         for roi in self.roi_manager.list_rois(self.primary_image.id):
             if not roi.visible:

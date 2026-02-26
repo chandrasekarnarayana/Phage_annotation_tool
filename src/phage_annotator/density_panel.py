@@ -33,7 +33,7 @@ class DensityPanel(QtWidgets.QWidget):
         input_group = QtWidgets.QGroupBox("Input")
         input_layout = QtWidgets.QGridLayout(input_group)
         self.target_combo = QtWidgets.QComboBox()
-        self.target_combo.addItems(["Frame", "Mean", "Composite", "Support"])
+        self.target_combo.addItems(["Frame", "Mean", "Support"])
         self.scope_combo = QtWidgets.QComboBox()
         self.scope_combo.addItems(["Current slice"])
         self.roi_only_chk = QtWidgets.QCheckBox("ROI only")

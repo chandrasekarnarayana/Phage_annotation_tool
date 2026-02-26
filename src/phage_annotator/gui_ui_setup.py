@@ -540,6 +540,7 @@ class UiSetupMixin:
         # Panels/docks + sidebar (status bar must be set up first for logs widget)
         self._setup_status_bar()
         self._init_panels(dock_panels_menu)
+        self._setup_annotation_toolbar()
 
         central_layout.addWidget(fig_container, stretch=1)
         central_layout.addWidget(playback_bar, stretch=0)

@@ -87,7 +87,7 @@ class ActionsMixin:
             )
 
     def _reset_confirmations(self) -> None:
-        """Reset all confirmation prompts to enabled (P3.3)."""
+        """Re-enable all confirmation dialogs."""
         self._settings.setValue("confirmApplyDisplayMapping", True)
         self._settings.setValue("confirmApplyThreshold", True)
         self._settings.setValue("confirmClearROI", True)

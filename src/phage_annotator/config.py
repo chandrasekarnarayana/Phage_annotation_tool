@@ -11,14 +11,7 @@ SUPPORTED_SUFFIXES: Tuple[str, ...] = (".tif", ".tiff", ".ome.tif", ".ome.tiff")
 
 @dataclass
 class AppConfig:
-    """Runtime settings for microscopy keypoint annotation.
-
-    Attributes:
-        pixel_size_nm: Nominal pixel size (nm) for downstream measurements.
-        supported_suffixes: Image filename suffixes accepted by the loader.
-        config_dir: Directory for user-level config or cache.
-        default_labels: Default label classes exposed in the GUI.
-    """
+    """Runtime settings for microscopy keypoint annotation."""
 
     pixel_size_nm: float = 1.0
     supported_suffixes: Tuple[str, ...] = SUPPORTED_SUFFIXES

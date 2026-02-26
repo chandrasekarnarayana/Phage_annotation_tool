@@ -22,4 +22,4 @@ class ControlsMixin(
     SmlmControlsMixin,
     ThresholdControlsMixin,
 ):
-    """Composite mixin for GUI control handlers."""
+    """Mixin for GUI control handlers."""

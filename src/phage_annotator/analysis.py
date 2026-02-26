@@ -22,18 +22,7 @@ from phage_annotator.io import standardize_axes
 
 
 def compute_mean_std(arr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """Compute mean/std projections over (T, Z) axes.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-        Input array in (T, Z, Y, X).
-
-    Returns
-    -------
-    mean_proj, std_proj : numpy.ndarray
-        Mean and standard deviation projections in (Y, X).
-    """
+    """Compute mean/std projections over T and Z dimensions."""
     mean_proj = arr.mean(axis=(0, 1)).astype(np.float32, copy=False)
     std_proj = arr.std(axis=(0, 1)).astype(np.float32, copy=False)
     return mean_proj, std_proj
@@ -45,19 +34,7 @@ def compute_roi_mean_for_path(
     roi_shape: str,
     crop_rect: Tuple[float, float, float, float],
 ) -> float:
-    """Load a TIFF path and compute ROI mean on the first frame.
-
-    Parameters
-    ----------
-    path : str
-        TIFF path to load.
-    roi_rect : tuple[float, float, float, float]
-        ROI rectangle in (X, Y, W, H) in full-resolution coordinates.
-    roi_shape : {"box", "circle"}
-        Shape of the ROI.
-    crop_rect : tuple[float, float, float, float]
-        Display crop (X, Y, W, H); ROI is applied after cropping.
-    """
+    """Load a TIFF and compute ROI mean on first frame."""
     arr = tif.imread(path, maxworkers=1)
     std, _, _ = standardize_axes(arr)
     frame = std[0, 0, :, :]

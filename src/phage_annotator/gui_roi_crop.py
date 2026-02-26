@@ -401,7 +401,7 @@ class RoiCropMixin:
 
     def _rebuild_figure_layout(self) -> None:
         layout_spec = {
-            "order": ["frame", "mean", "composite", "support", "std"],
+            "order": ["frame", "mean", "support", "std"],
             "panel_visibility": self._panel_visibility,
         }
         if not self.renderer.request_layout_rebuild(layout_spec):
@@ -409,7 +409,7 @@ class RoiCropMixin:
         axes = self.renderer.init_figure(layout_spec)
         self.ax_frame = axes.get("frame")
         self.ax_mean = axes.get("mean")
-        self.ax_comp = axes.get("composite")
+        self.ax_comp = None
         self.ax_support = axes.get("support")
         self.ax_std = axes.get("std")
         self._bind_axis_callbacks()

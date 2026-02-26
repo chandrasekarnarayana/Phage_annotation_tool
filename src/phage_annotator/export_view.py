@@ -88,7 +88,7 @@ def validate_export_preflight(
     
     # Check panel validity
     panel = options.panel.lower()
-    valid_panels = ("frame", "mean", "composite", "support", "std")
+    valid_panels = ("frame", "mean", "support", "std")
     if panel not in valid_panels:
         result.add_error(f"Invalid panel: {panel} (must be one of {valid_panels})")
     

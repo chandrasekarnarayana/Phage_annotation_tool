@@ -123,7 +123,6 @@ class KeypointAnnotator(
         self._panel_visibility = {
             "frame": True,
             "mean": True,
-            "composite": True,
             "support": True,
             "std": True,
         }
@@ -191,6 +190,8 @@ class KeypointAnnotator(
         self.dock_sidebar = None
         self.sidebar_stack = None
         self.sidebar_actions = []
+        self.annotation_toolbar = None
+        self.annotation_toolbar_action = None
         self.command_palette_act = None
         self.reset_view_act = None
         self.tool_router = None

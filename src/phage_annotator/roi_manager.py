@@ -22,11 +22,7 @@ class Roi:
 
 @dataclass
 class RoiManager:
-    """Container for image-scoped ROIs.
-    
-    P5.2 Enhancement: Supports multi-image ROI operations like copying ROI
-    across images and managing ROI templates for bulk preset application.
-    """
+    """Manages ROIs per image, including templates for bulk operations."""
 
     rois_by_image: Dict[int, List[Roi]] = field(default_factory=dict)
     active_roi_id: Optional[int] = None
@@ -55,24 +51,7 @@ class RoiManager:
         self.active_roi_id = roi_id
 
     def copy_roi_to_images(self, source_image_id: int, roi_id: int, target_image_ids: Iterable[int]) -> int:
-        """Copy a ROI from source to target images, preserving shape and position.
-        
-        P5.2: Multi-image ROI feature. Returns count of successfully copied ROIs.
-        
-        Parameters
-        ----------
-        source_image_id : int
-            Image ID containing the source ROI
-        roi_id : int
-            ROI ID to copy
-        target_image_ids : Iterable[int]
-            List of image IDs to copy the ROI to
-            
-        Returns
-        -------
-        int
-            Count of successfully copied ROIs
-        """
+        """Copy a ROI to multiple images keeping shape and position. Returns copy count."""
         source_roi = self.get_active(source_image_id)
         if source_roi is None or source_roi.roi_id != roi_id:
             # Search all ROIs in source image
@@ -108,17 +87,7 @@ class RoiManager:
         return copy_count
 
     def save_roi_template(self, name: str, roi: Roi) -> None:
-        """Save a ROI as a template for reuse across images.
-        
-        P5.2: ROI template feature for bulk preset application.
-        
-        Parameters
-        ----------
-        name : str
-            Template name (e.g., "Cell center", "Nucleus")
-        roi : Roi
-            ROI to save as template
-        """
+        """Save a ROI as a template for reuse across images."""
         template = Roi(
             roi_id=-1,  # Sentinel value for templates
             name=name,
@@ -134,15 +103,7 @@ class RoiManager:
         return self.roi_templates.get(name)
 
     def apply_template_to_image(self, template_name: str, image_id: int) -> bool:
-        """Apply a ROI template to an image.
-        
-        P5.2: Bulk preset application via templates.
-        
-        Returns
-        -------
-        bool
-            True if successfully applied, False if template not found
-        """
+        """Apply a saved template ROI to an image, returning True if successful."""
         template = self.get_roi_template(template_name)
         if template is None:
             return False

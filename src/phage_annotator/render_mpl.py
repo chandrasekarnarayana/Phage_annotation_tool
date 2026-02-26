@@ -3,7 +3,7 @@
 This module provides pure, testable rendering functions for displaying microscopy
 data in matplotlib figures. Key responsibilities:
 
-1. Projection rendering: Mean/composite/std projections over (T, Z) axes
+1. Projection rendering: Mean/std projections over (T, Z) axes
 2. Coordinate transforms: Full image <-> display (cropped/downsampled)
 3. Overlay rendering: Annotations, ROI, particles, density maps, SMLM results
 4. Color mapping: Apply LUT, invert, gamma correction, log scaling
@@ -18,7 +18,7 @@ Architecture
 Key Functions
 -------------
 - render_2d_image(): Render single frame with all overlays
-- render_projection(): Render mean/composite/std projections
+- render_projection(): Render mean/std projections
 - draw_*(): Low-level overlay drawing (annotations, ROI, particles)
 - coordinate_full_to_display(): Transform full-res coords to display space
 - coordinate_display_to_full(): Inverse transform
@@ -57,7 +57,7 @@ class RenderContext:
     support_frame : np.ndarray or None
         Support image frame (2D array) in display resolution.
     projections : dict[str, np.ndarray]
-        Precomputed projections keyed by name ("mean", "std", "composite").
+        Precomputed projections keyed by name ("mean", "std").
     view : ViewState
         View state (T/Z, crop/ROI, overlay toggle).
     annotations : Sequence[object]
@@ -181,7 +181,6 @@ class Renderer:
         self.image_artists: Dict[str, Optional[matplotlib.image.AxesImage]] = {
             "frame": None,
             "mean": None,
-            "composite": None,
             "support": None,
             "std": None,
             "frame_overlay": None,
@@ -242,8 +241,6 @@ class Renderer:
             self.axes["frame"].set_title(titles.get("frame", ""))
         if "mean" in self.axes:
             self.axes["mean"].set_title(titles.get("mean", ""))
-        if "composite" in self.axes:
-            self.axes["composite"].set_title(titles.get("composite", ""))
         if "support" in self.axes:
             self.axes["support"].set_title(titles.get("support", ""))
         if "std" in self.axes:
@@ -252,11 +249,9 @@ class Renderer:
         frame_norm = ctx.norms.get("frame")
         std_norm = ctx.norms.get("std")
         mean_norm = ctx.norms.get("mean")
-        comp_norm = ctx.norms.get("composite")
         support_norm = ctx.norms.get("support")
         frame_range = ctx.panel_ranges.get("frame", ctx.std_range)
         mean_range = ctx.panel_ranges.get("mean", ctx.std_range)
-        comp_range = ctx.panel_ranges.get("composite", ctx.std_range)
         support_range = ctx.panel_ranges.get("support", ctx.std_range)
         std_range = ctx.panel_ranges.get("std", ctx.std_range)
         if "frame" in self.axes:
@@ -315,17 +310,6 @@ class Renderer:
                 mean_range[1],
                 ctx.extents.get("mean"),
                 norm=mean_norm,
-            )
-        if "composite" in self.axes:
-            self.image_artists["composite"] = _update_or_create(
-                self.axes["composite"],
-                self.image_artists["composite"],
-                ctx.projections.get("composite"),
-                ctx.panel_cmaps.get("composite", self.colormaps[0]),
-                comp_range[0],
-                comp_range[1],
-                ctx.extents.get("composite"),
-                norm=comp_norm,
             )
         if "support" in self.axes and ctx.support_frame is not None:
             self.image_artists["support"] = _update_or_create(
@@ -525,7 +509,7 @@ class Renderer:
         panel = options.panel
         if panel == "support":
             image = ctx.support_frame
-        elif panel in ("mean", "std", "composite"):
+        elif panel in ("mean", "std"):
             image = ctx.projections.get(panel)
         else:
             image = ctx.image_frame

@@ -47,7 +47,7 @@ class ThresholdPanel(QtWidgets.QWidget):
         layout.addLayout(form)
 
         self.target_combo = QtWidgets.QComboBox()
-        self.target_combo.addItems(["Frame", "Mean", "Composite", "Support"])
+        self.target_combo.addItems(["Frame", "Mean", "Support"])
         form.addRow("Target", self.target_combo)
 
         self.region_chk = QtWidgets.QCheckBox("ROI only")

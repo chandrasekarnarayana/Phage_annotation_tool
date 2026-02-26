@@ -99,7 +99,6 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     for key, label in [
         ("frame", "Show Frame"),
         ("mean", "Show Mean"),
-        ("composite", "Show Composite"),
         ("support", "Show Support"),
         ("std", "Show STD"),
     ]:

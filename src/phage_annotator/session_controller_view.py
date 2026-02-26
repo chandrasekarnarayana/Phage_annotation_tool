@@ -217,9 +217,8 @@ class SessionViewMixin:
         self.view_state.overlay_enabled = enabled
         self.view_changed.emit()
 
-    def set_show_annotations(self, frame: bool, mean: bool, comp: bool) -> None:
+    def set_show_annotations(self, frame: bool, mean: bool) -> None:
         """Update which panels show annotations."""
         self.view_state.show_ann_frame = frame
         self.view_state.show_ann_mean = mean
-        self.view_state.show_ann_comp = comp
         self.view_changed.emit()

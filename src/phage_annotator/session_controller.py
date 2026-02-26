@@ -100,7 +100,7 @@ class SessionController(
             hist_bins=int(settings.value("histBinsDefault", 100, type=int)),
         )
         self.display_mapping = DisplayMapping(0.0, 1.0)
-        self.display_mapping.ensure_panels(("frame", "mean", "composite", "support", "std"))
+        self.display_mapping.ensure_panels(("frame", "mean", "support", "std"))
         self.rois_by_image: Dict[int, List[Roi]] = {}
         self._settings = settings
         self._colormaps = list(colormaps) if colormaps is not None else []

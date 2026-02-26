@@ -212,7 +212,7 @@ class JobsMixin:
         self.jobs.cancel(self._active_job_id)
 
     def _cancel_projection_jobs(self, image_id: int) -> None:
-        for kind in ("mean", "std", "composite"):
+        for kind in ("mean", "std"):
             keys = [k for k in self._projection_jobs.keys() if k[0] == image_id and k[1] == kind]
             for key in keys:
                 job_id = self._projection_jobs.pop(key, None)

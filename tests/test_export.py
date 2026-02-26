@@ -223,7 +223,7 @@ def test_export_overlay_only_warning():
     assert any("Overlay" in w for w in result.warnings)
 
 
-@pytest.mark.parametrize("panel", ["frame", "mean", "composite", "support", "std"])
+@pytest.mark.parametrize("panel", ["frame", "mean", "support", "std"])
 def test_export_valid_panels(panel):
     """Test that all valid panels are accepted."""
     from phage_annotator.export_view import ExportOptions, validate_export_preflight

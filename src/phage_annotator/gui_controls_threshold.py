@@ -152,9 +152,6 @@ class ThresholdControlsMixin:
         if target == "Mean":
             data, _ = self._get_projection(prim, "mean")
             return data
-        if target == "Composite":
-            data, _ = self._get_projection(prim, "composite")
-            return data
         if target == "Support":
             if self.support_image.array is None:
                 return None

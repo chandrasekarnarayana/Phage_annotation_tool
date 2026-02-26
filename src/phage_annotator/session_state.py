@@ -49,7 +49,6 @@ class ViewState:
     overlay_enabled: bool = True
     show_ann_frame: bool = True
     show_ann_mean: bool = True
-    show_ann_comp: bool = True
     profile_line: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None
     profile_enabled: bool = True
     hist_enabled: bool = True

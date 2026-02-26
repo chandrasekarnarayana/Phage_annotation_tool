@@ -186,7 +186,7 @@ class ExportMixin:
         layout = QtWidgets.QFormLayout(dlg)
         panel_combo = QtWidgets.QComboBox()
         panel_combo.setObjectName("export_dialog_combo_panel")
-        panel_combo.addItems(["Frame", "Mean", "Composite", "Support", "Std"])
+        panel_combo.addItems(["Frame", "Mean", "Support", "Std"])
         scope_combo = QtWidgets.QComboBox()
         scope_combo.setObjectName("export_dialog_combo_scope")
         scope_combo.addItems(["Current slice", "T range", "All frames"])
@@ -464,8 +464,6 @@ class ExportMixin:
             data, _ = compute_mean_std(prim.array)
         elif panel == "std":
             _, data = compute_mean_std(prim.array)
-        elif panel == "composite":
-            data, _ = compute_mean_std(prim.array)
         else:
             data = prim.array[t_idx, z_idx, :, :]
         return self._apply_crop_rect(data, crop_rect, data.shape)

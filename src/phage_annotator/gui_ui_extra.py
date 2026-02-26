@@ -156,6 +156,54 @@ class UiExtrasMixin:
             if not is_visible:
                 self._expand_sidebar()
             self._set_sidebar_mode(action_idx)
+
+    def _setup_annotation_toolbar(self) -> None:
+        """Add a right toolbar toggle for the annotation dock."""
+        if getattr(self, "dock_annotations", None) is None:
+            return
+
+        bar = QtWidgets.QToolBar("Annotation Controls", self)
+        bar.setObjectName("annotation_toolbar")
+        bar.setOrientation(QtCore.Qt.Orientation.Vertical)
+        bar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
+        bar.setMovable(False)
+        bar.setIconSize(QtCore.QSize(16, 16))
+
+        act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
+            "Annotations",
+            self,
+        )
+        act.setObjectName("annotation_toolbar_toggle")
+        act.setCheckable(True)
+        act.setChecked(True)
+        act.setToolTip("Show/hide annotation table")
+        act.triggered.connect(self._toggle_annotation_dock)
+        bar.addAction(act)
+
+        self.annotation_toolbar = bar
+        self.annotation_toolbar_action = act
+
+        self.addToolBar(QtCore.Qt.RightToolBarArea, bar)
+
+        self.dock_annotations.visibilityChanged.connect(self._sync_annotation_toolbar)
+
+    def _toggle_annotation_dock(self, checked: bool) -> None:
+        """Show or hide the annotation dock when the toolbar toggles."""
+        if getattr(self, "dock_annotations", None) is None:
+            return
+        self.dock_annotations.setVisible(checked)
+        if checked:
+            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
+            self.dock_annotations.raise_()
+
+    def _sync_annotation_toolbar(self, visible: bool) -> None:
+        """Keep the toolbar toggle in sync with the annotation dock visibility."""
+        action = getattr(self, "annotation_toolbar_action", None)
+        if action is not None:
+            action.blockSignals(True)
+            action.setChecked(visible)
+            action.blockSignals(False)
     
     def _collapse_sidebar(self) -> None:
         """Collapse sidebar to slim activity bar only."""
@@ -183,15 +231,12 @@ class UiExtrasMixin:
         row = QtWidgets.QHBoxLayout()
         self.show_frame_chk = QtWidgets.QCheckBox("Frame")
         self.show_mean_chk = QtWidgets.QCheckBox("Mean")
-        self.show_comp_chk = QtWidgets.QCheckBox("Composite")
         self.show_support_chk = QtWidgets.QCheckBox("Support")
         self.show_frame_chk.setChecked(True)
         self.show_mean_chk.setChecked(True)
-        self.show_comp_chk.setChecked(True)
         self.show_support_chk.setChecked(False)
         row.addWidget(self.show_frame_chk)
         row.addWidget(self.show_mean_chk)
-        row.addWidget(self.show_comp_chk)
         row.addWidget(self.show_support_chk)
         vis_layout.addWidget(self.show_ann_master_chk)
         vis_layout.addLayout(row)
@@ -223,7 +268,7 @@ class UiExtrasMixin:
         target_group = QtWidgets.QGroupBox("Target panel")
         target_layout = QtWidgets.QVBoxLayout(target_group)
         self.target_group = QtWidgets.QButtonGroup()
-        for label in ["Frame", "Mean", "Composite", "Support"]:
+        for label in ["Frame", "Mean", "Support"]:
             btn = QtWidgets.QRadioButton(label)
             if label == "Mean":
                 btn.setChecked(True)
@@ -431,7 +476,6 @@ class UiExtrasMixin:
         target_map = {
             "frame": self.ax_frame,
             "mean": self.ax_mean,
-            "comp": self.ax_comp,
             "support": self.ax_support,
         }
         return target_map.get(self.annotate_target, self.ax_frame)
@@ -442,7 +486,6 @@ class UiExtrasMixin:
             for ax in [
                 self.ax_frame,
                 self.ax_mean,
-                self.ax_comp,
                 self.ax_support,
                 self.ax_std,
             ]
@@ -646,30 +689,29 @@ class UiExtrasMixin:
     def apply_preset(self, name: str) -> None:
         """Apply a named layout preset without overwriting saved custom layout."""
         self._preset_active = True
-        if name == "Default":
-                        # Default: sidebar on EXPLORE (index 0), Annotation Table visible right
-                        self._set_sidebar_mode(0)  # Explore panel
-                        self._expand_sidebar()
-                        if self.dock_annotations is not None:
-                            self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
-                            self.dock_annotations.setVisible(True)
-                        # Hide other docks
-                        for dock in [
-                            self.dock_roi,
-                            self.dock_roi_manager,
-                            self.dock_results,
-                            self.dock_hist,
-                            self.dock_profile,
-                            self.dock_logs,
-                            self.dock_threshold,
-                            self.dock_particles,
-                        ]:
-                            if dock is not None:
-                                dock.setVisible(False)
-                        return
 
-                    # Legacy Default behavior: restore saved geometry/state
-                    if name == "Default_Legacy":
+        if name == "Default":
+            # Default: sidebar on EXPLORE (index 0), annotation table visible on the right
+            self._set_sidebar_mode(0)
+            self._expand_sidebar()
+            if self.dock_annotations is not None:
+                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
+                self.dock_annotations.setVisible(True)
+            for dock in [
+                self.dock_roi,
+                self.dock_roi_manager,
+                self.dock_results,
+                self.dock_hist,
+                self.dock_profile,
+                self.dock_logs,
+                self.dock_threshold,
+                self.dock_particles,
+            ]:
+                if dock is not None:
+                    dock.setVisible(False)
+            return
+
+        if name == "Default_Legacy":
             if self._default_geometry is not None:
                 self.restoreGeometry(self._default_geometry)
             if self._default_state is not None:
@@ -681,17 +723,16 @@ class UiExtrasMixin:
             self.dock_sidebar.setVisible(True)
 
         if name == "Minimal":
-                        # Minimal: sidebar collapsed, annotation table hidden, only Frame panel visible
-                        self._collapse_sidebar()
-                        if self.dock_annotations is not None:
-                            self.dock_annotations.setVisible(False)
-                        # Hide all other docks
+            # Minimal: sidebar collapsed, annotation table hidden
+            self._collapse_sidebar()
+            if self.dock_annotations is not None:
+                self.dock_annotations.setVisible(False)
             for dock in [
                 self.dock_roi,
-                                self.dock_roi_manager,
-                                self.dock_results,
-                                self.dock_threshold,
-                                self.dock_particles,
+                self.dock_roi_manager,
+                self.dock_results,
+                self.dock_threshold,
+                self.dock_particles,
                 self.dock_hist,
                 self.dock_profile,
                 self.dock_logs,
@@ -701,13 +742,12 @@ class UiExtrasMixin:
             return
 
         if name == "Annotate":
-                        # Annotate: sidebar on ANNOTATE (index 1), Annotation Table visible right, others hidden
-                        self._set_sidebar_mode(1)  # Annotate panel
-                        self._expand_sidebar()
+            # Annotate: sidebar on ANNOTATE (index 1), annotation table visible
+            self._set_sidebar_mode(1)
+            self._expand_sidebar()
             if self.dock_annotations is not None:
                 self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
                 self.dock_annotations.setVisible(True)
-            # Hide all other docks (annotate panel has tools inside sidebar)
             for dock in [
                 self.dock_roi,
                 self.dock_roi_manager,
@@ -723,13 +763,12 @@ class UiExtrasMixin:
             return
 
         if name == "Analyze":
-            # Analyze: sidebar on ANALYZE (index 5), Results + Threshold bottom, Annotation Table visible
-            self._set_sidebar_mode(5)  # Analyze panel
+            # Analyze: sidebar on ANALYZE (index 5), results + threshold bottom, annotation table visible
+            self._set_sidebar_mode(5)
             self._expand_sidebar()
             if self.dock_annotations is not None:
                 self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
                 self.dock_annotations.setVisible(True)
-            # Show Results and Threshold in bottom area
             if self.dock_results is not None:
                 self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_results)
                 self.dock_results.setVisible(True)
@@ -738,21 +777,20 @@ class UiExtrasMixin:
                 self.dock_threshold.setVisible(True)
                 if self.dock_results is not None:
                     self.tabifyDockWidget(self.dock_results, self.dock_threshold)
-            # Hide histogram/profile/logs
             for dock in [
                 self.dock_roi,
                 self.dock_roi_manager,
                 self.dock_particles,
                 self.dock_hist,
                 self.dock_profile,
-                            ]:
-                                if dock is not None:
-                                    dock.setVisible(False)
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_logs)
-                self.dock_logs.setVisible(True)
+                self.dock_logs,
+            ]:
+                if dock is not None:
+                    dock.setVisible(False)
             if self.dock_orthoview is not None:
                 self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_orthoview)
                 self.dock_orthoview.setVisible(True)
+            return
 
     def closeEvent(self, event) -> None:
         """Persist layout before closing the main window."""

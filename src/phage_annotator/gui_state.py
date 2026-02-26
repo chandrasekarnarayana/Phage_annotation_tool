@@ -238,7 +238,7 @@ class StateMixin:
 
     @show_ann_frame.setter
     def show_ann_frame(self, value: bool) -> None:
-        self.controller.set_show_annotations(value, self.show_ann_mean, self.show_ann_comp)
+        self.controller.set_show_annotations(value, self.show_ann_mean)
 
     @property
     def show_ann_mean(self) -> bool:
@@ -246,15 +246,7 @@ class StateMixin:
 
     @show_ann_mean.setter
     def show_ann_mean(self, value: bool) -> None:
-        self.controller.set_show_annotations(self.show_ann_frame, value, self.show_ann_comp)
-
-    @property
-    def show_ann_comp(self) -> bool:
-        return self.controller.view_state.show_ann_comp
-
-    @show_ann_comp.setter
-    def show_ann_comp(self, value: bool) -> None:
-        self.controller.set_show_annotations(self.show_ann_frame, self.show_ann_mean, value)
+        self.controller.set_show_annotations(self.show_ann_frame, value)
 
     @property
     def _annotations_dirty(self) -> bool:
@@ -547,12 +539,6 @@ class StateMixin:
         cached = self.proj_cache.get(key)
         if cached is not None:
             return cached, True
-        if kind == "composite":
-            mean_key = self._projection_key(img, "mean")
-            mean_cached = self.proj_cache.get(mean_key)
-            if mean_cached is not None:
-                self.proj_cache.put(key, mean_cached)
-                return mean_cached, True
         self._request_projection_job(img)
         return None, False
 
@@ -564,11 +550,9 @@ class StateMixin:
         t_sel, z_sel = -1, -1
         key_mean = (img.id, "mean", crop_rect, t_sel, z_sel)
         key_std = (img.id, "std", crop_rect, t_sel, z_sel)
-        key_comp = (img.id, "composite", crop_rect, t_sel, z_sel)
         if (
             key_mean in self._projection_jobs
             or key_std in self._projection_jobs
-            or key_comp in self._projection_jobs
         ):
             return
         if img.array is None:
@@ -605,10 +589,8 @@ class StateMixin:
                 return
             key_base = (image_id, "mean", crop_key, t_key, z_key)
             key_std_local = (image_id, "std", crop_key, t_key, z_key)
-            key_comp_local = (image_id, "composite", crop_key, t_key, z_key)
             self.proj_cache.put(key_base, mean_proj)
             self.proj_cache.put(key_std_local, std_proj)
-            self.proj_cache.put(key_comp_local, mean_proj)
             if job_id_holder["id"] is not None:
                 self._clear_projection_job_name(job_id_holder["id"])
             # PHASE 2D FIX: Use debounce timer to trigger refresh asynchronously.
@@ -633,7 +615,6 @@ class StateMixin:
             job_id_holder["id"] = handle.job_id
             self._projection_jobs[key_mean] = handle.job_id
             self._projection_jobs[key_std] = handle.job_id
-            self._projection_jobs[key_comp] = handle.job_id
         else:
             try:
                 result = _job(lambda _v, _m="": None, CancelTokenShim())

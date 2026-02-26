@@ -523,8 +523,6 @@ class DisplayControlsMixin:
             self.annotate_target = "frame"
         elif buttons[1].isChecked():
             self.annotate_target = "mean"
-        elif buttons[2].isChecked():
-            self.annotate_target = "comp"
         else:
             self.annotate_target = "support"
 
@@ -637,14 +635,8 @@ class DisplayControlsMixin:
         use_roi = self.auto_roi_chk.isChecked()
         scope = self.auto_scope_combo.currentText()
         target = self.auto_target_combo.currentText()
-
-        def _current_panel_id() -> str:
-            if self.annotate_target == "comp":
-                return "composite"
-            return self.annotate_target
-
         if target == "Current panel":
-            panel_ids = [_current_panel_id()]
+            panel_ids = [self.annotate_target]
         else:
             panel_ids = [
                 panel for panel, visible in self._panel_visibility.items() if visible

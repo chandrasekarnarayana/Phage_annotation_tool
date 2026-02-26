@@ -1,4 +1,4 @@
-"""Command pattern for undo/redo of view state operations (P3.1).
+"""Undo/redo command framework for view state changes.
 
 This module extends the existing annotation undo/redo system to support
 view state operations like ROI changes, crop operations, display mapping
