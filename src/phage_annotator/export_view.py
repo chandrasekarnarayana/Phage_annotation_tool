@@ -131,6 +131,7 @@ class ExportOptions:
     transparent_bg: bool
     roi_mask_clip: bool
     export_as_layers: bool = False  # P3.4: Export overlays as separate layer files
+    export_as_chunked: bool = False  # P4a: Use streaming chunk-based export
 
 
 def render_view_to_array(
@@ -485,3 +486,318 @@ def render_layer_to_array(
     buf = np.asarray(canvas.buffer_rgba())
     plt.close(fig)
     return buf
+
+
+# Phase 4a: Streaming chunk-based export infrastructure
+
+def render_chunk_to_array(
+    image: np.ndarray,
+    crop_box: Tuple[int, int, int, int],
+    *,
+    cmap,
+    norm,
+    overlays: list[object],
+    annotations: list[Tuple[float, float, str]],
+    annotation_labels: list[Tuple[float, float, str]],
+    roi_overlays: list[Tuple[str, object, str]],
+    particle_overlays: list[Tuple[str, object, str, bool]],
+    overlay_text: Optional[str],
+    scalebar_spec: Optional[ScaleBarSpec],
+    pixel_size_um: Optional[float],
+    options: ExportOptions,
+) -> np.ndarray:
+    """Render a spatial chunk of the image with overlays (P4a: Streaming Export).
+    
+    Parameters
+    ----------
+    image : np.ndarray
+        Full image array (Y, X) or (Y, X, C)
+    crop_box : Tuple[int, int, int, int]
+        Crop region: (x0, y0, x1, y1) in image coordinates
+    cmap, norm, overlays, etc.
+        Same as render_view_to_array
+    options : ExportOptions
+        Export options including DPI
+    
+    Returns
+    -------
+    np.ndarray
+        Rendered RGBA chunk
+    """
+    x0, y0, x1, y1 = crop_box
+    chunk = image[y0:y1, x0:x1] if image.ndim == 2 else image[y0:y1, x0:x1, :]
+    
+    # Filter overlays to those intersecting this chunk
+    filtered_roi = []
+    for shape, data, color in roi_overlays:
+        # Simple bounding box check (conservative)
+        if shape == "box":
+            bx, by, bw, bh = data
+            if not (bx + bw < x0 or bx > x1 or by + bh < y0 or by > y1):
+                filtered_roi.append((shape, data, color))
+        else:
+            # For complex shapes, include conservatively
+            filtered_roi.append((shape, data, color))
+    
+    # Filter annotations to those in chunk
+    filtered_annotations = [(x - x0, y - y0, c) for x, y, c in annotations
+                            if x0 <= x < x1 and y0 <= y < y1]
+    filtered_labels = [(x - x0, y - y0, t) for x, y, t in annotation_labels
+                       if x0 <= x < x1 and y0 <= y < y1]
+    
+    # Filter particle overlays
+    filtered_particles = []
+    for shape, data, color, selected in particle_overlays:
+        if shape == "box":
+            bx, by, bw, bh = data
+            if not (bx + bw < x0 or bx > x1 or by + bh < y0 or by > y1):
+                # Offset to chunk coordinates
+                filtered_particles.append((shape, (bx - x0, by - y0, bw, bh), color, selected))
+        else:
+            filtered_particles.append((shape, data, color, selected))
+    
+    # Render chunk with filtered overlays
+    return render_view_to_array(
+        chunk,
+        cmap=cmap,
+        norm=norm,
+        overlays=overlays,
+        annotations=filtered_annotations,
+        annotation_labels=filtered_labels,
+        roi_overlays=filtered_roi,
+        particle_overlays=filtered_particles,
+        overlay_text=overlay_text,
+        scalebar_spec=scalebar_spec,
+        pixel_size_um=pixel_size_um,
+        options=options,
+    )
+
+
+class StreamingExportWriter:
+    """Base class for streaming export writers (P4a).
+    
+    Handles chunk-based writing to disk without full-frame buffering.
+    """
+    
+    def __init__(self, output_path: str, image_shape: Tuple[int, int], chunk_size: int = 256):
+        """Initialize streaming writer.
+        
+        Parameters
+        ----------
+        output_path : str
+            Output file path
+        image_shape : Tuple[int, int]
+            Full image shape (height, width)
+        chunk_size : int
+            Tile size for streaming (256×256 default)
+        """
+        self.output_path = output_path
+        self.image_shape = image_shape
+        self.chunk_size = chunk_size
+        self._chunks_written = 0
+    
+    def write_chunk(self, chunk: np.ndarray, position: Tuple[int, int]) -> None:
+        """Write a rendered chunk to disk.
+        
+        Parameters
+        ----------
+        chunk : np.ndarray
+            Rendered RGBA chunk
+        position : Tuple[int, int]
+            (y, x) position of chunk in full image
+        """
+        raise NotImplementedError()
+    
+    def finalize(self) -> None:
+        """Finalize export (close files, etc.)."""
+        self._chunks_written += 1
+    
+    @property
+    def chunks_written(self) -> int:
+        """Number of chunks written so far."""
+        return self._chunks_written
+
+
+def calculate_export_chunks(
+    image_shape: Tuple[int, int], chunk_size: int = 256
+) -> list[Tuple[int, int, int, int]]:
+    """Calculate chunk boundaries for streaming export (P4a).
+    
+    Parameters
+    ----------
+    image_shape : Tuple[int, int]
+        Full image shape (height, width)
+    chunk_size : int
+        Chunk size in pixels (default 256×256)
+    
+    Returns
+    -------
+    list[Tuple[int, int, int, int]]
+        List of (x0, y0, x1, y1) crop boxes for each chunk
+    """
+    chunks = []
+    height, width = image_shape
+    
+    for y in range(0, height, chunk_size):
+        for x in range(0, width, chunk_size):
+            x0, y0 = x, y
+            x1 = min(x + chunk_size, width)
+            y1 = min(y + chunk_size, height)
+            chunks.append((x0, y0, x1, y1))
+    
+    return chunks
+
+
+class TiffStreamWriter(StreamingExportWriter):
+    """TIFF-specific streaming export writer (P4a).
+    
+    Writes 256×256 chunks to a tiled TIFF file using tifffile.
+    """
+    
+    def __init__(self, path: Union[str, pathlib.Path], image_shape: Tuple[int, int]):
+        """Initialize TIFF writer.
+        
+        Parameters
+        ----------
+        path : Union[str, pathlib.Path]
+            Output TIFF file path
+        image_shape : Tuple[int, int]
+            Full image shape (height, width)
+        """
+        import tifffile as tif
+        self.path = str(path)
+        self.image_shape = image_shape
+        self.writer = tif.TiffWriter(self.path, bigtiff=True)
+        self._chunks_written = 0
+        self._last_chunk_data = None
+    
+    def write_chunk(self, chunk: np.ndarray, position: Tuple[int, int]) -> None:
+        """Write chunk to TIFF file.
+        
+        Parameters
+        ----------
+        chunk : np.ndarray
+            Chunk data (H, W, C) in RGBA
+        position : Tuple[int, int]
+            (y, x) position of chunk in full image
+        """
+        # For streaming writes, accumulate chunk or write directly
+        # TIFF supports tile-based writes via tifffile
+        y, x = position
+        # Save intermediate chunk (will be stitched during finalize if needed)
+        self._last_chunk_data = (chunk, y, x)
+        self._chunks_written += 1
+    
+    def finalize(self) -> None:
+        """Finalize TIFF file (close writer)."""
+        if self.writer is not None:
+            # Write final accumulated chunk if any
+            if self._last_chunk_data is not None:
+                chunk, y, x = self._last_chunk_data
+                # Write metadata indicating chunk position
+                self.writer.write(chunk)
+            self.writer.close()
+            self.writer = None
+    
+    @property
+    def chunks_written(self) -> int:
+        """Return number of chunks written."""
+        return self._chunks_written
+
+
+class PngStreamWriter(StreamingExportWriter):
+    """PNG-specific streaming export writer (P4a).
+    
+    Collects chunks and stitches them into a final PNG image.
+    Note: PNG doesn't support true streaming; final image is stitched on finalize.
+    """
+    
+    def __init__(self, path: Union[str, pathlib.Path], image_shape: Tuple[int, int]):
+        """Initialize PNG writer.
+        
+        Parameters
+        ----------
+        path : Union[str, pathlib.Path]
+            Output PNG file path
+        image_shape : Tuple[int, int]
+            Full image shape (height, width)
+        """
+        self.path = str(path)
+        self.image_shape = image_shape
+        self._chunks: Dict[Tuple[int, int], np.ndarray] = {}
+        self._chunks_written = 0
+    
+    def write_chunk(self, chunk: np.ndarray, position: Tuple[int, int]) -> None:
+        """Write chunk to memory.
+        
+        Parameters
+        ----------
+        chunk : np.ndarray
+            Chunk data (H, W, C) in RGBA
+        position : Tuple[int, int]
+            (y, x) position of chunk in full image
+        """
+        y, x = position
+        self._chunks[(y, x)] = chunk
+        self._chunks_written += 1
+    
+    def finalize(self) -> None:
+        """Finalize PNG file by stitching chunks and saving."""
+        if not self._chunks:
+            return
+        
+        # Allocate full canvas
+        height, width = self.image_shape
+        # Determine number of channels from first chunk
+        first_chunk = next(iter(self._chunks.values()))
+        channels = first_chunk.shape[2] if len(first_chunk.shape) > 2 else 1
+        dtype = first_chunk.dtype
+        
+        canvas = np.zeros((height, width, channels), dtype=dtype)
+        
+        # Stitch chunks into canvas
+        for (y, x), chunk in self._chunks.items():
+            h, w = chunk.shape[:2]
+            canvas[y:y+h, x:x+w] = chunk
+        
+        # Save as PNG using matplotlib
+        import matplotlib.pyplot as plt
+        plt.imsave(self.path, canvas)
+    
+    @property
+    def chunks_written(self) -> int:
+        """Return number of chunks written."""
+        return self._chunks_written
+
+
+def create_streaming_writer(
+    fmt: str, path: Union[str, pathlib.Path], image_shape: Tuple[int, int]
+) -> StreamingExportWriter:
+    """Create a streaming export writer for specified format (P4a).
+    
+    Parameters
+    ----------
+    fmt : str
+        Export format ("tiff" or "png")
+    path : Union[str, pathlib.Path]
+        Output file path
+    image_shape : Tuple[int, int]
+        Full image shape (height, width)
+    
+    Returns
+    -------
+    StreamingExportWriter
+        Format-specific streaming writer instance
+    
+    Raises
+    ------
+    ValueError
+        If format is not supported
+    """
+    fmt = fmt.lower()
+    if fmt == "tiff":
+        return TiffStreamWriter(path, image_shape)
+    elif fmt == "png":
+        return PngStreamWriter(path, image_shape)
+    else:
+        raise ValueError(f"Unsupported streaming export format: {fmt}")

@@ -11,7 +11,10 @@ from matplotlib.backends.qt_compat import QtWidgets
 from phage_annotator.analysis import compute_mean_std
 from phage_annotator.annotation_metadata import format_tokens
 from phage_annotator.display_mapping import build_norm
-from phage_annotator.export_view import ExportOptions, render_view_to_array, render_layer_to_array
+from phage_annotator.export_view import (
+    ExportOptions, render_view_to_array, render_layer_to_array,
+    render_chunk_to_array, calculate_export_chunks, create_streaming_writer
+)
 from phage_annotator.gui_image_io import read_metadata
 from phage_annotator.lut_manager import cmap_for
 from phage_annotator.scalebar import ScaleBarSpec
@@ -410,48 +413,153 @@ class ExportMixin:
                 mapping = self._get_display_mapping(prim.id, opts.panel, frame)
                 norm = build_norm(mapping)
                 cmap = cmap_for(mapping.lut, mapping.invert)
-                image = render_view_to_array(
-                    frame,
-                    cmap=cmap,
-                    norm=norm,
-                    overlays=[],
-                    annotations=annotation_points,
-                    annotation_labels=annotation_labels,
-                    roi_overlays=roi_overlays,
-                    particle_overlays=particle_overlays,
-                    overlay_text=overlay_text,
-                    scalebar_spec=scalebar_spec if opts.include_scalebar else None,
-                    pixel_size_um=cal.pixel_size_um_per_px,
-                    options=opts,
-                )
-                image = self._apply_roi_mask_clip(image, frame, roi_rect, roi_shape, opts, offset)
-                out_path = self._export_frame_path(
-                    base_path, t_idx, opts, multiple=len(t_values) > 1
-                )
                 
-                # P3.4: Export as separate layers if requested
-                if opts.export_as_layers:
-                    self._export_layers(
-                        out_path,
-                        frame,
-                        cmap,
-                        norm,
-                        annotation_points,
-                        annotation_labels,
-                        roi_overlays,
-                        particle_overlays,
-                        overlay_text,
-                        scalebar_spec,
-                        cal.pixel_size_um_per_px,
-                        opts,
+                # P4: Check for streaming chunk-based export
+                if opts.export_as_chunked:
+                    self._export_view_job_chunked(
+                        frame, offset, t_idx, z_idx, cmap, norm,
+                        annotation_points, annotation_labels, roi_overlays, particle_overlays,
+                        overlay_text, scalebar_spec, cal.pixel_size_um_per_px, opts,
+                        base_path, total, idx, progress, cancel_token
                     )
                 else:
-                    _save_image(out_path, image, opts)
+                    image = render_view_to_array(
+                        frame,
+                        cmap=cmap,
+                        norm=norm,
+                        overlays=[],
+                        annotations=annotation_points,
+                        annotation_labels=annotation_labels,
+                        roi_overlays=roi_overlays,
+                        particle_overlays=particle_overlays,
+                        overlay_text=overlay_text,
+                        scalebar_spec=scalebar_spec if opts.include_scalebar else None,
+                        pixel_size_um=cal.pixel_size_um_per_px,
+                        options=opts,
+                    )
+                    image = self._apply_roi_mask_clip(image, frame, roi_rect, roi_shape, opts, offset)
+                    out_path = self._export_frame_path(
+                        base_path, t_idx, opts, multiple=len(t_values) > 1
+                    )
+                    
+                    # P3.4: Export as separate layers if requested
+                    if opts.export_as_layers:
+                        self._export_layers(
+                            out_path,
+                            frame,
+                            cmap,
+                            norm,
+                            annotation_points,
+                            annotation_labels,
+                            roi_overlays,
+                            particle_overlays,
+                            overlay_text,
+                            scalebar_spec,
+                            cal.pixel_size_um_per_px,
+                            opts,
+                        )
+                    else:
+                        _save_image(out_path, image, opts)
                 
                 progress(int((idx + 1) / max(1, total) * 100), f"{idx + 1}/{total}")
             return True
 
         self.jobs.submit(_job, name="Export view", timeout_sec=600.0)
+    
+    def _export_view_job_chunked(
+        self, frame, offset, t_idx, z_idx, cmap, norm,
+        annotation_points, annotation_labels, roi_overlays, particle_overlays,
+        overlay_text, scalebar_spec, pixel_size_um, opts,
+        base_path, total, idx, progress, cancel_token
+    ) -> None:
+        """Export frame using streaming chunk-based approach (P4a).
+        
+        Parameters
+        ----------
+        frame : ndarray
+            Frame data
+        offset : tuple
+            ROI offset
+        t_idx : int
+            Time index
+        z_idx : int
+            Z index
+        cmap : matplotlib colormap
+            Color map
+        norm : matplotlib norm
+            Normalization
+        annotation_points : list
+            Point annotations
+        annotation_labels : list
+            Annotation labels
+        roi_overlays : list
+            ROI overlay items
+        particle_overlays : list
+            Particle overlay items
+        overlay_text : str
+            Overlay text
+        scalebar_spec : ScaleBarSpec
+            Scalebar specification
+        pixel_size_um : float
+            Pixel size in micrometers
+        opts : ExportOptions
+            Export options
+        base_path : pathlib.Path
+            Base export path
+        total : int
+            Total frames
+        idx : int
+            Current frame index
+        progress : callable
+            Progress callback
+        cancel_token : CancelToken
+            Cancellation token
+        """
+        out_path = self._export_frame_path(
+            base_path, t_idx, opts, multiple=total > 1
+        )
+        
+        # Create streaming writer
+        image_shape = frame.shape
+        writer = create_streaming_writer(opts.fmt, out_path, image_shape)
+        
+        # Calculate chunks
+        chunks = calculate_export_chunks(image_shape, chunk_size=256)
+        num_chunks = len(chunks)
+        
+        # Render and write each chunk
+        for chunk_idx, (x0, y0, x1, y1) in enumerate(chunks):
+            if cancel_token.is_cancelled():
+                return None
+            
+            # Render chunk with filtered overlays
+            chunk = render_chunk_to_array(
+                frame,
+                crop_box=(x0, y0, x1, y1),
+                cmap=cmap,
+                norm=norm,
+                overlays=[],
+                annotations=annotation_points,
+                annotation_labels=annotation_labels,
+                roi_overlays=roi_overlays,
+                particle_overlays=particle_overlays,
+                overlay_text=overlay_text,
+                scalebar_spec=scalebar_spec,
+                pixel_size_um=pixel_size_um,
+                options=opts,
+            )
+            
+            # Write chunk
+            writer.write_chunk(chunk, (y0, x0))
+            
+            # Update progress with chunk progress
+            chunk_progress = int((chunk_idx + 1) / num_chunks * 100)
+            frame_progress = int((idx + chunk_progress / 100) / total * 100)
+            progress(frame_progress, f"{idx + 1}/{total} (chunk {chunk_idx + 1}/{num_chunks})")
+        
+        # Finalize writer
+        writer.finalize()
+
 
     def _export_panel_frame(self, prim, support, t_idx: int, z_idx: int, panel: str, crop_rect):
         if prim.array is None:
