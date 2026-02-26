@@ -1,4 +1,4 @@
-"""Phase 5 tests: Array pooling and reuse (P5)."""
+"""Array pooling and reuse tests."""
 
 from __future__ import annotations
 

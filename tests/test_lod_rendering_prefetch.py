@@ -1,11 +1,11 @@
-"""Phase 2: LOD-First Rendering and Pyramid Prefetch tests.
+"""LOD-first rendering and pyramid prefetch tests.
 
-Phase 2a: LOD-First Rendering
+LOD-first rendering:
 - When full-res projection is missing, return 8x pyramid level as fallback
 - Mark image as being in LOD mode while full-res loads
 - Automatically transition to full-res when available
 
-Phase 2b: Pyramid Prefetch  
+Pyramid prefetch:
 - Schedule pyramid jobs (8x, 4x, 2x) alongside full-res
 - Ensures LOD preview is available faster than full-res computation
 """
@@ -18,8 +18,8 @@ from phage_annotator.projection_cache import ProjectionCache, CacheTelemetry
 from phage_annotator.image_models import LazyImage
 
 
-class TestLODFirstRenderingPhase2a:
-    """Test Phase 2a: LOD-First Rendering."""
+class TestLodFirstRendering:
+    """Test LOD-first rendering."""
 
     def test_lod_mode_flag_initialization(self):
         """Verify _lod_mode_active dict is initialized."""
@@ -109,8 +109,8 @@ class TestLODFirstRenderingPhase2a:
         assert actual_ratio >= 60  # Allow some floating point tolerance
 
 
-class TestPyramidPrefetchPhase2b:
-    """Test Phase 2b: Pyramid Prefetch."""
+class TestPyramidPrefetch:
+    """Test pyramid prefetch."""
 
     def test_pyramid_prefetch_levels_3_2_1(self):
         """Verify pyramid levels 3, 2, 1 are scheduled for prefetch."""
@@ -200,8 +200,8 @@ class TestPyramidPrefetchPhase2b:
         assert cached.shape == (64, 64)
 
 
-class TestPhase2Integration:
-    """Integration tests for Phase 2 LOD + Prefetch."""
+class TestLodPrefetchIntegration:
+    """Integration tests for LOD and prefetch."""
 
     def test_lod_fallback_when_full_res_loading(self):
         """Verify LOD fallback integrates with full-res loading."""
@@ -282,12 +282,12 @@ class TestPhase2Integration:
         
         assert len(pyramid_jobs) == 0
 
-    def test_phase2a_backward_compatible_with_phase1(self):
-        """Phase 2a should not break Phase 1 (thrashing detection)."""
+    def test_lod_prefetch_backward_compatible_with_thrashing_detection(self):
+        """LOD/prefetch should not break thrashing detection."""
         cache = ProjectionCache(max_mb=10)
         telemetry = cache.telemetry()
         
-        # Phase 1a functionality should still work
+        # Thrashing detection functionality should still work
         assert hasattr(telemetry, 'is_thrashing')
         assert hasattr(telemetry, 'reset_cycle')
         assert hasattr(telemetry, 'hits_this_cycle')

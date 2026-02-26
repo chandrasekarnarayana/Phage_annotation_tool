@@ -3,3 +3,31 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+env/
+
+# Build/distribution artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Test/coverage outputs
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Lint/type-check caches
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Editor/OS files
+.DS_Store
+.idea/
+.vscode/

@@ -1,14 +1,14 @@
-"""Phase 1 tests: Thrashing detection and dtype optimization.
+"""Cache thrashing detection and overlay dtype normalization tests.
 
-P1a: Thrashing Detection
-  - verify is_thrashing() returns False initially
-  - simulate thrashing (many evictions, few hits)
-  - verify is_thrashing() returns True under threshold
-  
-P1b: Dtype Enforcement
-  - verify _normalize_overlay_to_uint8() converts float to uint8
-  - verify uint8 is preserved
-  - verify bool is converted to uint8 (0 or 255)
+Thrashing detection:
+    - verify is_thrashing() returns False initially
+    - simulate thrashing (many evictions, few hits)
+    - verify is_thrashing() returns True under threshold
+
+Overlay dtype normalization:
+    - verify _normalize_overlay_to_uint8() converts float to uint8
+    - verify uint8 is preserved
+    - verify bool is converted to uint8 (0 or 255)
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from phage_annotator.render_mpl import _normalize_overlay_to_uint8
 
 
 class TestThrashingDetection:
-    """Test cache thrashing detection (P1a)."""
+    """Test cache thrashing detection."""
 
     def test_telemetry_no_thrashing_initially(self):
         """Verify thrashing is False when no activity."""
@@ -94,7 +94,7 @@ class TestThrashingDetection:
 
 
 class TestDtypeOptimization:
-    """Test overlay dtype enforcement (P1b)."""
+    """Test overlay dtype normalization."""
 
     def test_normalize_uint8_preserved(self):
         """Verify uint8 is preserved as-is."""

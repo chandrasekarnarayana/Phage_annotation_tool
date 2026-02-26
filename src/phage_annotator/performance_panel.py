@@ -155,6 +155,17 @@ class PerformancePanel(QtWidgets.QWidget):
         self.cache_lod_mode_label.setStyleSheet("font-family: monospace;")
         layout.addWidget(self.cache_lod_mode_label, 6, 1)
 
+        # Component memory tracking (P7e)
+        layout.addWidget(QtWidgets.QLabel("Main proj:"), 7, 0)
+        self.cache_component_main_label = QtWidgets.QLabel("0 MB")
+        self.cache_component_main_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.cache_component_main_label, 7, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Pyramid:"), 8, 0)
+        self.cache_component_pyramid_label = QtWidgets.QLabel("0 MB")
+        self.cache_component_pyramid_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.cache_component_pyramid_label, 8, 1)
+
         return group
 
     def _create_jobs_group(self) -> QtWidgets.QGroupBox:
@@ -358,6 +369,16 @@ class PerformancePanel(QtWidgets.QWidget):
         else:
             self.cache_lod_mode_label.setText("OFF")
             self.cache_lod_mode_label.setStyleSheet("font-family: monospace;")
+
+        # Component memory tracking (P7e)
+        try:
+            main_bytes, main_mb = self.cache.get_component_usage('projection_main')
+            pyr_bytes, pyr_mb = self.cache.get_component_usage('projection_pyramid')
+            self.cache_component_main_label.setText(f"{main_mb} MB")
+            self.cache_component_pyramid_label.setText(f"{pyr_mb} MB")
+        except AttributeError:
+            # Component tracking not available (older cache instance)
+            pass
 
         # Progress bar
         percent = int((mb_used / mb_budget * 100)) if mb_budget > 0 else 0

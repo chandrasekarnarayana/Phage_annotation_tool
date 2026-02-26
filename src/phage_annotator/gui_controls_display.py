@@ -308,6 +308,80 @@ class DisplayControlsMixin:
                     self._refresh_metadata_dock(self.primary_image.id)
                     self._maybe_autoload_annotations(self.primary_image.id)
                     self._refresh_image()
+                    # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
+                    self._schedule_adjacent_fov_prefetch()
+
+    def _schedule_adjacent_fov_prefetch(self) -> None:
+        """Schedule low-priority prefetch of adjacent FOVs (P7c).
+        
+        When user navigates to a new FOV in a multi-FOV grid, detect and prefetch
+        adjacent FOVs (up, down, left, right) to enable faster navigation.
+        Uses lazy decompression (P7b) for bandwidth efficiency.
+        """
+        try:
+            # Check if FOV grid is configured
+            app_config = self.controller.app_config if hasattr(self.controller, 'app_config') else None
+            if app_config is None or not app_config.enable_fov_prefetch:
+                return
+            
+            cols = app_config.fov_grid_cols
+            rows = app_config.fov_grid_rows
+            if cols <= 0 or rows <= 0:
+                return  # Grid not configured
+            
+            current_idx = self.current_image_idx
+            
+            # Get adjacent FOV indices
+            adjacent_ids = self.proj_cache.get_adjacent_fov_ids(current_idx, cols, rows)
+            if not adjacent_ids:
+                return
+            
+            # Check if we should prefetch (cache not full, not thrashing)
+            if not self.proj_cache.should_prefetch_adjacent(current_idx):
+                return
+            
+            # Schedule low-priority prefetch for each adjacent FOV
+            for adj_idx in adjacent_ids:
+                if adj_idx < 0 or adj_idx >= len(self.images):
+                    continue
+                
+                adj_image = self.images[adj_idx]
+                
+                # Use lazy decompression (P7b) for bandwidth efficiency
+                # Check disk cache first via lazy load
+                def _lazy_prefetch_fn(img, callback_mgr):
+                    """Background job to prefetch adjacent FOV using lazy decomp"""
+                    try:
+                        crop_rect = self._cache_crop_rect(img) if hasattr(self, '_cache_crop_rect') else (0.0, 0.0, 0.0, 0.0)
+                        
+                        # Try lazy decompression from disk cache (P7b)
+                        for kind in ['mean', 'std']:
+                            key = (img.id, kind, crop_rect, -1, -1)
+                            buffer = self.proj_cache.get_lazy(key)
+                            if buffer is not None:
+                                # Got compressed buffer; decompress to reload to memory
+                                data = buffer.decompress_full()
+                                self.proj_cache.put(key, data)
+                            elif img.array is not None:
+                                # Not in disk cache; compute and cache
+                                from phage_annotator.analysis import compute_mean_std
+                                mean_proj, std_proj = compute_mean_std(img.array)
+                                self.proj_cache.put((img.id, 'mean', crop_rect, -1, -1), mean_proj)
+                                self.proj_cache.put((img.id, 'std', crop_rect, -1, -1), std_proj)
+                    except Exception as e:
+                        logger = __import__('logging').getLogger(__name__)
+                        logger.debug(f"Adjacent FOV prefetch failed for {adj_image.id}: {e}")
+                
+                # Queue low-priority background job
+                self.jobs.submit(
+                    lambda img=adj_image: _lazy_prefetch_fn(img, self.jobs),
+                    name=f"Prefetch FOV {adj_idx}",
+                    on_error=lambda e: None,  # Silently ignore prefetch errors
+                )
+        
+        except Exception as e:
+            logger = __import__('logging').getLogger(__name__)
+            logger.debug(f"FOV prefetch scheduling failed: {e}")
 
     def _set_support_combo(self, idx: int) -> None:
         if 0 <= idx < len(self.images):

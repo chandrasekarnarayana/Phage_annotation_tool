@@ -3,7 +3,7 @@ import pytest
 
 
 @pytest.mark.gui
-# Phase 2D COMPLETED: Widget initialization issues resolved by adding all missing widgets
+# Widget initialization issues resolved by adding all missing widgets.
 # to gui_ui_setup.py. GUI now launches successfully. Re-enabling test.
 def test_gui_launch(qtbot, tmp_path) -> None:
     pytest.importorskip("PyQt5")
@@ -19,7 +19,7 @@ def test_gui_launch(qtbot, tmp_path) -> None:
 
 
 @pytest.mark.gui
-# Phase 2D COMPLETED: Widget initialization issues resolved. Re-enabling test.
+# Widget initialization issues resolved. Re-enabling test.
 def test_gui_visual_regression(qtbot, tmp_path) -> None:
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image

@@ -1,4 +1,4 @@
-"""Phase 4 tests: Streaming chunk-based export (P4a)."""
+"""Streaming chunk-based export tests."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from phage_annotator.export_view import (
 
 
 class TestCalculateExportChunks(unittest.TestCase):
-    """Tests for chunk boundary calculation (P4a)."""
+    """Tests for chunk boundary calculation."""
 
     def test_calculate_chunks_even_dimensions(self):
         """Test chunk calculation with even dimensions (512×512 image)."""

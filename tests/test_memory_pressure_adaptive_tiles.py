@@ -1,13 +1,13 @@
-"""Phase 3: Memory Pressure Monitoring and Adaptive Tile Sizing tests.
+"""Memory pressure monitoring and adaptive tile sizing tests.
 
-Phase 3a: Memory Pressure Monitoring
+Memory pressure monitoring:
 - Monitor available system RAM via psutil
 - Detect memory pressure: HIGH (<20%), MEDIUM (20-80%), LOW (>80%)
 - Show real-time status in performance panel
 - Trigger mitigation when pressure threshold exceeded
 
-Phase 3b: Adaptive Tile Sizing
-- Reduce inference tile size from 512 → 256 → 128 under memory pressure
+Adaptive tile sizing:
+- Reduce inference tile size from 512 -> 256 -> 128 under memory pressure
 - Persist settings in AppConfig
 - Display current tile size in status
 """
@@ -23,8 +23,8 @@ except ImportError:
     HAS_PSUTIL = False
 
 
-class TestMemoryPressureMonitoringPhase3a:
-    """Test Phase 3a: Memory Pressure Monitoring."""
+class TestMemoryPressureMonitoring:
+    """Test memory pressure monitoring."""
 
     @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not available")
     def test_memory_pressure_thresholds_defined(self):
@@ -131,8 +131,8 @@ class TestMemoryPressureMonitoringPhase3a:
         assert memory_pressure_active is True
 
 
-class TestAdaptiveTileSizingPhase3b:
-    """Test Phase 3b: Adaptive Tile Sizing."""
+class TestAdaptiveTileSizing:
+    """Test adaptive tile sizing."""
 
     def test_adaptive_tile_size_initialization(self):
         """Verify adaptive tile size is initialized."""
@@ -283,8 +283,8 @@ class TestMemoryMitigationStrategies:
         assert images_cleared
 
 
-class TestPhase3Integration:
-    """Integration tests for Phase 3."""
+class TestMemoryPressureIntegration:
+    """Integration tests for memory pressure and tile sizing."""
 
     @pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not available")
     def test_pressure_monitoring_integrates_with_panel(self):
