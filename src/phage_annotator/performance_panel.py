@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
+from phage_annotator.array_pool import ARRAY_POOL
+
 try:
     import psutil
     HAS_PSUTIL = True
@@ -82,6 +84,10 @@ class PerformancePanel(QtWidgets.QWidget):
         # Ring buffer section
         buffer_group = self._create_buffer_group()
         layout.addWidget(buffer_group)
+
+        # Array pool section (P5)
+        pool_group = self._create_pool_group()
+        layout.addWidget(pool_group)
 
         # System memory section (P3a)
         if HAS_PSUTIL:
@@ -201,6 +207,38 @@ class PerformancePanel(QtWidgets.QWidget):
 
         return group
 
+    def _create_pool_group(self) -> QtWidgets.QGroupBox:
+        """Create array pool telemetry group box (P5)."""
+        group = QtWidgets.QGroupBox("Array Pool (P5)")
+        layout = QtWidgets.QGridLayout(group)
+
+        layout.addWidget(QtWidgets.QLabel("Hits:"), 0, 0)
+        self.pool_hits_label = QtWidgets.QLabel("0")
+        self.pool_hits_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.pool_hits_label, 0, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Misses:"), 1, 0)
+        self.pool_misses_label = QtWidgets.QLabel("0")
+        self.pool_misses_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.pool_misses_label, 1, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Hit rate:"), 2, 0)
+        self.pool_hit_rate_label = QtWidgets.QLabel("0.0%")
+        self.pool_hit_rate_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.pool_hit_rate_label, 2, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Entries:"), 3, 0)
+        self.pool_entries_label = QtWidgets.QLabel("0")
+        self.pool_entries_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.pool_entries_label, 3, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Drops:"), 4, 0)
+        self.pool_drops_label = QtWidgets.QLabel("0")
+        self.pool_drops_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.pool_drops_label, 4, 1)
+
+        return group
+
     def _create_memory_group(self) -> QtWidgets.QGroupBox:
         """Create system memory pressure group box (P3a)."""
         group = QtWidgets.QGroupBox("System Memory (P3a)")
@@ -264,9 +302,21 @@ class PerformancePanel(QtWidgets.QWidget):
         self._update_cache_metrics()
         self._update_jobs_metrics()
         self._update_buffer_metrics()
+        self._update_pool_metrics()
         if HAS_PSUTIL:
             self._update_memory_metrics()  # P3a: System memory monitoring
         self._update_warnings()
+
+    def _update_pool_metrics(self) -> None:
+        """Update array pool telemetry metrics (P5)."""
+        stats = ARRAY_POOL.stats()
+        total = stats.hits + stats.misses
+        hit_rate = (stats.hits / total) if total else 0.0
+        self.pool_hits_label.setText(str(stats.hits))
+        self.pool_misses_label.setText(str(stats.misses))
+        self.pool_hit_rate_label.setText(f"{hit_rate * 100:.1f}%")
+        self.pool_entries_label.setText(str(stats.entries))
+        self.pool_drops_label.setText(str(stats.drops))
 
     def _update_cache_metrics(self) -> None:
         """Update cache statistics."""

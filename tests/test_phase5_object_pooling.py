@@ -41,6 +41,16 @@ class TestArrayPool(unittest.TestCase):
         pool.clear()
         self.assertEqual(pool._pool, {})
 
+    def test_pool_stats_counts(self):
+        """Test that pool stats track hits and misses."""
+        pool = ArrayPool(PoolConfig(max_entries_per_key=1, max_entry_bytes=1024 * 1024))
+        arr = pool.acquire((8, 8), np.float32, fill=0.0)
+        pool.release(arr)
+        pool.acquire((8, 8), np.float32, fill=0.0)
+        stats = pool.stats()
+        self.assertEqual(stats.hits, 1)
+        self.assertEqual(stats.misses, 1)
+
 
 class TestWeightWindowCaching(unittest.TestCase):
     """Tests for cached weight windows and masks."""
