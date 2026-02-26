@@ -6,6 +6,11 @@ P5.1 Implementation: Real-time performance metrics dashboard showing:
   - Ring buffer memory usage
   - Performance warnings (cache at 90% budget, jobs backing up)
 
+P3a Implementation: Memory Pressure Monitoring
+  - System RAM availability tracking (psutil)
+  - Memory pressure levels: LOW (>80%), MEDIUM (20-80%), HIGH (<20%)
+  - Auto-mitigation when pressure detected (disable prefetch, reduce tile size)
+
 The panel updates every 500ms when visible and integrates with the session
 state, cache telemetry, job queue, and ring buffer management.
 """
@@ -18,12 +23,24 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
 if TYPE_CHECKING:
     from phage_annotator.gui_mpl import MainWindow
     from phage_annotator.projection_cache import ProjectionCache
     from phage_annotator.ring_buffer import RingBuffer
 
 logger = logging.getLogger(__name__)
+
+
+# Memory pressure thresholds (percentage of available RAM)
+MEMORY_PRESSURE_HIGH_THRESHOLD = 0.20  # <20% available
+MEMORY_PRESSURE_MEDIUM_THRESHOLD = 0.80  # Between 20% and 80% available
+MEMORY_PRESSURE_LOW_THRESHOLD = 0.80  # >80% available
 
 
 class PerformancePanel(QtWidgets.QWidget):
@@ -42,6 +59,8 @@ class PerformancePanel(QtWidgets.QWidget):
         self.cache: Optional[ProjectionCache] = None
         self.ring_buffer: Optional[RingBuffer] = None
         self._update_timer: Optional[QtCore.QTimer] = None
+        self._memory_pressure_active = False  # P3a: Track memory pressure state
+        self._last_prefetch_disabled = False  # P3b: Track prefetch mitigation
         
         self._init_ui()
         self._setup_update_timer()
@@ -63,6 +82,11 @@ class PerformancePanel(QtWidgets.QWidget):
         # Ring buffer section
         buffer_group = self._create_buffer_group()
         layout.addWidget(buffer_group)
+
+        # System memory section (P3a)
+        if HAS_PSUTIL:
+            memory_group = self._create_memory_group()
+            layout.addWidget(memory_group)
 
         # Warnings/alerts section
         self.warnings_label = QtWidgets.QLabel()
@@ -177,6 +201,37 @@ class PerformancePanel(QtWidgets.QWidget):
 
         return group
 
+    def _create_memory_group(self) -> QtWidgets.QGroupBox:
+        """Create system memory pressure group box (P3a)."""
+        group = QtWidgets.QGroupBox("System Memory (P3a)")
+        layout = QtWidgets.QGridLayout(group)
+
+        # Available memory
+        layout.addWidget(QtWidgets.QLabel("Available:"), 0, 0)
+        self.memory_available_label = QtWidgets.QLabel("0 / 0 GB")
+        self.memory_available_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.memory_available_label, 0, 1)
+
+        # Memory usage progress bar
+        self.memory_progress = QtWidgets.QProgressBar()
+        self.memory_progress.setRange(0, 100)
+        self.memory_progress.setValue(0)
+        layout.addWidget(self.memory_progress, 1, 0, 1, 2)
+
+        # Pressure level
+        layout.addWidget(QtWidgets.QLabel("Pressure:"), 2, 0)
+        self.memory_pressure_label = QtWidgets.QLabel("LOW")
+        self.memory_pressure_label.setStyleSheet("font-family: monospace; color: #51cf66;")
+        layout.addWidget(self.memory_pressure_label, 2, 1)
+
+        # Mitigation status (P3b)
+        layout.addWidget(QtWidgets.QLabel("Mitigation:"), 3, 0)
+        self.memory_mitigation_label = QtWidgets.QLabel("OFF")
+        self.memory_mitigation_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.memory_mitigation_label, 3, 1)
+
+        return group
+
     def _setup_update_timer(self) -> None:
         """Set up the periodic update timer (500ms)."""
         self._update_timer = QtCore.QTimer(self)
@@ -209,6 +264,8 @@ class PerformancePanel(QtWidgets.QWidget):
         self._update_cache_metrics()
         self._update_jobs_metrics()
         self._update_buffer_metrics()
+        if HAS_PSUTIL:
+            self._update_memory_metrics()  # P3a: System memory monitoring
         self._update_warnings()
 
     def _update_cache_metrics(self) -> None:
@@ -326,6 +383,107 @@ class PerformancePanel(QtWidgets.QWidget):
         except Exception as e:
             logger.debug(f"Error updating buffer metrics: {e}")
 
+    def _update_memory_metrics(self) -> None:
+        """Update system memory pressure metrics (P3a).
+        
+        Monitors available system RAM and triggers mitigation if pressure exceeds threshold.
+        """
+        if not HAS_PSUTIL:
+            return
+
+        try:
+            mem = psutil.virtual_memory()
+            total_gb = mem.total / (1024**3)
+            available_gb = mem.available / (1024**3)
+            available_pct = mem.available / mem.total
+            
+            # Update UI labels
+            self.memory_available_label.setText(f"{available_gb:.1f} / {total_gb:.1f} GB")
+            
+            # Calculate usage percentage (inverse of available)
+            usage_pct = int((1 - available_pct) * 100)
+            self.memory_progress.setValue(min(100, usage_pct))
+            
+            # Determine pressure level and update status display
+            if available_pct < MEMORY_PRESSURE_HIGH_THRESHOLD:
+                pressure = "HIGH"
+                color = "#ff6b6b"  # Red
+                self._memory_pressure_active = True
+            elif available_pct < MEMORY_PRESSURE_MEDIUM_THRESHOLD:
+                pressure = "MEDIUM"
+                color = "#ffa94d"  # Orange
+                self._memory_pressure_active = True
+            else:
+                pressure = "LOW"
+                color = "#51cf66"  # Green
+                self._memory_pressure_active = False
+            
+            self.memory_pressure_label.setText(pressure)
+            self.memory_pressure_label.setStyleSheet(f"font-family: monospace; color: {color};")
+            
+            # Update progress bar color based on pressure
+            if pressure == "HIGH":
+                self.memory_progress.setStyleSheet("QProgressBar::chunk { background-color: #ff6b6b; }")
+            elif pressure == "MEDIUM":
+                self.memory_progress.setStyleSheet("QProgressBar::chunk { background-color: #ffa94d; }")
+            else:
+                self.memory_progress.setStyleSheet("QProgressBar::chunk { background-color: #51cf66; }")
+            
+            # P3a: Trigger mitigation if memory pressure detected
+            if self._memory_pressure_active and self.main_window:
+                self._trigger_memory_mitigation()
+            
+        except Exception as e:
+            logger.debug(f"Error updating memory metrics: {e}")
+
+    def _trigger_memory_mitigation(self) -> None:
+        """Trigger memory pressure mitigation (P3a & P3b).
+        
+        Actions:
+        1. Disable pyramid prefetch (reduce background jobs)
+        2. Reduce inference tile size 512 → 256 → 128
+        3. Clear non-active image caches
+        4. Update UI status
+        """
+        if not self.main_window:
+            return
+
+        try:
+            # Action 1: Disable prefetch if not already disabled (P3b)
+            if not self._last_prefetch_disabled:
+                # Set flag to disable new pyramid prefetch jobs
+                if hasattr(self.main_window, '_prefetch_disabled'):
+                    self.main_window._prefetch_disabled = True
+                self._last_prefetch_disabled = True
+                logger.warning("Memory pressure detected: Disabling pyramid prefetch")
+            
+            # Action 2: Adaptive tile sizing (P3b)
+            if hasattr(self.main_window, '_adaptive_tile_size'):
+                current_size = self.main_window._adaptive_tile_size
+                if current_size == 512:
+                    self.main_window._adaptive_tile_size = 256
+                    logger.warning("Memory pressure: Reduced inference tile size to 256px")
+                elif current_size == 256:
+                    self.main_window._adaptive_tile_size = 128
+                    logger.warning("Memory pressure: Critical - reduced inference tile size to 128px")
+            
+            # Action 3: Clear non-active image caches
+            if hasattr(self.main_window, '_evict_image_cache'):
+                for img in self.main_window.images:
+                    if img.id not in (self.main_window.current_image_idx, 
+                                     self.main_window.support_image_idx):
+                        try:
+                            self.main_window._evict_image_cache(img)
+                        except Exception:
+                            pass
+            
+            # Action 4: Update UI status
+            self.memory_mitigation_label.setText("ACTIVE")
+            self.memory_mitigation_label.setStyleSheet("font-family: monospace; color: #ff6b6b; font-weight: bold;")
+            
+        except Exception as e:
+            logger.debug(f"Error triggering memory mitigation: {e}")
+
     def _update_warnings(self) -> None:
         """Update warning messages."""
         warnings = []
@@ -345,6 +503,15 @@ class PerformancePanel(QtWidgets.QWidget):
                 active_count = len(self.main_window.jobs._active_tasks)
             if active_count >= 5:
                 warnings.append(f"⚠ {active_count} jobs running (potential slowdown)")
+
+        # Memory pressure warning (P3a)
+        if HAS_PSUTIL and self._memory_pressure_active:
+            try:
+                mem = psutil.virtual_memory()
+                available_pct = mem.available / mem.total * 100
+                warnings.append(f"⚠ Memory pressure: only {available_pct:.0f}% available (mitigation active)")
+            except Exception:
+                pass
 
         # No warnings
         if not warnings:

@@ -18,6 +18,8 @@ class AppConfig:
     config_dir: Path = field(default_factory=lambda: Path.home() / ".phage_annotator")
     # P3.5: Default label classes for empty projects
     default_labels: Tuple[str, ...] = ("Point", "Region")
+    # P3b: Adaptive tile sizing for memory pressure response
+    adaptive_tile_size: int = 256  # Default inference tile size (512 normal, 256 pressure, 128 critical)
 
 
 DEFAULT_CONFIG = AppConfig()

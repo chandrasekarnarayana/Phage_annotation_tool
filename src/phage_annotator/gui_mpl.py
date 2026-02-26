@@ -132,6 +132,10 @@ class KeypointAnnotator(
         self.pixel_size_um_per_px = float(
             self._settings.value("defaultPixelSizeUmPerPx", 0.069, type=float)
         )
+        # Phase 3: Memory pressure response (P3a & P3b)
+        self._prefetch_disabled = False  # P3a: Flag to disable pyramid prefetch under memory pressure
+        self._adaptive_tile_size = 256  # P3b: Current inference tile size (256 default, 128 critical)
+        self._lod_mode_active: Dict[int, bool] = {}  # P2a: Track which images in LOD mode
         self._status_base = ""
         self._status_extra = ""
         self._default_geometry: Optional[QtCore.QByteArray] = None

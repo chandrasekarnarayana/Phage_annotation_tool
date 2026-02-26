@@ -593,7 +593,9 @@ class StateMixin:
         
         # Phase 2b: Schedule pyramid prefetch jobs (8x, 4x, 2x) before full-res
         # This ensures LOD preview is available quickly
-        if self.pyramid_enabled and img.array is not None:
+        # P3a: Skip prefetch if memory pressure detected
+        prefetch_enabled = not getattr(self, '_prefetch_disabled', False)
+        if self.pyramid_enabled and img.array is not None and prefetch_enabled:
             arr = img.array
             full_shape = (arr.shape[2], arr.shape[3])
             generation = self._job_generation
