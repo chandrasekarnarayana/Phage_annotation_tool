@@ -46,20 +46,36 @@ class CacheTelemetry:
     bytes_evicted: int = 0
     pyramid_evictions: int = 0
     warning_at_90_percent_issued: bool = False
+    hits_this_cycle: int = 0
+    misses_this_cycle: int = 0
+    evictions_this_cycle: int = 0
     
     def hit_ratio(self) -> float:
         """Return cache hit ratio (0.0 to 1.0)."""
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
     
+    def is_thrashing(self) -> bool:
+        """Detect cache thrashing: evictions > 2x hits in current cycle."""
+        if self.hits_this_cycle == 0:
+            return False
+        return self.evictions_this_cycle > 2 * self.hits_this_cycle
+    
+    def reset_cycle(self) -> None:
+        """Reset per-cycle counters (called each monitoring tick)."""
+        self.hits_this_cycle = 0
+        self.misses_this_cycle = 0
+        self.evictions_this_cycle = 0
+    
     def reset(self) -> None:
-        """Reset telemetry counters."""
+        """Reset all telemetry counters."""
         self.hits = 0
         self.misses = 0
         self.evictions = 0
         self.bytes_evicted = 0
         self.pyramid_evictions = 0
         self.warning_at_90_percent_issued = False
+        self.reset_cycle()
 
 
 class ProjectionCache:
@@ -95,9 +111,11 @@ class ProjectionCache:
         item = self._items.get(key)
         if item is None:
             self._telemetry.misses += 1
+            self._telemetry.misses_this_cycle += 1
             return None
         
         self._telemetry.hits += 1
+        self._telemetry.hits_this_cycle += 1
         self._items.move_to_end(key)
         return item.data
 
@@ -175,18 +193,20 @@ class ProjectionCache:
                     except Exception as e:
                         logger.debug(f"Warning callback error: {e}")
         
-        # Evict until within budget
+        # Evict until within budget, tracking per-cycle evictions
         while self._total_bytes > self._max_bytes and (self._pyramid_items or self._items):
             if self._pyramid_items:
                 _, item = self._pyramid_items.popitem(last=False)
                 self._total_bytes -= item.nbytes
                 self._telemetry.pyramid_evictions += 1
+                self._telemetry.evictions_this_cycle += 1
                 self._telemetry.bytes_evicted += item.nbytes
                 continue
             if self._items:
                 _, item = self._items.popitem(last=False)
                 self._total_bytes -= item.nbytes
                 self._telemetry.evictions += 1
+                self._telemetry.evictions_this_cycle += 1
                 self._telemetry.bytes_evicted += item.nbytes
                 continue
         

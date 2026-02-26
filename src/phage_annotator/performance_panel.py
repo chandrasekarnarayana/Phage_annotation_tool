@@ -113,6 +113,12 @@ class PerformancePanel(QtWidgets.QWidget):
         self.cache_items_label.setStyleSheet("font-family: monospace;")
         layout.addWidget(self.cache_items_label, 4, 1)
 
+        # Thrashing indicator (P1a)
+        layout.addWidget(QtWidgets.QLabel("Thrashing:"), 5, 0)
+        self.cache_thrashing_label = QtWidgets.QLabel("NO")
+        self.cache_thrashing_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.cache_thrashing_label, 5, 1)
+
         return group
 
     def _create_jobs_group(self) -> QtWidgets.QGroupBox:
@@ -217,6 +223,16 @@ class PerformancePanel(QtWidgets.QWidget):
         hit_ratio = telemetry.hit_ratio()
         self.cache_hit_ratio_label.setText(f"{hit_ratio * 100:.1f}%")
 
+        # Thrashing detection (P1a)
+        is_thrashing = telemetry.is_thrashing()
+        if is_thrashing:
+            self.cache_thrashing_label.setText("YES")
+            self.cache_thrashing_label.setStyleSheet("font-family: monospace; color: #ff6b6b; font-weight: bold;")
+            logger.warning(f"Cache thrashing detected: {telemetry.evictions_this_cycle} evictions vs {telemetry.hits_this_cycle} hits")
+        else:
+            self.cache_thrashing_label.setText("NO")
+            self.cache_thrashing_label.setStyleSheet("font-family: monospace;")
+
         # Progress bar
         percent = int((mb_used / mb_budget * 100)) if mb_budget > 0 else 0
         self.cache_progress.setValue(min(100, percent))
@@ -228,6 +244,9 @@ class PerformancePanel(QtWidgets.QWidget):
             self.cache_progress.setStyleSheet("QProgressBar::chunk { background-color: #ffa94d; }")
         else:
             self.cache_progress.setStyleSheet("QProgressBar::chunk { background-color: #51cf66; }")
+        
+        # Reset per-cycle counters for next monitoring tick
+        telemetry.reset_cycle()
 
     def _update_jobs_metrics(self) -> None:
         """Update job queue and prefetch statistics."""

@@ -267,13 +267,15 @@ class Renderer:
             )
             overlay = ctx.overlay_frame
             if overlay is not None:
+                # P1b: Enforce uint8 dtype for overlay frames
+                overlay_uint8 = _normalize_overlay_to_uint8(overlay)
                 self.image_artists["frame_overlay"] = _update_or_create(
                     self.axes["frame"],
                     self.image_artists["frame_overlay"],
-                    overlay,
+                    overlay_uint8,
                     ctx.overlay_cmap or plt.get_cmap("magma"),
                     0.0,
-                    float(np.max(overlay)) if np.max(overlay) > 0 else 1.0,
+                    255.0,
                     ctx.overlay_extent,
                     norm=ctx.overlay_norm,
                 )
@@ -284,13 +286,15 @@ class Renderer:
             elif self.image_artists.get("frame_overlay") is not None:
                 self.image_artists["frame_overlay"].set_visible(False)
             if ctx.threshold_visible and ctx.threshold_mask is not None:
+                # P1b: Enforce uint8 dtype for overlays
+                threshold_data = _normalize_overlay_to_uint8(ctx.threshold_mask)
                 self.image_artists["threshold_overlay"] = _update_or_create(
                     self.axes["frame"],
                     self.image_artists["threshold_overlay"],
-                    ctx.threshold_mask.astype(float, copy=False),
+                    threshold_data,
                     plt.get_cmap("Reds"),
                     0.0,
-                    1.0,
+                    255.0,
                     ctx.threshold_extent,
                     norm=None,
                 )
@@ -674,6 +678,25 @@ def _update_or_create(
             extent = (0, data.shape[1], data.shape[0], 0)
         artist.set_extent(extent)
     return artist
+
+
+def _normalize_overlay_to_uint8(data: np.ndarray) -> np.ndarray:
+    """Normalize overlay array to uint8 (P1b: dtype enforcement).
+    
+    Converts float overlays to uint8 with min/max normalization.
+    Preserves bool and uint8 as-is.
+    """
+    if data.dtype == np.uint8:
+        return data
+    if data.dtype == bool:
+        return data.astype(np.uint8) * 255
+    # Float: normalize to [0, 255]
+    data_min = float(np.min(data))
+    data_max = float(np.max(data))
+    if data_max <= data_min:
+        return np.zeros_like(data, dtype=np.uint8)
+    normalized = (data - data_min) / (data_max - data_min)
+    return (normalized * 255).astype(np.uint8)
 
 
 def _clear_overlays(
