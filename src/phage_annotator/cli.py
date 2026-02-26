@@ -30,8 +30,14 @@ from phage_annotator.demo import generate_dummy_image
 )
 def main(inputs: List[pathlib.Path], demo: bool) -> None:
     """Launch the Matplotlib+Qt keypoint annotation GUI for microscopy stacks."""
+    # Initialize application context (services) before GUI
+    from phage_annotator.framework import ApplicationContext
+    
+    context = ApplicationContext.create_default()
+    ApplicationContext.set_global(context)
+
     # Import GUI lazily to avoid initializing Qt during module import or non-GUI tests.
-    from phage_annotator.gui_mpl import run_gui
+    from phage_annotator.ui_qt.main_window import run_gui
 
     if demo:
         dummy = generate_dummy_image(pathlib.Path.cwd() / "phage_annotator_demo.tif", mode="t")

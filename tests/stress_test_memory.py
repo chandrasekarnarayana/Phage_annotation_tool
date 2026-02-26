@@ -30,8 +30,8 @@ except ImportError:
 
 from matplotlib.backends.qt_compat import QtWidgets
 
-from phage_annotator.config import SUPPORTED_SUFFIXES
-from phage_annotator.gui_mpl import KeypointAnnotator, create_app
+from phage_annotator.config.settings import SUPPORTED_SUFFIXES
+from phage_annotator.ui_qt.main_window import KeypointAnnotator, create_app
 
 
 def _rss_mb() -> float:

@@ -32,6 +32,9 @@ dev = [
   "pytest-qt>=4.4",
   "pytest-benchmark>=4.0",
 ]
+cache = [
+  "zstandard>=0.22",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"

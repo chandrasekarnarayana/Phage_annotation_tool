@@ -38,15 +38,21 @@ jobs:
       - name: Mypy (core)
         run: >
           mypy --ignore-missing-imports --follow-imports=skip
-          src/phage_annotator/io.py
-          src/phage_annotator/analysis.py
-          src/phage_annotator/annotations.py
-          src/phage_annotator/project_io.py
-          src/phage_annotator/projection_cache.py
-          src/phage_annotator/pyramid.py
-          src/phage_annotator/ring_buffer.py
+          src/phage_annotator/io/readers/base.py
+          src/phage_annotator/algorithms/analysis.py
+          src/phage_annotator/annotation/core.py
+          src/phage_annotator/io/projects/base.py
+          src/phage_annotator/cache/projection_cache.py
+          src/phage_annotator/data/pyramid.py
+          src/phage_annotator/data/ring_buffer.py
+      - name: Import integrity check
+        run: python scripts/check_import_integrity.py
+      - name: Package layout check
+        run: python scripts/check_package_layout.py
       - name: Core Qt import guard
         run: python scripts/check_core_no_qt.py
+      - name: Acyclic import check (layer enforcement)
+        run: python scripts/check_acyclic_imports.py --verbose
 
   test-core:
     name: Core Tests (${{ matrix.os }} / py${{ matrix.python-version }})
@@ -75,7 +81,7 @@ jobs:
           python -c "import pkgutil; print('PyQt5', 'available' if pkgutil.find_loader('PyQt5') else 'not available')"
       - name: Run core tests
         run: >
-          python -m pytest -m "not gui" --ignore=tests/test_gui_basic.py
+          python -m pytest -m "not gui"
           --junitxml=artifacts/junit-core.xml
           --log-file=artifacts/pytest-core.log
           --durations=10
@@ -163,7 +169,8 @@ jobs:
           python -m pip install dist/*.whl
           python - <<'PY'
           import phage_annotator
-          from phage_annotator import io, annotations
+          from phage_annotator import io
+          from phage_annotator.annotation import core as annotation_core
           print("import ok", phage_annotator.__version__)
-          print("io", io.__name__, "annotations", annotations.__name__)
+          print("io", io.__name__, "annotation_core", annotation_core.__name__)
           PY

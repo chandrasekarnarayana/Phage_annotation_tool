@@ -19,6 +19,8 @@ Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0; extra == "dev"
 Requires-Dist: pytest-qt>=4.4; extra == "dev"
 Requires-Dist: pytest-benchmark>=4.0; extra == "dev"
+Provides-Extra: cache
+Requires-Dist: zstandard>=0.22; extra == "cache"
 Dynamic: license-file
 
 # Phage Annotator  
