@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
-from PyQt5.QtWidgets import QSizePolicy
+from matplotlib.figure import Figure
 
 from phage_annotator.ui_qt.utils import ui_actions, ui_docks
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
@@ -15,6 +14,13 @@ from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
 from phage_annotator.rendering.mpl import Renderer
+from phage_annotator.ui_qt.widgets.modality_canvas import ModalityCanvasManager
+
+try:
+    from phage_annotator.ui_qt.utils.bcontrast_integration import integrate_b_contrast_features
+    HAS_BCONTRAST = True
+except ImportError:
+    HAS_BCONTRAST = False
 
 
 class UiSetupMixin:
@@ -68,6 +74,8 @@ class UiSetupMixin:
         about_act = actions["about"]
         copy_display_act = actions["copy_display"]
         measure_act = actions["measure"]
+        jump_to_frame_act = actions["jump_to_frame"]
+        jump_to_z_act = actions["jump_to_z"]
         show_roi_handles_act = self.show_roi_handles_act
         clear_roi_act = self.clear_roi_act
 
@@ -106,6 +114,13 @@ class UiSetupMixin:
             self.support_combo.addItem(img.name)
         self.primary_combo.setCurrentIndex(self.current_image_idx)
         self.support_combo.setCurrentIndex(self.support_image_idx)
+        
+        # Add context menu for renaming modalities (Phase γ)
+        self.primary_combo.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.primary_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
+        self.support_combo.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.support_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
+        
         primary_box.addWidget(self.primary_combo)
         primary_box.addWidget(QtWidgets.QLabel("Support"))
         primary_box.addWidget(self.support_combo)
@@ -131,7 +146,8 @@ class UiSetupMixin:
         fig_layout = QtWidgets.QVBoxLayout(fig_container)
         fig_layout.setContentsMargins(8, 8, 8, 8)
         fig_layout.setSpacing(6)
-        self.figure = plt.figure(figsize=(13, 7))
+        self.modality_canvas = ModalityCanvasManager(parent=self)
+        self.figure = self.modality_canvas.figure
         self.ax_frame = None
         self.ax_mean = None
         self.ax_comp = None
@@ -140,12 +156,16 @@ class UiSetupMixin:
         self.ax_std = None
         self.ax_line = None
         self.ax_hist = None
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.canvas.updateGeometry()
-        self.toolbar = NavigationToolbar2QT(self.canvas, self)
-        fig_layout.addWidget(self.toolbar)
-        fig_layout.addWidget(self.canvas, stretch=1)
+        self.canvas = self.modality_canvas.canvas
+        if self.canvas is not None:
+            self.canvas.setSizePolicy(
+                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+            )
+            self.canvas.updateGeometry()
+        self.toolbar = NavigationToolbar2QT(self.canvas, self) if self.canvas is not None else None
+        if self.toolbar is not None:
+            fig_layout.addWidget(self.toolbar)
+        fig_layout.addWidget(self.modality_canvas, stretch=1)
         fallback_cmaps = [cmap_for(spec, False) for spec in LUTS]
         self.renderer = Renderer(self.figure, self.canvas, fallback_cmaps)
         self.renderer.set_roi_callback(self._on_roi_interactor_change)
@@ -207,6 +227,16 @@ class UiSetupMixin:
         playback_layout.addWidget(self.loop_chk, 2, 3)
         self.fps_label = QtWidgets.QLabel(f"FPS: {self.speed_slider.value()}")
         playback_layout.addWidget(self.fps_label, 2, 1)
+
+        self.playback_mode_combo = QtWidgets.QComboBox()
+        self.playback_mode_combo.addItems(["Synchronized", "Independent", "Sequential"])
+        self.playback_target_combo = QtWidgets.QComboBox()
+        self.playback_target_combo.addItem("Active")
+        self.playback_target_btn = QtWidgets.QPushButton("Play Target")
+        playback_layout.addWidget(QtWidgets.QLabel("Mode"), 3, 0)
+        playback_layout.addWidget(self.playback_mode_combo, 3, 1)
+        playback_layout.addWidget(self.playback_target_combo, 3, 2)
+        playback_layout.addWidget(self.playback_target_btn, 3, 3)
 
         display_group = QtWidgets.QGroupBox("Display")
         display_layout = QtWidgets.QGridLayout(display_group)
@@ -308,6 +338,40 @@ class UiSetupMixin:
 
         self.log_chk = QtWidgets.QCheckBox("Log display")
         display_layout.addWidget(self.log_chk, drow, 0, 1, 2)
+        drow += 1
+
+        # Replace projection_axis_combo with full ProjectionSelectorWidget
+        from phage_annotator.ui_qt.widgets.projection_selector import ProjectionSelectorWidget
+        self.projection_selector = ProjectionSelectorWidget(self)
+        display_layout.addWidget(QtWidgets.QLabel("Projection"), drow, 0)
+        display_layout.addWidget(self.projection_selector, drow, 2)
+        # Keep projection_axis_combo as alias for backward compatibility
+        self.projection_axis_combo = self.projection_selector.axis_combo
+        drow += 1
+
+        sync_group = QtWidgets.QGroupBox("Sync")
+        sync_layout = QtWidgets.QGridLayout(sync_group)
+        self.sync_list = QtWidgets.QListWidget()
+        self.sync_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.sync_playback_chk = QtWidgets.QCheckBox("Playback")
+        self.sync_zoom_chk = QtWidgets.QCheckBox("Zoom/Pan")
+        self.sync_contrast_chk = QtWidgets.QCheckBox("Contrast")
+        # Visual indicators for sync state
+        self.sync_playback_label = QtWidgets.QLabel("🔲")  # Empty box when off, will be updated
+        self.sync_playback_label.setToolTip("Playback sync is OFF")
+        self.sync_zoom_label = QtWidgets.QLabel("🔲")
+        self.sync_zoom_label.setToolTip("Zoom/Pan sync is OFF")
+        self.sync_contrast_label = QtWidgets.QLabel("🔲")
+        self.sync_contrast_label.setToolTip("Contrast sync is OFF")
+        sync_layout.addWidget(QtWidgets.QLabel("Linked views"), 0, 0, 1, 2)
+        sync_layout.addWidget(self.sync_list, 1, 0, 1, 2)
+        sync_layout.addWidget(self.sync_playback_label, 2, 0)
+        sync_layout.addWidget(self.sync_playback_chk, 2, 1)
+        sync_layout.addWidget(self.sync_zoom_label, 2, 2)
+        sync_layout.addWidget(self.sync_zoom_chk, 2, 3)
+        sync_layout.addWidget(self.sync_contrast_label, 3, 0)
+        sync_layout.addWidget(self.sync_contrast_chk, 3, 1)
+        display_layout.addWidget(sync_group, drow, 0, 1, 3)
         drow += 1
 
         self.scalebar_chk = QtWidgets.QCheckBox("Show scale bar")
@@ -499,16 +563,17 @@ class UiSetupMixin:
         self.sidebar_pages = self._build_sidebar_pages(display_group)
 
         # Diagnostics panels (histogram/profile)
-        self.hist_fig = plt.figure(figsize=(5, 3))
+        self.hist_fig = Figure(figsize=(5, 3))
         self.hist_canvas = FigureCanvasQTAgg(self.hist_fig)
         self.ax_hist = self.hist_fig.add_subplot(111)
-        self.profile_fig = plt.figure(figsize=(5, 3))
+        self.profile_fig = Figure(figsize=(5, 3))
         self.profile_canvas = FigureCanvasQTAgg(self.profile_fig)
         self.ax_line = self.profile_fig.add_subplot(111)
 
         # Panels/docks + sidebar (status bar must be set up first for logs widget)
         self._setup_status_bar()
         self._init_panels(dock_panels_menu)
+        self._init_channel_panel_integration()
         self._setup_annotation_toolbar()
 
         central_layout.addWidget(fig_container, stretch=1)
@@ -584,6 +649,8 @@ class UiSetupMixin:
             self.show_smlm_sr_act.triggered.connect(self._toggle_smlm_sr)
         self.undo_act.triggered.connect(self.undo_last_action)
         self.redo_act.triggered.connect(self.redo_last_action)
+        jump_to_frame_act.triggered.connect(self._jump_to_frame_dialog)
+        jump_to_z_act.triggered.connect(self._jump_to_z_dialog)
         copy_display_act.triggered.connect(self._copy_display_settings)
         measure_act.triggered.connect(self._results_measure_current)
         self.show_recorder_act.triggered.connect(self._toggle_recorder)
@@ -607,11 +674,18 @@ class UiSetupMixin:
                 self._density_overlay_changed
             )
             self.density_panel.contours_chk.toggled.connect(self._density_overlay_changed)
+        if getattr(self, "qc_issues_panel", None) is not None:
+            self.qc_issues_panel.jump_to_location.connect(self._jump_to_qc_issue)
+            self.qc_issues_panel.validation_requested.connect(self._trigger_qc_validation)
+            self.qc_issues_panel.export_requested.connect(self._export_qc_report)
         if hasattr(self, "annotation_meta_apply_btn"):
             self.annotation_meta_apply_btn.clicked.connect(self._apply_annotation_metadata)
             self.annotation_meta_close_btn.clicked.connect(self._dismiss_annotation_meta_banner)
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
+        self.controller.annotations_changed.connect(
+            lambda: self._schedule_qc_validation(self.controller.session_state.active_primary_id)
+        )
         self._rebuild_figure_layout()
         self._apply_default_layout()
         self._restore_layout()
@@ -635,6 +709,54 @@ class UiSetupMixin:
 
     def _init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         ui_docks.init_panels(self, dock_menu)
+
+    def _init_channel_panel_integration(self) -> None:
+        """Wire channel panel signals to session state integration."""
+        panel = getattr(self, "channel_panel", None)
+        if panel is None:
+            self.channel_integration = None
+            return
+        try:
+            from phage_annotator.ui_qt.integration.channel_integration import (
+                ChannelPanelIntegration,
+            )
+        except Exception:
+            self.channel_integration = None
+            return
+        self.channel_integration = ChannelPanelIntegration(
+            self.controller.session_state,
+            canvas_refresh_callback=self._refresh_image,
+        )
+        panel.channel_visibility_changed.connect(
+            self.channel_integration.on_channel_visibility_changed
+        )
+        panel.channel_opacity_changed.connect(
+            self.channel_integration.on_channel_opacity_changed
+        )
+        panel.channel_lut_changed.connect(self.channel_integration.on_channel_lut_changed)
+        panel.blend_mode_changed.connect(self.channel_integration.on_blend_mode_changed)
+        self._sync_channel_panel_for_active_image()
+
+    def _sync_channel_panel_for_active_image(self) -> None:
+        """Refresh channel panel visibility/settings for the active primary image."""
+        panel = getattr(self, "channel_panel", None)
+        integration = getattr(self, "channel_integration", None)
+        if panel is None or integration is None or not self.images:
+            return
+        channel_count = int(getattr(self.primary_image, "channel_count", 1) or 1)
+        dock = getattr(self, "dock_channels", None)
+        if channel_count <= 1:
+            panel.setEnabled(False)
+            if dock is not None:
+                dock.setVisible(False)
+            return
+        panel.setEnabled(True)
+        settings = integration.initialize_from_session(channel_count)
+        self.controller.session_state.channel_display_settings = settings.to_dict()
+        panel.set_channel_settings(settings)
+        if dock is not None and not getattr(self, "_channel_panel_autoshown", False):
+            dock.setVisible(True)
+            self._channel_panel_autoshown = True
 
     def _build_panel_registry(self) -> List[PanelSpec]:
         return ui_docks.build_panel_registry(self)
@@ -694,6 +816,9 @@ class UiSetupMixin:
     def _make_density_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_density_widget(self)
 
+    def _make_channel_controls_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_channel_controls_widget(self)
+
     def _make_logs_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_logs_widget(self)
 
@@ -707,6 +832,9 @@ class UiSetupMixin:
         panel.set_ring_buffer(self._playback_ring)
         self.performance_panel = panel
         return panel
+
+    def _make_qc_issues_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_qc_issues_widget(self)
 
     def _build_sidebar_pages(
         self, display_group: QtWidgets.QGroupBox
@@ -763,6 +891,7 @@ class UiSetupMixin:
         self.reset_view_btn = QtWidgets.QPushButton("Reset view")
         self.reset_view_btn.setToolTip("Reset zoom and contrast")
         display_layout.addWidget(_dock_button("Show Histogram/B&C", "dock_hist"))
+        display_layout.addWidget(_dock_button("Show Channels", "dock_channels"))
         display_layout.addWidget(self.reset_view_btn)
         display_layout.addWidget(display_group)
         display_layout.addStretch(1)
@@ -1011,3 +1140,10 @@ class UiSetupMixin:
 
     def _setup_status_bar(self) -> None:
         ui_docks.setup_status_bar(self)
+        
+        # Integrate Phase θ features (keyboard shortcuts and visual indicators)
+        if HAS_BCONTRAST:
+            try:
+                integrate_b_contrast_features(self)
+            except Exception as e:
+                print(f"[B&C Integration] Warning: Failed to integrate B&C features: {e}")

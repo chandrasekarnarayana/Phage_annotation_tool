@@ -55,6 +55,24 @@ class EventsMixin:
         self.lut_invert_chk.stateChanged.connect(self._on_lut_invert)
         self.gamma_slider.valueChanged.connect(self._on_gamma_change)
         self.log_chk.stateChanged.connect(self._on_log_toggle)
+        # Wire up projection selector widget (Phase γ)
+        if getattr(self, "projection_selector", None) is not None:
+            self.projection_selector.projection_changed.connect(
+                self._on_projection_changed
+            )
+        elif getattr(self, "projection_axis_combo", None) is not None:
+            # Backward compat for old axis-only combo
+            self.projection_axis_combo.currentTextChanged.connect(
+                self._on_projection_axis_change
+            )
+        if getattr(self, "sync_list", None) is not None:
+            self.sync_list.itemSelectionChanged.connect(self._on_sync_selection_changed)
+        if getattr(self, "sync_playback_chk", None) is not None:
+            self.sync_playback_chk.stateChanged.connect(self._on_sync_mode_changed)
+        if getattr(self, "sync_zoom_chk", None) is not None:
+            self.sync_zoom_chk.stateChanged.connect(self._on_sync_mode_changed)
+        if getattr(self, "sync_contrast_chk", None) is not None:
+            self.sync_contrast_chk.stateChanged.connect(self._on_sync_mode_changed)
         self.label_buttons.buttonClicked.connect(self._on_label_change)
         self.scope_group.buttonClicked.connect(self._on_scope_change)
         self.target_group.buttonClicked.connect(self._on_target_change)
@@ -65,9 +83,12 @@ class EventsMixin:
         self.profile_clear_btn.clicked.connect(self._clear_profile)
         self.hist_region_combo.currentIndexChanged.connect(self._on_hist_region)
         self.hist_scope_combo.currentIndexChanged.connect(self._on_hist_scope_change)
+        if getattr(self, "bc_range_slider", None) is not None:
+            self.bc_range_slider.rangeChanged.connect(self._on_bc_range_changed)
         if getattr(self, "bc_min_slider", None) is not None:
             self.bc_min_slider.valueChanged.connect(self._on_bc_min_slider)
             self.bc_max_slider.valueChanged.connect(self._on_bc_max_slider)
+        if getattr(self, "bc_min_spin", None) is not None:
             self.bc_min_spin.valueChanged.connect(self._on_bc_min_spin)
             self.bc_max_spin.valueChanged.connect(self._on_bc_max_spin)
             self.bc_brightness_slider.valueChanged.connect(self._on_bc_brightness_change)
@@ -75,6 +96,8 @@ class EventsMixin:
             self.bc_auto_btn.clicked.connect(self._auto_contrast)
             self.bc_reset_btn.clicked.connect(self.reset_contrast)
             self.bc_set_btn.clicked.connect(self._bc_set_from_inputs)
+            if getattr(self, "bc_dialog_btn", None) is not None:
+                self.bc_dialog_btn.clicked.connect(self._open_contrast_dialog)
             self.bc_apply_btn.clicked.connect(self._apply_display_mapping)
         self.roi_shape_group.buttonClicked.connect(self._on_roi_shape_change)
         self.roi_x_spin.valueChanged.connect(self._on_roi_change)
@@ -176,7 +199,7 @@ class EventsMixin:
     def _bind_application_events(self) -> None:
         """Subscribe to application-level events from the event bus.
         
-        This integrates GUI with the FIJI event service, allowing components
+        This integrates GUI with the event service, allowing components
         to react to state changes without direct coupling.
         """
         try:
@@ -226,11 +249,26 @@ class EventsMixin:
     def _on_view_state_changed_event(self, event) -> None:
         """Handle view state changes from event bus."""
         try:
-            # View state changed (T, Z, crop) - refresh rendering
-            if hasattr(self, '_refresh_image'):
-                # Only refresh if not already in middle of change (avoid loops)
-                if not getattr(self, '_suppress_refresh', False):
-                    self._refresh_image()
+            change_type = getattr(event, "change_type", None)
+
+            if change_type == "t" and hasattr(self, "t_slider"):
+                t_index = getattr(event, "t_index", None)
+                if t_index is not None:
+                    clamped = max(self.t_slider.minimum(), min(int(t_index), self.t_slider.maximum()))
+                    if self.t_slider.value() != clamped:
+                        self.t_slider.setValue(clamped)
+                        return
+
+            if change_type == "z" and hasattr(self, "z_slider"):
+                z_index = getattr(event, "z_index", None)
+                if z_index is not None:
+                    clamped = max(self.z_slider.minimum(), min(int(z_index), self.z_slider.maximum()))
+                    if self.z_slider.value() != clamped:
+                        self.z_slider.setValue(clamped)
+                        return
+
+            if hasattr(self, "_refresh_image") and not getattr(self, "_suppress_refresh", False):
+                self._refresh_image()
         except Exception:
             # Silently ignore errors in event handling
             pass
@@ -253,17 +291,21 @@ class EventsMixin:
 
     def _bind_axis_callbacks(self) -> None:
         """Bind zoom callbacks for current axes to keep zoom synced."""
-        axes = [
-            ax
-            for ax in [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
+        axes = []
+        if getattr(self, "renderer", None) is not None:
+            axes = [ax for ax in self.renderer.axes.values() if ax is not None]
+        if not axes:
+            axes = [
+                ax
+                for ax in [
+                    self.ax_frame,
+                    self.ax_mean,
+                    self.ax_comp,
+                    self.ax_support,
+                    self.ax_std,
+                ]
+                if ax is not None
             ]
-            if ax is not None
-        ]
         for ax in axes:
             ax.callbacks.connect("xlim_changed", self._on_limits_changed)
             ax.callbacks.connect("ylim_changed", self._on_limits_changed)
@@ -271,13 +313,18 @@ class EventsMixin:
     def reset_view(self) -> None:
         """Reset zoom/pan to full extent of current frame."""
         self._last_zoom_linked = None
-        for ax in [
-            self.ax_frame,
-            self.ax_mean,
-            self.ax_comp,
-            self.ax_support,
-            self.ax_std,
-        ]:
+        axes = []
+        if getattr(self, "renderer", None) is not None:
+            axes = [ax for ax in self.renderer.axes.values() if ax is not None]
+        if not axes:
+            axes = [
+                self.ax_frame,
+                self.ax_mean,
+                self.ax_comp,
+                self.ax_support,
+                self.ax_std,
+            ]
+        for ax in axes:
             if ax is None:
                 continue
             ax.set_xlim(auto=True)
@@ -293,6 +340,7 @@ class EventsMixin:
             return
         mapping = self._get_display_mapping(prim.id, "frame", prim.array)
         mapping.reset_to_auto(prim.array, low=5, high=95)
+        self._sync_modality_display_settings("frame", mapping)
         self.vmin_slider.setValue(5)
         self.vmax_slider.setValue(95)
         self.vmin_label.setText(f"vmin: {mapping.min_val:.3f}")

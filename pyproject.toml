@@ -37,8 +37,23 @@ cache = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --strict-markers"
 testpaths = ["tests"]
 markers = [
   "gui: GUI tests that require a Qt backend (run under Xvfb in CI)",
+  "benchmark: performance benchmark tests requiring pytest-benchmark",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/phage_annotator"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
 ]

@@ -1,6 +1,6 @@
-"""Cache implementations and memory management (FIJI Layer 4).
+"""Cache implementations and memory management (Layer 4).
 
-This package implements the Cache Layer in the FIJI architecture, providing
+This package implements the Cache Layer, providing
 intelligent caching strategies, memory budgeting, and eviction policies.
 
 **Layer 4 Responsibilities**:
@@ -39,10 +39,10 @@ intelligent caching strategies, memory budgeting, and eviction policies.
     disk_cache = DiskCache(path="./cache", capacity_mb=500)
     cached_value = disk_cache.get_or_compute(key, compute_fn)
 
-**Phase Progress**:
-- Phase 2.5: Physical migration from core → cache
-- Phase 8.2: Eviction strategy patterns added
-- Phase 9: Full FIJI documentation complete
+**Architecture Evolution**:
+- Physical migration from core → cache
+- Eviction strategy patterns added
+- Full documentation complete
 """
 
 # Import from new locations (Phase 2.5 physical migration)

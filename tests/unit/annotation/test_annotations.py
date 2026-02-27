@@ -1,7 +1,11 @@
 from pathlib import Path
 
-from phage_annotator.annotation.core import (Keypoint, keypoints_to_dataframe, save_keypoints_csv,
-                                         save_keypoints_json)
+from phage_annotator.annotation.core import (
+    Keypoint,
+    keypoints_to_dataframe,
+    save_keypoints_csv,
+    save_keypoints_json,
+)
 
 
 def sample_keypoints():
@@ -30,3 +34,21 @@ def test_save_keypoints(tmp_path: Path) -> None:
     assert "phage" in csv_path.read_text()
     content = json_path.read_text()
     assert "img.tif" in content
+
+
+def test_annotation_meta_defaults() -> None:
+    kp = Keypoint(
+        image_id=0,
+        image_name="img.tif",
+        t=0,
+        z=0,
+        y=1.0,
+        x=2.0,
+        label="phage",
+        meta={"confidence": 0.75},
+    )
+    assert kp.meta["confidence"] == 0.75
+    assert kp.meta["annotator"] == ""
+    assert kp.meta["timestamp"] is None
+    assert kp.meta["comment"] == ""
+    assert kp.meta["uncertain"] is False

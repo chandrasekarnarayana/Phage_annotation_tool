@@ -22,12 +22,31 @@ import pandas as pd
 
 __all__ = [
     "Keypoint",
+    "ANNOTATION_META_DEFAULTS",
+    "normalize_annotation_meta",
     "keypoints_to_dataframe",
     "save_keypoints_csv",
     "save_keypoints_json",
     "keypoints_from_csv",
     "keypoints_from_json",
 ]
+
+
+ANNOTATION_META_DEFAULTS = {
+    "confidence": None,
+    "annotator": "",
+    "timestamp": None,
+    "comment": "",
+    "uncertain": False,
+}
+
+
+def normalize_annotation_meta(meta: dict | None) -> dict:
+    """Normalize metadata dict to include baseline schema fields."""
+    normalized = dict(meta or {})
+    for key, default in ANNOTATION_META_DEFAULTS.items():
+        normalized.setdefault(key, default)
+    return normalized
 
 
 @dataclass
@@ -54,6 +73,10 @@ class Keypoint:
         Source tag (manual | legacy_csv | thunderstorm_csv | json | project).
     meta : dict
         Extra metadata (sigma, photons, uncertainty, etc.).
+    modality_idx : int, optional
+        Index of the modality this annotation belongs to. 
+        If None, annotation is visible on all modalities (backward compatible).
+        Enables modality-specific annotations for multi-view workflows.
     """
 
     image_id: int
@@ -67,6 +90,10 @@ class Keypoint:
     image_key: str = ""
     source: str = "manual"
     meta: dict = field(default_factory=dict)
+    modality_idx: int | None = None  # Phase ζ: Multi-modality support
+
+    def __post_init__(self) -> None:
+        self.meta = normalize_annotation_meta(self.meta)
 
 
 def keypoints_to_dataframe(keypoints: Iterable[Keypoint]) -> pd.DataFrame:

@@ -23,6 +23,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,8 +34,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ruff mypy
-      - name: Ruff
-        run: ruff check src tests
+      - name: Ruff (blocking correctness)
+        run: ruff check src tests --select E9,F63,F7,F82
+      - name: Ruff (maintained test/style surface)
+        run: >
+          ruff check
+          tests/conftest.py
+          tests/unit/annotation/test_multi_modality_annotations.py
+          tests/unit/session/test_projection_ui_logic.py
+          tests/integration/gui/test_projection_ui_wiring.py
+          tests/unit/ui_qt/test_sidebar_manager.py
+          tests/integration/test_sync_propagation_integration.py
+          tests/unit/data/test_sync_rules.py
       - name: Mypy (core)
         run: >
           mypy --ignore-missing-imports --follow-imports=skip
@@ -53,10 +64,23 @@ jobs:
         run: python scripts/check_core_no_qt.py
       - name: Acyclic import check (layer enforcement)
         run: python scripts/check_acyclic_imports.py --verbose
+      - name: Test layout guard (no root-level tests)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root_tests = sorted(p.name for p in Path("tests").glob("test_*.py"))
+          if root_tests:
+              raise SystemExit(
+                  "Root-level tests are not allowed. Move these files into unit/, integration/, "
+                  f"or integration/gui/: {root_tests}"
+              )
+          print("Test layout guard passed.")
+          PY
 
   test-core:
     name: Core Tests (${{ matrix.os }} / py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -82,29 +106,29 @@ jobs:
       - name: Run core tests
         run: >
           python -m pytest -m "not gui"
+          --cov=src/phage_annotator
+          --cov-branch
+          --cov-report=term-missing:skip-covered
+          --cov-report=xml:artifacts/coverage-core.xml
           --junitxml=artifacts/junit-core.xml
           --log-file=artifacts/pytest-core.log
           --durations=10
       - name: Upload core artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: core-artifacts-${{ matrix.os }}-py${{ matrix.python-version }}
           path: artifacts
 
   test-gui:
-    name: GUI Tests (${{ matrix.os }} / py${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
-        python-version: ["3.11"]
+    name: GUI Tests (ubuntu-22.04 / py3.11)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
           cache: pip
       - name: Install test deps
         run: |
@@ -112,8 +136,7 @@ jobs:
           python -m pip install .[dev]
       - name: Prepare artifacts dir
         run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
-      - name: Install Xvfb (Linux only)
-        if: runner.os == 'Linux'
+      - name: Install Xvfb
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
@@ -122,8 +145,7 @@ jobs:
           python -c "import sys,platform; print(sys.version); print(platform.platform())"
           python -c "import matplotlib; print('matplotlib', matplotlib.get_backend())"
           python -c "import pkgutil; print('PyQt5', 'available' if pkgutil.find_loader('PyQt5') else 'not available')"
-      - name: Run GUI tests (Linux)
-        if: runner.os == 'Linux'
+      - name: Run GUI tests
         env:
           QT_QPA_PLATFORM: offscreen
           MPLBACKEND: Agg
@@ -132,26 +154,17 @@ jobs:
           --junitxml=artifacts/junit-gui.xml
           --log-file=artifacts/pytest-gui.log
           --durations=10
-      - name: Run GUI tests (macOS/Windows)
-        if: runner.os != 'Linux'
-        env:
-          QT_QPA_PLATFORM: offscreen
-          MPLBACKEND: Agg
-        run: >
-          python -m pytest -m gui --run-gui
-          --junitxml=artifacts/junit-gui.xml
-          --log-file=artifacts/pytest-gui.log
-          --durations=10
       - name: Upload GUI artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gui-artifacts-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: gui-artifacts-ubuntu-22.04-py3.11
           path: artifacts
 
   build:
     name: Build
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

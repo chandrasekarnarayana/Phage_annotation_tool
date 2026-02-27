@@ -1,7 +1,7 @@
 """Data source interfaces for render/data separation.
 
 This module defines abstract interfaces for data provision to renderers,
-implementing the FIJI-style architecture principle of separating data access
+implementing the layered architecture principle of separating data access
 from data visualization.
 
 Architecture Principles

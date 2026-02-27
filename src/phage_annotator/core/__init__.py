@@ -1,10 +1,10 @@
-"""Core domain models and data structures - FIJI Layer 1: Core Models.
+"""Core domain models and data structures - Layer 1: Core Models.
 
-This package implements the CORE LAYER of the FIJI-style architecture,
+This package implements the CORE LAYER of the layered architecture,
 containing pure domain objects and data models independent of rendering,
 storage, or UI frameworks.
 
-**FIJI Layer**: 1 (Core domain models)
+**Layer**: 1 (Core domain models)
 
 **Responsibilities**:
 - Define immutable domain models (Keypoint, ViewState, SessionState)

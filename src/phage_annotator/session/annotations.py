@@ -21,8 +21,16 @@ class SessionAnnotationsMixin:
         x: float,
         label: str,
         scope: str,
+        modality_idx: Optional[int] = None,
     ) -> Keypoint:
-        """Add an annotation to the session."""
+        """Add an annotation to the session.
+        
+        Parameters
+        ----------
+        modality_idx : int, optional
+            Index of modality this annotation belongs to.
+            If None, annotation is visible on all modalities (backward compatible).
+        """
         kp = Keypoint(
             image_id=image_id,
             image_name=image_name,
@@ -31,6 +39,7 @@ class SessionAnnotationsMixin:
             y=float(y),
             x=float(x),
             label=label,
+            modality_idx=modality_idx,
         )
         self.session_state.annotations.setdefault(image_id, []).append(kp)
         self.session_state.annotations_loaded[image_id] = True
@@ -84,7 +93,8 @@ class SessionAnnotationsMixin:
                 )
                 event_service.publish(CacheInvalidationEvent(scope="image", image_id=image_id))
             except Exception:
-                pass  # Gracefully handle if event service not initialized        return removed
+                pass  # Gracefully handle if event service not initialized
+        return removed
 
     def update_annotation(self, image_id: int, old: Keypoint, new: Keypoint) -> bool:
         """Replace a single annotation with an updated version."""
@@ -127,21 +137,47 @@ class SessionAnnotationsMixin:
         if not self._undo_stack:
             return False
         action = self._undo_stack.pop()
+
+        if self._is_serialized_command(action):
+            from phage_annotator.session.commands import command_from_dict
+
+            cmd = command_from_dict(action, self)
+            if cmd and cmd.undo():
+                self._redo_stack.append(action)
+                return True
+            self._undo_stack.append(action)
+            return False
+
         inverse = self._apply_action(action, undo=True)
         if inverse:
             self._redo_stack.append(inverse)
             self.annotations_changed.emit()
             return True
+        self._undo_stack.append(action)
+        return False
 
     def redo(self) -> bool:
         if not self._redo_stack:
             return False
         action = self._redo_stack.pop()
+
+        if self._is_serialized_command(action):
+            from phage_annotator.session.commands import command_from_dict
+
+            cmd = command_from_dict(action, self)
+            if cmd and cmd.redo():
+                self._undo_stack.append(action)
+                return True
+            self._redo_stack.append(action)
+            return False
+
         inverse = self._apply_action(action, undo=False)
         if inverse:
             self._undo_stack.append(inverse)
             self.annotations_changed.emit()
             return True
+        self._redo_stack.append(action)
+        return False
 
     def _apply_action(self, action: dict, undo: bool) -> Optional[dict]:
         atype = action.get("type")
@@ -167,3 +203,13 @@ class SessionAnnotationsMixin:
             pts.remove(point)
         except ValueError:
             pass
+
+    @staticmethod
+    def _is_serialized_command(action: dict) -> bool:
+        """Return True when an undo-stack item is a serialized command payload."""
+        return bool(
+            isinstance(action, dict)
+            and action.get("type")
+            and action.get("before")
+            and action.get("after")
+        )

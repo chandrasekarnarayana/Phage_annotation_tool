@@ -2,8 +2,8 @@
 
 Contains:
 - logging: Logging configuration and helpers
-- zero_copy: Zero-copy array view utilities (Phase 7)
-- memory_profiling: Memory profiling decorators and helpers (Phase 7)
+- zero_copy: Zero-copy array view utilities
+- memory_profiling: Memory profiling decorators and helpers
 """
 
 from phage_annotator.utils.memory_profiling import (

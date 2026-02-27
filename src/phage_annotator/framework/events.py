@@ -1,4 +1,4 @@
-"""Application events for FIJI architecture service integration.
+"""Application events for service integration.
 
 This module defines event types used throughout the application to decouple
 components through the event bus (EventService).

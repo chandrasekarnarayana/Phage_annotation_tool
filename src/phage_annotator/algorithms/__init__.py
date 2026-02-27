@@ -1,6 +1,6 @@
-"""Analysis algorithms and computational methods (FIJI Layer 3).
+"""Analysis algorithms and computational methods (Layer 3).
 
-This package implements the Algorithms Layer in the FIJI architecture,
+This package implements the Algorithms Layer,
 providing stateless functions for image analysis, particle detection, ML
 inference, and other computational tasks.
 
@@ -38,10 +38,10 @@ inference, and other computational tasks.
     particles = analyze_particles(image_array, threshold=0.5)
     roi = propose_roi(frame, method="density")
     
-**Phase Progress**:
-- Phase 2.5: Physical migration from core → algorithms
-- Phase 3: GPU optimization for ML inference
-- Phase 9: Full FIJI documentation complete
+**Architecture Evolution**:
+- Physical migration from core → algorithms
+- GPU optimization for ML inference
+- Full documentation complete
 """
 
 # Import from new locations (Phase 2.5 physical migration)
@@ -55,6 +55,9 @@ from phage_annotator.algorithms.particles import (
     analyze_particles,
 )
 
+# analysis.py
+from phage_annotator.algorithms.analysis import compute_projection, compute_projections
+
 __all__ = [
     # auto_roi
     "propose_roi",
@@ -62,4 +65,7 @@ __all__ = [
     "Particle",
     "ParticleOptions",
     "analyze_particles",
+    # analysis
+    "compute_projection",
+    "compute_projections",
 ]

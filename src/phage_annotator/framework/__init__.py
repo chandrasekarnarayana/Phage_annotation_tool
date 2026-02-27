@@ -1,6 +1,6 @@
-"""Framework and service infrastructure (FIJI Layer 5).
+"""Framework and service infrastructure (Layer 5).
 
-This package implements the Framework Layer in the FIJI architecture,
+This package implements the Framework Layer,
 providing service interfaces and dependency injection for all application
 components. It is the wiring that enables loose coupling throughout.
 
@@ -64,10 +64,10 @@ components. It is the wiring that enables loose coupling throughout.
     context.set_service(LogService, MockLogService())
     ApplicationContext.set_global(context)
 
-**Phase Progress**:
-- Phase 1-2: Initial service architecture
-- Phase 6-8: Event system refinement and integration
-- Phase 9: Full FIJI documentation and GUI integration complete
+**Architecture Evolution**:
+- Initial service architecture
+- Event system refinement and integration
+- Full documentation and GUI integration complete
 """
 
 from phage_annotator.framework.base import (

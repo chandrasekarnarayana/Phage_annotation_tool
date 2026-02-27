@@ -1,6 +1,6 @@
-"""Qt-based GUI application for microscopy image annotation (FIJI Layer 6).
+"""Qt-based GUI application for microscopy image annotation (Layer 6).
 
-This package implements the Presentation Layer in the FIJI architecture,
+This package implements the Presentation Layer,
 providing the PyQt5-based GUI for image annotation and analysis.
 
 **Layer 6 Responsibilities**:
@@ -74,11 +74,11 @@ providing the PyQt5-based GUI for image annotation and analysis.
       + TableStatusMixin (table/status bar)
       + ExportMixin (export capabilities)
 
-**Phase Progress**:
-- Phase 1-2: Initial Qt GUI structure
-- Phase 3: Mixin decomposition for maintainability
-- Phase 6: Data source interfaces for renderer decoupling
-- Phase 9: Event subscription and full FIJI integration complete
+**Architecture Evolution**:
+- Initial Qt GUI structure
+- Mixin decomposition for maintainability
+- Data source interfaces for renderer decoupling
+- Event subscription and full integration complete
 """
 
 # Lazy imports to avoid circular dependencies during module initialization

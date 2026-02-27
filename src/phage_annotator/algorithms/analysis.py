@@ -31,6 +31,58 @@ def compute_mean_std(arr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return mean_proj, std_proj
 
 
+def compute_projections(
+    arr: np.ndarray,
+    kinds: Iterable[str],
+    axis: str = "tz",
+) -> dict[str, np.ndarray]:
+    """Compute multiple projections over the requested axes.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Image array in (T, Z, Y, X) order.
+    kinds : Iterable[str]
+        Projection kinds: "mean", "std", "min", "max".
+    axis : str
+        Projection axis: "tz" (default), "t", or "z".
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Mapping of kind -> projection array (2D).
+    """
+    axis = axis.lower()
+    reduce_axes: tuple[int, ...]
+    if axis == "t":
+        reduce_axes = (0,)
+    elif axis == "z":
+        reduce_axes = (1,)
+    else:
+        reduce_axes = (0, 1)
+
+    results: dict[str, np.ndarray] = {}
+    for kind in kinds:
+        kind_l = kind.lower()
+        if kind_l == "mean":
+            proj = arr.mean(axis=reduce_axes)
+        elif kind_l == "std":
+            proj = arr.std(axis=reduce_axes)
+        elif kind_l == "min":
+            proj = arr.min(axis=reduce_axes)
+        elif kind_l == "max":
+            proj = arr.max(axis=reduce_axes)
+        else:
+            raise ValueError(f"Unsupported projection kind: {kind}")
+        results[kind_l] = proj.astype(np.float32, copy=False)
+    return results
+
+
+def compute_projection(arr: np.ndarray, kind: str, axis: str = "tz") -> np.ndarray:
+    """Compute a single projection over the requested axes."""
+    return compute_projections(arr, [kind], axis=axis)[kind.lower()]
+
+
 def compute_roi_mean_for_path(
     path: str,
     roi_rect: Tuple[float, float, float, float],
@@ -301,6 +353,8 @@ def fit_gaussian_2d(
         raise ValueError("Patch too small for Gaussian fit.")
     y = np.arange(h)
     x = np.arange(w)
+    xx: np.ndarray
+    yy: np.ndarray
     xx, yy = np.meshgrid(x, y)
     amp0 = float(patch.max() - patch.min())
     offset0 = float(patch.min())

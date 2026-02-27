@@ -23,7 +23,7 @@ import logging
 import math
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Callable, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
@@ -33,8 +33,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-CacheKey = Tuple[int, str, Tuple[float, float, float, float], int, int]
-PyramidKey = Tuple[int, str, int, int, Tuple[float, float, float, float], int]
+CacheKey = Tuple[int, str, Tuple[float, float, float, float], int, int, int]
+PyramidKey = Tuple[int, str, int, int, Tuple[float, float, float, float], int, int]
 
 
 @dataclass
@@ -105,7 +105,7 @@ class ProjectionCache:
         self._max_bytes = int(max_mb) * 1024 * 1024
         self._total_bytes = 0
         self._telemetry = CacheTelemetry()
-        self._warning_callback: Optional[callable] = None  # For toast notifications
+        self._warning_callback: Optional[Callable[[str], None]] = None  # For toast notifications
         self._disk_cache = disk_cache  # Optional disk cache (P6)
         self._component_budget = component_budget  # P7e: Per-component memory tracking
         
@@ -114,6 +114,10 @@ class ProjectionCache:
             'projection_main': 0,  # Primary projections
             'projection_pyramid': 0,  # LOD pyramid levels
         }
+        # Phase η: Per-modality cache tracking
+        self._modality_bytes_main: dict[int, int] = {}
+        self._modality_bytes_pyramid: dict[int, int] = {}
+        self._modality_count = 1
 
     def set_budget_mb(self, max_mb: int) -> None:
         """Update the cache budget in MB and evict if needed."""
@@ -121,7 +125,12 @@ class ProjectionCache:
         self._telemetry.warning_at_90_percent_issued = False  # Reset warning
         self._evict_if_needed()
 
-    def set_warning_callback(self, callback: Optional[callable]) -> None:
+    def set_modality_count(self, count: int) -> None:
+        """Set the number of modalities for per-modality cache budgets."""
+        self._modality_count = max(1, int(count))
+        self._evict_if_needed()
+
+    def set_warning_callback(self, callback: Optional[Callable[[str], None]]) -> None:
         """Set callback for 90% budget warnings (e.g., toast notification)."""
         self._warning_callback = callback
 
@@ -183,13 +192,20 @@ class ProjectionCache:
     def put(self, key: CacheKey, data: np.ndarray) -> None:
         """Insert/update a cached array and enforce the memory budget."""
         nbytes = int(data.nbytes)
+        modality_idx = int(key[-1])
         existing = self._items.pop(key, None)
         if existing is not None:
             self._total_bytes -= existing.nbytes
             self._component_bytes['projection_main'] -= existing.nbytes
+            self._modality_bytes_main[modality_idx] = (
+                self._modality_bytes_main.get(modality_idx, 0) - existing.nbytes
+            )
         self._items[key] = CacheItem(data=data, nbytes=nbytes)
         self._total_bytes += nbytes
         self._component_bytes['projection_main'] += nbytes  # P7e: Track component usage
+        self._modality_bytes_main[modality_idx] = (
+            self._modality_bytes_main.get(modality_idx, 0) + nbytes
+        )
         self._evict_if_needed()
 
     def get_pyramid(self, key: PyramidKey) -> Optional[np.ndarray]:
@@ -203,13 +219,20 @@ class ProjectionCache:
     def put_pyramid(self, key: PyramidKey, data: np.ndarray) -> None:
         """Insert/update a cached pyramid level with lower eviction priority."""
         nbytes = int(data.nbytes)
+        modality_idx = int(key[-1])
         existing = self._pyramid_items.pop(key, None)
         if existing is not None:
             self._total_bytes -= existing.nbytes
             self._component_bytes['projection_pyramid'] -= existing.nbytes
+            self._modality_bytes_pyramid[modality_idx] = (
+                self._modality_bytes_pyramid.get(modality_idx, 0) - existing.nbytes
+            )
         self._pyramid_items[key] = CacheItem(data=data, nbytes=nbytes)
         self._total_bytes += nbytes
         self._component_bytes['projection_pyramid'] += nbytes  # P7e: Track component usage
+        self._modality_bytes_pyramid[modality_idx] = (
+            self._modality_bytes_pyramid.get(modality_idx, 0) + nbytes
+        )
         self._evict_if_needed()
 
     def invalidate_image(self, image_id: int) -> None:
@@ -218,16 +241,30 @@ class ProjectionCache:
             item = self._items.pop(cache_key, None)
             if item is not None:
                 self._total_bytes -= item.nbytes
+                self._component_bytes['projection_main'] -= item.nbytes
+                modality_idx = int(cache_key[-1])
+                self._modality_bytes_main[modality_idx] = (
+                    self._modality_bytes_main.get(modality_idx, 0) - item.nbytes
+                )
         for pyramid_key in [k for k in self._pyramid_items.keys() if k[0] == image_id]:
             item = self._pyramid_items.pop(pyramid_key, None)
             if item is not None:
                 self._total_bytes -= item.nbytes
+                self._component_bytes['projection_pyramid'] -= item.nbytes
+                modality_idx = int(pyramid_key[-1])
+                self._modality_bytes_pyramid[modality_idx] = (
+                    self._modality_bytes_pyramid.get(modality_idx, 0) - item.nbytes
+                )
 
     def clear(self) -> None:
         """Clear all cached items and reset byte tracking."""
         self._items.clear()
         self._pyramid_items.clear()
         self._total_bytes = 0
+        self._component_bytes['projection_main'] = 0
+        self._component_bytes['projection_pyramid'] = 0
+        self._modality_bytes_main.clear()
+        self._modality_bytes_pyramid.clear()
 
     def stats(self) -> Tuple[int, int]:
         """Return (mb_used, item_count) for UI/status display."""
@@ -342,6 +379,49 @@ class ProjectionCache:
         
         return 0
 
+    def get_modality_usage(self, modality_idx: int) -> Tuple[int, int]:
+        """Get total memory usage for a modality.
+
+        Returns:
+            Tuple of (bytes_used, mb_used)
+        """
+        total_bytes = self._modality_bytes_main.get(modality_idx, 0) + self._modality_bytes_pyramid.get(
+            modality_idx, 0
+        )
+        return total_bytes, total_bytes // (1024 * 1024)
+
+    def should_compute(self, modality_idx: int) -> bool:
+        """Decide whether to schedule full-res projection computation."""
+        if self._max_bytes <= 0:
+            return False
+        percent = (self._total_bytes / self._max_bytes * 100) if self._max_bytes else 0
+        if percent >= 90:
+            return False
+        per_modality_budget = self._max_bytes // self._modality_count
+        modality_bytes = self._modality_bytes_main.get(modality_idx, 0) + self._modality_bytes_pyramid.get(
+            modality_idx, 0
+        )
+        return modality_bytes <= per_modality_budget
+
+    def _modality_overages(self) -> dict[int, int]:
+        per_modality_budget = self._max_bytes // self._modality_count
+        overages: dict[int, int] = {}
+        for modality_idx in set(self._modality_bytes_main) | set(self._modality_bytes_pyramid):
+            bytes_used = self._modality_bytes_main.get(modality_idx, 0) + self._modality_bytes_pyramid.get(
+                modality_idx, 0
+            )
+            over = bytes_used - per_modality_budget
+            if over > 0:
+                overages[modality_idx] = over
+        return overages
+
+    def _pop_lru_for_modality(self, items: OrderedDict, modality_idx: int) -> Optional[Tuple[tuple, CacheItem]]:
+        for key in list(items.keys()):
+            if int(key[-1]) == modality_idx:
+                item = items.pop(key)
+                return key, item
+        return None
+
     def _evict_if_needed(self) -> None:
         """Evict least-recently-used items until within budget.
         
@@ -366,24 +446,51 @@ class ProjectionCache:
                         logger.debug(f"Warning callback error: {e}")
         
         # Evict until within budget, tracking per-cycle evictions
-        while self._total_bytes > self._max_bytes and (self._pyramid_items or self._items):
+        while (self._total_bytes > self._max_bytes or self._modality_overages()) and (
+            self._pyramid_items or self._items
+        ):
+            overages = self._modality_overages()
+            modality_idx = max(overages, key=lambda idx: overages[idx]) if overages else None
+
+            # Evict from pyramid first, but prefer the most over-budget modality if available.
             if self._pyramid_items:
-                key, item = self._pyramid_items.popitem(last=False)
+                if modality_idx is not None:
+                    popped = self._pop_lru_for_modality(self._pyramid_items, modality_idx)
+                else:
+                    popped = None
+                if popped is None:
+                    popped = self._pyramid_items.popitem(last=False)
+                key, item = popped
                 self._total_bytes -= item.nbytes
+                self._component_bytes['projection_pyramid'] -= item.nbytes
+                modality_key = int(key[-1])
+                self._modality_bytes_pyramid[modality_key] = (
+                    self._modality_bytes_pyramid.get(modality_key, 0) - item.nbytes
+                )
                 self._telemetry.pyramid_evictions += 1
                 self._telemetry.evictions_this_cycle += 1
                 self._telemetry.bytes_evicted += item.nbytes
-                # P6: Save to disk cache before discarding pyramid
                 if self._disk_cache:
                     self._disk_cache.save(key, item.data)
                 continue
+
             if self._items:
-                key, item = self._items.popitem(last=False)
+                if modality_idx is not None:
+                    popped = self._pop_lru_for_modality(self._items, modality_idx)
+                else:
+                    popped = None
+                if popped is None:
+                    popped = self._items.popitem(last=False)
+                key, item = popped
                 self._total_bytes -= item.nbytes
+                self._component_bytes['projection_main'] -= item.nbytes
+                modality_key = int(key[-1])
+                self._modality_bytes_main[modality_key] = (
+                    self._modality_bytes_main.get(modality_key, 0) - item.nbytes
+                )
                 self._telemetry.evictions += 1
                 self._telemetry.evictions_this_cycle += 1
                 self._telemetry.bytes_evicted += item.nbytes
-                # P6: Save to disk cache before discarding
                 if self._disk_cache:
                     self._disk_cache.save(key, item.data)
                 continue

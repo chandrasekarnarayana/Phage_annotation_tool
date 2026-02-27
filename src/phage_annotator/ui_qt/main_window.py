@@ -41,6 +41,9 @@ from phage_annotator.ui_qt.utils.state import StateMixin
 from phage_annotator.ui_qt.utils.table_status import TableStatusMixin
 from phage_annotator.ui_qt.utils.ui_extra import UiExtrasMixin
 from phage_annotator.ui_qt.utils.ui_setup import UiSetupMixin
+from phage_annotator.ui_qt.utils.modality_helpers import ModalityHelpersMixin
+from phage_annotator.ui_qt.handlers.keyboard_handlers import KeyboardHandlersMixin
+from phage_annotator.ui_qt.utils.context_menu import ContextMenuMixin
 from phage_annotator.data.models import LazyImage
 from phage_annotator.ui_qt.services.jobs import JobManager
 from phage_annotator.ui_qt.rendering.lut_manager import lut_names
@@ -50,6 +53,9 @@ from phage_annotator.ui_qt.panels.recorder_legacy import ActionRecorder
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
 from phage_annotator.roi.manager import RoiManager
 from phage_annotator.session.controller import SessionController
+from phage_annotator.session.modality_facade import ModalityFacade
+from phage_annotator.session.multi_playback import ModalityPlaybackManager, PlaybackMode
+from phage_annotator.session.view_sync import ViewSyncManager
 from phage_annotator.tools import Tool
 
 
@@ -64,11 +70,14 @@ class KeypointAnnotator(
     RenderingMixin,
     RoiCropMixin,
     AnnotationsMixin,
+    ContextMenuMixin,
     ActionsMixin,
     FileActionsMixin,
     ControlsMixin,
     TableStatusMixin,
     ExportMixin,
+    ModalityHelpersMixin,
+    KeyboardHandlersMixin,
 ):
     """Main GUI window for keypoint annotation on T/Z image stacks.
 
@@ -157,6 +166,7 @@ class KeypointAnnotator(
         self._prefetch_disabled = False
         self._adaptive_tile_size = 256
         self._lod_mode_active: Dict[int, bool] = {}
+        self._panel_modality_map: Dict[str, object] = {}
         self._status_base = ""
         self._status_extra = ""
         self._default_geometry: Optional[QtCore.QByteArray] = None
@@ -190,6 +200,9 @@ class KeypointAnnotator(
         self.cache_stats_label = None
         self.buffer_stats_label = None
         self._dev_demo_job_act = None
+        self.modality_facade = None
+        self.modality_playback = None
+        self.view_sync = None
 
         # Matplotlib image artists reused across refreshes to avoid recreation.
         self.im_frame = None
@@ -207,6 +220,7 @@ class KeypointAnnotator(
         self.dock_smlm = None
         self.dock_threshold = None
         self.dock_particles = None
+        self.dock_channels = None
         self.dock_annotations = None
         self.dock_roi = None
         self.dock_logs = None
@@ -263,6 +277,9 @@ class KeypointAnnotator(
         self.smlm_panel = None
         self.threshold_panel = None
         self.particles_panel = None
+        self.channel_panel = None
+        self.channel_integration = None
+        self._channel_panel_autoshown = False
         self.metadata_widget = None
         self.density_panel = None
         self._roi_controls_layout = None
@@ -291,6 +308,9 @@ class KeypointAnnotator(
             ring_buffer=self._playback_ring,
             colormaps=lut_names(),
         )
+        self.modality_facade = ModalityFacade(self.controller.session_state)
+        self.modality_playback = ModalityPlaybackManager(self)
+        self.view_sync = ViewSyncManager(self)
         self.colormaps = lut_names()
         self._autosave_timer = QtCore.QTimer()
         self._autosave_timer.setInterval(120000)
@@ -307,11 +327,13 @@ class KeypointAnnotator(
         self._smlm_overlay_extent = None
         self._smlm_job_id: Optional[str] = None
         self._smlm_run_id = 0
+        self._smlm_modality_idx: Optional[int] = None  # Phase ζ: Track modality for SMLM results
         self._deepstorm_results = []
         self._deepstorm_overlay = None
         self._deepstorm_overlay_extent = None
         self._deepstorm_job_id: Optional[str] = None
         self._deepstorm_run_id = 0
+        self._deepstorm_modality_idx: Optional[int] = None  # Phase ζ: Track modality for Deep-STORM results
         self._sr_overlay = None
         self._sr_overlay_extent = None
         self._smlm_run_history: List[dict] = []
@@ -331,6 +353,7 @@ class KeypointAnnotator(
         self._binary_view_mask = None
         self._binary_view_enabled = False
         self._particles_results: List[object] = []
+        self._particles_modality_idx: Optional[int] = None  # Phase ζ: Track modality for particle results
         self._particles_overlays: List[tuple] = []
         self._particles_selected: Optional[int] = None
         self._particles_job_id: Optional[str] = None
@@ -357,6 +380,13 @@ class KeypointAnnotator(
         )
 
         self._setup_ui()
+        if hasattr(self, "_update_analysis_panel_modalities"):
+            self._update_analysis_panel_modalities()
+        if self.view_sync is not None:
+            self.view_sync.view_changed.connect(self._on_view_sync_changed)
+            self.view_sync.enable_zoom_sync(self.link_zoom)
+            self.view_sync.enable_pan_sync(self.link_zoom)
+        self._init_modality_playback()
         self._cleanup_recent_images()  # Remove missing paths from recent files list
         if hasattr(self, "show_smlm_points_act"):
             self.show_smlm_points = self.show_smlm_points_act.isChecked()
@@ -376,6 +406,7 @@ class KeypointAnnotator(
         self._reset_crop(initial=True)
         self._reset_roi()
         self._refresh_image()
+        self._schedule_qc_validation()
         self._autosave_timer.start()
 
 

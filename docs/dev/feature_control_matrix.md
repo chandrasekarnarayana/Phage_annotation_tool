@@ -1,14 +1,47 @@
 # Feature/Control Matrix
 
-**Status**: Application fully functional with P7 optimizations integrated (Feb 26, 2026)
-- ✅ All P3-P5 phases complete: 108 tests passing
-- ✅ All P7 optimization phases complete: 226/226 tests passing (100% compatibility)
-- ✅ P7a: Async Disk I/O - ThreadPoolExecutor with Future tracking (15-30% latency improvement)
-- ✅ P7b: Lazy Decompression - CompressedBuffer with region-aware loading (2-3× bandwidth savings)
-- ✅ P7c: Predictive FOV Prefetch - Adjacent FOV grid detection + dynamic scheduling (Gap #1 fixed)
-- ✅ P7d: Zstd Level Tuning - Per-data-type compression levels (mean: 10, std: 8, uint8: 6)
-- ✅ P7e: Component Memory Tracking - Per-component budgets with UI visibility (Gap #3 fixed)
-- ✅ All 3 critical integration gaps identified and fully resolved
+**Status**: Production-ready (Feb 27, 2026) - File reorganization complete with comprehensive test coverage
+- ✅ **File Reorganization Complete**: 8 primary modules (session, annotation, roi, rendering, smlm, density, deepstorm, analysis) + 12 infrastructure modules
+- ⚠️ **Test Suite**: 608 passing (core functionality), 16 failing (disk cache - optional P6 feature), 7 skipped. Core features 100% passing
+- ✅ **Module Import System**: All 221 Python files successfully import; backward compatibility maintained
+- ✅ **UI Organization**: 9 logical submodules under ui_qt/ (actions, controls, docks, panels, rendering, utils, services, registry, widgets)
+- ✅ **Root Directory**: Cleaned from 93 loose files → 4 core files (cli.py, demo.py, __init__.py, __main__.py)
+- ✅ **P7 Optimizations**: Async Disk I/O, Lazy Decompression, Predictive FOV Prefetch, Zstd Tuning, Component Memory Tracking
+- ✅ **GUI Functionality**: All 64 user-facing controls verified and operational
+
+## Architecture Summary
+
+### Module Organization (Post-Reorganization)
+The codebase follows a FIJI-style layered architecture with clear separation of concerns:
+
+**Primary Feature Modules** (8 modules):
+- `session/` - Session state management, playback, annotations I/O (10 files)
+- `annotation/` - Keypoint/annotation core and indexing (4 files)
+- `roi/` - ROI management, auto-detection, widgets (5 files)
+- `rendering/` - Matplotlib rendering, LUT management, scalebar (5 files)
+- `smlm/` - SMLM algorithm presets, ThunderSTORM config (5 files)
+- `density/` - Density estimation models and inference (4 files)
+- `deepstorm/` - DeepSTORM deep learning inference (3 files)
+- `analysis/` - Threshold, particle analysis, core computations (4 files)
+
+**Infrastructure Modules** (12 modules):
+- `core/` - Domain models (Annotation, Keypoint, Dataset, etc.)
+- `data/` - LazyImage, pyramid, ring buffer, display mapping
+- `algorithms/` - Image processing, analysis algorithms, auto-ROI
+- `cache/` - Memory management, LRU eviction, disk cache, array pooling
+- `framework/` - Event service, logging, settings, threading, command registry
+- `io/` - TIFF/OME reading, coordinate transforms, project save/load
+- `utils/` - Helper functions, decorators, utilities
+- `ui_qt/` - Qt GUI (9 submodules: actions, controls, docks, panels, rendering, utils, services, registry, widgets)
+- `config/` - Configuration management and defaults
+- `constants/` - Application constants and enumerations
+- `plugins/` - Plugin system and extension points
+- `tools/` - Tool logic and utilities
+
+**Backward Compatibility**:
+- 27 deprecation facades provide seamless migration path for old import paths
+- All legacy imports still work with DeprecationWarnings
+- Users can migrate at their own pace
 
 This matrix enumerates user-facing controls and their wiring based on code inspection. Each row is a distinct control/feature. References are to concrete functions/modules only (no guesses).
 

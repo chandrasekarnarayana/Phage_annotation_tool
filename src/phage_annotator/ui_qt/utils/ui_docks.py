@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
+import pathlib
 from typing import List, Optional
 
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.figure import Figure
 
 from phage_annotator.roi.widgets import RoiManagerWidget
-from phage_annotator.ui_qt.panels.analyze_particles_panel import AnalyzeParticlesPanel
-from phage_annotator.ui_qt.panels.density_panel import DensityPanel
+from phage_annotator.ui_qt.panels.particles import AnalyzeParticlesPanel
+from phage_annotator.ui_qt.panels.channel_controls import ChannelControlPanel
+from phage_annotator.ui_qt.panels.density import DensityPanel
+from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
 from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.threshold import ThresholdPanel
 from phage_annotator.ui_qt.docks.metadata_dock import MetadataDock
 from phage_annotator.ui_qt.widgets.table_legacy import ResultsTableWidget
 from phage_annotator.ui_qt.widgets.orthoview import OrthoViewWidget
-# performance_panel moved to ui_qt PerformancePanel
-from phage_annotator.smlm.ui import SmlmPanel
-# threshold_panel moved to ui_qt ThresholdPanel
+from phage_annotator.ui_qt.widgets.slider_panel_double import SliderPanelDouble
+from phage_annotator.ui_qt.panels.smlm import SmlmPanel
 
 
 def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
@@ -30,6 +33,19 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     for spec in self.panel_specs:
         widget = spec.widget_factory()
         dock = create_dock(self, spec.id, spec.title, widget)
+        if spec.id == "sidebar":
+            dock.setFeatures(
+                QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
+                | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
+            )
+            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea)
+            dock.setMinimumWidth(48)
+        elif spec.id == "annotations":
+            dock.setFeatures(
+                QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
+                | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
+            )
+            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         if spec.id == "annotations":
             dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.panel_docks[spec.id] = dock
@@ -64,7 +80,9 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_recorder = self.panel_docks.get("recorder")
     self.dock_metadata = self.panel_docks.get("metadata")
     self.dock_density = self.panel_docks.get("density")
+    self.dock_channels = self.panel_docks.get("channels")
     self.dock_performance = self.panel_docks.get("performance")
+    self.dock_qc_issues = self.panel_docks.get("qc_issues")
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
@@ -77,10 +95,10 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     if self.dock_roi and self.dock_metadata:
         self.tabifyDockWidget(self.dock_roi, self.dock_metadata)
     if self.dock_smlm is not None:
-        self.dock_smlm.setFloating(True)
+        self.dock_smlm.setFloating(False)
         self.dock_smlm.setVisible(False)
     if self.dock_orthoview is not None:
-        self.dock_orthoview.setFloating(True)
+        self.dock_orthoview.setFloating(False)
         self.dock_orthoview.setVisible(False)
     if self.dock_metadata is not None:
         self.dock_metadata.visibilityChanged.connect(self._on_metadata_dock_visibility)
@@ -204,6 +222,14 @@ def build_panel_registry(self) -> List[PanelSpec]:
             toggle_action_text="Density",
         ),
         PanelSpec(
+            id="channels",
+            title="Channels",
+            default_area=QtCore.Qt.LeftDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_channel_controls_widget,
+            toggle_action_text="Channels",
+        ),
+        PanelSpec(
             id="logs",
             title="Diagnostics",
             default_area=QtCore.Qt.BottomDockWidgetArea,
@@ -226,6 +252,14 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_performance_widget,
             toggle_action_text="Performance Monitor",
+        ),
+        PanelSpec(
+            id="qc_issues",
+            title="QC Issues",
+            default_area=QtCore.Qt.BottomDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_qc_issues_widget,
+            toggle_action_text="QC Issues",
         ),
     ]
 
@@ -320,7 +354,7 @@ def make_recorder_widget(self) -> QtWidgets.QWidget:
 
 def make_hist_widget(self) -> QtWidgets.QWidget:
     if self.hist_canvas is None:
-        self.hist_fig = plt.figure(figsize=(4, 3))
+        self.hist_fig = Figure(figsize=(4, 3))
         self.hist_canvas = FigureCanvasQTAgg(self.hist_fig)
         self.ax_hist = self.hist_fig.add_subplot(111)
     hist_container = QtWidgets.QWidget()
@@ -367,20 +401,21 @@ def make_hist_widget(self) -> QtWidgets.QWidget:
     )
     bc_layout.addWidget(self.bc_preview, 0, 0, 1, 3)
 
-    self.bc_min_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-    self.bc_max_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+    self.bc_range_slider = SliderPanelDouble()
+    self.bc_range_slider.setMinimumHeight(26)
+    bc_layout.addWidget(QtWidgets.QLabel("Range"), 1, 0)
+    bc_layout.addWidget(self.bc_range_slider, 1, 1, 1, 2)
+
     self.bc_min_spin = QtWidgets.QDoubleSpinBox()
     self.bc_max_spin = QtWidgets.QDoubleSpinBox()
     for spin in (self.bc_min_spin, self.bc_max_spin):
         spin.setDecimals(3)
         spin.setSingleStep(1.0)
         spin.setKeyboardTracking(False)
-    bc_layout.addWidget(QtWidgets.QLabel("Minimum"), 1, 0)
-    bc_layout.addWidget(self.bc_min_spin, 1, 1)
-    bc_layout.addWidget(self.bc_min_slider, 1, 2)
-    bc_layout.addWidget(QtWidgets.QLabel("Maximum"), 2, 0)
-    bc_layout.addWidget(self.bc_max_spin, 2, 1)
-    bc_layout.addWidget(self.bc_max_slider, 2, 2)
+    bc_layout.addWidget(QtWidgets.QLabel("Minimum"), 2, 0)
+    bc_layout.addWidget(self.bc_min_spin, 2, 1)
+    bc_layout.addWidget(QtWidgets.QLabel("Maximum"), 3, 0)
+    bc_layout.addWidget(self.bc_max_spin, 3, 1)
 
     self.bc_brightness_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
     self.bc_brightness_slider.setRange(-100, 100)
@@ -388,21 +423,23 @@ def make_hist_widget(self) -> QtWidgets.QWidget:
     self.bc_contrast_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
     self.bc_contrast_slider.setRange(-100, 100)
     self.bc_contrast_slider.setValue(0)
-    bc_layout.addWidget(QtWidgets.QLabel("Brightness"), 3, 0)
-    bc_layout.addWidget(self.bc_brightness_slider, 3, 1, 1, 2)
-    bc_layout.addWidget(QtWidgets.QLabel("Contrast"), 4, 0)
-    bc_layout.addWidget(self.bc_contrast_slider, 4, 1, 1, 2)
+    bc_layout.addWidget(QtWidgets.QLabel("Brightness"), 4, 0)
+    bc_layout.addWidget(self.bc_brightness_slider, 4, 1, 1, 2)
+    bc_layout.addWidget(QtWidgets.QLabel("Contrast"), 5, 0)
+    bc_layout.addWidget(self.bc_contrast_slider, 5, 1, 1, 2)
 
     bc_btns = QtWidgets.QHBoxLayout()
     self.bc_auto_btn = QtWidgets.QPushButton("Auto")
     self.bc_reset_btn = QtWidgets.QPushButton("Reset")
     self.bc_set_btn = QtWidgets.QPushButton("Set")
+    self.bc_dialog_btn = QtWidgets.QPushButton("Dialog")
     self.bc_apply_btn = QtWidgets.QPushButton("Apply")
     bc_btns.addWidget(self.bc_auto_btn)
     bc_btns.addWidget(self.bc_reset_btn)
     bc_btns.addWidget(self.bc_set_btn)
+    bc_btns.addWidget(self.bc_dialog_btn)
     bc_btns.addWidget(self.bc_apply_btn)
-    bc_layout.addLayout(bc_btns, 5, 0, 1, 3)
+    bc_layout.addLayout(bc_btns, 6, 0, 1, 3)
 
     hist_layout.addWidget(bc_group)
     return hist_container
@@ -411,7 +448,7 @@ def make_hist_widget(self) -> QtWidgets.QWidget:
 def make_profile_widget(self) -> QtWidgets.QWidget:
     """Create the profile (line-plot) widget and checkbox."""
     if self.profile_canvas is None:
-        self.profile_fig = plt.figure(figsize=(4, 3))
+        self.profile_fig = Figure(figsize=(4, 3))
         self.profile_canvas = FigureCanvasQTAgg(self.profile_fig)
         self.ax_line = self.profile_fig.add_subplot(111)
     profile_container = QtWidgets.QWidget()
@@ -450,6 +487,13 @@ def make_threshold_widget(self) -> QtWidgets.QWidget:
 def make_particles_widget(self) -> QtWidgets.QWidget:
     widget = AnalyzeParticlesPanel(parent=self)
     self.particles_panel = widget
+    return widget
+
+
+def make_channel_controls_widget(self) -> QtWidgets.QWidget:
+    """Create the channel controls dock widget."""
+    widget = ChannelControlPanel(parent=self)
+    self.channel_panel = widget
     return widget
 
 
@@ -550,6 +594,12 @@ def make_metadata_widget(self) -> QtWidgets.QWidget:
 def make_density_widget(self) -> QtWidgets.QWidget:
     widget = DensityPanel(parent=self)
     self.density_panel = widget
+    return widget
+
+
+def make_qc_issues_widget(self) -> QtWidgets.QWidget:
+    widget = QCIssuesPanel(qc_state=getattr(self, "qc_state", None), parent=self)
+    self.qc_issues_panel = widget
     return widget
 
 

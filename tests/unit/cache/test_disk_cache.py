@@ -335,7 +335,7 @@ class TestProjectionCacheDiskIntegration(unittest.TestCase):
         proj_cache = ProjectionCache(max_mb=10, disk_cache=self.disk_cache)
 
         # Add large array to trigger eviction
-        key1 = "pyramid_0_0_0"
+        key1 = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         data1 = np.ones((512, 512), dtype=np.float32)  # ~1 MB
         proj_cache.put(key1, data1)
 
@@ -346,13 +346,12 @@ class TestProjectionCacheDiskIntegration(unittest.TestCase):
 
         # Add more data to trigger eviction of first
         for i in range(15):
-            key = f"pyramid_0_{i}_frame"
+            key = (i + 1, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
             data = np.ones((512, 512), dtype=np.float32)
             proj_cache.put(key, data)
 
-        # Original key1 should be evicted from memory
-        mem_result = proj_cache.get(key1)
-        # It might be in memory still or None, depending on exact eviction timing
+        # Original key1 may or may not still be in memory depending on eviction timing.
+        proj_cache.get(key1)
 
         # But it should load from disk if available
         disk_result = self.disk_cache.load(key1)
@@ -363,10 +362,8 @@ class TestProjectionCacheDiskIntegration(unittest.TestCase):
         """Test that memory miss falls back to disk cache."""
         from phage_annotator.cache.projection_cache import ProjectionCache
 
-        proj_cache = ProjectionCache(max_mb=10, disk_cache=self.disk_cache)
-
         # Manually add to disk cache (simulating evicted item)
-        key = "tile_evicted"
+        key = (1, "std", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         data = np.ones((256, 256), dtype=np.float32)
         self.disk_cache.save(key, data)
 
@@ -385,7 +382,7 @@ class TestProjectionCacheDiskIntegration(unittest.TestCase):
         # ProjectionCache without disk cache should still work
         proj_cache = ProjectionCache(max_mb=10, disk_cache=None)
 
-        key = "test_data"
+        key = (0, "raw", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         data = np.ones((256, 256), dtype=np.float32)
         proj_cache.put(key, data)
 
@@ -404,13 +401,20 @@ class TestProjectionCacheDiskIntegration(unittest.TestCase):
         fov_data = {}
         for fov_idx in range(5):
             for tile_idx in range(4):
-                key = f"fov_{fov_idx}_tile_{tile_idx}"
+                key = (
+                    fov_idx,
+                    "mean",
+                    (float(tile_idx), 0.0, 0.0, 0.0),
+                    -1,
+                    -1,
+                    0,
+                )
                 data = np.random.rand(256, 256).astype(np.float32)
                 fov_data[key] = data
                 proj_cache.put(key, data)
 
         # Browse back to first FOV - some tiles might be in disk cache
-        fov0_key = "fov_0_tile_0"
+        fov0_key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         
         # Try to get tile from first FOV
         result = proj_cache.get(fov0_key)

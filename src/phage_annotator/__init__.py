@@ -2,7 +2,7 @@
 
 See documentation at: https://github.com/chandrasekarnarayana/Phage_annotation_tool
 
-Package structure (Fiji-style architecture):
+Package structure (layered architecture):
 - core/: Domain models (Annotation, Keypoint, Dataset)
 - io/: I/O operations (read/write TIFF, JSON, projects)
 - data/: Image data handling (LazyImage, Pyramid, RingBuffer)

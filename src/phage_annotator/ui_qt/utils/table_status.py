@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
@@ -110,7 +110,29 @@ class TableStatusMixin:
             density_txt = f" | View pts: {pts_view} | Area: {area_um2:.2f} um^2 | Density: {density:.3f} /um^2"
         cache_mb, cache_items = self.proj_cache.stats()
         cache_txt = f" | Cache: {cache_mb} MB | Items: {cache_items}"
-        self._status_base = f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} | Speed {self.speed_slider.value()} fps{density_txt}{cache_txt}"
+        
+        # Collect diagnostic flags
+        diag_flags = []
+        render_scales = getattr(self, "_render_scales", {}) or {}
+        scale = max(render_scales.values()) if render_scales else 1
+        if scale > 1:
+            diag_flags.append(f"Downsample x{scale}")
+        
+        # Check for memory pressure / spatial downsampling on loaded image
+        if self.primary_image.downsampled:
+            diag_flags.append(f"Spatial 2x downsampled (memory)")
+        
+        lod_active = getattr(self, "_lod_mode_active", {})
+        if lod_active.get(self.primary_image.id, False):
+            diag_flags.append("LOD")
+        if getattr(self.primary_image.array, "filename", None) is not None:
+            diag_flags.append("Memmap")
+        
+        diag_txt = f" | {'; '.join(diag_flags)}" if diag_flags else ""
+        self._status_base = (
+            f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} "
+            f"| Speed {self.speed_slider.value()} fps{density_txt}{cache_txt}{diag_txt}"
+        )
         self._render_status()
         if self.tool_label is not None and self.tool_router is not None:
             self.tool_label.setText(f"Tool: {self._tool_label(self.tool_router.tool)}")
@@ -220,20 +242,46 @@ class TableStatusMixin:
             t = self.t_slider.value()
             z = self.z_slider.value()
             pts = [kp for kp in pts if (kp.t in (t, -1) and kp.z in (z, -1))]
+        
+        # Phase ζ: Filter by current modality_idx if enabled
+        if hasattr(self, '_filter_by_modality') and self._filter_by_modality:
+            # Get current modality idx (from modality manager or primary image)
+            current_modality_idx = self._get_current_modality_idx()
+            if current_modality_idx is not None:
+                from phage_annotator.core.multi_modality import filter_by_modality
+                pts = filter_by_modality(pts, current_modality_idx, show_all=True)
+        
         return pts
+    
+    def _get_current_modality_idx(self) -> Optional[int]:
+        """Get the modality index for the currently displayed image."""
+        manager = getattr(self.controller.session_state, "modality_manager", None)
+        if manager is None:
+            return None
+        
+        # Find modality for current primary image
+        for modality in manager.get_all_modalities():
+            if modality.image_id == self.primary_image.id:
+                return modality.idx
+        
+        return None
 
     def _restore_zoom(self, data_shape: Tuple[int, int]) -> None:
-        axes = [
-            ax
-            for ax in [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
+        axes = []
+        if getattr(self, "renderer", None) is not None:
+            axes = [ax for ax in self.renderer.axes.values() if ax is not None]
+        if not axes:
+            axes = [
+                ax
+                for ax in [
+                    self.ax_frame,
+                    self.ax_mean,
+                    self.ax_comp,
+                    self.ax_support,
+                    self.ax_std,
+                ]
+                if ax is not None
             ]
-            if ax is not None
-        ]
         if not axes:
             return
         if self.link_zoom:
@@ -261,17 +309,21 @@ class TableStatusMixin:
                     ax.set_ylim(default_ylim)
 
     def _capture_zoom_state(self) -> None:
-        axes = [
-            ax
-            for ax in [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
+        axes = []
+        if getattr(self, "renderer", None) is not None:
+            axes = [ax for ax in self.renderer.axes.values() if ax is not None]
+        if not axes:
+            axes = [
+                ax
+                for ax in [
+                    self.ax_frame,
+                    self.ax_mean,
+                    self.ax_comp,
+                    self.ax_support,
+                    self.ax_std,
+                ]
+                if ax is not None
             ]
-            if ax is not None
-        ]
         if not axes:
             return
         ax = axes[0]

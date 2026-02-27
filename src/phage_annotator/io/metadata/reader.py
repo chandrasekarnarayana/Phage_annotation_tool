@@ -61,10 +61,13 @@ def _build_summary(
     axes = series.axes
     shape = series.shape
     dims = _axes_to_tzyx(axes, shape)
+    axes_upper = axes.upper()
+    channel_count = int(dict(zip(axes_upper, shape)).get("C", 1))
     summary: Dict[str, Any] = {
         "axes": axes,
         "shape": tuple(shape),
         "dims": {"T": dims[0], "Z": dims[1], "Y": dims[2], "X": dims[3]},
+        "channel_count": channel_count,
         "dtype": str(series.dtype),
     }
     if ome_parsed:

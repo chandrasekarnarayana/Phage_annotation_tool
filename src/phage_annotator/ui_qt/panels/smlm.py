@@ -20,6 +20,15 @@ class SmlmPanel(QtWidgets.QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
+        # Phase ζ: Modality selector for multi-modality analysis
+        modality_row = QtWidgets.QHBoxLayout()
+        modality_row.addWidget(QtWidgets.QLabel("Run on modality"))
+        self.modality_combo = QtWidgets.QComboBox()
+        self.modality_combo.addItem("Current (Primary)")
+        modality_row.addWidget(self.modality_combo)
+        modality_row.addStretch(1)
+        layout.addLayout(modality_row)
+
         preset_row = QtWidgets.QHBoxLayout()
         preset_row.addWidget(QtWidgets.QLabel("Preset"))
         self.preset_combo = QtWidgets.QComboBox()
@@ -67,3 +76,24 @@ class SmlmPanel(QtWidgets.QWidget):
         self.thunder.det_thr_spin.setToolTip(thr_tip)
         self.thunder.fit_radius_spin.setToolTip(fit_tip)
         self.deep.sigma_spin.setToolTip(sigma_tip)
+
+    def update_modality_list(self, modality_manager) -> None:
+        """Update modality combo with available modalities."""
+        current_text = self.modality_combo.currentText()
+        self.modality_combo.clear()
+        self.modality_combo.addItem("Current (Primary)")
+        
+        if modality_manager is not None:
+            modalities = modality_manager.get_all_modalities()
+            for modality in modalities:
+                self.modality_combo.addItem(modality.display_name, modality.idx)
+        
+        # Restore previous selection if still available
+        idx = self.modality_combo.findText(current_text)
+        if idx >= 0:
+            self.modality_combo.setCurrentIndex(idx)
+    
+    def get_selected_modality_idx(self) -> Optional[int]:
+        """Get modality_idx for selected modality, or None for current."""
+        data = self.modality_combo.currentData()
+        return data if data is not None else None

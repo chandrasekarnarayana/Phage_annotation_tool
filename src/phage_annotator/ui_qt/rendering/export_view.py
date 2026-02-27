@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from matplotlib import pyplot as plt

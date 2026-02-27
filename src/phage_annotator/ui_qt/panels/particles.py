@@ -12,6 +12,7 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 class AnalyzeParticlesValues:
     """Snapshot of Analyze Particles controls."""
 
+    modality: str  # Phase ζ: Selected modality name
     region_roi: bool
     scope: str
     min_area: int
@@ -40,6 +41,11 @@ class AnalyzeParticlesPanel(QtWidgets.QWidget):
         form = QtWidgets.QFormLayout()
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         layout.addLayout(form)
+
+        # Phase ζ: Modality selector for multi-modality analysis
+        self.modality_combo = QtWidgets.QComboBox()
+        self.modality_combo.addItem("Current (Primary)")
+        form.addRow("Run on modality", self.modality_combo)
 
         self.region_chk = QtWidgets.QCheckBox("ROI only")
         self.region_chk.setChecked(True)
@@ -118,6 +124,7 @@ class AnalyzeParticlesPanel(QtWidgets.QWidget):
     def values(self) -> AnalyzeParticlesValues:
         """Return a typed snapshot of current UI values."""
         return AnalyzeParticlesValues(
+            modality=self.modality_combo.currentText(),
             region_roi=self.region_chk.isChecked(),
             scope=self.scope_combo.currentText(),
             min_area=int(self.min_area_spin.value()),
@@ -133,3 +140,24 @@ class AnalyzeParticlesPanel(QtWidgets.QWidget):
             show_labels=self.show_labels_chk.isChecked(),
             watershed_split=self.watershed_chk.isChecked(),
         )
+
+    def update_modality_list(self, modality_manager) -> None:
+        """Update modality combo with available modalities."""
+        current_text = self.modality_combo.currentText()
+        self.modality_combo.clear()
+        self.modality_combo.addItem("Current (Primary)")
+        
+        if modality_manager is not None:
+            modalities = modality_manager.get_all_modalities()
+            for modality in modalities:
+                self.modality_combo.addItem(modality.display_name, modality.idx)
+        
+        # Restore previous selection if still available
+        idx = self.modality_combo.findText(current_text)
+        if idx >= 0:
+            self.modality_combo.setCurrentIndex(idx)
+    
+    def get_selected_modality_idx(self) -> Optional[int]:
+        """Get modality_idx for selected modality, or None for current."""
+        data = self.modality_combo.currentData()
+        return data if data is not None else None

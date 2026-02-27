@@ -27,12 +27,93 @@ from phage_annotator.io.metadata.reader import read_metadata_summary as _read_su
 __all__ = [
     "ImageMeta",
     "load_images",
+    "parse_axes_info",
     "standardize_axes",
     "read_contiguous_block",
     "read_contiguous_block_from_path",
     "read_metadata_bundle",
     "read_metadata_summary",
 ]
+
+
+AXIS_CONTRACT = {
+    "required_axes": ("Y", "X"),
+    "supported_axes": ("T", "Z", "Y", "X", "C"),
+    "heuristic_3d": "axis0<=5 => time else depth",
+}
+
+
+def parse_axes_info(
+    shape: Tuple[int, ...],
+    ome_axes: Optional[str] = None,
+    interpret_3d_as: str = "auto",
+) -> dict:
+    """Parse axes metadata into a normalized axis info dictionary."""
+    axes = None
+    source = "heuristic"
+    inferred = True
+    ndim = len(shape)
+    if ome_axes and len(ome_axes) == ndim:
+        axes = ome_axes.upper()
+        source = "ome"
+        inferred = False
+    else:
+        mode = interpret_3d_as.lower()
+        if mode not in {"auto", "time", "depth"}:
+            mode = "auto"
+        if ndim == 2:
+            axes = "YX"
+        elif ndim == 3:
+            if mode == "auto":
+                mode = "time" if shape[0] <= 5 else "depth"
+            axes = "TYX" if mode == "time" else "ZYX"
+        elif ndim == 4:
+            axes = "TZYX"
+        elif ndim == 5:
+            axes = "CTZYX"
+        else:
+            axes = ""
+    channel_axis = axes.find("C") if "C" in axes else None
+    channel_count = int(shape[channel_axis]) if channel_axis is not None else 1
+    mapping = dict(zip(axes, shape)) if axes else {}
+    t_dim = int(mapping.get("T", 1))
+    z_dim = int(mapping.get("Z", 1))
+    y_dim = int(mapping.get("Y", shape[-2] if ndim >= 2 else 1))
+    x_dim = int(mapping.get("X", shape[-1] if ndim >= 1 else 1))
+    return {
+        "axes": axes,
+        "shape": tuple(shape),
+        "channel_axis": channel_axis,
+        "channel_count": channel_count,
+        "has_time": "T" in axes if axes else False,
+        "has_z": "Z" in axes if axes else False,
+        "tzyx": (t_dim, z_dim, y_dim, x_dim),
+        "inferred": inferred,
+        "source": source,
+    }
+
+
+def _validate_ome_axes(
+    ome_axes: str,
+    shape: tuple[int, ...],
+    strict: bool,
+) -> str | None:
+    axes = ome_axes.upper()
+    if len(axes) != len(shape):
+        if strict:
+            raise ValueError(
+                f"OME axes length {len(axes)} does not match shape {len(shape)}"
+            )
+        return None
+    if any(ax not in AXIS_CONTRACT["supported_axes"] for ax in axes):
+        if strict:
+            raise ValueError(f"Unsupported OME axes: {axes}")
+        return None
+    if not all(ax in axes for ax in AXIS_CONTRACT["required_axes"]):
+        if strict:
+            raise ValueError(f"OME axes must include {AXIS_CONTRACT['required_axes']}")
+        return None
+    return axes
 
 
 @dataclass
@@ -52,7 +133,11 @@ class ImageMeta:
 
 
 def standardize_axes(
-    arr: np.ndarray, interpret_3d_as: str = "auto", ome_axes: Optional[str] = None
+    arr: np.ndarray,
+    interpret_3d_as: str = "auto",
+    ome_axes: Optional[str] = None,
+    channel_idx: int = 0,
+    strict: bool = False,
 ) -> tuple[np.ndarray, bool, bool]:
     """Standardize an array to (T, Z, Y, X) and report time/Z presence.
 
@@ -74,9 +159,29 @@ def standardize_axes(
     -----
     - OME metadata takes priority when available and consistent.
     - Heuristic fallback for 3D uses axis0 <= 5 as time.
+    - strict=True raises ValueError on invalid axes metadata.
     """
     if ome_axes:
+        axes = _validate_ome_axes(ome_axes, arr.shape, strict)
+        if axes is None:
+            ome_axes = None
+        else:
+            ome_axes = axes
+    if ome_axes:
         axes = ome_axes.upper()
+        if "C" in axes:
+            c_idx = axes.index("C")
+            if arr.shape[c_idx] > 1:
+                if channel_idx < 0 or channel_idx >= arr.shape[c_idx]:
+                    if strict:
+                        raise ValueError(
+                            f"Invalid channel_idx {channel_idx} for size {arr.shape[c_idx]}"
+                        )
+                    channel_idx = 0
+                arr = np.take(arr, int(channel_idx), axis=c_idx)
+            else:
+                arr = np.squeeze(arr, axis=c_idx)
+            axes = "".join(ax for ax in axes if ax != "C")
         if len(axes) == arr.ndim:
             keep_axes = []
             squeeze_axes = []
@@ -120,6 +225,12 @@ def standardize_axes(
             arr = arr[np.newaxis, :, :, :]
             has_time, has_z = False, True
     elif ndim == 4:
+        has_time, has_z = True, True
+    elif ndim == 5:
+        if strict:
+            raise ValueError(f"Unsupported image ndim={ndim}, shape={arr.shape}")
+        # Heuristic: assume channel axis first (CTZYX) and select first channel.
+        arr = arr[0]
         has_time, has_z = True, True
     else:
         raise ValueError(f"Unsupported image ndim={ndim}, shape={arr.shape}")
@@ -173,11 +284,36 @@ def read_contiguous_block_from_path(
     z_idx: int,
     interpret_3d_as: str = "auto",
     ome_axes: Optional[str] = None,
+    channel_idx: int = 0,
+    apply_memory_sampling: bool = False,
 ) -> np.ndarray:
     """Read a contiguous block of frames from disk and standardize axes.
 
     This helper prefers tifffile's key slicing for contiguous reads and falls
     back to a per-frame loop when key slicing is unavailable.
+    
+    Parameters
+    ----------
+    path : Path
+        Path to TIFF file.
+    t_start, t_stop : int
+        Time frame range [t_start, t_stop) to read.
+    z_idx : int
+        Z-slice index to extract.
+    interpret_3d_as : str
+        Interpretation for 3D stacks ("auto", "time", "depth").
+    ome_axes : Optional[str]
+        OME axes metadata if available.
+    channel_idx : int
+        Channel index for multi-channel selection.
+    apply_memory_sampling : bool
+        If True, apply spatial 2x downsampling to reduce memory footprint.
+        Used when prefetching under memory pressure.
+        
+    Returns
+    -------
+    np.ndarray
+        Contiguous block of shape (t_stop - t_start, Y, X) or (t_stop - t_start, Y//2, X//2) if downsampled.
     """
     try:
         arr = tif.imread(str(path), key=slice(t_start, t_stop))
@@ -190,8 +326,19 @@ def read_contiguous_block_from_path(
         if not frames:
             return np.empty((0, 0, 0), dtype=np.float32)
         arr = np.stack(frames, axis=0)
-    std, _, _ = standardize_axes(arr, interpret_3d_as=interpret_3d_as, ome_axes=ome_axes)
-    return std[:, z_idx, :, :]
+    std, _, _ = standardize_axes(
+        arr,
+        interpret_3d_as=interpret_3d_as,
+        ome_axes=ome_axes,
+        channel_idx=channel_idx,
+    )
+    result = std[:, z_idx, :, :]
+    
+    # Apply spatial downsampling if memory sampling enabled
+    if apply_memory_sampling and result.ndim >= 2:
+        result = result[::2, ::2]
+    
+    return result
 
 
 def read_metadata_bundle(path: Path) -> MetadataBundle:

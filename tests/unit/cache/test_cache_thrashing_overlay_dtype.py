@@ -58,13 +58,13 @@ class TestThrashingDetection:
         cache = ProjectionCache(max_mb=2)  # Small budget to trigger evictions
         
         # Add items (512x512 float32 = 1MB each)
-        key1 = (0, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1)
+        key1 = (0, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1, 0)
         data1 = np.ones((512, 512), dtype=np.float32)
         cache.put(key1, data1)
         
         # Force eviction by adding more data
         for i in range(5):
-            key = (i + 1, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1)
+            key = (i + 1, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1, 0)
             cache.put(key, data1)
         
         # Check telemetry
@@ -78,7 +78,7 @@ class TestThrashingDetection:
     def test_cache_hit_increments_this_cycle(self):
         """Verify cache.get() increments hits_this_cycle."""
         cache = ProjectionCache(max_mb=100)
-        key = (0, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1)
+        key = (0, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1, 0)
         data = np.ones((256, 256), dtype=np.float32)
         cache.put(key, data)
         
@@ -88,7 +88,7 @@ class TestThrashingDetection:
         assert cache.telemetry().hits_this_cycle == 1
         
         # Miss
-        result = cache.get((999, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1))
+        result = cache.get((999, "mean", (0.0, 0.0, 100.0, 100.0), -1, -1, 0))
         assert result is None
         assert cache.telemetry().misses_this_cycle == 1
 

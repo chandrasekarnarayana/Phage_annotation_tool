@@ -313,6 +313,55 @@ def command_from_dict(data: dict, controller: "SessionController") -> Optional[C
         )
     elif cmd_type == "SetThresholdCommand":
         cmd = SetThresholdCommand(controller, image_id, after["data"]["settings"])
+    elif cmd_type == "JumpToFrameCommand":
+        from phage_annotator.session.navigation_commands import JumpToFrameCommand
+
+        cmd = JumpToFrameCommand(controller, image_id, int(after["data"]["new_t"]))
+    elif cmd_type == "JumpToZCommand":
+        from phage_annotator.session.navigation_commands import JumpToZCommand
+
+        cmd = JumpToZCommand(controller, image_id, int(after["data"]["new_z"]))
+    elif cmd_type == "DeleteNearestCommand":
+        from phage_annotator.session.context_commands import DeleteNearestCommand
+
+        cmd = DeleteNearestCommand(controller, image_id, x=0.0, y=0.0, radius=0.0)
+    elif cmd_type == "MarkUncertainCommand":
+        from phage_annotator.session.context_commands import MarkUncertainCommand
+
+        uncertain = bool(after["data"].get("is_uncertain", True))
+        cmd = MarkUncertainCommand(
+            controller,
+            image_id,
+            x=0.0,
+            y=0.0,
+            radius=0.0,
+            uncertain=uncertain,
+        )
+    elif cmd_type == "EditNearestMetadataCommand":
+        from phage_annotator.session.context_commands import EditNearestMetadataCommand
+
+        cmd = EditNearestMetadataCommand(
+            controller,
+            image_id,
+            x=0.0,
+            y=0.0,
+            radius=0.0,
+            annotation_id=after["data"].get("annotation_id"),
+            new_label=after["data"].get("new_label"),
+            new_meta=dict(after["data"].get("new_meta", {})),
+        )
+    elif cmd_type == "SnapToLocalMaxCommand":
+        from phage_annotator.session.context_commands import SnapToLocalMaxCommand
+
+        cmd = SnapToLocalMaxCommand(
+            controller,
+            image_id,
+            x=0.0,
+            y=0.0,
+            radius=0.0,
+            search_radius=0.0,
+            image_data=None,
+        )
     else:
         return None
     
@@ -320,3 +369,146 @@ def command_from_dict(data: dict, controller: "SessionController") -> Optional[C
     cmd.memento_before = CommandMemento(**before)
     cmd.memento_after = CommandMemento(**after)
     return cmd
+
+
+class TransactionCommand(Command):
+    """Command that groups multiple sub-commands as a single transaction.
+    
+    This enables atomic operations where multiple individual commands are
+    treated as a single undo/redo item. Useful for batch operations like
+    bulk metadata updates or multi-step context actions.
+    """
+    
+    def __init__(
+        self,
+        controller: "SessionController",
+        image_id: int,
+        transaction_name: str,
+    ):
+        """Initialize transaction command.
+        
+        Parameters
+        ----------
+        controller : SessionController
+            Session controller.
+        image_id : int
+            Image ID (used for grouping).
+        transaction_name : str
+            Human-readable name for the transaction (e.g., "Bulk Update Metadata").
+        """
+        super().__init__(controller, image_id)
+        self.transaction_name = transaction_name
+        self.commands: list[Command] = []
+        self._executed = False
+    
+    def add_command(self, cmd: Command) -> None:
+        """Add a sub-command to the transaction.
+        
+        Parameters
+        ----------
+        cmd : Command
+            Command to add. Should not have been executed yet.
+        """
+        if self._executed:
+            raise RuntimeError("Cannot add commands to transaction after execution")
+        self.commands.append(cmd)
+    
+    def execute(self) -> bool:
+        """Execute all sub-commands in order.
+        
+        If any sub-command fails, previously executed commands are NOT
+        rolled back. This follows the memento pattern where each command
+        stores its own before/after state.
+        
+        Returns
+        -------
+        bool
+            True if all commands executed successfully, False if any failed.
+        """
+        if self._executed:
+            return False
+        
+        # Capture pre-transaction state
+        mementos_before = []
+        for cmd in self.commands:
+            mementos_before.append(cmd.memento_before)
+        
+        # Execute each command
+        success = True
+        for cmd in self.commands:
+            if not cmd.execute():
+                success = False
+                break
+        
+        # If any failed, capture state and return False
+        # (Caller should decide whether to rollback)
+        if not success:
+            return False
+        
+        # Create transaction-level mementos
+        self.memento_before = CommandMemento(
+            command_type="transaction",
+            image_id=self.image_id,
+            data={
+                "name": self.transaction_name,
+                "num_commands": len(self.commands),
+                "command_mementos": [m.data if m else {} for m in mementos_before],
+            },
+        )
+        
+        mementos_after = []
+        for cmd in self.commands:
+            mementos_after.append(cmd.memento_after)
+        
+        self.memento_after = CommandMemento(
+            command_type="transaction",
+            image_id=self.image_id,
+            data={
+                "name": self.transaction_name,
+                "num_commands": len(self.commands),
+                "command_mementos": [m.data if m else {} for m in mementos_after],
+            },
+        )
+        
+        self._executed = True
+        return True
+    
+    def undo(self) -> bool:
+        """Undo all sub-commands in reverse order.
+        
+        Returns
+        -------
+        bool
+            True if all undo operations succeeded, False otherwise.
+        """
+        if not self._executed:
+            return False
+        
+        # Undo in reverse order
+        success = True
+        for cmd in reversed(self.commands):
+            if not cmd.undo():
+                success = False
+                break
+        
+        return success
+    
+    def redo(self) -> bool:
+        """Redo all sub-commands in order.
+        
+        Returns
+        -------
+        bool
+            True if all redo operations succeeded, False otherwise.
+        """
+        if not self._executed:
+            return False
+        
+        # Redo in order
+        success = True
+        for cmd in self.commands:
+            if not cmd.redo():
+                success = False
+                break
+        
+        return success

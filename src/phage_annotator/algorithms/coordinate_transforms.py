@@ -1,6 +1,6 @@
 """Backward compatibility facade for coordinate transforms.
 
-Phase 4: This module has been moved to phage_annotator.io.data.transforms.
+This module has been moved to phage_annotator.io.data.transforms.
 """
 
 from phage_annotator.io.data.transforms import (

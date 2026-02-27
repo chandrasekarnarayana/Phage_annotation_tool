@@ -131,7 +131,7 @@ class TestProjectionCacheEviction:
     def test_cache_insertion_and_retrieval(self):
         """Test basic cache insertion and retrieval."""
         cache = ProjectionCache(max_mb=100)
-        key = (0, "mean", (0.0, 0.0, 100.0, 100.0), 0, 0)
+        key = (0, "mean", (0.0, 0.0, 100.0, 100.0), 0, 0, 0)
         data = np.random.rand(100, 100).astype(np.float32)
 
         cache.put(key, data)
@@ -148,7 +148,7 @@ class TestProjectionCacheEviction:
         # Insert moderately-sized arrays
         keys = []
         for i in range(5):
-            key = (i, f"proj_{i}", (0.0, 0.0, 100.0, 100.0), 0, 0)
+            key = (i, f"proj_{i}", (0.0, 0.0, 100.0, 100.0), 0, 0, 0)
             # Create a ~1 MB array (float32, 512x512)
             data = np.ones((512, 512), dtype=np.float32)
             cache.put(key, data)
@@ -164,9 +164,9 @@ class TestProjectionCacheEviction:
         cache = ProjectionCache(max_mb=5)
 
         # Insert small items
-        key1 = (1, "a", (0.0, 0.0, 10.0, 10.0), 0, 0)
-        key2 = (2, "b", (0.0, 0.0, 10.0, 10.0), 0, 0)
-        key3 = (3, "c", (0.0, 0.0, 10.0, 10.0), 0, 0)
+        key1 = (1, "a", (0.0, 0.0, 10.0, 10.0), 0, 0, 0)
+        key2 = (2, "b", (0.0, 0.0, 10.0, 10.0), 0, 0, 0)
+        key3 = (3, "c", (0.0, 0.0, 10.0, 10.0), 0, 0, 0)
 
         # Small arrays (~100 KB each)
         data_small = np.ones((100, 100), dtype=np.float32)
@@ -184,7 +184,7 @@ class TestProjectionCacheEviction:
         _ = cache.get(key1)
 
         # Insert larger items to trigger eviction
-        key4 = (4, "d", (0.0, 0.0, 10.0, 10.0), 0, 0)
+        key4 = (4, "d", (0.0, 0.0, 10.0, 10.0), 0, 0, 0)
         data_large = np.ones((1000, 1000), dtype=np.float32)  # ~4 MB
         cache.put(key4, data_large)
 
@@ -197,12 +197,12 @@ class TestProjectionCacheEviction:
         cache = ProjectionCache(max_mb=50)
 
         # Insert a pyramid item
-        pyramid_key = (0, "mean", 2, 100, (0.0, 0.0, 100.0, 100.0), 0)
+        pyramid_key = (0, "mean", 2, 100, (0.0, 0.0, 100.0, 100.0), 0, 0)
         pyramid_data = np.ones((100, 100), dtype=np.float32)
         cache.put_pyramid(pyramid_key, pyramid_data)
 
         # Insert a regular item
-        regular_key = (0, "mean", (0.0, 0.0, 100.0, 100.0), 0, 0)
+        regular_key = (0, "mean", (0.0, 0.0, 100.0, 100.0), 0, 0, 0)
         regular_data = np.ones((100, 100), dtype=np.float32)
         cache.put(regular_key, regular_data)
 
@@ -247,7 +247,9 @@ class TestAnnotationImportEdgeCases:
 
         assert kp.label == "phage"  # Default
         assert kp.source == "manual"  # Default
-        assert kp.meta == {}  # Default
+        # M3: baseline metadata fields are now initialized by default
+        assert "confidence" in kp.meta  # Baseline field
+        assert "annotator" in kp.meta  # Baseline field
 
     def test_annotation_uuid_uniqueness(self):
         """Test that annotation UUIDs are unique."""

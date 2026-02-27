@@ -156,6 +156,8 @@ class ExportMixin:
             cfg = self.controller.session_state.threshold_configs_by_image.get(image_id)
             if cfg:
                 self._apply_threshold_settings(cfg)
+        if hasattr(self, "_sync_channel_panel_for_active_image"):
+            self._sync_channel_panel_for_active_image()
         if self.density_panel is not None:
             cfg = self.controller.density_config
             self.density_panel.normalize_combo.setCurrentText(cfg.normalize)
@@ -573,7 +575,9 @@ class ExportMixin:
         elif panel == "std":
             _, data = compute_mean_std(prim.array)
         else:
-            data = prim.array[t_idx, z_idx, :, :]
+            data = self._build_multichannel_frame(prim, t_idx, z_idx)
+            if data is None:
+                data = prim.array[t_idx, z_idx, :, :]
         return self._apply_crop_rect(data, crop_rect, data.shape)
 
     def _apply_roi_region(

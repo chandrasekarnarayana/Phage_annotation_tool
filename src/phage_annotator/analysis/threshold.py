@@ -1,4 +1,4 @@
-"""Thresholding helpers for Fiji-style preview and masks (no Qt)."""
+"""Thresholding helpers for preview and masks (no Qt)."""
 
 from __future__ import annotations
 

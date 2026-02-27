@@ -36,16 +36,98 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import colormaps
 
+from phage_annotator.data.channel_display import MultiChannelDisplaySettings
 from phage_annotator.data.display_mapping import DisplayMapping, build_norm
+from phage_annotator.ui_qt.rendering.blend_modes import composite_channels
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for
+from phage_annotator.ui_qt.utils.image_io import load_array
 from phage_annotator.rendering.mpl import RenderContext
 from phage_annotator.rendering.scalebar import ScaleBarSpec, compute_scalebar
 
 
 class RenderingMixin:
     """Mixin for image rendering and overlay composition."""
+
+    def _get_channel_stack(self, img, channel_idx: int) -> Optional[np.ndarray]:
+        """Load/cache standardized stack for a specific channel."""
+        if channel_idx < 0 or channel_idx >= int(getattr(img, "channel_count", 1)):
+            return None
+        cache = getattr(img, "_channel_stack_cache", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            setattr(img, "_channel_stack_cache", cache)
+        if channel_idx in cache:
+            return cache[channel_idx]
+        current_idx = int(getattr(img, "channel_idx", 0))
+        if img.array is not None and channel_idx == current_idx:
+            cache[channel_idx] = img.array
+            return img.array
+        arr, _has_time, _has_z = load_array(
+            img.path,
+            interpret_3d_as=img.interpret_3d_as,
+            ome_axes=img.ome_axes,
+            channel_idx=channel_idx,
+        )
+        cache[channel_idx] = arr
+        return arr
+
+    def _normalize_channel_frame(self, frame: np.ndarray) -> np.ndarray:
+        """Normalize a channel frame to [0, 1] for compositing."""
+        data = np.asarray(frame, dtype=np.float32)
+        if data.size == 0:
+            return data
+        finite = np.isfinite(data)
+        if not finite.any():
+            return np.zeros_like(data, dtype=np.float32)
+        vals = data[finite]
+        lo, hi = np.percentile(vals, [1.0, 99.0])
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+            lo = float(np.min(vals))
+            hi = float(np.max(vals))
+            if hi <= lo:
+                return np.zeros_like(data, dtype=np.float32)
+        normalized = (data - lo) / (hi - lo)
+        normalized = np.clip(normalized, 0.0, 1.0)
+        normalized[~finite] = 0.0
+        return normalized.astype(np.float32, copy=False)
+
+    def _build_multichannel_frame(self, img, t_idx: int, z_idx: int) -> Optional[np.ndarray]:
+        """Build an RGB frame using per-channel settings and blend mode."""
+        if int(getattr(img, "channel_count", 1)) <= 1:
+            return None
+        settings_raw = getattr(self.controller.session_state, "channel_display_settings", None)
+        if not isinstance(settings_raw, dict):
+            return None
+        try:
+            settings = MultiChannelDisplaySettings.from_dict(settings_raw)
+        except Exception:
+            return None
+        if settings.channel_count != int(getattr(img, "channel_count", 1)):
+            return None
+        layers: List[Tuple[np.ndarray, float]] = []
+        for state in settings.channels:
+            if not state.visible or state.opacity <= 0:
+                continue
+            stack = self._get_channel_stack(img, int(state.channel_idx))
+            if stack is None or stack.ndim != 4:
+                continue
+            t_safe = max(0, min(int(t_idx), stack.shape[0] - 1))
+            z_safe = max(0, min(int(z_idx), stack.shape[1] - 1))
+            frame = stack[t_safe, z_safe, :, :]
+            normalized = self._normalize_channel_frame(frame)
+            lut_idx = max(0, min(int(state.lut), len(LUTS) - 1))
+            cmap = cmap_for(LUTS[lut_idx], invert=False)
+            rgb = cmap(normalized)[..., :3].astype(np.float32, copy=False)
+            layers.append((rgb, float(state.opacity)))
+        if not layers:
+            return None
+        return composite_channels(
+            layers,
+            blend_mode=settings.blend_mode,
+            normalize_output=True,
+        )
 
     def _clear_histogram_cache(self) -> None:
         try:
@@ -74,9 +156,15 @@ class RenderingMixin:
         self._ensure_loaded(self.support_image_idx)
         if prim.array is None:
             return
+        layout_spec = self._current_layout_spec()
+        self._rebuild_figure_layout(layout_spec)
         self._capture_zoom_state()
         t_idx, z_idx = self._slice_indices(prim)
-        slice_data = self._slice_data(prim)
+        raw_slice_data = self._slice_data(prim)
+        slice_data = raw_slice_data
+        composite_frame = self._build_multichannel_frame(prim, t_idx, z_idx)
+        if composite_frame is not None:
+            slice_data = composite_frame
         support_slice = self._slice_data(supp) if supp.array is not None else None
         crop_rect = self.crop_rect
         if crop_rect:
@@ -98,9 +186,11 @@ class RenderingMixin:
         mean_data, mean_ready = self._get_projection(prim, "mean")
         std_data, std_ready = self._get_projection(prim, "std")
         if mean_data is None:
-            mean_data = np.zeros_like(slice_data)
+            mean_data = np.zeros_like(raw_slice_data)
         if std_data is None:
-            std_data = np.zeros_like(slice_data)
+            std_data = np.zeros_like(raw_slice_data)
+
+        self._last_display_shape = slice_data.shape
 
         # Interactive downsampling (display-only).
         slice_display = slice_data
@@ -113,18 +203,25 @@ class RenderingMixin:
             if level > 0:
                 scale = 2**level
                 self._render_scales = {ax: scale for ax in self.renderer.axes.values()}
-                slice_display = self._get_pyramid_display(
-                    prim.id,
-                    "frame",
-                    slice_data,
-                    t_idx,
-                    z_idx,
-                    self.crop_rect or (0, 0, 0, 0),
-                    level,
-                )
+                axis = self._projection_axis_for_image(prim)
+                mean_kind = "mean" if axis == "tz" else f"mean:{axis}"
+                std_kind = "std" if axis == "tz" else f"std:{axis}"
+                if slice_data.ndim == 3:
+                    # RGB composites are display-only and bypass grayscale pyramid cache.
+                    slice_display = self._downsample(slice_data, 2**level)
+                else:
+                    slice_display = self._get_pyramid_display(
+                        prim.id,
+                        "frame",
+                        slice_data,
+                        t_idx,
+                        z_idx,
+                        self.crop_rect or (0, 0, 0, 0),
+                        level,
+                    )
                 mean_display = self._get_pyramid_display(
                     prim.id,
-                    "mean",
+                    mean_kind,
                     mean_data,
                     -1,
                     -1,
@@ -133,7 +230,7 @@ class RenderingMixin:
                 )
                 std_display = self._get_pyramid_display(
                     prim.id,
-                    "std",
+                    std_kind,
                     std_data,
                     -1,
                     -1,
@@ -163,15 +260,43 @@ class RenderingMixin:
             "std": "Std Projection",
         }
         extents = {}
-        for key, data in [
-            ("frame", slice_display),
-            ("mean", mean_display),
-            ("support", support_display),
-            ("std", std_display),
-        ]:
+        panel_images: Dict[str, np.ndarray] = {
+            "frame": slice_display,
+            "mean": mean_display,
+            "support": support_display if support_display is not None else slice_display,
+            "std": std_display,
+        }
+        for key, data in list(panel_images.items()):
             if data is None:
+                panel_images.pop(key, None)
                 continue
             extents[key] = (0, data.shape[1], data.shape[0], 0)
+        if getattr(self, "_panel_modality_map", None):
+            for key, modality in self._panel_modality_map.items():
+                if key in panel_images:
+                    continue
+                img = self.images[modality.image_id]
+                self._ensure_loaded(modality.image_id)
+                if img.array is None:
+                    continue
+                if modality.projection_type.value == "raw":
+                    data = self._slice_data(img)
+                else:
+                    data, _ready = self._get_projection(
+                        img,
+                        modality.projection_type.value,
+                        axis_override=modality.display_settings.projection_axis,
+                        modality_idx=modality.idx,
+                    )
+                    if data is None:
+                        data = self._slice_data(img)
+                if self.crop_rect:
+                    data = self._apply_crop_rect(data, self.crop_rect, data.shape)
+                if self._interactive and level > 0:
+                    data = self._downsample(data, 2**level)
+                panel_images[key] = data
+                extents[key] = (0, data.shape[1], data.shape[0], 0)
+                titles[key] = modality.display_name
         panel_annotations = self._build_panel_annotations()
         roi_overlays = self._build_roi_overlays()
         overlay_text = self._build_overlay_text()
@@ -202,6 +327,15 @@ class RenderingMixin:
                 "support": build_norm(support_mapping),
                 "std": build_norm(std_mapping),
             }
+        if slice_data.ndim == 3:
+            norms["frame"] = None
+        if getattr(self, "_panel_modality_map", None):
+            for key, modality in self._panel_modality_map.items():
+                mapping = self._get_display_mapping(modality.image_id, key, panel_images.get(key))
+                if self._playback_mode:
+                    norms[key] = self._norm_cached(key, mapping)
+                else:
+                    norms[key] = build_norm(mapping)
 
         def _spec(idx: int):
             if idx < 0:
@@ -216,6 +350,17 @@ class RenderingMixin:
             "support": cmap_for(_spec(support_mapping.lut), support_mapping.invert),
             "std": cmap_for(_spec(std_mapping.lut), std_mapping.invert),
         }
+        panel_ranges = {
+            "frame": (frame_mapping.min_val, frame_mapping.max_val),
+            "mean": (mean_mapping.min_val, mean_mapping.max_val),
+            "support": (support_mapping.min_val, support_mapping.max_val),
+            "std": (std_mapping.min_val, std_mapping.max_val),
+        }
+        if getattr(self, "_panel_modality_map", None):
+            for key, modality in self._panel_modality_map.items():
+                mapping = self._get_display_mapping(modality.image_id, key, panel_images.get(key))
+                panel_cmaps[key] = cmap_for(_spec(mapping.lut), mapping.invert)
+                panel_ranges[key] = (mapping.min_val, mapping.max_val)
         overlay_frame = None
         overlay_extent = None
         if self.show_sr_overlay:
@@ -275,12 +420,6 @@ class RenderingMixin:
                             float(loc.score),
                         )
                     )
-        panel_ranges = {
-            "frame": (frame_mapping.min_val, frame_mapping.max_val),
-            "mean": (mean_mapping.min_val, mean_mapping.max_val),
-            "support": (support_mapping.min_val, support_mapping.max_val),
-            "std": (std_mapping.min_val, std_mapping.max_val),
-        }
         scale_bar = None
         scale_bar_warning = None
         if self.scale_bar_enabled:
@@ -315,9 +454,10 @@ class RenderingMixin:
                 "mean": mean_display,
                 "std": std_display,
             },
+            panel_images=panel_images,
             view=self.controller.view_state,
             annotations=self._current_keypoints(),
-            panel_visibility=self._panel_visibility,
+            panel_visibility=layout_spec["panel_visibility"],
             titles=titles,
             extents=extents,
             std_range=(std_vmin, std_vmax),
@@ -344,7 +484,7 @@ class RenderingMixin:
             ),
             overlay_norm=None,
             overlay_cmap=(
-                plt.get_cmap(self._density_overlay_cmap)
+                colormaps.get_cmap(self._density_overlay_cmap)
                 if self._density_overlay is not None
                 else None
             ),
@@ -411,6 +551,28 @@ class RenderingMixin:
             self.log_chk.blockSignals(True)
             self.log_chk.setChecked(frame_mapping.mode == "log")
             self.log_chk.blockSignals(False)
+        # Update projection selector (Phase γ UI wiring)
+        if getattr(self, "projection_selector", None) is not None:
+            manager = getattr(self.controller.session_state, "modality_manager", None)
+            if manager is not None:
+                for modality in manager.get_all_modalities():
+                    if modality.image_id == self.primary_image.id:
+                        self.projection_selector.blockSignals(True)
+                        self.projection_selector.set_modality(modality)
+                        self.projection_selector.blockSignals(False)
+                        break
+        elif getattr(self, "projection_axis_combo", None) is not None:
+            # Backward compat for old axis-only combo
+            axis = "t"
+            manager = getattr(self.controller.session_state, "modality_manager", None)
+            if manager is not None:
+                for modality in manager.get_all_modalities():
+                    if modality.image_id == self.primary_image.id:
+                        axis = modality.display_settings.projection_axis
+                        break
+            self.projection_axis_combo.blockSignals(True)
+            self.projection_axis_combo.setCurrentText(axis.upper())
+            self.projection_axis_combo.blockSignals(False)
         if self.render_level_label is not None:
             self.render_level_label.setText(f"Render: L{level}")
         self._update_status()
@@ -509,8 +671,19 @@ class RenderingMixin:
     def _build_panel_annotations(
         self,
     ) -> Dict[str, List[Tuple[float, float, str, bool]]]:
+        # Phase ι: Filter annotations by active modality
+        active_modality_idx = getattr(self, "_active_modality_idx", None)
+        
         points = []
         for kp in self._current_keypoints():
+            # Filter: show annotation if:
+            # - No modality system active (backward compat)
+            # - Annotation has no modality_idx (visible on all modalities)
+            # - Annotation matches active modality
+            if active_modality_idx is not None and kp.modality_idx is not None:
+                if kp.modality_idx != active_modality_idx:
+                    continue  # Skip annotations from other modalities
+            
             color = self._label_color(kp.label, faded=kp.image_id != self.primary_image.id)
             selected = kp in self._table_rows
             points.append((kp.x, kp.y, color, selected))
@@ -621,6 +794,27 @@ class RenderingMixin:
         pixel_size = (
             f"{cal.pixel_size_um_per_px:.4f} um/px" if cal.pixel_size_um_per_px else "unknown"
         )
+        
+        # Add memory pressure diagnostics
+        diag_lines = []
+        if img.downsampled:
+            diag_lines.append(f"Spatial downsampling: {img.downsample_factor}x (memory pressure)")
+        
+        # Check for interactive downsampling
+        render_scales = getattr(self, "_render_scales", {}) or {}
+        render_scale = max(render_scales.values()) if render_scales else 1
+        if render_scale > 1:
+            diag_lines.append(f"Interactive downsampling: {int(render_scale)}x")
+        
+        # Check for LOD mode
+        lod_active = getattr(self, "_lod_mode_active", {}) or {}
+        if lod_active.get(img.id, False):
+            diag_lines.append("LOD mode: computing full-resolution")
+        
+        diag_txt = "\n".join(diag_lines)
+        if diag_txt:
+            diag_txt = "\n" + diag_txt
+        
         return (
             f"{img.name}\n"
             f"T {t_idx + 1}/{t_total} | Z {z_idx + 1}/{z_total}\n"
@@ -629,7 +823,7 @@ class RenderingMixin:
             f"vmin/vmax: {vmin}/{vmax}\n"
             f"Crop: {crop_txt} {crop_rect}\n"
             f"ROI: {roi_txt} {roi_rect}\n"
-            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}"
+            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}"
         )
 
     def _get_display_mapping(
@@ -637,6 +831,24 @@ class RenderingMixin:
     ) -> DisplayMapping:
         created = image_id not in self.controller.display_mapping.per_image
         mapping = self.controller.display_mapping.mapping_for(image_id, panel)
+        panel_map = getattr(self, "_panel_modality_map", {})
+        modality = panel_map.get(panel)
+        if modality is not None:
+            settings = modality.display_settings
+            if created:
+                if settings.vmax > settings.vmin:
+                    mapping.set_window(settings.vmin, settings.vmax)
+                    mapping.lut = settings.lut
+                    mapping.gamma = settings.gamma
+                elif data is not None:
+                    mapping.reset_to_auto(data)
+                    settings.vmin = mapping.min_val
+                    settings.vmax = mapping.max_val
+            if data is not None and mapping.min_val == mapping.max_val:
+                mapping.reset_to_auto(data)
+                settings.vmin = mapping.min_val
+                settings.vmax = mapping.max_val
+            return mapping
         if data is not None and (created or mapping.min_val == mapping.max_val):
             mapping.reset_to_auto(data)
         return mapping

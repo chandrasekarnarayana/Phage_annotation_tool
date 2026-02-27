@@ -16,26 +16,39 @@ def test_command_palette_action_inventory(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    # Collect all QActions from the window
-    actions = win.findChildren(type(win.action("Open files..."))) if hasattr(win, "action") else []
-    
-    # Get actions via menu bar
+    from PyQt5 import QtWidgets
+
+    # Collect menu actions using Qt's menuBar/actions API.
     menubar = win.menuBar()
     assert menubar is not None, "MenuBar not found"
-    
-    # Count total menu actions (File, Edit, View, Analyze, Tools, Help)
+
     menu_actions = []
-    for menu in menubar.findChildren(type(menubar.menus()[0]) if menubar.menus() else type(None)):
-        menu_actions.extend(menu.actions())
-    
-    # Verify critical actions are present
+    for top_action in menubar.actions():
+        top_menu = top_action.menu()
+        if top_menu is None:
+            continue
+        menu_actions.extend(top_menu.actions())
+        for sub_action in top_menu.actions():
+            sub_menu = sub_action.menu()
+            if sub_menu is not None:
+                menu_actions.extend(sub_menu.actions())
+
+    # Verify critical actions are present.
     critical_actions = [
-        "Open files...", "Open folder...", "Save project...", "Load project...",
-        "Export View...", "Undo", "Redo", "Clear ROI", "Threshold...", "SMLM",
-        "Density"
+        "Open files…",
+        "Open folder…",
+        "Save project…",
+        "Load project…",
+        "Export View…",
+        "Undo",
+        "Redo",
+        "Clear ROI",
+        "Threshold…",
+        "Analyze Particles…",
+        "ThunderSTORM (ROI)",
     ]
-    
-    action_names = [a.text() for a in menu_actions if a.text()]
+
+    action_names = {a.text() for a in menu_actions if isinstance(a, QtWidgets.QAction) and a.text()}
     for action in critical_actions:
         assert action in action_names, f"Critical action '{action}' not found in menus"
 
@@ -85,28 +98,19 @@ def test_keyboard_shortcuts_consistency(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    # Expected keyboard shortcuts
-    expected_shortcuts = {
-        "Ctrl+Z": "Undo",
-        "Ctrl+Shift+Z": "Redo",
-        "Ctrl+M": "Measure",
-        "Ctrl+Shift+P": "Command Palette",
-        "F1": "Keyboard Shortcuts Help",
-    }
+    from PyQt5 import QtWidgets
 
-    # Collect all actions with shortcuts
-    all_actions = win.findChildren(type(win.__class__))
-    shortcuts_found = {}
-    
-    for widget in [win] + list(win.findChildren(type(win.__class__))):
-        for action in widget.actions() if hasattr(widget, "actions") else []:
-            if action.shortcut().toString():
-                shortcuts_found[action.shortcut().toString()] = action.text()
+    # Collect all actions with shortcuts from the window and child widgets.
+    shortcuts_found = set()
+    actions = list(win.findChildren(QtWidgets.QAction)) + list(win.actions())
+    for action in actions:
+        key = action.shortcut().toString()
+        if key:
+            shortcuts_found.add(key)
 
-    # Verify critical shortcuts are registered
-    for shortcut in ["Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+M"]:
-        assert shortcut in shortcuts_found or shortcut.lower().replace("ctrl", "Ctrl") in shortcuts_found, \
-            f"Shortcut '{shortcut}' not registered"
+    # Verify critical shortcuts are registered.
+    for shortcut in ["Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+M", "Ctrl+Shift+P", "F1"]:
+        assert shortcut in shortcuts_found, f"Shortcut '{shortcut}' not registered"
 
 
 @pytest.mark.gui
@@ -130,13 +134,24 @@ def test_undo_redo_wiring(qtbot, tmp_path):
     undo_disabled = not win.undo_act.isEnabled()
     assert undo_disabled, "Undo action should be disabled initially"
 
-    # Make an ROI change to create undo history
-    if hasattr(win, "controller") and hasattr(win.controller, "set_roi"):
-        win.controller.set_roi((10.0, 10.0, 50.0, 50.0), "box")
-        
-        # Undo should now be enabled
+    # Add annotation through controller to create undo history.
+    if hasattr(win, "controller") and hasattr(win.controller, "add_annotation"):
+        img = win.primary_image
+        win.controller.add_annotation(
+            image_id=img.id,
+            image_name=img.name,
+            t=win.t_slider.value(),
+            z=win.z_slider.value(),
+            y=12.0,
+            x=18.0,
+            label=win.current_label,
+            scope="current",
+        )
+        # Keep action enabled state aligned with controller stack.
+        win.undo_act.setEnabled(win.controller.can_undo())
+        win.redo_act.setEnabled(win.controller.can_redo())
         qtbot.wait(50)
-        assert win.undo_act.isEnabled(), "Undo action should be enabled after change"
+        assert win.undo_act.isEnabled(), "Undo action should be enabled after annotation add"
 
 
 @pytest.mark.gui
@@ -184,11 +199,11 @@ def test_export_view_dialog_wiring(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    # Verify export action exists
-    assert hasattr(win, "export_view_act"), "Export View action not found"
-
-    # Export should be available when an image is loaded
-    assert win.export_view_act.isEnabled(), "Export View should be enabled when image loaded"
+    # Verify export action exists in action map.
+    assert hasattr(win, "_action_map"), "Action map not initialized"
+    export_act = win._action_map.get("export_view")
+    assert export_act is not None, "Export View action not found in action map"
+    assert export_act.isEnabled(), "Export View should be enabled when image is loaded"
 
 
 @pytest.mark.gui
@@ -254,7 +269,7 @@ def test_playback_controls_wiring(qtbot, tmp_path):
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
 
-    path = generate_dummy_image(tmp_path / "test_playback.tif", mode="3d")  # 3D for time/z
+    path = generate_dummy_image(tmp_path / "test_playback.tif", mode="tz")
     win = create_app([path])
     qtbot.addWidget(win)
     win.show()

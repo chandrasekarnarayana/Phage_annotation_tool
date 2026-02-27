@@ -1,6 +1,6 @@
 """Backward compatibility facade for annotation index helpers.
 
-Phase 4: This module has been moved to phage_annotator.io.metadata.index.
+This module has been moved to phage_annotator.io.metadata.index.
 """
 
 from phage_annotator.io.metadata.index import AnnotationIndexEntry, build_index, match

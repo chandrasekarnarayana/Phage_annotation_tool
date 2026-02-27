@@ -19,7 +19,11 @@ class SessionImageMixin:
 
     def _build_image_state(self, img: "LazyImage") -> ImageState:
         """Create an ImageState from LazyImage metadata."""
-        if len(img.shape) == 2:
+        axis_info = getattr(img, "axis_info", {}) or {}
+        tzyx = axis_info.get("tzyx")
+        if isinstance(tzyx, tuple) and len(tzyx) == 4:
+            dims = tzyx
+        elif len(img.shape) == 2:
             dims = (1, 1, img.shape[0], img.shape[1])
         elif len(img.shape) == 3:
             if img.has_time and not img.has_z:

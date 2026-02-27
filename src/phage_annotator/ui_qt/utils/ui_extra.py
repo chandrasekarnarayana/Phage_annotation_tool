@@ -6,7 +6,7 @@ from typing import List, Set, Tuple
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
-from phage_annotator.ui_qt.registry.panel_registry import build_sidebar_panel_registry
+from phage_annotator.ui_qt.utils.sidebar_manager import SidebarManager
 from phage_annotator.tools import Tool, ToolCallbacks, ToolRouter
 
 
@@ -26,10 +26,17 @@ class UiExtrasMixin:
         self._sidebar_stack_min_width = 260
         self._sidebar_bar_width = 36
         self._sidebar_collapsed = False
+        self.sidebar_manager = SidebarManager()
         
         # Create the stacked widget for panels
         self.sidebar_stack = QtWidgets.QStackedWidget()
         self.sidebar_stack.setObjectName("sidebar_stack")
+
+        # Breadcrumb label for the current sidebar section
+        self.sidebar_breadcrumb = QtWidgets.QLabel()
+        self.sidebar_breadcrumb.setObjectName("sidebar_breadcrumb")
+        self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text("Explore"))
+        self.sidebar_breadcrumb.setStyleSheet("font-weight: 600; padding: 6px 8px;")
         
         # Use the 10-panel registry if sidebar_pages are built
         pages = getattr(self, "sidebar_pages", None)
@@ -114,13 +121,21 @@ class UiExtrasMixin:
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
         sidebar_layout.addWidget(bar)
-        
+
         self.sidebar_stack.setMinimumWidth(self._sidebar_stack_min_width)
         self.sidebar_stack.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
-        sidebar_layout.addWidget(self.sidebar_stack)
+
+        stack_container = QtWidgets.QWidget()
+        stack_layout = QtWidgets.QVBoxLayout(stack_container)
+        stack_layout.setContentsMargins(0, 0, 0, 0)
+        stack_layout.setSpacing(0)
+        stack_layout.addWidget(self.sidebar_breadcrumb)
+        stack_layout.addWidget(self.sidebar_stack, stretch=1)
+
+        sidebar_layout.addWidget(stack_container)
         
         self._restore_sidebar_mode()
         return sidebar_container
@@ -209,15 +224,21 @@ class UiExtrasMixin:
         """Collapse sidebar to slim activity bar only."""
         if self.sidebar_stack and self.sidebar_stack.isVisible():
             self.sidebar_stack.setVisible(False)
+            if getattr(self, "sidebar_breadcrumb", None) is not None:
+                self.sidebar_breadcrumb.setVisible(False)
             self._sidebar_collapsed = True
             self._settings.setValue("sidebarCollapsed", True)
+            self._apply_canvas_priority_layout()
     
     def _expand_sidebar(self) -> None:
         """Expand sidebar to show active panel."""
         if self.sidebar_stack and not self.sidebar_stack.isVisible():
             self.sidebar_stack.setVisible(True)
+            if getattr(self, "sidebar_breadcrumb", None) is not None:
+                self.sidebar_breadcrumb.setVisible(True)
             self._sidebar_collapsed = False
             self._settings.setValue("sidebarCollapsed", False)
+            self._apply_canvas_priority_layout()
 
     def _build_annotate_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
@@ -388,6 +409,7 @@ class UiExtrasMixin:
         toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         toolbar.setMovable(True)
         self.addToolBar(QtCore.Qt.TopToolBarArea, toolbar)
+        self.tools_toolbar = toolbar
 
         group = QtWidgets.QActionGroup(self)
         group.setExclusive(True)
@@ -436,6 +458,21 @@ class UiExtrasMixin:
             group.addAction(act)
             toolbar.addAction(act)
             self.tool_actions[tool] = act
+
+        jump_to_frame = getattr(self, "jump_to_frame_act", None)
+        jump_to_z = getattr(self, "jump_to_z_act", None)
+        if jump_to_frame is not None and jump_to_z is not None:
+            jump_to_frame.setIcon(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MediaSeekForward)
+            )
+            jump_to_z.setIcon(
+                self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MediaSkipForward)
+            )
+            jump_to_frame.setToolTip("Jump to frame (Ctrl+G)")
+            jump_to_z.setToolTip("Jump to Z slice (Ctrl+Shift+G)")
+            toolbar.addSeparator()
+            toolbar.addAction(jump_to_frame)
+            toolbar.addAction(jump_to_z)
 
     def _set_tool(self, tool: Tool) -> None:
         if self.tool_router is not None:
@@ -518,6 +555,11 @@ class UiExtrasMixin:
         # Switch to the panel
         self.sidebar_stack.setCurrentIndex(stack_idx)
         self._settings.setValue("sidebarMode", idx)
+
+        # Update breadcrumb label to match the selected panel
+        if getattr(self, "sidebar_breadcrumb", None) is not None:
+            label = self.sidebar_actions[idx].text()
+            self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text(label))
         
         # Update action checked states
         for i, act in enumerate(self.sidebar_actions):
@@ -530,7 +572,7 @@ class UiExtrasMixin:
         
         # Restore panel index
         idx = self._settings.value("sidebarMode", 0, type=int)
-        idx = max(0, min(idx, len(self.sidebar_actions) - 1))
+        idx = self.sidebar_manager.clamp_index(idx, len(self.sidebar_actions))
         
         # Restore collapsed state
         collapsed = self._settings.value("sidebarCollapsed", False, type=bool)
@@ -541,9 +583,37 @@ class UiExtrasMixin:
             stack_idx = self.sidebar_panel_indices.get(idx, 0)
             if stack_idx >= 0:
                 self.sidebar_stack.setCurrentIndex(stack_idx)
+            if getattr(self, "sidebar_breadcrumb", None) is not None:
+                label = self.sidebar_actions[idx].text()
+                self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text(label))
         else:
             self._expand_sidebar()
             self._set_sidebar_mode(idx)
+
+    def _apply_canvas_priority_layout(self) -> None:
+        """Resize docks so the canvas remains the primary focus."""
+        docks: List[QtWidgets.QDockWidget] = []
+        sizes: List[int] = []
+
+        sidebar_visible = getattr(self, "dock_sidebar", None) is not None and self.dock_sidebar.isVisible()
+        annotations_visible = (
+            getattr(self, "dock_annotations", None) is not None and self.dock_annotations.isVisible()
+        )
+
+        for key in self.sidebar_manager.dock_order(sidebar_visible, annotations_visible):
+            if key == "sidebar":
+                docks.append(self.dock_sidebar)
+            elif key == "annotations":
+                docks.append(self.dock_annotations)
+
+        sizes = self.sidebar_manager.dock_sizes(
+            sidebar_visible=sidebar_visible,
+            annotations_visible=annotations_visible,
+            collapsed=getattr(self, "_sidebar_collapsed", False),
+        )
+
+        if docks:
+            self.resizeDocks(docks, sizes, QtCore.Qt.Orientation.Horizontal)
 
     def _set_sidebar_expanded(self, expanded: bool) -> None:
         if self.sidebar_stack is None:
@@ -656,6 +726,7 @@ class UiExtrasMixin:
         self._apply_panel_defaults()
         self._default_geometry = self.saveGeometry()
         self._default_state = self.saveState()
+        self._apply_canvas_priority_layout()
 
     def _restore_layout(self) -> None:
         """Restore the user's custom layout from QSettings if present."""
@@ -667,6 +738,7 @@ class UiExtrasMixin:
             self.restoreState(state)
         if self.dock_sidebar is not None and not self.dock_sidebar.isVisible():
             self.dock_sidebar.setVisible(True)
+        self._apply_canvas_priority_layout()
 
     def _save_layout(self) -> None:
         """Persist the current layout unless a preset is active."""
@@ -685,6 +757,7 @@ class UiExtrasMixin:
         """Reset dock placement to PanelSpec defaults without removing docks."""
         self._apply_panel_defaults()
         self._preset_active = False
+        self._apply_canvas_priority_layout()
 
     def apply_preset(self, name: str) -> None:
         """Apply a named layout preset without overwriting saved custom layout."""
@@ -709,6 +782,7 @@ class UiExtrasMixin:
             ]:
                 if dock is not None:
                     dock.setVisible(False)
+            self._apply_canvas_priority_layout()
             return
 
         if name == "Default_Legacy":
@@ -739,6 +813,7 @@ class UiExtrasMixin:
             ]:
                 if dock is not None:
                     dock.setVisible(False)
+            self._apply_canvas_priority_layout()
             return
 
         if name == "Annotate":
@@ -795,4 +870,8 @@ class UiExtrasMixin:
     def closeEvent(self, event) -> None:
         """Persist layout before closing the main window."""
         self._save_layout()
-        super().closeEvent(event)
+        for fig_name in ("hist_fig", "profile_fig"):
+            fig = getattr(self, fig_name, None)
+            if fig is not None:
+                fig.clear()
+        QtWidgets.QMainWindow.closeEvent(self, event)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-import matplotlib.cm as cm
+from matplotlib import colormaps
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ def lut_names() -> List[str]:
 
 def cmap_for(spec: LutSpec, invert: bool = False):
     """Return a matplotlib colormap for the LUT spec."""
-    cmap = cm.get_cmap(spec.matplotlib_cmap_name)
+    cmap = colormaps.get_cmap(spec.matplotlib_cmap_name)
     if invert and spec.invert_supported:
         return cmap.reversed()
     return cmap

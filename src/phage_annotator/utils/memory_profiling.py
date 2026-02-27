@@ -1,4 +1,4 @@
-"""Memory profiling utilities for Phase 7 zero-copy optimizations.
+"""Memory profiling utilities for zero-copy optimizations.
 
 Provides decorators and context managers to measure memory usage and track
 the effectiveness of zero-copy optimizations.

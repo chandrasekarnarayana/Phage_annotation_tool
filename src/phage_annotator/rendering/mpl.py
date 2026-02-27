@@ -47,6 +47,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
 import numpy as np
 
 from phage_annotator.ui_qt.rendering.export_view import ExportOptions, render_view_to_array
@@ -139,6 +140,7 @@ class RenderContext:
     image_frame: np.ndarray
     support_frame: Optional[np.ndarray]
     projections: Dict[str, np.ndarray]
+    panel_images: Dict[str, np.ndarray]
     view: ViewState
     annotations: Sequence[object]
     panel_visibility: Dict[str, bool]
@@ -243,17 +245,37 @@ class Renderer:
         self.canvas.draw_idle()
         return axes
 
+    def init_external_axes(
+        self,
+        axes: Dict[str, matplotlib.axes.Axes],
+        layout_key: Sequence[str],
+    ) -> Dict[str, matplotlib.axes.Axes]:
+        """Initialize renderer state using externally managed axes.
+
+        Parameters
+        ----------
+        axes : dict[str, matplotlib.axes.Axes]
+            Pre-built axes keyed by panel name.
+        layout_key : Sequence[str]
+            Visible panel order used for layout caching.
+        """
+        self._layout_key = tuple(layout_key)
+        self.axes = axes
+        for key in self.image_artists:
+            self.image_artists[key] = None
+        self.overlay_text = None
+        if "frame" in axes:
+            self.roi_interactor = RoiInteractor(axes["frame"], self._on_roi_change)
+            if self._roi_callback is not None:
+                self.roi_interactor.on_change = self._roi_callback
+        self.canvas.draw_idle()
+        return axes
+
     def update_images(self, ctx: RenderContext) -> None:
         """Update image artists in-place for all visible panels."""
         titles = ctx.titles
-        if "frame" in self.axes:
-            self.axes["frame"].set_title(titles.get("frame", ""))
-        if "mean" in self.axes:
-            self.axes["mean"].set_title(titles.get("mean", ""))
-        if "support" in self.axes:
-            self.axes["support"].set_title(titles.get("support", ""))
-        if "std" in self.axes:
-            self.axes["std"].set_title(titles.get("std", ""))
+        for key, ax in self.axes.items():
+            ax.set_title(titles.get(key, ""))
 
         frame_norm = ctx.norms.get("frame")
         std_norm = ctx.norms.get("std")
@@ -263,6 +285,24 @@ class Renderer:
         mean_range = ctx.panel_ranges.get("mean", ctx.std_range)
         support_range = ctx.panel_ranges.get("support", ctx.std_range)
         std_range = ctx.panel_ranges.get("std", ctx.std_range)
+        for key, data in ctx.panel_images.items():
+            if key not in self.axes:
+                continue
+            if key in ("frame", "mean", "support", "std"):
+                continue
+            norm = ctx.norms.get(key)
+            prange = ctx.panel_ranges.get(key, ctx.std_range)
+            cmap = ctx.panel_cmaps.get(key, self.colormaps[0])
+            self.image_artists[key] = _update_or_create(
+                self.axes[key],
+                self.image_artists.get(key),
+                data,
+                cmap,
+                prange[0],
+                prange[1],
+                ctx.extents.get(key),
+                norm=norm,
+            )
         if "frame" in self.axes:
             self.image_artists["frame"] = _update_or_create(
                 self.axes["frame"],
@@ -282,7 +322,7 @@ class Renderer:
                     self.axes["frame"],
                     self.image_artists["frame_overlay"],
                     overlay_uint8,
-                    ctx.overlay_cmap or plt.get_cmap("magma"),
+                    ctx.overlay_cmap or colormaps.get_cmap("magma"),
                     0.0,
                     255.0,
                     ctx.overlay_extent,
@@ -301,7 +341,7 @@ class Renderer:
                     self.axes["frame"],
                     self.image_artists["threshold_overlay"],
                     threshold_data,
-                    plt.get_cmap("Reds"),
+                    colormaps.get_cmap("Reds"),
                     0.0,
                     255.0,
                     ctx.threshold_extent,

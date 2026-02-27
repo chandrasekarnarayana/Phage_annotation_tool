@@ -126,6 +126,13 @@ class SessionProjectMixin:
         display_mappings: Dict[int, Dict[str, dict]] = {}
         for image_id, panels in self.display_mapping.per_image.items():
             display_mappings[image_id] = {panel: mapping_to_dict(mapping) for panel, mapping in panels.items()}
+        
+        # Phase ι: Pass modality_manager for persistence
+        modality_manager = getattr(self.session_state, "modality_manager", None)
+        channel_display_settings = getattr(
+            self.session_state, "channel_display_settings", None
+        )
+        
         save_project(
             path,
             self.session_state.images,
@@ -136,6 +143,8 @@ class SessionProjectMixin:
             self.session_state.threshold_configs_by_image,
             self.session_state.particles_configs_by_image,
             self.session_state.annotation_imports,
+            modality_manager=modality_manager,
+            channel_display_settings=channel_display_settings,
         )
         self.session_state.project_path = path
         self.session_state.project_save_time = path.stat().st_mtime if path.exists() else None
@@ -143,10 +152,33 @@ class SessionProjectMixin:
 
     def load_project(self, parent: QtWidgets.QWidget, path: pathlib.Path, read_metadata) -> bool:
         try:
-            image_entries, settings, ann_map, roi_map, thr_map, part_map, import_map = load_project(path)
+            (
+                image_entries,
+                settings,
+                ann_map,
+                roi_map,
+                thr_map,
+                part_map,
+                import_map,
+                modality_manager_data,
+                channel_display_settings,
+            ) = load_project(path)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Load project failed", str(exc))
             return False
+        
+        # Phase ι: Restore modality_manager if present
+        from phage_annotator.session.modality import ModalityManager
+        if modality_manager_data is not None:
+            try:
+                self.session_state.modality_manager = ModalityManager.from_dict(modality_manager_data)
+            except Exception as e:
+                # Graceful fallback if deserialization fails
+                self.session_state.modality_manager = None
+        else:
+            self.session_state.modality_manager = None
+        self.session_state.channel_display_settings = channel_display_settings
+        
         images = []
         annotations: Dict[int, List[Keypoint]] = {}
         display_per_image: Dict[int, Dict[str, DisplayMapping]] = {}

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from phage_annotator.io.metadata.index import AnnotationIndexEntry
     from phage_annotator.core.annotation import Keypoint
     from phage_annotator.data.models import LazyImage
+    from phage_annotator.session.modality import ModalityManager
 
 
 @dataclass
@@ -127,3 +128,12 @@ class SessionState:
     annotation_imports: Dict[int, List[Dict[str, object]]] = field(default_factory=dict)
     annotation_index: Dict[int, List[AnnotationIndexEntry]] = field(default_factory=dict)
     annotations_loaded: Dict[int, bool] = field(default_factory=dict)
+    
+    # Phase α: Multi-modality support (new fields)
+    # Note: These are optional to maintain backward compatibility during migration
+    modality_manager: Optional["ModalityManager"] = None
+    migration_version: int = 0  # 0=old (primary/support), 1=new (modalities)
+    
+    # Phase β: M2 Multi-channel viewer support
+    # Channel display settings for multi-channel composition
+    channel_display_settings: Optional[Dict[str, object]] = None  # Serialized MultiChannelDisplaySettings

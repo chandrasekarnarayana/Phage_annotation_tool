@@ -115,6 +115,11 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.redo_act.setShortcut("Ctrl+Shift+Z")
     self.undo_act.setEnabled(False)
     self.redo_act.setEnabled(False)
+    edit_menu.addSeparator()
+    self.jump_to_frame_act = edit_menu.addAction("Jump to Frame...")
+    self.jump_to_z_act = edit_menu.addAction("Jump to Z Slice...")
+    self.jump_to_frame_act.setShortcut("Ctrl+G")
+    self.jump_to_z_act.setShortcut("Ctrl+Shift+G")
     self.copy_display_act = edit_menu.addAction("Copy Display Settings…")
     self.reset_confirms_act = edit_menu.addAction("Reset confirmations")
     self.measure_act = edit_menu.addAction("Measure (Results)")
@@ -182,5 +187,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "measure": self.measure_act,
         "show_recorder": self.show_recorder_act,
         "clear_hist_cache": self.clear_hist_cache_act,
+        "jump_to_frame": self.jump_to_frame_act,
+        "jump_to_z": self.jump_to_z_act,
     }
     return actions, dock_panels_menu

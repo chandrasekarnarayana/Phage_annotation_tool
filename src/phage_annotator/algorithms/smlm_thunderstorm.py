@@ -66,7 +66,7 @@ def detect_candidates(
 ) -> np.ndarray:
     """Detect candidate peaks using local maxima and robust thresholding.
     
-    Phase 7: Optimized to avoid full array copy when applying ROI mask.
+    Optimized to avoid full array copy when applying ROI mask.
     Uses np.where for conditional value replacement instead of copy+mask.
     """
     # Phase 7: Use np.where instead of copy+mask to avoid 4MB copy per frame

@@ -51,6 +51,11 @@ class SmlmControlsMixin:
             if self.dock_roi is not None:
                 self.dock_roi.setVisible(True)
             return
+        
+        # Phase ζ: Get selected modality_idx from panel
+        selected_modality_idx = self.smlm_panel.get_selected_modality_idx()
+        self._smlm_modality_idx = selected_modality_idx
+        
         params = self._smlm_params_from_ui()
         if params is None:
             return
@@ -342,6 +347,11 @@ class SmlmControlsMixin:
             if self.dock_roi is not None:
                 self.dock_roi.setVisible(True)
             return
+        
+        # Phase ζ: Get selected modality_idx from panel
+        selected_modality_idx = self.smlm_panel.get_selected_modality_idx()
+        self._deepstorm_modality_idx = selected_modality_idx
+        
         err, warn = self._validate_deepstorm_params(params)
         if err:
             deep.status_label.setText(err)

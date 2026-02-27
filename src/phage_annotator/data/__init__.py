@@ -1,6 +1,6 @@
-"""Data models and image handling (FIJI Layer 2).
+"""Data models and image handling (Layer 2).
 
-This package implements the Data Layer in the FIJI architecture, providing
+This package implements the Data Layer, providing
 immutable value objects for all domain concepts and interfaces for data access.
 
 **Layer 2 Responsibilities**:
@@ -36,10 +36,10 @@ immutable value objects for all domain concepts and interfaces for data access.
     data_source = SessionDataSource(controller)
     frame = data_source.get_frame(t=5, z=3)
 
-**Phase Progress**:
-- Phase 2.5: Physical migration from core → data
-- Phase 6: Data source interfaces added
-- Phase 9: Full FIJI documentation complete
+**Architecture Evolution**:
+- Physical migration from core → data
+- Data source interfaces added
+- Full documentation complete
 """
 
 # Import from new locations (Phase 2.5 physical migration)

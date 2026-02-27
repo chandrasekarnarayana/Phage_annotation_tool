@@ -1,4 +1,4 @@
-"""Lightweight numpy array pooling for tile-sized buffers (Phase 5)."""
+"""Lightweight numpy array pooling for tile-sized buffers."""
 
 from __future__ import annotations
 

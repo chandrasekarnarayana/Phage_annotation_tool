@@ -1,6 +1,6 @@
 """Backward compatibility facade for annotation metadata helpers.
 
-Phase 4: This module has been moved to phage_annotator.io.metadata.annotation.
+This module has been moved to phage_annotator.io.metadata.annotation.
 """
 
 from phage_annotator.io.metadata.annotation import (

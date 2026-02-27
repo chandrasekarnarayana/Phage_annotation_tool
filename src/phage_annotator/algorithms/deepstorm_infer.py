@@ -259,7 +259,7 @@ def _weight_mask(h: int, w: int) -> np.ndarray:
 def _finalize_sr(sr_accum: np.ndarray, weight_accum: np.ndarray) -> np.ndarray:
     """Normalize SR accumulator by weight map, returning a copy.
     
-    Phase 7 Note: Copy is required because sr_accum/weight_accum are pooled buffers
+    Copy is required because sr_accum/weight_accum are pooled buffers
     that will be released and reused. The copy ensures the returned SR image is
     independent of the buffer pool lifecycle.
     """

@@ -11,10 +11,10 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.qt_compat import QtWidgets
+from matplotlib.figure import Figure
 
 
 class OrthoViewWidget(QtWidgets.QWidget):
@@ -30,7 +30,9 @@ class OrthoViewWidget(QtWidgets.QWidget):
         self._message_text_xz = None
         self._message_text_yz = None
 
-        self.fig, (self.ax_xz, self.ax_yz) = plt.subplots(1, 2, figsize=(5, 3))
+        self.fig = Figure(figsize=(5, 3))
+        self.ax_xz = self.fig.add_subplot(1, 2, 1)
+        self.ax_yz = self.fig.add_subplot(1, 2, 2)
         self.canvas = FigureCanvasQTAgg(self.fig)
         self.ax_xz.set_title("XZ")
         self.ax_yz.set_title("YZ")
@@ -52,6 +54,11 @@ class OrthoViewWidget(QtWidgets.QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
         layout.addWidget(self.canvas)
+
+    def closeEvent(self, event) -> None:
+        """Release figure resources when the widget closes."""
+        self.fig.clear()
+        super().closeEvent(event)
 
     def set_callbacks(
         self,

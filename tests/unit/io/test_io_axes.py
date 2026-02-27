@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from phage_annotator.io import standardize_axes
 
@@ -40,3 +41,13 @@ def test_standardize_axes_degenerate_shapes() -> None:
     std, has_time, has_z = standardize_axes(arr4d_single_t)
     assert std.shape == (1, 3, 4, 5)
     assert has_time is True and has_z is True
+
+
+def test_standardize_axes_invalid_ome_axes_strict() -> None:
+    arr = np.zeros((3, 4, 5))
+    std, has_time, has_z = standardize_axes(arr, ome_axes="CYX", strict=True)
+    assert std.shape == (1, 1, 4, 5)
+    assert has_time is False and has_z is False
+
+    with pytest.raises(ValueError):
+        standardize_axes(arr, ome_axes="TYXW", strict=True)

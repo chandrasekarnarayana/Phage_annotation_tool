@@ -1,6 +1,6 @@
 """Backward compatibility facade for annotation CSV readers.
 
-Phase 4: This module has been moved to phage_annotator.io.readers.annotations.
+This module has been moved to phage_annotator.io.readers.annotations.
 """
 
 from phage_annotator.io.readers.annotations import (

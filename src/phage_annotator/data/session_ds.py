@@ -77,6 +77,10 @@ class SessionDataSource(ComprehensiveDataSource):
         if img is None:
             return (1, 1, 1, 1)
         
+        axis_info = getattr(img, "axis_info", {}) or {}
+        tzyx = axis_info.get("tzyx")
+        if isinstance(tzyx, tuple) and len(tzyx) == 4:
+            return tzyx
         # LazyImage shape varies: (Y, X), (T, Y, X), or (T, Z, Y, X)
         if len(img.shape) == 2:
             return (1, 1, img.shape[0], img.shape[1])

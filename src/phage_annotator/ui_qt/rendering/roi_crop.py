@@ -2,16 +2,104 @@
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.roi.auto import propose_roi
+from phage_annotator.session.modality import (
+    ModalityDisplaySettings,
+    ModalitySpec,
+    ProjectionType,
+)
+from phage_annotator.ui_qt.widgets.modality_canvas import LayoutMode
 
 
 class RoiCropMixin:
     """Mixin for ROI and crop computations."""
+
+    def _current_layout_spec(self) -> dict:
+        order = ["frame", "mean", "support", "std"]
+        panel_visibility = dict(self._panel_visibility)
+        self._panel_modality_map = {}
+        manager = getattr(self.controller.session_state, "modality_manager", None)
+        if not self.images:
+            return {
+                "order": order,
+                "panel_visibility": panel_visibility,
+            }
+        primary_id = self.current_image_idx
+        support_id = self.support_image_idx
+
+        def _clone_settings(source: Optional[ModalityDisplaySettings]) -> ModalityDisplaySettings:
+            if source is None:
+                return ModalityDisplaySettings()
+            return ModalityDisplaySettings(
+                vmin=source.vmin,
+                vmax=source.vmax,
+                lut=source.lut,
+                projection_axis=source.projection_axis,
+                gamma=source.gamma,
+            )
+
+        primary_modality = None
+        support_modality = None
+        if manager is not None:
+            for modality in manager.get_all_modalities():
+                if modality.image_id == primary_id and primary_modality is None:
+                    primary_modality = modality
+                if modality.image_id == support_id and support_modality is None:
+                    support_modality = modality
+
+        self._panel_modality_map["frame"] = ModalitySpec(
+            idx=-100,
+            image_id=primary_id,
+            display_name="Frame",
+            projection_type=ProjectionType.RAW,
+            display_settings=_clone_settings(
+                primary_modality.display_settings if primary_modality else None
+            ),
+        )
+        self._panel_modality_map["mean"] = ModalitySpec(
+            idx=-101,
+            image_id=primary_id,
+            display_name="Mean Projection",
+            projection_type=ProjectionType.MEAN,
+            display_settings=_clone_settings(
+                primary_modality.display_settings if primary_modality else None
+            ),
+        )
+        self._panel_modality_map["support"] = ModalitySpec(
+            idx=-102,
+            image_id=support_id,
+            display_name="Support",
+            projection_type=ProjectionType.RAW,
+            display_settings=_clone_settings(
+                support_modality.display_settings if support_modality else None
+            ),
+        )
+        self._panel_modality_map["std"] = ModalitySpec(
+            idx=-103,
+            image_id=primary_id,
+            display_name="Std Projection",
+            projection_type=ProjectionType.STD,
+            display_settings=_clone_settings(
+                primary_modality.display_settings if primary_modality else None
+            ),
+        )
+        if manager is not None:
+            for modality in manager.get_all_modalities():
+                if modality.idx < 2:
+                    continue
+                key = f"modality_{modality.idx}"
+                order.append(key)
+                panel_visibility[key] = True
+                self._panel_modality_map[key] = modality
+        return {
+            "order": order,
+            "panel_visibility": panel_visibility,
+        }
 
     def _roi_mask(self, shape: Tuple[int, int]) -> np.ndarray:
         h, w = shape
@@ -399,19 +487,33 @@ class RoiCropMixin:
             return 1, 3
         return 2, 2
 
-    def _rebuild_figure_layout(self) -> None:
-        layout_spec = {
-            "order": ["frame", "mean", "support", "std"],
-            "panel_visibility": self._panel_visibility,
-        }
+    def _rebuild_figure_layout(self, layout_spec: Optional[dict] = None) -> None:
+        if layout_spec is None:
+            layout_spec = self._current_layout_spec()
         if not self.renderer.request_layout_rebuild(layout_spec):
             return
-        axes = self.renderer.init_figure(layout_spec)
+        order = layout_spec["order"]
+        panel_visibility = layout_spec.get("panel_visibility", {})
+        visible = [key for key in order if panel_visibility.get(key, False)]
+        axes = {}
+        if getattr(self, "modality_canvas", None) is not None:
+            panel_indices = {"frame": 0, "mean": 1, "support": 2, "std": 3}
+            specs = [(panel_indices[key], key.title()) for key in visible]
+            self.modality_canvas.set_layout_mode(LayoutMode.AUTO)
+            self.modality_canvas.set_modalities(specs)
+            for key in visible:
+                view = self.modality_canvas.get_view(panel_indices[key])
+                if view is not None:
+                    axes[key] = view.ax
+            axes = self.renderer.init_external_axes(axes, visible)
+        else:
+            axes = self.renderer.init_figure(layout_spec)
         self.ax_frame = axes.get("frame")
         self.ax_mean = axes.get("mean")
         self.ax_comp = None
         self.ax_support = axes.get("support")
         self.ax_std = axes.get("std")
+        self._sync_view_manager_panels(visible)
         self._bind_axis_callbacks()
         if self.tool_router is not None:
             self._set_roi_interactor_tool(self.tool_router.tool)

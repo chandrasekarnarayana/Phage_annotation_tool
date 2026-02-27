@@ -1,6 +1,6 @@
 """Zero-copy array view utilities for memory-efficient operations.
 
-Phase 7: Provides safe, memory-efficient view operations to minimize array copies
+Provides safe, memory-efficient view operations to minimize array copies
 throughout the rendering and analysis pipeline.
 
 Key Principles:
@@ -358,7 +358,7 @@ def frame_view_4d(
 ) -> np.ndarray:
     """Extract a 2D frame from a 4D (T, Z, Y, X) stack as a safe view.
 
-    This is the canonical way to extract frames for rendering in FIJI architecture.
+    This is the canonical way to extract frames for rendering.
 
     Parameters
     ----------

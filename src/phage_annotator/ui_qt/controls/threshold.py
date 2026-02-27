@@ -330,6 +330,11 @@ class ThresholdControlsMixin:
         if mask_entry is None:
             self.particles_panel.status_label.setText("No threshold mask. Create one first.")
             return
+        
+        # Phase ζ: Get selected modality_idx from panel
+        selected_modality_idx = self.particles_panel.get_selected_modality_idx()
+        self._particles_modality_idx = selected_modality_idx
+        
         values = self.particles_panel.values()
         if values.clear_previous:
             self._particles_results = []

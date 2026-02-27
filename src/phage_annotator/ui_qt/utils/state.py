@@ -35,7 +35,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 import numpy as np
 from matplotlib.backends.qt_compat import QtCore
 
-from phage_annotator.analysis.core import compute_mean_std
+from phage_annotator.analysis.core import compute_projection, compute_projections
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.io.data.calibration import CalibrationState
 from phage_annotator.ui_qt.utils.constants import PROJECTION_ASYNC_BYTES, CancelTokenShim
@@ -297,17 +297,38 @@ class StateMixin:
         return self.images[self.support_image_idx]
 
     def _ensure_loaded(self, idx: int) -> None:
-        """Load a stack lazily into memory and evict non-active images."""
+        """Load a stack lazily into memory and evict non-active images.
+        
+        Detects memory pressure during load and tracks downsampling diagnostics
+        for user feedback in the renderer.
+        """
         img = self.images[idx]
         if img.array is None:
             arr, has_time, has_z = load_array(
-                img.path, interpret_3d_as=img.interpret_3d_as, ome_axes=img.ome_axes
+                img.path,
+                interpret_3d_as=img.interpret_3d_as,
+                ome_axes=img.ome_axes,
+                channel_idx=getattr(img, "channel_idx", 0),
             )
             img.array = arr
             img.has_time = has_time
             img.has_z = has_z
             img.mean_proj = None
             img.std_proj = None
+            
+            # Extract and track downsampling diagnostics
+            if hasattr(arr, "_diagnostics"):
+                diagnostics = arr._diagnostics
+                img.downsampled = diagnostics.get("downsampled", False)
+                img.downsampling_reason = diagnostics.get("downsampling_reason", None)
+                img.downsample_factor = diagnostics.get("downsample_factor", 1)
+                if img.downsampled:
+                    debug_log(f"[Memory] {img.downsampling_reason}")
+                    # Flag memory pressure state for UI indicators
+                    if not hasattr(self, "_image_memory_pressure"):
+                        self._image_memory_pressure = {}
+                    self._image_memory_pressure[img.id] = True
+            
             if img.ome_axes is None and img.interpret_3d_as == "auto" and len(img.shape) == 3:
                 axis0 = img.shape[0]
                 img.axis_auto_used = True
@@ -334,6 +355,9 @@ class StateMixin:
         img.array = None
         img.mean_proj = None
         img.std_proj = None
+        channel_cache = getattr(img, "_channel_stack_cache", None)
+        if isinstance(channel_cache, dict):
+            channel_cache.clear()
 
     def _effective_axes(self, img: "LazyImage") -> Tuple[bool, bool]:
         mode = img.interpret_3d_as
@@ -363,7 +387,7 @@ class StateMixin:
     ) -> np.ndarray:
         """Extract a single (Y, X) frame from image array at given T and Z indices.
         
-        Phase 7: Returns zero-copy view for memory efficiency. The returned array
+        Returns a zero-copy view for memory efficiency. The returned array
         should not be modified; use .copy() if mutation is needed downstream.
 
         Parameters
@@ -401,12 +425,41 @@ class StateMixin:
         return self.controller.resolve_calibration_state(image_id, user_value, project_default)
 
     def _projection_key(
-        self, img: "LazyImage", kind: str
-    ) -> Tuple[int, str, Tuple[float, float, float, float], int, int]:
+        self,
+        img: "LazyImage",
+        kind: str,
+        axis: str = "tz",
+        modality_idx: Optional[int] = None,
+    ) -> Tuple[int, str, Tuple[float, float, float, float], int, int, int]:
         crop_rect = self._cache_crop_rect(img)
+        if axis != "tz":
+            kind = f"{kind}:{axis}"
         # Projections are global over T/Z; keep selection fields for key shape.
         t_sel, z_sel = -1, -1
-        return (img.id, kind, crop_rect, t_sel, z_sel)
+        if modality_idx is None:
+            modality_idx = self._modality_idx_for_image(img.id)
+        return (img.id, kind, crop_rect, t_sel, z_sel, int(modality_idx))
+
+    def _modality_idx_for_image(self, image_id: int) -> int:
+        """Return the first modality idx for an image id, or -1 if unknown."""
+        manager = getattr(self.controller.session_state, "modality_manager", None)
+        if manager is None:
+            return -1
+        for modality in manager.get_all_modalities():
+            if modality.image_id == image_id:
+                return modality.idx
+        return -1
+
+    def _projection_axis_for_image(self, img: "LazyImage") -> str:
+        manager = self.controller.session_state.modality_manager
+        if manager is None:
+            return "tz"
+        for modality in manager.get_all_modalities():
+            if modality.image_id == img.id:
+                axis = modality.display_settings.projection_axis
+                if axis in ("t", "z"):
+                    return axis
+        return "tz"
 
     def _cache_crop_rect(self, img: "LazyImage") -> Tuple[float, float, float, float]:
         """Return the crop rect normalized for cache keys."""
@@ -497,10 +550,13 @@ class StateMixin:
         z_idx: int,
         crop_rect: Tuple[float, float, float, float],
         level: int,
+        modality_idx: Optional[int] = None,
     ) -> np.ndarray:
         if level <= 0 or not self.pyramid_enabled:
             return data
-        key = (img_id, kind, t_idx, z_idx, crop_rect, level)
+        if modality_idx is None:
+            modality_idx = self._modality_idx_for_image(img_id)
+        key = (img_id, kind, t_idx, z_idx, crop_rect, level, int(modality_idx))
         cached = self.proj_cache.get_pyramid(key)
         if cached is not None:
             return cached
@@ -537,15 +593,23 @@ class StateMixin:
         scale = pyramid_level_factor(level)
         return self._downsample(data, scale)
 
-    def _get_projection(self, img: "LazyImage", kind: str) -> Tuple[Optional[np.ndarray], bool]:
+    def _get_projection(
+        self,
+        img: "LazyImage",
+        kind: str,
+        axis_override: Optional[str] = None,
+        modality_idx: Optional[int] = None,
+    ) -> Tuple[Optional[np.ndarray], bool]:
         """Return a cached projection or LOD fallback while full-res loads.
         
-        Phase 2a: LOD-First Rendering
+        LOD-first rendering behavior:
         - If full-res cached, return it (full-res ready)
         - If not cached but 8x pyramid available, return pyramid as fallback (LOD mode)
         - Otherwise schedule full-res job and return None
         """
-        key = self._projection_key(img, kind)
+        kind_l = kind.lower()
+        axis = axis_override or self._projection_axis_for_image(img)
+        key = self._projection_key(img, kind_l, axis, modality_idx=modality_idx)
         cached = self.proj_cache.get(key)
         if cached is not None:
             # Full-res available; mark LOD mode as complete
@@ -558,24 +622,51 @@ class StateMixin:
         if img.array is not None and self.pyramid_enabled:
             crop_rect = self._cache_crop_rect(img)
             t_idx, z_idx = -1, -1
-            pyramid_key = (img.id, kind, t_idx, z_idx, crop_rect, 3)  # level 3 = 8x downsampling
+            kind_key = f"{kind_l}:{axis}" if axis != "tz" else kind_l
+            if modality_idx is None:
+                modality_idx = self._modality_idx_for_image(img.id)
+            pyramid_key = (
+                img.id,
+                kind_key,
+                t_idx,
+                z_idx,
+                crop_rect,
+                3,
+                int(modality_idx),
+            )  # level 3 = 8x downsampling
             pyramid_cached = self.proj_cache.get_pyramid(pyramid_key)
             if pyramid_cached is not None:
                 # LOD pyramid available; mark LOD mode as active
                 if not hasattr(self, '_lod_mode_active'):
                     self._lod_mode_active = {}
                 self._lod_mode_active[img.id] = True
-                self._request_projection_job(img)  # Still schedule full-res
+                self._request_projection_job(
+                    img,
+                    {kind_l},
+                    axis_override=axis,
+                    modality_idx=modality_idx,
+                )
                 return pyramid_cached, False  # Return LOD but mark as not fully cached
         
         # Full-res not available and no LOD fallback; schedule full-res job
-        self._request_projection_job(img)
+        self._request_projection_job(
+            img,
+            {kind_l},
+            axis_override=axis,
+            modality_idx=modality_idx,
+        )
         return None, False
 
-    def _request_projection_job(self, img: "LazyImage") -> None:
+    def _request_projection_job(
+        self,
+        img: "LazyImage",
+        kinds: Optional[set[str]] = None,
+        axis_override: Optional[str] = None,
+        modality_idx: Optional[int] = None,
+    ) -> None:
         """Schedule projection computation and populate the cache on completion.
         
-        Phase 2b: Pyramid Prefetch
+        Pyramid prefetch behavior:
         - Schedule pyramid jobs for 8x, 4x, 2x levels first (low priority)
         - Then schedule full-res job (normal priority)
         """
@@ -583,12 +674,15 @@ class StateMixin:
             return
         crop_rect = self.crop_rect or (0.0, 0.0, 0.0, 0.0)
         t_sel, z_sel = -1, -1
-        key_mean = (img.id, "mean", crop_rect, t_sel, z_sel)
-        key_std = (img.id, "std", crop_rect, t_sel, z_sel)
-        if (
-            key_mean in self._projection_jobs
-            or key_std in self._projection_jobs
-        ):
+        if not kinds:
+            kinds = {"mean", "std"}
+        axis = axis_override or self._projection_axis_for_image(img)
+        kinds = {k.lower() for k in kinds}
+        kind_keys = {k if axis == "tz" else f"{k}:{axis}" for k in kinds}
+        if modality_idx is None:
+            modality_idx = self._modality_idx_for_image(img.id)
+        keys = [(img.id, k, crop_rect, t_sel, z_sel, int(modality_idx)) for k in kind_keys]
+        if all(key in self._projection_jobs for key in keys):
             return
         if img.array is None:
             self._ensure_loaded(img.id)
@@ -607,8 +701,9 @@ class StateMixin:
             # Schedule pyramid levels 3, 2, 1 (8x, 4x, 2x downsampling factors)
             for level in [3, 2, 1]:
                 scale = pyramid_level_factor(level)
-                for kind in ["mean", "std"]:
-                    pyramid_key = (img.id, kind, t_sel, z_sel, crop_rect, level)
+                for kind in sorted(kinds):
+                    kind_key = kind if axis == "tz" else f"{kind}:{axis}"
+                    pyramid_key = (img.id, kind_key, t_sel, z_sel, crop_rect, level, int(modality_idx))
                     if pyramid_key not in self._pyramid_jobs and self.proj_cache.get_pyramid(pyramid_key) is None:
                         job_name = f"PyramidPrefetch:{img.id}:{kind}:L{level}"
                         self._pyramid_jobs[pyramid_key] = job_name
@@ -623,13 +718,8 @@ class StateMixin:
                                        kind_l=kind_local, level_l=level_local):
                             if cancel_token.is_cancelled():
                                 return None
-                            # Compute projection first (if this is first pyramid request)
-                            mean_proj_work, std_proj_work = compute_mean_std(data)
-                            mean_proj_work = self._apply_crop_rect(mean_proj_work, crop_rect, full_shape)
-                            std_proj_work = self._apply_crop_rect(std_proj_work, crop_rect, full_shape)
-                            
-                            # Select which projection to downsample
-                            proj = mean_proj_work if kind_l == "mean" else std_proj_work
+                            proj = compute_projection(data, kind_l, axis=axis)
+                            proj = self._apply_crop_rect(proj, crop_rect, full_shape)
                             result = downsample_mean_pool(proj, scale)
                             return (pyramid_key, result, generation, kind_l, level_l)
                         
@@ -652,6 +742,8 @@ class StateMixin:
                                        on_error=_pyramid_error)
         
         # Now schedule full-res projection job
+        if not self.proj_cache.should_compute(int(modality_idx)):
+            return
         generation = self._job_generation
         arr = img.array
         job_name = f"Projections:{img.id}"
@@ -662,28 +754,28 @@ class StateMixin:
                 return None
             if arr.nbytes >= PROJECTION_ASYNC_BYTES:
                 progress(5, "Computing projections")
-            mean_proj, std_proj = compute_mean_std(arr)
+            proj_map = compute_projections(arr, kinds, axis=axis)
             if cancel_token.is_cancelled():
                 return None
-            mean_proj = self._apply_crop_rect(mean_proj, crop_rect, full_shape)
-            std_proj = self._apply_crop_rect(std_proj, crop_rect, full_shape)
+            for k in list(proj_map.keys()):
+                proj_map[k] = self._apply_crop_rect(proj_map[k], crop_rect, full_shape)
             progress(100, "Done")
-            return (mean_proj, std_proj, img.id, generation, crop_rect, t_sel, z_sel)
+            return (proj_map, img.id, generation, crop_rect, t_sel, z_sel)
 
         job_id_holder = {"id": None}
 
         def _on_result(result):
             if result is None:
                 return
-            mean_proj, std_proj, image_id, gen, crop_key, t_key, z_key = result
+            proj_map, image_id, gen, crop_key, t_key, z_key = result
             if gen != self._job_generation:
                 return
             if image_id < 0 or image_id >= len(self.images):
                 return
-            key_base = (image_id, "mean", crop_key, t_key, z_key)
-            key_std_local = (image_id, "std", crop_key, t_key, z_key)
-            self.proj_cache.put(key_base, mean_proj)
-            self.proj_cache.put(key_std_local, std_proj)
+            for kind_local, proj in proj_map.items():
+                kind_key = kind_local if axis == "tz" else f"{kind_local}:{axis}"
+                key_local = (image_id, kind_key, crop_key, t_key, z_key, int(modality_idx))
+                self.proj_cache.put(key_local, proj)
             if job_id_holder["id"] is not None:
                 self._clear_projection_job_name(job_id_holder["id"])
             # Mark LOD mode as complete (full-res now available)
@@ -710,8 +802,8 @@ class StateMixin:
         if arr.nbytes >= PROJECTION_ASYNC_BYTES:
             handle = self.jobs.submit(_job, name=job_name, on_result=_on_result, on_error=_on_error)
             job_id_holder["id"] = handle.job_id
-            self._projection_jobs[key_mean] = handle.job_id
-            self._projection_jobs[key_std] = handle.job_id
+            for key in keys:
+                self._projection_jobs[key] = handle.job_id
         else:
             try:
                 result = _job(lambda _v, _m="": None, CancelTokenShim())
@@ -780,6 +872,75 @@ class StateMixin:
         self.buffer_stats_label.setText(
             f"Buffer: {stats.filled}/{stats.capacity} | Prefetch: {block_size} | Underruns: {self._playback_underruns}"
         )
+
+    def get_diagnostic_info(self, image_id: int) -> dict:
+        """Get detailed diagnostic info for a given image.
+        
+        Returns
+        -------
+        dict
+            Diagnostic information including:
+            - downsampled: bool
+            - downsampling_reason: Optional[str]
+            - lod_active: bool
+            - memmap: bool
+            - downsample_factor: int
+            - render_scale: float (interactive downsampling factor)
+        """
+        img = None
+        for image in self.images:
+            if image.id == image_id:
+                img = image
+                break
+        if img is None:
+            return {}
+        
+        render_scales = getattr(self, "_render_scales", {}) or {}
+        render_scale = render_scales.get(image_id, 1.0)
+        lod_active = getattr(self, "_lod_mode_active", {}) or {}
+        
+        return {
+            "downsampled": getattr(img, "downsampled", False),
+            "downsampling_reason": getattr(img, "downsampling_reason", None),
+            "downsample_factor": getattr(img, "downsample_factor", 1),
+            "lod_active": lod_active.get(image_id, False),
+            "memmap": getattr(img.array, "filename", None) is not None if img.array else False,
+            "render_scale": float(render_scale),
+        }
+
+    def format_diagnostic_tooltip(self, image_id: int) -> str:
+        """Format a detailed diagnostic tooltip for display.
+        
+        Example output:
+        "Image 1: Spatial 2x downsampled (memory: 1.9 GB > 1.5 GB threshold)
+         Interactive: 2x downsampled; LOD active; Memmap"
+        """
+        diags = self.get_diagnostic_info(image_id)
+        if not diags:
+            return "No diagnostic information"
+        
+        lines = []
+        
+        # Memory pressure diagnostics
+        if diags["downsampled"]:
+            reason = diags.get("downsampling_reason", "")
+            lines.append(f"Spatial downsampling: {diags['downsample_factor']}x")
+            if reason:
+                lines.append(f"  Reason: {reason}")
+        
+        # Interactive/render diagnostics
+        interactive_flags = []
+        if diags["render_scale"] > 1:
+            interactive_flags.append(f"Interactive {int(diags['render_scale'])}x")
+        if diags["lod_active"]:
+            interactive_flags.append("LOD active")
+        if diags["memmap"]:
+            interactive_flags.append("Memmap mode")
+        
+        if interactive_flags:
+            lines.append("Display: " + "; ".join(interactive_flags))
+        
+        return "\n".join(lines) if lines else "Full resolution, no optimizations active"
 
     def _flash_status(self, text: str, ms: int = 1200) -> None:
         """Show a temporary status message without overwriting the base status."""

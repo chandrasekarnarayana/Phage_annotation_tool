@@ -1,4 +1,4 @@
-"""Qt panel for Fiji-style thresholding controls."""
+"""Qt panel for thresholding controls."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from phage_annotator.analysis.threshold import AUTO_METHODS
 class ThresholdUiValues:
     """Snapshot of thresholding controls."""
 
+    modality: str  # Phase ζ: Selected modality name
     target: str
     region_roi: bool
     scope: str
@@ -45,6 +46,11 @@ class ThresholdPanel(QtWidgets.QWidget):
         form = QtWidgets.QFormLayout()
         form.setLabelAlignment(QtCore.Qt.AlignRight)
         layout.addLayout(form)
+
+        # Phase ζ: Modality selector for multi-modality analysis
+        self.modality_combo = QtWidgets.QComboBox()
+        self.modality_combo.addItem("Current (Primary)")
+        form.addRow("Run on modality", self.modality_combo)
 
         self.target_combo = QtWidgets.QComboBox()
         self.target_combo.addItems(["Frame", "Mean", "Support"])
@@ -153,6 +159,7 @@ class ThresholdPanel(QtWidgets.QWidget):
     def values(self) -> ThresholdUiValues:
         """Return a typed snapshot of current UI values."""
         return ThresholdUiValues(
+            modality=self.modality_combo.currentText(),
             target=self.target_combo.currentText(),
             region_roi=self.region_chk.isChecked(),
             scope=self.scope_combo.currentText(),
@@ -192,3 +199,24 @@ class ThresholdPanel(QtWidgets.QWidget):
         self.low_slider.setToolTip(thr_tip)
         self.high_slider.setToolTip(thr_tip)
         self.open_spin.setToolTip(fit_tip)
+
+    def update_modality_list(self, modality_manager) -> None:
+        """Update modality combo with available modalities."""
+        current_text = self.modality_combo.currentText()
+        self.modality_combo.clear()
+        self.modality_combo.addItem("Current (Primary)")
+        
+        if modality_manager is not None:
+            modalities = modality_manager.get_all_modalities()
+            for modality in modalities:
+                self.modality_combo.addItem(modality.display_name, modality.idx)
+        
+        # Restore previous selection if still available
+        idx = self.modality_combo.findText(current_text)
+        if idx >= 0:
+            self.modality_combo.setCurrentIndex(idx)
+    
+    def get_selected_modality_idx(self) -> Optional[int]:
+        """Get modality_idx for selected modality, or None for current."""
+        data = self.modality_combo.currentData()
+        return data if data is not None else None

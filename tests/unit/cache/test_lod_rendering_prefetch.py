@@ -38,7 +38,7 @@ class TestLodFirstRendering:
     def test_full_res_available_disables_lod_mode(self):
         """When full-res is cached, LOD mode should be disabled."""
         cache = ProjectionCache(max_mb=10)
-        key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1)
+        key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         data = np.random.rand(512, 512).astype(np.float32)
         
         cache.put(key, data)
@@ -54,7 +54,7 @@ class TestLodFirstRendering:
         
         # Create pyramid data (8x downsampled)
         pyramid_data = np.random.rand(64, 64).astype(np.float32)
-        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3)  # level 3 = 8x
+        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0)  # level 3 = 8x
         cache.put_pyramid(pyramid_key, pyramid_data)
         
         # Verify pyramid is cached
@@ -137,7 +137,7 @@ class TestPyramidPrefetch:
         pyramid_jobs = {}
         
         # First request
-        key1 = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3)
+        key1 = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0)
         if key1 not in pyramid_jobs:
             pyramid_jobs[key1] = "job_name"
         
@@ -155,7 +155,7 @@ class TestPyramidPrefetch:
         data1 = np.ones((64, 64), dtype=np.float32)
         data2 = np.zeros((64, 64), dtype=np.float32)
         
-        key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3)
+        key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0)
         
         # First put
         cache.put_pyramid(key, data1)
@@ -188,7 +188,7 @@ class TestPyramidPrefetch:
         """Pyramid prefetch result callback should cache the downsampled data."""
         cache = ProjectionCache(max_mb=50)
         
-        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3)
+        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0)
         pyramid_data = np.random.rand(64, 64).astype(np.float32)
         
         # Simulate result callback putting data into cache
@@ -208,8 +208,8 @@ class TestLodPrefetchIntegration:
         cache = ProjectionCache(max_mb=50)
         
         # Scenario: Full-res loading, only 8x pyramid available
-        full_res_key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1)
-        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3)
+        full_res_key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+        pyramid_key = (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0)
         
         # Pre-populate pyramid
         pyramid_data = np.random.rand(64, 64).astype(np.float32)
@@ -228,7 +228,7 @@ class TestLodPrefetchIntegration:
         lod_mode_active = {0: True}
         cache = ProjectionCache(max_mb=50)
         
-        key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1)
+        key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
         data = np.random.rand(512, 512).astype(np.float32)
         
         # Full-res completes (in _on_result callback)
@@ -269,7 +269,7 @@ class TestLodPrefetchIntegration:
     def test_pyramid_prefetch_handles_image_eviction(self):
         """Pyramid prefetch jobs should be cancelled when image is evicted."""
         pyramid_jobs = {
-            (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3): "job_name_1",
+            (0, "mean", -1, -1, (0.0, 0.0, 0.0, 0.0), 3, 0): "job_name_1",
             (0, "std", -1, -1, (0.0, 0.0, 0.0, 0.0), 3): "job_name_2",
         }
         

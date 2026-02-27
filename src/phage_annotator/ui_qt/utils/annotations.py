@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Tuple
 
 import numpy as np
+from matplotlib.backends.qt_compat import QtCore
 
 
 class AnnotationsMixin:
@@ -14,6 +15,21 @@ class AnnotationsMixin:
         if event.inaxes == self.ax_frame and event.xdata is not None and event.ydata is not None:
             fx, fy = self._to_full_coords(self.ax_frame, event.xdata, event.ydata)
             self._set_cursor_xy(fx, fy, refresh=False)
+        button = getattr(event, "button", None)
+        is_right_click = button == 3 or str(button).lower().endswith("right")
+        if (
+            is_right_click
+            and event.inaxes in self._get_image_axes()
+            and event.xdata is not None
+            and event.ydata is not None
+            and hasattr(self, "_show_annotation_context_menu")
+        ):
+            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
+            global_pos = self.canvas.mapToGlobal(
+                QtCore.QPoint(int(event.x), int(self.canvas.height() - event.y))
+            )
+            self._show_annotation_context_menu(fx, fy, global_pos)
+            return
         if self.tool_router is not None:
             self.tool_router.on_click(event)
 
@@ -23,7 +39,11 @@ class AnnotationsMixin:
         """Append a new annotation in full-resolution coordinates.
 
         Coordinates are stored in image space regardless of crop or downsample.
+        Assigns active modality_idx if multi-modality system is enabled.
         """
+        # Phase ι: Get active modality index if available
+        active_modality_idx = getattr(self, "_active_modality_idx", None)
+        
         self.controller.add_annotation(
             image_id=image_id,
             image_name=self.primary_image.name,
@@ -33,6 +53,7 @@ class AnnotationsMixin:
             x=x,
             label=label,
             scope=scope,
+            modality_idx=active_modality_idx,
         )
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
