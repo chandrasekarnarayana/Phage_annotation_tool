@@ -216,7 +216,7 @@ class UiExtrasMixin:
         """Show or hide the annotation dock when the toolbar toggles."""
         if getattr(self, "dock_annotations", None) is None:
             return
-        self.dock_annotations.setVisible(checked)
+        self.set_panel_visible("annotations", bool(checked), source="annotation_toolbar")
         if checked:
             self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
             self.dock_annotations.raise_()
@@ -339,7 +339,7 @@ class UiExtrasMixin:
         roi_reset = QtWidgets.QPushButton("Reset ROI")
         roi_show = QtWidgets.QPushButton("Show ROI Controls")
         roi_reset.clicked.connect(self._reset_roi)
-        roi_show.clicked.connect(lambda: self.dock_roi.setVisible(True) if self.dock_roi else None)
+        roi_show.clicked.connect(lambda: self.set_panel_visible("roi", True, source="analyze_panel"))
         roi_layout.addWidget(roi_reset)
         roi_layout.addWidget(roi_show)
 
@@ -568,6 +568,48 @@ class UiExtrasMixin:
         for i, act in enumerate(self.sidebar_actions):
             act.setChecked(i == idx)
 
+    def _sidebar_action_index_for_label(self, label: str) -> int:
+        """Return sidebar action index by label, or -1 if not found."""
+        want = str(label).strip().lower()
+        for i, act in enumerate(getattr(self, "sidebar_actions", []) or []):
+            if str(act.text()).strip().lower() == want:
+                return i
+        return -1
+
+    def open_preferences(self, section: str | None = None) -> None:
+        """Open Preferences page and optionally focus a specific section."""
+        if getattr(self, "dock_sidebar", None) is not None:
+            self.set_panel_visible("sidebar", True, source="open_preferences")
+        self._expand_sidebar()
+        pref_idx = self._sidebar_action_index_for_label("Preferences")
+        if pref_idx >= 0:
+            self._set_sidebar_mode(pref_idx)
+        if section != "training_controls":
+            return
+
+        if getattr(self, "settings_advanced_container", None) is not None:
+            self.settings_advanced_container.setVisible(True)
+        if getattr(self, "advanced_group", None) is not None:
+            self.advanced_group.setChecked(True)
+
+        scroll = self.sidebar_stack.currentWidget() if self.sidebar_stack is not None else None
+        if isinstance(scroll, QtWidgets.QScrollArea):
+            scroll.ensureWidgetVisible(self.settings_advanced_container, 0, 24)
+
+        focus_widget = getattr(self, "suggestion_auto_retrain_chk", None)
+        if focus_widget is not None:
+            focus_widget.setFocus(QtCore.Qt.FocusReason.ShortcutFocusReason)
+
+        # Brief highlight to confirm navigation target.
+        if getattr(self, "advanced_group", None) is not None:
+            group = self.advanced_group
+            prior_style = group.styleSheet()
+            group.setStyleSheet(
+                prior_style
+                + "\nQGroupBox { border: 2px solid #42a5f5; border-radius: 4px; }"
+            )
+            QtCore.QTimer.singleShot(1500, lambda: group.setStyleSheet(prior_style))
+
     def _restore_sidebar_mode(self) -> None:
         """Restore sidebar panel and collapsed/expanded state from settings."""
         if not self.sidebar_stack or not self.sidebar_actions:
@@ -600,7 +642,9 @@ class UiExtrasMixin:
 
         sidebar_visible = getattr(self, "dock_sidebar", None) is not None and self.dock_sidebar.isVisible()
         annotations_visible = (
-            getattr(self, "dock_annotations", None) is not None and self.dock_annotations.isVisible()
+            (getattr(self, "dock_annotations", None) is not None and self.dock_annotations.isVisible())
+            or (getattr(self, "dock_review_queue", None) is not None and self.dock_review_queue.isVisible())
+            or (getattr(self, "dock_suggestion_explain", None) is not None and self.dock_suggestion_explain.isVisible())
         )
 
         for key in self.sidebar_manager.dock_order(sidebar_visible, annotations_visible):
@@ -648,6 +692,8 @@ class UiExtrasMixin:
         def _add_action(act: QtWidgets.QAction) -> None:
             if act in seen:
                 return
+            if not act.isVisible():
+                return
             text = act.text().replace("&", "").strip()
             if not text:
                 return
@@ -657,6 +703,8 @@ class UiExtrasMixin:
         def _walk_menu(menu: QtWidgets.QMenu) -> None:
             for act in menu.actions():
                 if act.isSeparator():
+                    continue
+                if not act.isVisible():
                     continue
                 if act.menu() is not None:
                     _walk_menu(act.menu())
@@ -694,17 +742,60 @@ class UiExtrasMixin:
         search = QtWidgets.QLineEdit()
         search.setPlaceholderText("Type a command...")
         listw = QtWidgets.QListWidget()
+        rationale_lbl = QtWidgets.QLabel("")
+        rationale_lbl.setStyleSheet("color: #666666;")
         layout.addWidget(search)
         layout.addWidget(listw)
+        layout.addWidget(rationale_lbl)
 
         action_map: List[Tuple[str, QtWidgets.QAction]] = []
         for act in actions:
             label = act.text().replace("&", "").strip()
             action_map.append((label, act))
 
+        if not hasattr(self, "_command_usage_count"):
+            self._command_usage_count = {}
+        if not hasattr(self, "_command_last_used_ts"):
+            self._command_last_used_ts = {}
+
+        def _current_palette_mode() -> str:
+            if getattr(self, "dock_review_queue", None) is not None and self.dock_review_queue.isVisible():
+                return "review"
+            return "annotate"
+
+        mode_keywords = {
+            "review": ("review", "queue", "qc", "issue", "approve", "assign", "reject"),
+            "annotate": ("annotate", "point", "label", "roi", "slice", "frame", "accept"),
+        }
+
+        import time
+
+        def _score(label: str, act: QtWidgets.QAction, filter_text: str) -> float:
+            key = str(act.objectName() or label)
+            usage = float(self._command_usage_count.get(key, 0))
+            last_ts = float(self._command_last_used_ts.get(key, 0.0))
+            age_sec = max(0.0, float(time.time()) - last_ts) if last_ts > 0 else 1e9
+            recency_bonus = max(0.0, 1000.0 - min(1000.0, age_sec))
+            score = usage * 3.0 + recency_bonus
+            mode = _current_palette_mode()
+            low = label.lower()
+            if any(k in low for k in mode_keywords.get(mode, ())):
+                score += 10.0
+            if filter_text:
+                if low.startswith(filter_text):
+                    score += 30.0
+                elif filter_text in low:
+                    score += 10.0
+            return score
+
         def _populate(filter_text: str = "") -> None:
             listw.clear()
-            for label, act in action_map:
+            ranked = sorted(
+                action_map,
+                key=lambda row: _score(row[0], row[1], filter_text),
+                reverse=True,
+            )
+            for label, act in ranked:
                 if filter_text and filter_text not in label.lower():
                     continue
                 item = QtWidgets.QListWidgetItem(label)
@@ -714,6 +805,11 @@ class UiExtrasMixin:
                 listw.addItem(item)
             if listw.count():
                 listw.setCurrentRow(0)
+            mode = _current_palette_mode()
+            rationale_lbl.setText(
+                f"Ranking: frequency + recency + mode boost ({mode}). "
+                "Review mode boosts review/QC commands."
+            )
 
         def _activate() -> None:
             item = listw.currentItem()
@@ -722,6 +818,9 @@ class UiExtrasMixin:
             act = item.data(QtCore.Qt.UserRole)
             dlg.accept()
             if act is not None:
+                key = str(act.objectName() or act.text().replace("&", "").strip())
+                self._command_usage_count[key] = int(self._command_usage_count.get(key, 0) + 1)
+                self._command_last_used_ts[key] = float(time.time())
                 act.trigger()
 
         _populate()
@@ -731,6 +830,27 @@ class UiExtrasMixin:
         dlg.finished.connect(lambda _code: setattr(self, "_command_palette_dialog", None))
         search.setFocus()
         dlg.open()
+
+    def _toggle_review_context_pack(self) -> None:
+        """One-click toggle for Table + Queue + Why review context pack."""
+        keys = ("annotations", "review_queue", "suggestion_explain")
+        visible_now = [
+            bool(getattr(self, "panel_docks", {}).get(k).isVisible())
+            for k in keys
+            if getattr(self, "panel_docks", {}).get(k) is not None
+        ]
+        pack_on = not all(visible_now)
+        if pack_on:
+            for key in keys:
+                self.set_panel_visible(key, True, source="review_context_pack")
+            if getattr(self, "dock_review_queue", None) is not None:
+                self.dock_review_queue.raise_()
+            self._set_status("Review Context Pack enabled.")
+        else:
+            self.set_panel_visible("annotations", True, source="review_context_pack")
+            self.set_panel_visible("review_queue", False, source="review_context_pack")
+            self.set_panel_visible("suggestion_explain", False, source="review_context_pack")
+            self._set_status("Review Context Pack collapsed to table.")
 
     def _apply_default_layout(self) -> None:
         """Save the initial layout as the default reset state."""
@@ -748,7 +868,7 @@ class UiExtrasMixin:
         if state:
             self.restoreState(state)
         if self.dock_sidebar is not None and not self.dock_sidebar.isVisible():
-            self.dock_sidebar.setVisible(True)
+            self.set_panel_visible("sidebar", True, source="layout_restore")
         self._apply_canvas_priority_layout()
 
     def _save_layout(self) -> None:
@@ -774,28 +894,6 @@ class UiExtrasMixin:
         """Apply a named layout preset without overwriting saved custom layout."""
         self._preset_active = True
 
-        if name == "Default":
-            # Default: sidebar on EXPLORE (index 0), annotation table visible on the right
-            self._set_sidebar_mode(0)
-            self._expand_sidebar()
-            if self.dock_annotations is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
-                self.dock_annotations.setVisible(True)
-            for dock in [
-                self.dock_roi,
-                self.dock_roi_manager,
-                self.dock_results,
-                self.dock_hist,
-                self.dock_profile,
-                self.dock_logs,
-                self.dock_threshold,
-                self.dock_particles,
-            ]:
-                if dock is not None:
-                    dock.setVisible(False)
-            self._apply_canvas_priority_layout()
-            return
-
         if name == "Default_Legacy":
             if self._default_geometry is not None:
                 self.restoreGeometry(self._default_geometry)
@@ -803,80 +901,146 @@ class UiExtrasMixin:
                 self.restoreState(self._default_state)
             return
 
-        if self.dock_sidebar is not None:
-            self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dock_sidebar)
-            self.dock_sidebar.setVisible(True)
+        def _dock_to_area(panel_id: str, area: QtCore.Qt.DockWidgetArea) -> None:
+            dock = getattr(self, f"dock_{panel_id}", None)
+            if dock is not None:
+                self.addDockWidget(area, dock)
 
-        if name == "Minimal":
-            # Minimal: sidebar collapsed, annotation table hidden
+        # Canonical geometry targets for key presets.
+        _dock_to_area("sidebar", QtCore.Qt.LeftDockWidgetArea)
+        if name in {"Default", "Annotate", "Analyze", "Assist Expert"}:
+            _dock_to_area("annotations", QtCore.Qt.RightDockWidgetArea)
+            _dock_to_area("review_queue", QtCore.Qt.RightDockWidgetArea)
+        if name in {"Analyze", "Assist Expert"}:
+            _dock_to_area("qc_issues", QtCore.Qt.BottomDockWidgetArea)
+        if name == "Analyze":
+            _dock_to_area("results", QtCore.Qt.BottomDockWidgetArea)
+            _dock_to_area("threshold", QtCore.Qt.BottomDockWidgetArea)
+            if self.dock_results is not None and self.dock_threshold is not None:
+                self.tabifyDockWidget(self.dock_results, self.dock_threshold)
+            _dock_to_area("orthoview", QtCore.Qt.RightDockWidgetArea)
+        if name == "Assist Expert":
+            _dock_to_area("suggestion_explain", QtCore.Qt.RightDockWidgetArea)
+
+        preset_visibility: dict[str, dict[str, bool]] = {
+            "Default": {
+                "sidebar": True,
+                "annotations": True,
+                "review_queue": True,
+                "suggestion_explain": False,
+                "advanced_analysis": False,
+                "roi": False,
+                "roi_manager": False,
+                "results": False,
+                "hist": False,
+                "profile": False,
+                "logs": False,
+                "threshold": False,
+                "particles": False,
+                "qc_issues": True,
+                "orthoview": False,
+            },
+            "Minimal": {
+                "sidebar": True,
+                "annotations": False,
+                "review_queue": False,
+                "suggestion_explain": False,
+                "advanced_analysis": False,
+                "roi": False,
+                "roi_manager": False,
+                "results": False,
+                "threshold": False,
+                "particles": False,
+                "hist": False,
+                "profile": False,
+                "logs": False,
+                "qc_issues": True,
+                "orthoview": False,
+            },
+            "Annotate": {
+                "sidebar": True,
+                "annotations": True,
+                "review_queue": True,
+                "suggestion_explain": False,
+                "advanced_analysis": False,
+                "roi": False,
+                "roi_manager": False,
+                "results": False,
+                "threshold": False,
+                "particles": False,
+                "hist": False,
+                "profile": False,
+                "logs": False,
+                "qc_issues": True,
+                "orthoview": False,
+            },
+            "Analyze": {
+                "sidebar": True,
+                "annotations": True,
+                "review_queue": True,
+                "suggestion_explain": False,
+                "advanced_analysis": False,
+                "results": True,
+                "threshold": True,
+                "orthoview": True,
+                "roi": False,
+                "roi_manager": False,
+                "particles": False,
+                "hist": False,
+                "profile": False,
+                "logs": False,
+                "qc_issues": True,
+            },
+            "Assist Expert": {
+                "sidebar": True,
+                "annotations": True,
+                "review_queue": True,
+                "suggestion_explain": True,
+                "advanced_analysis": False,
+                "qc_issues": True,
+                "roi": False,
+                "roi_manager": False,
+                "results": False,
+                "threshold": False,
+                "particles": False,
+                "hist": False,
+                "profile": False,
+                "logs": False,
+                "metadata": False,
+                "density": False,
+                "orthoview": False,
+            },
+        }
+
+        if name == "Default":
+            self._set_sidebar_mode(0)
+            self._expand_sidebar()
+        elif name == "Minimal":
             self._collapse_sidebar()
-            if self.dock_annotations is not None:
-                self.dock_annotations.setVisible(False)
-            for dock in [
-                self.dock_roi,
-                self.dock_roi_manager,
-                self.dock_results,
-                self.dock_threshold,
-                self.dock_particles,
-                self.dock_hist,
-                self.dock_profile,
-                self.dock_logs,
-            ]:
-                if dock is not None:
-                    dock.setVisible(False)
-            self._apply_canvas_priority_layout()
-            return
-
-        if name == "Annotate":
-            # Annotate: sidebar on ANNOTATE (index 1), annotation table visible
+        elif name == "Annotate":
             self._set_sidebar_mode(1)
             self._expand_sidebar()
-            if self.dock_annotations is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
-                self.dock_annotations.setVisible(True)
-            for dock in [
-                self.dock_roi,
-                self.dock_roi_manager,
-                self.dock_results,
-                self.dock_threshold,
-                self.dock_particles,
-                self.dock_hist,
-                self.dock_profile,
-                self.dock_logs,
-            ]:
-                if dock is not None:
-                    dock.setVisible(False)
-            return
-
-        if name == "Analyze":
-            # Analyze: sidebar on ANALYZE (index 5), results + threshold bottom, annotation table visible
+        elif name == "Analyze":
             self._set_sidebar_mode(5)
             self._expand_sidebar()
-            if self.dock_annotations is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_annotations)
-                self.dock_annotations.setVisible(True)
-            if self.dock_results is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_results)
-                self.dock_results.setVisible(True)
-            if self.dock_threshold is not None:
-                self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.dock_threshold)
-                self.dock_threshold.setVisible(True)
-                if self.dock_results is not None:
-                    self.tabifyDockWidget(self.dock_results, self.dock_threshold)
-            for dock in [
-                self.dock_roi,
-                self.dock_roi_manager,
-                self.dock_particles,
-                self.dock_hist,
-                self.dock_profile,
-                self.dock_logs,
-            ]:
-                if dock is not None:
-                    dock.setVisible(False)
-            if self.dock_orthoview is not None:
-                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.dock_orthoview)
-                self.dock_orthoview.setVisible(True)
+        elif name == "Assist Expert":
+            self._set_sidebar_mode(1)
+            self._collapse_sidebar()
+        else:
             return
+
+        preset = preset_visibility.get(name)
+        if preset is not None:
+            self.apply_panel_visibility_preset(preset, source=f"preset:{name.lower().replace(' ', '_')}")
+        if name == "Assist Expert" and self.dock_annotations is not None:
+            self.dock_annotations.resize(
+                self.dock_annotations.width(),
+                max(220, self.dock_annotations.height()),
+            )
+        if name == "Assist Expert" and self.dock_review_queue is not None:
+            self.dock_review_queue.raise_()
+        self._apply_canvas_priority_layout()
+        return
 
     def closeEvent(self, event) -> None:
         """Persist layout before closing the main window."""

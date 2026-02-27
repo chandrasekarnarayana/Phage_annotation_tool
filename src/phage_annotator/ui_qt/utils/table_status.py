@@ -19,6 +19,12 @@ except ImportError:  # pragma: no cover - exercised in headless CI/test envs
 
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.tools import Tool
+from phage_annotator.ui_qt.assist_state import (
+    AssistState,
+    assist_state_color,
+    assist_state_label,
+    infer_assist_state,
+)
 
 
 class TableStatusMixin:
@@ -28,6 +34,98 @@ class TableStatusMixin:
         """Refresh table rows and keep selection focused for current T/Z when enabled."""
         self._populate_table()
         self._focus_table_current_slice_row()
+        self._refresh_right_dock_segment_headers()
+        if hasattr(self, "_refresh_review_queue_panel"):
+            self._refresh_review_queue_panel()
+
+    def _canonical_assist_state(self, suggestions: Optional[List[object]] = None) -> AssistState:
+        """Resolve assist-state from one canonical inference path."""
+        rows = list(suggestions) if suggestions is not None else list(
+            getattr(self, "suggestions", {}).get(self.primary_image.id, [])
+        )
+        annotation_space = str(
+            getattr(self.controller.session_state, "annotation_space", "stack")
+            if getattr(self, "controller", None) is not None
+            else "stack"
+        )
+        return infer_assist_state(
+            controller=getattr(self, "controller", None),
+            image_name=str(getattr(self.primary_image, "name", "unknown")),
+            annotation_space=annotation_space,
+            suggestions=rows,
+        )
+
+    def _assist_context_need_count(self, suggestions: Optional[List[object]] = None) -> int:
+        """Return remaining labels needed for current assist context."""
+        controller = getattr(self, "controller", None)
+        if controller is None or not hasattr(controller, "assist_need_breakdown"):
+            return 0
+        rows = list(suggestions) if suggestions is not None else list(
+            getattr(self, "suggestions", {}).get(self.primary_image.id, [])
+        )
+        annotation_space = str(getattr(controller.session_state, "annotation_space", "stack"))
+        if rows:
+            context_key = controller._context_key(
+                suggestion=rows[0], annotation_space=annotation_space
+            )
+        else:
+            context_key = f"{self.primary_image.name}|{annotation_space}|current_view"
+        breakdown = controller.assist_need_breakdown(
+            annotation_space=annotation_space,
+            context_key=context_key,
+        )
+        return int(
+            max(
+                breakdown.get("need_total", 0),
+                breakdown.get("need_pos", 0),
+                breakdown.get("need_neg", 0),
+                breakdown.get("need_context", 0),
+            )
+        )
+
+    def _style_assist_state_label(
+        self,
+        widget: Optional["QtWidgets.QLabel"],
+        state: AssistState,
+        prefix: str = "Assist: ",
+        suffix: str = "",
+    ) -> None:
+        """Apply canonical assist-state wording and color to a label."""
+        if widget is None:
+            return
+        widget.setText(f"{prefix}{assist_state_label(state)}{suffix}")
+        widget.setStyleSheet(
+            "font-weight: 600; "
+            f"color: {assist_state_color(state)};"
+        )
+
+    def _refresh_right_dock_segment_headers(self) -> None:
+        """Sync segmented right-dock headers with counts and active tab state."""
+        table_count = int(self.annot_table.rowCount()) if getattr(self, "annot_table", None) is not None else 0
+        queue_count = 0
+        if hasattr(self, "_visible_suggestions_uncertain_first"):
+            try:
+                queue_count = int(len(self._visible_suggestions_uncertain_first()))
+            except Exception:
+                queue_count = 0
+
+        active = "table"
+        dock_annotations = getattr(self, "dock_annotations", None)
+        dock_review_queue = getattr(self, "dock_review_queue", None)
+        dock_suggestion_explain = getattr(self, "dock_suggestion_explain", None)
+        if dock_review_queue is not None and bool(dock_review_queue.isVisible()):
+            active = "queue"
+        elif dock_suggestion_explain is not None and bool(dock_suggestion_explain.isVisible()):
+            active = "why"
+        elif dock_annotations is not None and bool(dock_annotations.isVisible()):
+            active = "table"
+
+        for attr in ("annotation_segment_header", "review_segment_header", "explain_segment_header"):
+            header = getattr(self, attr, None)
+            if header is None:
+                continue
+            header.set_counts(table_count=table_count, queue_count=queue_count)
+            header.set_active(active)
 
     def _on_auto_follow_table_changed(self, state: int) -> None:
         """Persist auto-follow preference and refresh table view."""
@@ -209,7 +307,10 @@ class TableStatusMixin:
             [kp for kp in self._current_keypoints() if kp.t == self.t_slider.value() or kp.t == -1]
         )
         dataset_name = str(getattr(self.primary_image, "name", "unknown"))
-        frame_txt = f"T{int(self.t_slider.value()) + 1}/Z{int(self.z_slider.value()) + 1}"
+        array = getattr(self.primary_image, "array", None)
+        t_total = int(array.shape[0]) if array is not None and getattr(array, "ndim", 0) >= 1 else int(self.t_slider.maximum() + 1)
+        z_total = int(array.shape[1]) if array is not None and getattr(array, "ndim", 0) >= 2 else int(self.z_slider.maximum() + 1)
+        frame_txt = f"T: {int(self.t_slider.value()) + 1}/{max(1, t_total)} | Z: {int(self.z_slider.value()) + 1}/{max(1, z_total)}"
         annotation_space = str(
             getattr(getattr(self, "controller", None).session_state, "annotation_space", "stack")
             if getattr(self, "controller", None) is not None
@@ -252,20 +353,7 @@ class TableStatusMixin:
             diag_flags.append("Memmap")
         
         diag_txt = f" | {'; '.join(diag_flags)}" if diag_flags else ""
-        assist_txt = ""
-        controller = getattr(self, "controller", None)
-        if controller is not None and hasattr(controller, "assist_status"):
-            suggestions = self.suggestions.get(self.primary_image.id, []) if hasattr(self, "suggestions") else []
-            annotation_space = str(getattr(controller.session_state, "annotation_space", "stack"))
-            if suggestions:
-                context_key = controller._context_key(suggestion=suggestions[0], annotation_space=annotation_space)
-            else:
-                context_key = f"{self.primary_image.name}|{annotation_space}|current_view"
-            _level, msg = controller.assist_status(
-                annotation_space=annotation_space,
-                context_key=context_key,
-            )
-            assist_txt = f" | {msg}"
+        assist_state = self._canonical_assist_state()
         jobs_txt = ""
         if getattr(self, "jobs", None) is not None:
             try:
@@ -287,10 +375,85 @@ class TableStatusMixin:
                 autosave_txt = "Autosave: recent"
             else:
                 autosave_txt = "Autosave: on"
+        scope_state = "Stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "Slice"
+        target_map = {"frame": "Frame", "mean": "Mean Projection", "support": "Support"}
+        target_state = target_map.get(str(getattr(self, "annotate_target", "frame")), "Frame")
+        qc_warnings = 0
+        qc_errors = 0
+        qc_state = getattr(self, "qc_state", None)
+        if qc_state is not None:
+            for issue in getattr(qc_state, "issues", []):
+                sev = str(getattr(getattr(issue, "severity", None), "value", "")).lower()
+                if sev == "warning":
+                    qc_warnings += 1
+                elif sev == "error":
+                    qc_errors += 1
+        qc_label = f"QC: {qc_warnings} warnings"
+        if qc_errors > 0:
+            qc_label += f", {qc_errors} errors"
+
+        # Permanent status widgets are the primary operational state display.
+        if getattr(self, "status_dataset_lbl", None) is not None:
+            self.status_dataset_lbl.setText(f"Dataset: {dataset_name}")
+        if getattr(self, "status_tz_lbl", None) is not None:
+            self.status_tz_lbl.setText(frame_txt)
+        if getattr(self, "status_scope_lbl", None) is not None:
+            self.status_scope_lbl.setText(f"Scope: {scope_state}")
+        if getattr(self, "status_target_lbl", None) is not None:
+            self.status_target_lbl.setText(f"Target: {target_state}")
+        if getattr(self, "status_context_lock_lbl", None) is not None:
+            pending = bool(
+                hasattr(self, "_is_annotation_context_guard_pending")
+                and self._is_annotation_context_guard_pending()
+            )
+            if pending:
+                self.status_context_lock_lbl.setText("Write Context: Pending Confirm")
+                self.status_context_lock_lbl.setStyleSheet("color: #e65100; font-weight: 600;")
+            else:
+                self.status_context_lock_lbl.setText("Write Context: Locked")
+                self.status_context_lock_lbl.setStyleSheet("")
+        need = self._assist_context_need_count()
+        suffix = f" (Need {need} more labels in this context)" if assist_state == AssistState.HEURISTIC and need > 0 else ""
+        self._style_assist_state_label(
+            getattr(self, "status_assist_lbl", None),
+            assist_state,
+            suffix=suffix,
+        )
+        readiness = (
+            f"Assist readiness: heuristic-only, need {need} more labels in this context."
+            if assist_state == AssistState.HEURISTIC and need > 0
+            else f"Assist readiness: {assist_state_label(assist_state)}."
+        )
+        for attr in (
+            "suggest_points_act",
+            "suggest_points_image_act",
+            "accept_visible_suggestions_act",
+            "accept_green_suggestions_act",
+            "train_ranker_now_act",
+        ):
+            action = getattr(self, attr, None)
+            if action is not None:
+                action.setToolTip(readiness)
+                action.setStatusTip(readiness)
+        if getattr(self, "status_qc_lbl", None) is not None:
+            self.status_qc_lbl.setText(qc_label)
+        if getattr(self, "evidence_strip_lbl", None) is not None:
+            projection_txt = "raw"
+            if getattr(self, "projection_selector", None) is not None:
+                try:
+                    projection_txt, axis_txt = self.projection_selector.current_selection()
+                    projection_txt = f"{projection_txt} ({axis_txt})"
+                except Exception:
+                    projection_txt = "raw"
+            modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
+            target_txt = str(getattr(self, "annotate_target", "frame"))
+            self.evidence_strip_lbl.setText(
+                f"Evidence: target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
+            )
+
         self._status_base = (
-            f"{dataset_name} | {frame_txt} | Space: {annotation_space} | Modality: {modality_txt} "
-            f"| Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} "
-            f"| Speed {self.speed_slider.value()} fps | {autosave_txt}{density_txt}{cache_txt}{diag_txt}{assist_txt}{jobs_txt}"
+            f"Label: {self.current_label} | Slice pts: {current} | Total pts: {total} "
+            f"| Speed {self.speed_slider.value()} fps | {autosave_txt}{density_txt}{cache_txt}{diag_txt}{jobs_txt}"
         )
         self._render_status()
         if self.tool_label is not None and self.tool_router is not None:

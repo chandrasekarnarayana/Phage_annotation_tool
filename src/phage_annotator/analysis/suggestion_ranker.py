@@ -163,6 +163,10 @@ class LightweightSuggestionRanker:
         probs = self.predict_p_accept(feats)
         out = list(suggestions)
         for idx, suggestion in enumerate(out):
+            suggestion.meta.setdefault(
+                "generator_score",
+                float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0))),
+            )
             p_accept = float(probs[idx])
             suggestion.meta["p_accept"] = p_accept
             suggestion.meta["confidence"] = p_accept

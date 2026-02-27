@@ -49,7 +49,7 @@ class SmlmControlsMixin:
         if roi_rect is None or roi_rect[2] <= 0 or roi_rect[3] <= 0:
             thunder.status_label.setText("Set an ROI first.")
             if self.dock_roi is not None:
-                self.dock_roi.setVisible(True)
+                self.set_panel_visible("roi", True, source="smlm_validation")
             return
         
         # Phase ζ: Get selected modality_idx from panel
@@ -265,6 +265,9 @@ class SmlmControlsMixin:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("No SMLM results to add.")
             return
+        if hasattr(self, "_ensure_annotation_write_context_confirmed"):
+            if not self._ensure_annotation_write_context_confirmed("Import SMLM localizations"):
+                return
         image_id = self.primary_image.id
         self._block_table = True
         for loc in self._smlm_results:
@@ -345,7 +348,7 @@ class SmlmControlsMixin:
         if roi_rect is None or roi_rect[2] <= 0 or roi_rect[3] <= 0:
             deep.status_label.setText("Set an ROI first.")
             if self.dock_roi is not None:
-                self.dock_roi.setVisible(True)
+                self.set_panel_visible("roi", True, source="deepstorm_validation")
             return
         
         # Phase ζ: Get selected modality_idx from panel
@@ -535,6 +538,9 @@ class SmlmControlsMixin:
             if self.smlm_panel is not None:
                 self.smlm_panel.deep.status_label.setText("No Deep-STORM results to add.")
             return
+        if hasattr(self, "_ensure_annotation_write_context_confirmed"):
+            if not self._ensure_annotation_write_context_confirmed("Import Deep-STORM localizations"):
+                return
         image_id = self.primary_image.id
         self._block_table = True
         for loc in self._deepstorm_results:

@@ -11,6 +11,7 @@ from matplotlib.figure import Figure
 from phage_annotator.ui_qt.utils import ui_actions, ui_docks
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.right_dock_segment_header import RightDockSegmentHeader
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
 from phage_annotator.rendering.mpl import Renderer
@@ -76,6 +77,7 @@ class UiSetupMixin:
         load_suggestion_rule_config_act = actions["load_suggestion_rule_config"]
         set_suggestion_score_threshold_act = actions["set_suggestion_score_threshold"]
         accept_visible_suggestions_act = actions["accept_visible_suggestions"]
+        accept_green_suggestions_act = actions["accept_green_suggestions"]
         accept_suggestions_in_roi_act = actions["accept_suggestions_in_roi"]
         reject_visible_suggestions_act = actions["reject_visible_suggestions"]
         clear_suggestions_act = actions["clear_suggestions"]
@@ -84,7 +86,12 @@ class UiSetupMixin:
         start_timed_session_manual_act = actions["start_timed_session_manual"]
         stop_timed_session_act = actions["stop_timed_session"]
         assist_warmup_act = actions["assist_warmup"]
+        train_ranker_now_act = actions["train_ranker_now"]
+        batch_correct_suggestions_act = actions["batch_correct_suggestions"]
+        propagate_suggestions_act = actions["propagate_suggestions"]
         toggle_suggestions_overlay_act = actions["toggle_suggestions_overlay"]
+        qc_validate_act = actions["qc_validate"]
+        qc_jump_next_act = actions["qc_jump_next"]
         set_current_user_act = actions["set_current_user"]
         mark_selected_in_review_act = actions["mark_selected_in_review"]
         mark_selected_approved_act = actions["mark_selected_approved"]
@@ -98,6 +105,7 @@ class UiSetupMixin:
         clear_hist_cache_act = actions.get("clear_hist_cache")
         exit_act = actions["exit"]
         about_act = actions["about"]
+        context_help_act = actions["context_help"]
         copy_display_act = actions["copy_display"]
         measure_act = actions["measure"]
         jump_to_frame_act = actions["jump_to_frame"]
@@ -172,6 +180,15 @@ class UiSetupMixin:
         annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
         annot_layout.setContentsMargins(8, 8, 8, 8)
         annot_layout.setSpacing(8)
+        self.annotation_segment_header = RightDockSegmentHeader(self.annotation_table_panel)
+        self.annotation_segment_header.segment_requested.connect(self._activate_right_dock_segment)
+        self.annotation_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
+        annot_layout.addWidget(self.annotation_segment_header)
+        self.review_queue_hint_lbl = QtWidgets.QLabel(
+            "Tip: Review Queue is a tab in this right-side dock."
+        )
+        self.review_queue_hint_lbl.setStyleSheet("color: #666; font-style: italic;")
+        annot_layout.addWidget(self.review_queue_hint_lbl)
         table_filter_row = QtWidgets.QHBoxLayout()
         table_filter_row.addWidget(self.filter_current_chk)
         table_filter_row.addWidget(self.auto_follow_table_chk)
@@ -202,6 +219,11 @@ class UiSetupMixin:
         self.toolbar = NavigationToolbar2QT(self.canvas, self) if self.canvas is not None else None
         if self.toolbar is not None:
             fig_layout.addWidget(self.toolbar)
+        self.evidence_strip_lbl = QtWidgets.QLabel("Evidence: view=Frame | projection=Raw | modalities=default")
+        self.evidence_strip_lbl.setStyleSheet(
+            "QLabel { background: #eef3f8; color: #1d3557; padding: 4px 8px; border-radius: 4px; }"
+        )
+        fig_layout.addWidget(self.evidence_strip_lbl)
         fig_layout.addWidget(self.modality_canvas, stretch=1)
         fallback_cmaps = [cmap_for(spec, False) for spec in LUTS]
         self.renderer = Renderer(self.figure, self.canvas, fallback_cmaps)
@@ -277,12 +299,24 @@ class UiSetupMixin:
         self.quick_hist_btn = QtWidgets.QPushButton("Histogram")
         self.quick_profile_btn = QtWidgets.QPushButton("Profile")
         self.quick_qc_btn = QtWidgets.QPushButton("QC Issues")
+        self.quick_layout_btn = QtWidgets.QToolButton()
+        self.quick_layout_btn.setText("Layouts")
+        self.quick_layout_btn.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.quick_layout_menu = QtWidgets.QMenu(self.quick_layout_btn)
+        self.quick_layout_menu.addAction("Default", lambda: self.apply_preset("Default"))
+        self.quick_layout_menu.addAction("Annotate", lambda: self.apply_preset("Annotate"))
+        self.quick_layout_menu.addAction("Analyze", lambda: self.apply_preset("Analyze"))
+        self.quick_layout_menu.addAction("Assist Expert", lambda: self.apply_preset("Assist Expert"))
+        self.quick_layout_menu.addAction("Minimal", lambda: self.apply_preset("Minimal"))
+        self.quick_layout_btn.setMenu(self.quick_layout_menu)
         self.quick_hist_btn.setToolTip("Toggle histogram panel")
         self.quick_profile_btn.setToolTip("Toggle line profile panel")
         self.quick_qc_btn.setToolTip("Show QC issues panel")
+        self.quick_layout_btn.setToolTip("Quick layout presets")
         playback_layout.addWidget(self.quick_hist_btn, 4, 1)
         playback_layout.addWidget(self.quick_profile_btn, 4, 2)
         playback_layout.addWidget(self.quick_qc_btn, 4, 3)
+        playback_layout.addWidget(self.quick_layout_btn, 4, 0)
 
         display_group = QtWidgets.QGroupBox("Display")
         display_layout = QtWidgets.QGridLayout(display_group)
@@ -709,6 +743,16 @@ class UiSetupMixin:
         # Panels/docks + sidebar (status bar must be set up first for logs widget)
         self._setup_status_bar()
         self._init_panels(dock_panels_menu)
+        self.review_segment_header = RightDockSegmentHeader(self.review_queue_panel)
+        self.review_segment_header.segment_requested.connect(self._activate_right_dock_segment)
+        self.review_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
+        if getattr(self, "review_queue_panel", None) is not None:
+            self.review_queue_panel.layout().insertWidget(0, self.review_segment_header)
+        self.explain_segment_header = RightDockSegmentHeader(self.suggestion_explain_panel)
+        self.explain_segment_header.segment_requested.connect(self._activate_right_dock_segment)
+        self.explain_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
+        if getattr(self, "suggestion_explain_panel", None) is not None:
+            self.suggestion_explain_panel.layout().insertWidget(0, self.explain_segment_header)
         self._init_channel_panel_integration()
         self._setup_annotation_toolbar()
 
@@ -731,6 +775,7 @@ class UiSetupMixin:
         prefs_act.triggered.connect(self._show_preferences_dialog)
         reset_confirms_act.triggered.connect(self._reset_confirmations)
         about_act.triggered.connect(self._show_about)
+        context_help_act.triggered.connect(self._show_contextual_help)
         shortcuts_act = actions.get("shortcuts")
         if shortcuts_act is not None:
             shortcuts_act.triggered.connect(self._show_keyboard_shortcuts)
@@ -756,6 +801,7 @@ class UiSetupMixin:
             self._set_suggestion_score_threshold_dialog
         )
         accept_visible_suggestions_act.triggered.connect(self._accept_visible_suggestions)
+        accept_green_suggestions_act.triggered.connect(self._accept_high_confidence_suggestions)
         accept_suggestions_in_roi_act.triggered.connect(self._accept_suggestions_in_roi)
         reject_visible_suggestions_act.triggered.connect(self._reject_visible_suggestions)
         clear_suggestions_act.triggered.connect(self._clear_suggestions_current_image)
@@ -768,7 +814,16 @@ class UiSetupMixin:
         )
         stop_timed_session_act.triggered.connect(self._stop_timed_annotation_session)
         assist_warmup_act.triggered.connect(self._start_assist_warmup)
+        train_ranker_now_act.triggered.connect(self._train_suggestion_ranker_now)
+        batch_correct_suggestions_act.triggered.connect(
+            self._batch_correct_suggestions_dialog
+        )
+        propagate_suggestions_act.triggered.connect(
+            self._propagate_suggestions_remaining_dialog
+        )
         toggle_suggestions_overlay_act.triggered.connect(self._toggle_suggestions_overlay)
+        qc_validate_act.triggered.connect(self._trigger_qc_validation)
+        qc_jump_next_act.triggered.connect(self._jump_to_next_qc_issue)
         set_current_user_act.triggered.connect(self._set_current_user_dialog)
         mark_selected_in_review_act.triggered.connect(
             lambda: self._set_selected_review_state("in_review")
@@ -789,6 +844,7 @@ class UiSetupMixin:
         queue_blocked_qc_act.triggered.connect(
             lambda: self._set_review_queue_filter("blocked_qc")
         )
+        self.review_context_pack_act.triggered.connect(self._toggle_review_context_pack)
 
         self.toggle_profile_act.triggered.connect(self._toggle_profile_panel)
         self.toggle_hist_act.triggered.connect(self._toggle_hist_panel)
@@ -800,15 +856,16 @@ class UiSetupMixin:
         self.toggle_overlay_act.triggered.connect(self._toggle_overlay)
         self.layout_preset_annotate_act.triggered.connect(lambda: self.apply_preset("Annotate"))
         self.layout_preset_analyze_act.triggered.connect(lambda: self.apply_preset("Analyze"))
+        self.layout_preset_assist_expert_act.triggered.connect(
+            lambda: self.apply_preset("Assist Expert")
+        )
         self.layout_preset_minimal_act.triggered.connect(lambda: self.apply_preset("Minimal"))
         self.layout_preset_default_act.triggered.connect(lambda: self.apply_preset("Default"))
         self.command_palette_act.triggered.connect(self._show_command_palette)
         self.toggle_logs_act.triggered.connect(
-            lambda checked: (self.dock_logs.setVisible(checked) if self.dock_logs else None)
+            lambda checked: self.set_panel_visible("logs", bool(checked), source="menu:layout")
         )
-        self.overlay_act.triggered.connect(self._toggle_overlay)
-        self.view_overlay_act.triggered.connect(self._toggle_overlay)
-        self.view_overlay_act.setChecked(True)
+        self.toggle_overlay_act.setChecked(True)
         self.reset_view_act.triggered.connect(self.reset_all_view)
         self.show_profiles_act.triggered.connect(self._show_profile_dialog)
         self.show_bleach_act.triggered.connect(self._show_bleach_dialog)
@@ -856,14 +913,30 @@ class UiSetupMixin:
         self.qc_auto_show_chk.toggled.connect(self._on_qc_auto_show_changed)
         self.assist_warmup_next_btn.clicked.connect(self._next_uncertain_suggestion)
         self.assist_warmup_refresh_btn.clicked.connect(self._refresh_assist_warmup_panel)
+        if getattr(self, "review_queue_panel", None) is not None:
+            self.review_queue_panel.accept_requested.connect(
+                self._accept_current_uncertain_suggestion
+            )
+            self.review_queue_panel.accept_next_requested.connect(
+                self._accept_and_next_uncertain_suggestion
+            )
+            self.review_queue_panel.accept_all_green_requested.connect(
+                self._accept_high_confidence_suggestions
+            )
+            self.review_queue_panel.reject_requested.connect(
+                self._reject_current_uncertain_suggestion
+            )
+            self.review_queue_panel.skip_requested.connect(self._next_uncertain_suggestion)
+            self.review_queue_panel.next_uncertain_requested.connect(
+                self._focus_current_uncertain_suggestion
+            )
+            self.review_queue_panel.apply_offset_requested.connect(
+                self._apply_review_queue_offset
+            )
         self.quick_hist_btn.clicked.connect(self._toggle_hist_panel)
         self.quick_profile_btn.clicked.connect(self._toggle_profile_panel)
         self.quick_qc_btn.clicked.connect(
-            lambda: (
-                getattr(self, "dock_qc_issues", None).setVisible(True)
-                if getattr(self, "dock_qc_issues", None) is not None
-                else None
-            )
+            lambda: self.set_panel_visible("qc_issues", True, source="quick_button:qc")
         )
         for dock_attr in (
             "dock_hist",
@@ -873,6 +946,10 @@ class UiSetupMixin:
             "dock_logs",
             "dock_metadata",
             "dock_results",
+            "dock_annotations",
+            "dock_review_queue",
+            "dock_suggestion_explain",
+            "dock_advanced_analysis",
         ):
             dock = getattr(self, dock_attr, None)
             if dock is not None:
@@ -900,6 +977,19 @@ class UiSetupMixin:
         self._sync_panel_visibility_state()
         self._update_qc_button_highlight(0)
         self._refresh_assist_warmup_panel()
+        self._refresh_right_dock_segment_headers()
+        if hasattr(self, "advanced_open_explain_btn"):
+            self.advanced_open_explain_btn.clicked.connect(
+                lambda: self._set_panel_visibility("suggestion_explain", True)
+            )
+        if hasattr(self, "advanced_open_training_btn"):
+            self.advanced_open_training_btn.clicked.connect(
+                lambda: self.open_preferences(section="training_controls")
+            )
+        if hasattr(self, "advanced_train_now_btn"):
+            self.advanced_train_now_btn.clicked.connect(self._train_suggestion_ranker_now)
+        if hasattr(self, "advanced_open_calib_btn"):
+            self.advanced_open_calib_btn.clicked.connect(self._show_reviewer_analytics_dialog)
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
         self.controller.annotations_changed.connect(
@@ -909,6 +999,7 @@ class UiSetupMixin:
         self._apply_default_layout()
         self._restore_layout()
         self._apply_default_preferences()
+        QtCore.QTimer.singleShot(0, self._maybe_show_first_run_welcome)
 
     def _apply_default_preferences(self) -> None:
         """Apply startup preferences from QSettings without overwriting layouts."""
@@ -926,8 +1017,44 @@ class UiSetupMixin:
         if self.auto_pct_label is not None:
             self.auto_pct_label.setText(f"{low_pct:.2f}% / {high_pct:.2f}%")
 
+    def _maybe_show_first_run_welcome(self) -> None:
+        """Show a first-run quick guide for onboarding and discoverability."""
+        if bool(self._settings.value("firstRunWelcomeShown", False, type=bool)):
+            return
+        self._settings.setValue("firstRunWelcomeShown", True)
+        QtWidgets.QMessageBox.information(
+            self,
+            "Welcome",
+            (
+                "• Use A/R/N/P to review suggestions\n"
+                "• Check Status Bar for scope & assist state\n"
+                "• Try Layout Presets from Layout menu"
+            ),
+        )
+
     def _init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         ui_docks.init_panels(self, dock_menu)
+
+    def _activate_right_dock_segment(self, segment: str) -> None:
+        """Raise one of the tabbed right-dock panels via segmented headers."""
+        seg = str(segment).strip().lower()
+        target_attr = {
+            "table": "dock_annotations",
+            "queue": "dock_review_queue",
+            "why": "dock_suggestion_explain",
+        }.get(seg, "dock_annotations")
+        target = getattr(self, target_attr, None)
+        if target is None:
+            return
+        panel_id = {
+            "dock_annotations": "annotations",
+            "dock_review_queue": "review_queue",
+            "dock_suggestion_explain": "suggestion_explain",
+        }.get(target_attr, "annotations")
+        self.set_panel_visible(panel_id, True, source="right_dock_segment")
+        target.raise_()
+        if hasattr(self, "_refresh_right_dock_segment_headers"):
+            self._refresh_right_dock_segment_headers()
 
     def _init_channel_panel_integration(self) -> None:
         """Wire channel panel signals to session state integration."""
@@ -1002,6 +1129,15 @@ class UiSetupMixin:
     def _make_annotations_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_annotations_widget(self)
 
+    def _make_review_queue_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_review_queue_widget(self)
+
+    def _make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_suggestion_explain_widget(self)
+
+    def _make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_advanced_analysis_widget(self)
+
     def _make_roi_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_roi_widget(self)
 
@@ -1069,10 +1205,10 @@ class UiSetupMixin:
         def _dock_button(text: str, dock_attr: str) -> QtWidgets.QPushButton:
             btn = QtWidgets.QPushButton(text)
             btn.clicked.connect(
-                lambda: (
-                    getattr(self, dock_attr, None).setVisible(True)
-                    if getattr(self, dock_attr, None) is not None
-                    else None
+                lambda: self.set_panel_visible(
+                    str(dock_attr).replace("dock_", ""),
+                    True,
+                    source="sidebar_button",
                 )
             )
             return btn

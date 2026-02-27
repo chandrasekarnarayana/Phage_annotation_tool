@@ -175,6 +175,10 @@ class KeypointAnnotator(
         self._panel_modality_map: Dict[str, object] = {}
         self._status_base = ""
         self._status_extra = ""
+        self._annotation_write_context_pending = False
+        self._annotation_context_change_reason = ""
+        self._annotation_write_context_pending_value = None
+        self._annotation_write_context_confirmed = None
         self._default_geometry: Optional[QtCore.QByteArray] = None
         self._default_state: Optional[QtCore.QByteArray] = None
         self._preset_active = False
@@ -228,6 +232,8 @@ class KeypointAnnotator(
         self.dock_particles = None
         self.dock_channels = None
         self.dock_annotations = None
+        self.dock_review_queue = None
+        self.dock_suggestion_explain = None
         self.dock_roi = None
         self.dock_logs = None
         self.dock_metadata = None
@@ -291,6 +297,7 @@ class KeypointAnnotator(
         self._timed_session_points = 0
         self._timed_session_correction_time = 0.0
         self._review_queue_filter = "all"
+        self._qc_issue_cursor = -1
         self.panel_specs: List[PanelSpec] = []
         self.panel_docks: Dict[str, QtWidgets.QDockWidget] = {}
         self.dock_actions: Dict[str, QtWidgets.QAction] = {}
@@ -303,6 +310,8 @@ class KeypointAnnotator(
         self._channel_panel_autoshown = False
         self.metadata_widget = None
         self.density_panel = None
+        self.review_queue_panel = None
+        self.suggestion_explain_panel = None
         self._roi_controls_layout = None
         
         # Pre-initialize widget references that are filled during UI setup.

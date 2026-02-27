@@ -326,6 +326,40 @@ class SessionController(
         # Debounce retraining to keep annotation interactions responsive.
         self._ranker_retrain_timer.start()
 
+    def observe_suggestion_correction(self, suggestion, *, dx: float, dy: float) -> None:
+        """Log a geometric correction as a positive training signal."""
+        try:
+            features = feature_vector_from_suggestion(suggestion)
+        except Exception:
+            return
+        row = {
+            "x": [float(v) for v in features.tolist()],
+            "y": 1,
+            "timestamp": time.time(),
+            "image_id": int(getattr(suggestion, "image_id", -1)),
+            "suggestion_id": str(getattr(suggestion, "suggestion_id", "")),
+            "strategy": str(getattr(suggestion, "source_modality", "raw")),
+            "annotation_space": str(getattr(self.session_state, "annotation_space", "stack")),
+            "context_key": self._context_key(
+                suggestion=suggestion,
+                annotation_space=str(getattr(self.session_state, "annotation_space", "stack")),
+            ),
+            "correction_dx": float(dx),
+            "correction_dy": float(dy),
+            "correction_distance": float((float(dx) ** 2 + float(dy) ** 2) ** 0.5),
+            "signal_type": "batch_offset",
+        }
+        self.session_state.suggestion_training_samples.append(row)
+        ctx = self.session_state.suggestion_context_stats.setdefault(
+            str(row["context_key"]), {"total": 0, "pos": 0, "neg": 0}
+        )
+        ctx["total"] = int(ctx.get("total", 0) + 1)
+        ctx["pos"] = int(ctx.get("pos", 0) + 1)
+        self.session_state.suggestion_training_pending = int(
+            self.session_state.suggestion_training_pending + 1
+        )
+        self._ranker_retrain_timer.start()
+
     def _retrain_timer_fired(self) -> None:
         self._maybe_retrain_suggestion_ranker()
 

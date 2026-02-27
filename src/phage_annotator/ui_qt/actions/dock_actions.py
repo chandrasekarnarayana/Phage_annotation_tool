@@ -14,8 +14,8 @@ class DockActionsMixin:
     def _toggle_hist_panel(self) -> None:
         self._set_panel_visibility("hist")
 
-    def _set_panel_visibility(self, panel: str, visible: Optional[bool] = None) -> None:
-        """Single source of truth for panel visibility (dock/menu/checkbox/buttons)."""
+    def _resolve_panel_dock(self, panel: str):
+        """Return dock widget for a panel id, if present."""
         key = str(panel).strip().lower()
         dock = None
         panel_docks = getattr(self, "panel_docks", {})
@@ -23,16 +23,47 @@ class DockActionsMixin:
             dock = panel_docks.get(key)
         if dock is None:
             dock = getattr(self, f"dock_{key}", None)
+        return key, dock
+
+    def set_panel_visible(self, panel_id: str, visible: bool, *, source: str = "unknown") -> None:
+        """Canonical panel-visibility writer used by menus/toolbars/presets."""
+        _key, dock = self._resolve_panel_dock(panel_id)
         if dock is None:
             return
-        target = (not dock.isVisible()) if visible is None else bool(visible)
+        target = bool(visible)
         if dock.isVisible() != target:
             dock.setVisible(target)
         self._sync_panel_visibility_state()
 
+    def apply_panel_visibility_preset(self, preset: dict[str, bool], *, source: str = "preset") -> None:
+        """Apply a visibility preset through the canonical visibility writer."""
+        for panel_id, visible in dict(preset).items():
+            self.set_panel_visible(str(panel_id), bool(visible), source=source)
+
+    def _set_panel_visibility(self, panel: str, visible: Optional[bool] = None) -> None:
+        """Backward-compatible wrapper for panel visibility updates."""
+        key, dock = self._resolve_panel_dock(panel)
+        if dock is None:
+            return
+        target = (not dock.isVisible()) if visible is None else bool(visible)
+        self.set_panel_visible(key, target, source="legacy_wrapper")
+
     def _sync_panel_visibility_state(self) -> None:
         """Sync visibility state across dock, menu toggles, and panel checkboxes."""
-        panel_keys = ("hist", "profile", "qc_issues", "density", "logs", "metadata", "results")
+        panel_keys = (
+            "sidebar",
+            "hist",
+            "profile",
+            "qc_issues",
+            "density",
+            "logs",
+            "metadata",
+            "results",
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "advanced_analysis",
+        )
         for key in panel_keys:
             dock = None
             panel_docks = getattr(self, "panel_docks", {})
@@ -82,4 +113,3 @@ class DockActionsMixin:
             )
         else:
             btn.setStyleSheet("")
-

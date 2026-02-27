@@ -89,10 +89,14 @@ class RenderContext:
     panel_annotations : dict[str, list[tuple[float, float, str, bool]]]
         Per-panel display coordinates for annotations:
         (x, y, color, selected).
+    suggestion_staleness_labels : dict[str, list[tuple[float, float, str]]]
+        Per-panel suggestion age labels as (x, y, text).
     roi_overlays : dict[str, list[tuple[str, object, str]]]
         Per-panel ROI overlays: (shape, data, color).
     overlay_text : str or None
         Overlay text to display in the active panel.
+    canvas_header_text : str or None
+        Always-visible non-interactive header text rendered above the frame panel.
     marker_size : float
         Marker size for scatter annotations.
     localization_points : list[tuple[float, float, float]]
@@ -148,8 +152,10 @@ class RenderContext:
     extents: Dict[str, Tuple[float, float, float, float]]
     std_range: Tuple[float, float]
     panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]]
+    suggestion_staleness_labels: Dict[str, List[Tuple[float, float, str]]]
     roi_overlays: Dict[str, List[Tuple[str, object, str]]]
     overlay_text: Optional[str]
+    canvas_header_text: Optional[str]
     marker_size: float
     norms: Dict[str, matplotlib.colors.Normalize]
     panel_cmaps: Dict[str, matplotlib.colors.Colormap]
@@ -198,6 +204,7 @@ class Renderer:
             "threshold_overlay": None,
         }
         self.overlay_text = None
+        self.canvas_header_text = None
         self.scale_bar_patch = None
         self.scale_bar_text = None
         self.scale_bar_warning = None
@@ -238,6 +245,7 @@ class Renderer:
         for key in self.image_artists:
             self.image_artists[key] = None
         self.overlay_text = None
+        self.canvas_header_text = None
         if "frame" in axes:
             self.roi_interactor = RoiInteractor(axes["frame"], self._on_roi_change)
             if self._roi_callback is not None:
@@ -264,6 +272,7 @@ class Renderer:
         for key in self.image_artists:
             self.image_artists[key] = None
         self.overlay_text = None
+        self.canvas_header_text = None
         if "frame" in axes:
             self.roi_interactor = RoiInteractor(axes["frame"], self._on_roi_change)
             if self._roi_callback is not None:
@@ -448,6 +457,25 @@ class Renderer:
             selected = [p[3] for p in points]
             sizes = [ctx.marker_size * (1.3 if sel else 1.0) for sel in selected]
             ax.scatter(xs, ys, c=colors, s=sizes, marker="o", edgecolors="k")
+        for panel, labels in ctx.suggestion_staleness_labels.items():
+            ax = self.axes.get(panel)
+            if ax is None or not labels:
+                continue
+            for x, y, text in labels:
+                ax.text(
+                    x + 4.0,
+                    y - 4.0,
+                    text,
+                    fontsize=7,
+                    color="#eceff1",
+                    bbox=dict(
+                        boxstyle="round,pad=0.15",
+                        facecolor="#263238",
+                        alpha=0.45,
+                        edgecolor="none",
+                    ),
+                    zorder=15,
+                )
         if ctx.particle_overlays:
             ax = self.axes.get("frame")
             if ax is not None:
@@ -526,6 +554,32 @@ class Renderer:
                 self.overlay_text.set_visible(True)
         elif self.overlay_text is not None:
             self.overlay_text.set_visible(False)
+        if ctx.canvas_header_text:
+            ax = self.axes.get("frame") or next(iter(self.axes.values()), None)
+            if ax is not None:
+                if self.canvas_header_text is None:
+                    self.canvas_header_text = ax.text(
+                        0.5,
+                        1.01,
+                        "",
+                        transform=ax.transAxes,
+                        ha="center",
+                        va="bottom",
+                        fontsize=9,
+                        color="#111111",
+                        bbox=dict(
+                            boxstyle="round,pad=0.25",
+                            facecolor="#f5f5f5",
+                            alpha=0.95,
+                            edgecolor="#d0d0d0",
+                        ),
+                        clip_on=False,
+                        zorder=20,
+                    )
+                self.canvas_header_text.set_text(ctx.canvas_header_text)
+                self.canvas_header_text.set_visible(True)
+        elif self.canvas_header_text is not None:
+            self.canvas_header_text.set_visible(False)
         self._update_scalebar(ctx)
         self._flush()
 

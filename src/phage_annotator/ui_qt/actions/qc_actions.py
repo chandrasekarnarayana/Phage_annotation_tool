@@ -96,6 +96,9 @@ class QCActionsMixin:
                 self.qc_state.add_issue(issue)
 
         self.qc_state.validation_timestamp = time.time()
+        if not hasattr(self, "_qc_issue_cursor"):
+            self._qc_issue_cursor = -1
+        self._qc_issue_cursor = -1
         if getattr(self, "qc_issues_panel", None) is not None:
             self.qc_issues_panel.set_qc_state(self.qc_state)
             self.qc_issues_panel.refresh()
@@ -105,7 +108,7 @@ class QCActionsMixin:
         if dock_qc is not None:
             dock_qc.setWindowTitle(f"QC Issues ({issue_count})" if issue_count > 0 else "QC Issues")
             if issue_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", True, type=bool)):
-                dock_qc.setVisible(True)
+                self.set_panel_visible("qc_issues", True, source="qc_validation")
                 dock_qc.raise_()
         issue_counts_by_type: dict[str, int] = {}
         for issue in self.qc_state.issues:
@@ -119,6 +122,30 @@ class QCActionsMixin:
         )
 
         self._set_status(f"QC validation complete: {len(self.qc_state.issues)} issue(s).")
+        self._update_status()
+
+    def _jump_to_next_qc_issue(self) -> None:
+        """Jump to the next visible QC issue in round-robin order."""
+        self._ensure_qc_runtime()
+        visible = list(self.qc_state.get_visible_issues(respect_filters=True))
+        if not visible:
+            self._set_status("No QC issues to review.")
+            self._update_status()
+            return
+        cursor = int(getattr(self, "_qc_issue_cursor", -1))
+        cursor = (cursor + 1) % len(visible)
+        self._qc_issue_cursor = cursor
+        issue = visible[cursor]
+        x = float(getattr(issue, "location_x", 0.0) if getattr(issue, "location_x", None) is not None else 0.0)
+        y = float(getattr(issue, "location_y", 0.0) if getattr(issue, "location_y", None) is not None else 0.0)
+        z = int(getattr(issue, "location_z", 0) if getattr(issue, "location_z", None) is not None else 0)
+        t = int(getattr(issue, "location_t", 0) if getattr(issue, "location_t", None) is not None else 0)
+        image_id = int(getattr(issue, "image_id", self.current_image_idx))
+        self._jump_to_qc_issue(x, y, z, t, image_id)
+        self._set_status(
+            f"QC issue {cursor + 1}/{len(visible)}: {str(getattr(issue, 'issue_type', 'issue'))}."
+        )
+        self._update_status()
 
     def _jump_to_qc_issue(self, x: float, y: float, z: int, t: int, image_id: int) -> None:
         """Navigate to an issue location from the QC issues panel."""
@@ -149,6 +176,7 @@ class QCActionsMixin:
 
         self._refresh_image()
         self._set_status("Jumped to QC issue location.")
+        self._update_status()
 
     def _export_qc_report(self, export_format: str) -> None:
         """Export QC issues in machine-readable format."""
@@ -197,4 +225,3 @@ class QCActionsMixin:
                 "Export QC Report",
                 f"Failed to export QC report to {output_path}.",
             )
-

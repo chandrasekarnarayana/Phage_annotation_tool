@@ -14,6 +14,8 @@ from phage_annotator.ui_qt.panels.particles import AnalyzeParticlesPanel
 from phage_annotator.ui_qt.panels.channel_controls import ChannelControlPanel
 from phage_annotator.ui_qt.panels.density import DensityPanel
 from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
+from phage_annotator.ui_qt.panels.review_queue_panel import ReviewQueuePanel
+from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
 from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
 from phage_annotator.ui_qt.panels.threshold import ThresholdPanel
@@ -40,13 +42,13 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
             )
             dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea)
             dock.setMinimumWidth(48)
-        elif spec.id == "annotations":
+        elif spec.id in ("annotations", "review_queue", "suggestion_explain", "advanced_analysis"):
             dock.setFeatures(
                 QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
                 | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
             )
             dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
-        if spec.id == "annotations":
+        if spec.id in ("annotations", "review_queue", "suggestion_explain", "advanced_analysis"):
             dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.panel_docks[spec.id] = dock
         self.addDockWidget(spec.default_area, dock)
@@ -67,6 +69,9 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
 
     self.dock_sidebar = self.panel_docks.get("sidebar")
     self.dock_annotations = self.panel_docks.get("annotations")
+    self.dock_review_queue = self.panel_docks.get("review_queue")
+    self.dock_suggestion_explain = self.panel_docks.get("suggestion_explain")
+    self.dock_advanced_analysis = self.panel_docks.get("advanced_analysis")
     self.dock_roi = self.panel_docks.get("roi")
     self.dock_roi_manager = self.panel_docks.get("roi_manager")
     self.dock_results = self.panel_docks.get("results")
@@ -86,6 +91,13 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
+    if self.dock_annotations and self.dock_review_queue:
+        self.tabifyDockWidget(self.dock_annotations, self.dock_review_queue)
+        self.dock_review_queue.raise_()
+    if self.dock_review_queue and self.dock_suggestion_explain:
+        self.tabifyDockWidget(self.dock_review_queue, self.dock_suggestion_explain)
+    if self.dock_suggestion_explain and self.dock_advanced_analysis:
+        self.tabifyDockWidget(self.dock_suggestion_explain, self.dock_advanced_analysis)
     if self.dock_roi and self.dock_roi_manager:
         self.tabifyDockWidget(self.dock_roi, self.dock_roi_manager)
     if self.dock_roi and self.dock_results:
@@ -96,20 +108,15 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         self.tabifyDockWidget(self.dock_roi, self.dock_metadata)
     if self.dock_smlm is not None:
         self.dock_smlm.setFloating(False)
-        self.dock_smlm.setVisible(False)
+        self.set_panel_visible("smlm", False, source="panel_init")
     if self.dock_orthoview is not None:
         self.dock_orthoview.setFloating(False)
-        self.dock_orthoview.setVisible(False)
+        self.set_panel_visible("orthoview", False, source="panel_init")
     if self.dock_metadata is not None:
         self.dock_metadata.visibilityChanged.connect(self._on_metadata_dock_visibility)
 
-    self.view_overlay_act.triggered.connect(self._toggle_overlay)
-    self.reset_layout_act.triggered.connect(self._reset_layout)
-    self.save_layout_default_act.triggered.connect(self._save_layout_default)
-    self.preset_annotate_act.triggered.connect(lambda: self.apply_preset("Annotate"))
-    self.preset_analyze_act.triggered.connect(lambda: self.apply_preset("Analyze"))
-    self.preset_minimal_act.triggered.connect(lambda: self.apply_preset("Minimal"))
-    self.preset_default_act.triggered.connect(lambda: self.apply_preset("Default"))
+    # Action wiring is intentionally centralized in ui_setup.py to avoid
+    # duplicate signal connections and double-trigger behavior.
     apply_panel_defaults(self)
     self._restore_sidebar_mode()
 
@@ -132,6 +139,30 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=True,
             widget_factory=self._make_annotations_widget,
             toggle_action_text="Annotation Table",
+        ),
+        PanelSpec(
+            id="review_queue",
+            title="Review Queue",
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=True,
+            widget_factory=self._make_review_queue_widget,
+            toggle_action_text="Review Queue",
+        ),
+        PanelSpec(
+            id="suggestion_explain",
+            title="Why This Suggestion?",
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_suggestion_explain_widget,
+            toggle_action_text="Why This Suggestion?",
+        ),
+        PanelSpec(
+            id="advanced_analysis",
+            title="Advanced Analysis",
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_advanced_analysis_widget,
+            toggle_action_text="Advanced Analysis",
         ),
         PanelSpec(
             id="roi",
@@ -257,7 +288,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             id="qc_issues",
             title="QC Issues",
             default_area=QtCore.Qt.BottomDockWidgetArea,
-            default_visible=False,
+            default_visible=True,
             widget_factory=self._make_qc_issues_widget,
             toggle_action_text="QC Issues",
         ),
@@ -321,6 +352,73 @@ def make_sidebar_widget(self) -> QtWidgets.QWidget:
 
 def make_annotations_widget(self) -> QtWidgets.QWidget:
     return self.annotation_table_panel
+
+
+def make_review_queue_widget(self) -> QtWidgets.QWidget:
+    widget = ReviewQueuePanel(parent=self)
+    self.review_queue_panel = widget
+    return widget
+
+
+def make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
+    widget = SuggestionExplainPanel(parent=self)
+    self.suggestion_explain_panel = widget
+    return widget
+
+
+def make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
+    """Create progressive-disclosure container for advanced assist analysis."""
+    container = QtWidgets.QWidget(parent=self)
+    layout = QtWidgets.QVBoxLayout(container)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+
+    intro = QtWidgets.QLabel(
+        "Advanced assist analysis tools.\n"
+        "Hidden by default to reduce onboarding load."
+    )
+    intro.setWordWrap(True)
+    layout.addWidget(intro)
+
+    toolbox = QtWidgets.QToolBox(container)
+    section_explain = QtWidgets.QWidget()
+    explain_layout = QtWidgets.QVBoxLayout(section_explain)
+    explain_layout.setContentsMargins(6, 6, 6, 6)
+    explain_layout.addWidget(
+        QtWidgets.QLabel("Inspect score components, patch preview, and staleness.")
+    )
+    self.advanced_open_explain_btn = QtWidgets.QPushButton("Open Why This Suggestion")
+    explain_layout.addWidget(self.advanced_open_explain_btn)
+    explain_layout.addStretch(1)
+    toolbox.addItem(section_explain, "Explain Panel")
+
+    section_train = QtWidgets.QWidget()
+    train_layout = QtWidgets.QVBoxLayout(section_train)
+    train_layout.setContentsMargins(6, 6, 6, 6)
+    train_layout.addWidget(
+        QtWidgets.QLabel("Training controls and minima are in Settings -> Advanced.")
+    )
+    self.advanced_open_training_btn = QtWidgets.QPushButton("Open Training Controls")
+    train_layout.addWidget(self.advanced_open_training_btn)
+    self.advanced_train_now_btn = QtWidgets.QPushButton("Train Ranker Now")
+    train_layout.addWidget(self.advanced_train_now_btn)
+    train_layout.addStretch(1)
+    toolbox.addItem(section_train, "Training Controls")
+
+    section_cal = QtWidgets.QWidget()
+    cal_layout = QtWidgets.QVBoxLayout(section_cal)
+    cal_layout.setContentsMargins(6, 6, 6, 6)
+    cal_layout.addWidget(
+        QtWidgets.QLabel("Inspect calibration and proposal metrics diagnostics.")
+    )
+    self.advanced_open_calib_btn = QtWidgets.QPushButton("Open Calibration Diagnostics")
+    cal_layout.addWidget(self.advanced_open_calib_btn)
+    cal_layout.addStretch(1)
+    toolbox.addItem(section_cal, "Calibration Diagnostics")
+
+    layout.addWidget(toolbox)
+    layout.addStretch(1)
+    return container
 
 
 def make_roi_widget(self) -> QtWidgets.QWidget:
@@ -610,7 +708,28 @@ def setup_status_bar(self) -> None:
 
     # QLabel used by docks as the shared status text widget.
     self.status = QtWidgets.QLabel("")
-    status_bar.addWidget(self.status, stretch=1)
+    self.status.setMinimumWidth(180)
+    status_bar.addWidget(self.status, stretch=0)
+
+    # Permanent operational state widgets (single source of truth).
+    self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -")
+    self.status_tz_lbl = QtWidgets.QLabel("T: -/- | Z: -/-")
+    self.status_scope_lbl = QtWidgets.QLabel("Scope: Slice")
+    self.status_target_lbl = QtWidgets.QLabel("Target: Frame")
+    self.status_context_lock_lbl = QtWidgets.QLabel("Write Context: Locked")
+    self.status_assist_lbl = QtWidgets.QLabel("Assist: Off")
+    self.status_qc_lbl = QtWidgets.QLabel("QC: 0 warnings")
+    for widget in (
+        self.status_dataset_lbl,
+        self.status_tz_lbl,
+        self.status_scope_lbl,
+        self.status_target_lbl,
+        self.status_context_lock_lbl,
+        self.status_assist_lbl,
+        self.status_qc_lbl,
+    ):
+        widget.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.NoTextInteraction)
+        status_bar.addPermanentWidget(widget)
     
     self.progress_label = QtWidgets.QLabel("Working:")
     self.progress_bar = QtWidgets.QProgressBar()

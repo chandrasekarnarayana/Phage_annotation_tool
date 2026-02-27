@@ -122,7 +122,7 @@ class JobsMixin:
             self._append_log(f"[EXCEPTION] {exc_type.__name__}: {exc}\n{msg}")
             self._set_status("Unexpected error. See Logs.")
             if self.dock_logs is not None:
-                self.dock_logs.setVisible(True)
+                self.set_panel_visible("logs", True, source="exception_hook")
 
         sys.excepthook = _hook
 
@@ -149,7 +149,7 @@ class JobsMixin:
         LOGGER.error("Job error: %s\n%s", name, traceback_text, extra={"job_id": job_id})
         self._set_status(f"Job error: {name}")
         if self.dock_logs is not None:
-            self.dock_logs.setVisible(True)
+            self.set_panel_visible("logs", True, source="job_error")
 
     def _on_job_cancelled(self, name: str, job_id: str) -> None:
         self._append_log(f"[JOB] Cancelled: {name} ({job_id})")

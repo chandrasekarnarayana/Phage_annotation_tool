@@ -18,3 +18,6 @@ This folder contains the reviewer-facing report set.
 - Every claim maps to code path, test, benchmark, or ADR.
 - No ambiguous status labels (implemented vs planned).
 - Validation scope and blockers are explicit.
+
+## Tracking Rule
+- If a report is referenced in planning, reviews, or IDE workflow, the file must exist in this folder.

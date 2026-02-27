@@ -16,6 +16,22 @@ from phage_annotator.tools import Tool
 class KeyboardEventsMixin:
     """Qt and Matplotlib keyboard shortcut handlers."""
 
+    def _suggestion_shortcut_context_available(self) -> bool:
+        """Return True when suggestion triage shortcuts are safe to execute."""
+        if not bool(getattr(self, "_show_suggestion_overlay", True)):
+            return False
+        if not hasattr(self, "_visible_suggestions_uncertain_first"):
+            return False
+        try:
+            return bool(self._visible_suggestions_uncertain_first())
+        except Exception:
+            return False
+
+    def _suggestion_shortcut_noop_hint(self) -> None:
+        """Show a subtle hint when suggestion shortcuts are used out of context."""
+        if hasattr(self, "_set_status"):
+            self._set_status("No suggestions to review on current view.")
+
     def _keyboard_registry_ok(self) -> bool:
         return len(detect_conflicts(all_shortcuts())) == 0
 
@@ -58,6 +74,9 @@ class KeyboardEventsMixin:
             self._step_slider(self.z_slider, 1)
         elif action_id == "play_pause":
             self._toggle_play("t")
+        elif action_id == "contextual_help":
+            if hasattr(self, "_show_contextual_help"):
+                self._show_contextual_help()
         elif action_id == "delete_selected":
             if self.tool_router and self.tool_router.tool in (
                 Tool.ROI_BOX,
@@ -68,10 +87,12 @@ class KeyboardEventsMixin:
             else:
                 self._delete_selected_annotations()
         elif action_id == "accept_suggestion":
-            if hasattr(self, "_accept_current_uncertain_suggestion"):
+            if self._suggestion_shortcut_context_available() and hasattr(
+                self, "_accept_current_uncertain_suggestion"
+            ):
                 self._accept_current_uncertain_suggestion()
             else:
-                self._set_status("Click on the image to add an annotation point.")
+                self._suggestion_shortcut_noop_hint()
         elif action_id == "clear_roi":
             if self.tool_router and self.tool_router.tool in (
                 Tool.ROI_BOX,
@@ -81,21 +102,27 @@ class KeyboardEventsMixin:
                 self._clear_roi()
             return
         elif action_id == "next_suggestion":
-            if hasattr(self, "_next_uncertain_suggestion"):
+            if self._suggestion_shortcut_context_available() and hasattr(
+                self, "_next_uncertain_suggestion"
+            ):
                 self._next_uncertain_suggestion()
             else:
-                self._set_status("Click on the image to add an annotation point.")
+                self._suggestion_shortcut_noop_hint()
         elif action_id == "prev_suggestion":
-            if hasattr(self, "_prev_uncertain_suggestion"):
+            if self._suggestion_shortcut_context_available() and hasattr(
+                self, "_prev_uncertain_suggestion"
+            ):
                 self._prev_uncertain_suggestion()
             else:
-                self._set_status("Click on the image to add an annotation point.")
+                self._suggestion_shortcut_noop_hint()
         elif action_id == "reset_view":
             self.reset_all_view()
         elif action_id == "reject_suggestion":
-            if hasattr(self, "_reject_current_uncertain_suggestion"):
+            if self._suggestion_shortcut_context_available() and hasattr(
+                self, "_reject_current_uncertain_suggestion"
+            ):
                 self._reject_current_uncertain_suggestion()
             else:
-                self.reset_all_view()
+                self._suggestion_shortcut_noop_hint()
         else:
             super().keyPressEvent(event)

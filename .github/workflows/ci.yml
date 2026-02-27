@@ -161,6 +161,49 @@ jobs:
           name: gui-artifacts-ubuntu-22.04-py3.11
           path: artifacts
 
+  test-gui-ux-state:
+    name: GUI UX State Tests (ubuntu-22.04 / py3.11)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .[dev]
+      - name: Prepare artifacts dir
+        run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
+      - name: Install Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Run GUI UX state tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+          MPLBACKEND: Agg
+        run: >
+          xvfb-run -a python -m pytest --run-gui
+          tests/integration/gui/test_ui_wiring.py
+          -k "advanced_analysis_toggle_syncs_visibility_and_menu_state or
+              command_palette_weighting_usage_and_mode_boost or
+              assist_expert_preset_expected_visibility_set or
+              open_training_controls_routes_to_preferences or
+              layout_preset_action_fires_once or
+              overlay_toggle_action_fires_once or
+              reset_layout_action_fires_once"
+          --junitxml=artifacts/junit-gui-ux-state.xml
+          --log-file=artifacts/pytest-gui-ux-state.log
+      - name: Upload GUI UX artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-ux-state-artifacts-ubuntu-22.04-py3.11
+          path: artifacts
+
   build:
     name: Build
     runs-on: ubuntu-22.04

@@ -41,6 +41,9 @@ class AnnotationsMixin:
         Coordinates are stored in image space regardless of crop or downsample.
         Assigns active modality_idx if multi-modality system is enabled.
         """
+        if hasattr(self, "_ensure_annotation_write_context_confirmed"):
+            if not self._ensure_annotation_write_context_confirmed("Add annotation point"):
+                return
         # Phase ι: Get active modality index if available
         active_modality_idx = getattr(self, "_active_modality_idx", None)
         

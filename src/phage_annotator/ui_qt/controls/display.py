@@ -598,6 +598,8 @@ class DisplayControlsMixin:
             self.controller.set_z(int(self.z_slider.value()))
         if bool(getattr(self, "auto_follow_table_chk", None) and self.auto_follow_table_chk.isChecked()):
             self._refresh_table()
+        if hasattr(self, "_refresh_review_queue_panel"):
+            self._refresh_review_queue_panel()
         self._refresh_image()
 
     def _on_loop_change(self) -> None:
@@ -846,8 +848,11 @@ class DisplayControlsMixin:
         self.annotation_scope = (
             "current" if self.scope_group.buttons()[0].isChecked() else "all"
         )
+        self._update_status()
+        self._refresh_image()
 
     def _on_target_change(self) -> None:
+        old_target = str(getattr(self, "annotate_target", "frame"))
         buttons = self.target_group.buttons()
         if buttons[0].isChecked():
             self.annotate_target = "frame"
@@ -855,6 +860,14 @@ class DisplayControlsMixin:
             self.annotate_target = "mean"
         else:
             self.annotate_target = "support"
+        if old_target != str(self.annotate_target) and hasattr(
+            self, "_mark_annotation_context_changed"
+        ):
+            self._mark_annotation_context_changed(
+                f"target panel changed ({old_target} -> {self.annotate_target})"
+            )
+        self._update_status()
+        self._refresh_image()
 
     def _on_marker_size_change(self, val: int) -> None:
         self.marker_size = float(val)

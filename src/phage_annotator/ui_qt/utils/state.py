@@ -801,7 +801,7 @@ class StateMixin:
                 self._clear_projection_job_name(job_id_holder["id"])
             self._append_log(f"[JOB] Projection error for {img.name}\n{err}")
             if self.dock_logs is not None:
-                self.dock_logs.setVisible(True)
+                self.set_panel_visible("logs", True, source="projection_error")
 
         if arr.nbytes >= PROJECTION_ASYNC_BYTES:
             handle = self.jobs.submit(_job, name=job_name, on_result=_on_result, on_error=_on_error)

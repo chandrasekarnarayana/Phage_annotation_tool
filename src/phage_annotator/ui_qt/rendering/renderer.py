@@ -50,6 +50,19 @@ from phage_annotator.rendering.scalebar import ScaleBarSpec, compute_scalebar
 class RenderingMixin:
     """Mixin for image rendering and overlay composition."""
 
+    def _suggestion_overlay_style(self, suggestion) -> tuple[str, str]:
+        """Return (color, trust_state) for a suggestion overlay marker."""
+        meta = dict(getattr(suggestion, "meta", {}) or {})
+        confidence_available = bool(meta.get("confidence_available", False))
+        if not confidence_available:
+            return "#9e9e9e", "heuristic"
+        p_accept = float(meta.get("p_accept", getattr(suggestion, "score", 0.0)))
+        if p_accept >= 0.75:
+            return "#43a047", "calibrated_high"
+        if p_accept >= 0.5:
+            return "#fdd835", "calibrated_mid"
+        return "#e53935", "calibrated_low"
+
     def _get_channel_stack(self, img, channel_idx: int) -> Optional[np.ndarray]:
         """Load/cache standardized stack for a specific channel."""
         if channel_idx < 0 or channel_idx >= int(getattr(img, "channel_count", 1)):
@@ -301,8 +314,10 @@ class RenderingMixin:
                 extents[key] = (0, data.shape[1], data.shape[0], 0)
                 titles[key] = modality.display_name
         panel_annotations = self._build_panel_annotations()
+        suggestion_staleness_labels = self._build_suggestion_staleness_labels()
         roi_overlays = self._build_roi_overlays()
         overlay_text = self._build_overlay_text()
+        canvas_header_text = self._build_canvas_header_text()
         roi_spec = self.controller.view_state.roi_spec
         roi_rect = roi_spec.rect
         roi_type = roi_spec.shape
@@ -465,8 +480,10 @@ class RenderingMixin:
             extents=extents,
             std_range=(std_vmin, std_vmax),
             panel_annotations=panel_annotations,
+            suggestion_staleness_labels=suggestion_staleness_labels,
             roi_overlays=roi_overlays,
             overlay_text=overlay_text,
+            canvas_header_text=canvas_header_text,
             marker_size=self.marker_size,
             norms=norms,
             panel_cmaps=panel_cmaps,
@@ -706,7 +723,7 @@ class RenderingMixin:
                 score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
                 if score < min_score:
                     continue
-                color = "#ffd54f" if score >= 0.75 else "#ff8a65"
+                color, _state = self._suggestion_overlay_style(suggestion)
                 points.append((float(suggestion.x), float(suggestion.y), color, False))
 
         def _filter(panel: str) -> List[Tuple[float, float, str, bool]]:
@@ -728,6 +745,40 @@ class RenderingMixin:
             scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
             panel_annotations[panel] = [(x / scale, y / scale, c, s) for x, y, c, s in pts]
         return panel_annotations
+
+    def _build_suggestion_staleness_labels(self) -> Dict[str, List[Tuple[float, float, str]]]:
+        """Build lightweight age labels for visible suggestions in the frame panel."""
+        labels: Dict[str, List[Tuple[float, float, str]]] = {"frame": [], "mean": [], "support": []}
+        if not bool(getattr(self, "_show_suggestion_overlay", True)):
+            return labels
+        image_id = self.primary_image.id
+        t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
+        z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
+        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
+        now_ts = float(time.time())
+        frame_ax = (
+            self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        )
+        scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
+        for suggestion in self.suggestions.get(image_id, []):
+            if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
+                continue
+            if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
+                continue
+            score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
+            if score < min_score:
+                continue
+            meta = dict(getattr(suggestion, "meta", {}) or {})
+            ts = meta.get("generated_at_ts")
+            if ts is None:
+                continue
+            age_s = max(0.0, now_ts - float(ts))
+            if age_s < 60.0:
+                label = f"{int(round(age_s))}s"
+            else:
+                label = f"{int(round(age_s / 60.0))}m"
+            labels["frame"].append((float(suggestion.x) / scale, float(suggestion.y) / scale, label))
+        return labels
 
     def _build_roi_overlays(self) -> Dict[str, List[Tuple[str, object, str]]]:
         overlays: Dict[str, List[Tuple[str, object, str]]] = {
@@ -837,6 +888,26 @@ class RenderingMixin:
         if diag_txt:
             diag_txt = "\n" + diag_txt
         
+        stale_count = 0
+        visible_suggestions = 0
+        now_ts = float(time.time())
+        for suggestion in self.suggestions.get(img.id, []):
+            t_match = int(getattr(suggestion, "t", -1)) in (t_idx, -1)
+            z_match = int(getattr(suggestion, "z", -1)) in (z_idx, -1)
+            if not (t_match and z_match):
+                continue
+            visible_suggestions += 1
+            ts = dict(getattr(suggestion, "meta", {}) or {}).get("generated_at_ts")
+            if ts is None:
+                continue
+            if (now_ts - float(ts)) >= 300.0:
+                stale_count += 1
+        stale_txt = (
+            f"\nSuggestion staleness: {stale_count}/{visible_suggestions} >= 5m old"
+            if visible_suggestions > 0
+            else ""
+        )
+
         return (
             f"{img.name}\n"
             f"T {t_idx + 1}/{t_total} | Z {z_idx + 1}/{z_total}\n"
@@ -845,8 +916,34 @@ class RenderingMixin:
             f"vmin/vmax: {vmin}/{vmax}\n"
             f"Crop: {crop_txt} {crop_rect}\n"
             f"ROI: {roi_txt} {roi_rect}\n"
-            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}"
+            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}{stale_txt}"
         )
+
+    def _build_canvas_header_text(self) -> str:
+        """Build always-visible canvas header for target/scope context."""
+        img = self.primary_image
+        t_idx, z_idx = self._slice_indices(img)
+        z_total = int(img.array.shape[1]) if img.array is not None and img.array.ndim >= 2 else int(self.z_slider.maximum() + 1)
+        target = str(getattr(self, "annotate_target", "frame"))
+        scope = str(getattr(self, "annotation_scope", "current"))
+
+        if target == "mean":
+            target_txt = f"Mean Projection (Z=1-{max(1, z_total)})"
+        elif target == "support":
+            target_txt = "Support"
+        else:
+            target_txt = f"Frame T={int(t_idx) + 1} Z={int(z_idx) + 1}"
+
+        if scope == "all":
+            scope_txt = "Stack Annotation (All Z)"
+        else:
+            scope_txt = "Slice Annotation (Current Z)"
+        lock_pending = bool(
+            hasattr(self, "_is_annotation_context_guard_pending")
+            and self._is_annotation_context_guard_pending()
+        )
+        lock_txt = " | Write Context: Pending Confirm" if lock_pending else ""
+        return f"{target_txt} | {scope_txt}{lock_txt}"
 
     def _get_display_mapping(
         self, image_id: int, panel: str, data: Optional[np.ndarray]
