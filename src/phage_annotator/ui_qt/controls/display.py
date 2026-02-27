@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -595,6 +596,8 @@ class DisplayControlsMixin:
         if hasattr(self, "controller") and self.controller is not None:
             self.controller.set_t(int(self.t_slider.value()))
             self.controller.set_z(int(self.z_slider.value()))
+        if bool(getattr(self, "auto_follow_table_chk", None) and self.auto_follow_table_chk.isChecked()):
+            self._refresh_table()
         self._refresh_image()
 
     def _on_loop_change(self) -> None:
@@ -866,11 +869,13 @@ class DisplayControlsMixin:
         self.profile_enabled = self.profile_mode_chk.isChecked()
 
     def _on_profile_chk_changed(self) -> None:
-        self.profile_enabled = self.profile_chk.isChecked()
+        self._set_panel_visibility("profile", self.profile_chk.isChecked())
+        self.profile_enabled = bool(self.profile_chk.isChecked())
         self._refresh_image()
 
     def _on_hist_chk_changed(self) -> None:
-        self.hist_enabled = self.hist_chk.isChecked()
+        self._set_panel_visibility("hist", self.hist_chk.isChecked())
+        self.hist_enabled = bool(self.hist_chk.isChecked())
         self._refresh_image()
 
     def _clear_profile(self) -> None:
@@ -1140,6 +1145,8 @@ class DisplayControlsMixin:
         path = self.controller.autosave_if_needed(self, self._current_keypoints)
         if path is None:
             return
+        self._last_autosave_path = str(path)
+        self._last_autosave_timestamp = time.time()
         self._append_log(f"[RECOVERY] Autosaved annotations to {path}")
         self._set_status("Autosaved recovery file.")
 
@@ -1212,14 +1219,7 @@ class DisplayControlsMixin:
             if ax not in set(self.renderer.axes.values()):
                 return
         else:
-            if ax not in {
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
-            }:
-                return
+            return
         if self._suppress_limits:
             return
         if self.link_zoom:
@@ -1254,14 +1254,6 @@ class DisplayControlsMixin:
             for key, panel_ax in self.renderer.axes.items():
                 if panel_ax == ax:
                     return key
-        if ax == self.ax_frame:
-            return "frame"
-        if ax == self.ax_mean:
-            return "mean"
-        if ax == self.ax_support:
-            return "support"
-        if ax == self.ax_std:
-            return "std"
         return None
 
     def _update_sync_list(self, visible: List[str]) -> None:

@@ -31,3 +31,6 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Demo data
+phage_annotator_demo.tif

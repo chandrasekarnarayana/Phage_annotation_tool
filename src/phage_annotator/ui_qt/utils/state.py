@@ -36,7 +36,7 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtCore
 
 from phage_annotator.analysis.core import compute_projection, compute_projections
-from phage_annotator.annotation.core import Keypoint
+from phage_annotator.annotation.core import Keypoint, PointSuggestion
 from phage_annotator.io.data.calibration import CalibrationState
 from phage_annotator.ui_qt.utils.constants import PROJECTION_ASYNC_BYTES, CancelTokenShim
 from phage_annotator.ui_qt.utils.debug import debug_log
@@ -75,6 +75,10 @@ class StateMixin:
     @property
     def annotations(self) -> Dict[int, List[Keypoint]]:
         return self.controller.session_state.annotations
+
+    @property
+    def suggestions(self) -> Dict[int, List[PointSuggestion]]:
+        return self.controller.session_state.suggestions
 
     @property
     def axis_mode(self) -> Dict[int, str]:

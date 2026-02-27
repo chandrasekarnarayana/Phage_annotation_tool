@@ -57,6 +57,12 @@ from phage_annotator.session.modality_facade import ModalityFacade
 from phage_annotator.session.multi_playback import ModalityPlaybackManager, PlaybackMode
 from phage_annotator.session.view_sync import ViewSyncManager
 from phage_annotator.tools import Tool
+from phage_annotator.analysis.suggestion_model import LocalPeakSuggestionModel
+from phage_annotator.ui_qt.services.settings_proxy import UnifiedSettingsProxy
+from phage_annotator.ui_qt.services.settings_schema import (
+    apply_settings_migrations,
+    ensure_ui_settings_defaults,
+)
 
 
 class KeypointAnnotator(
@@ -88,12 +94,7 @@ class KeypointAnnotator(
     """
     
     def _get_setting(self, key: str, default, type_):
-        """Get a setting from SettingsService, falling back to QSettings."""
-        if self._settings_service is not None:
-            try:
-                return self._settings_service.get_value(key, default)
-            except Exception:
-                pass
+        """Get a setting via unified settings proxy."""
         return self._settings.value(key, default, type=type_)
 
     def __init__(self, images: List[LazyImage], labels: Sequence[str] | None = None) -> None:
@@ -110,7 +111,7 @@ class KeypointAnnotator(
         # densityConfig, densityInferOptions, densityTargetPanel,
         # prefetchBlockSizeFrames, prefetchMaxInflightBlocks, throttleAnalysisHzDuringPlayback,
         # pyramidEnabled, pyramidMaxLevels, showRoiHandles, markerSize, clickRadiusPx, activeTool.
-        self._settings = QtCore.QSettings("PhageAnnotator", "PhageAnnotator")
+        qsettings = QtCore.QSettings("PhageAnnotator", "PhageAnnotator")
         
         # Optional settings service integration.
         try:
@@ -123,6 +124,10 @@ class KeypointAnnotator(
         except (ImportError, RuntimeError, AttributeError):
             self._settings_service = None
         
+        self._settings = UnifiedSettingsProxy(qsettings, self._settings_service)
+        apply_settings_migrations(self._settings)
+        ensure_ui_settings_defaults(self._settings)
+
         # Marker size controls visual size only; click_radius_px controls selection tolerance.
         self.marker_size = self._get_setting("markerSize", 40, int)
         self.click_radius_px = self._get_setting("clickRadiusPx", 6.0, float)
@@ -132,6 +137,7 @@ class KeypointAnnotator(
         self._left_sizes: Optional[List[int]] = None
         self._block_table = False
         self._table_rows: List[Keypoint] = []
+        self._selected_annotation_ids: set[str] = set()
 
         self._suppress_limits = False
 
@@ -270,6 +276,21 @@ class KeypointAnnotator(
         self._density_contours = False
         self._density_last_result = None
         self._density_last_panel = "frame"
+        self._show_suggestion_overlay = True
+        self._suggestion_model = LocalPeakSuggestionModel()
+        self._suggestion_strategy = "current_view"
+        self._suggestion_score_threshold = 0.0
+        self._suggestion_cursor = 0
+        self._suggestion_focus_zoom_px = 160.0
+        self._suggestion_rule_config = None
+        self._timed_session_active = False
+        self._timed_session_assisted = True
+        self._timed_session_started_at = 0.0
+        self._timed_session_accepts = 0
+        self._timed_session_rejects = 0
+        self._timed_session_points = 0
+        self._timed_session_correction_time = 0.0
+        self._review_queue_filter = "all"
         self.panel_specs: List[PanelSpec] = []
         self.panel_docks: Dict[str, QtWidgets.QDockWidget] = {}
         self.dock_actions: Dict[str, QtWidgets.QAction] = {}

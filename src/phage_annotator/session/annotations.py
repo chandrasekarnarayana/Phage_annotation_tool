@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Iterable, Optional
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.framework import get_event_service
@@ -41,11 +42,24 @@ class SessionAnnotationsMixin:
             label=label,
             modality_idx=modality_idx,
         )
+        kp.meta["annotator"] = self.session_state.current_user
+        kp.meta["timestamp"] = time.time()
         self.session_state.annotations.setdefault(image_id, []).append(kp)
         self.session_state.annotations_loaded[image_id] = True
         self._push_undo({"type": "add_point", "point": kp, "image_id": image_id})
         self.set_dirty(True)
         self.annotations_changed.emit()
+        if hasattr(self, "append_audit_event"):
+            self.append_audit_event(
+                "annotation_added",
+                image_id=image_id,
+                annotation_id=kp.annotation_id,
+                label=kp.label,
+                x=kp.x,
+                y=kp.y,
+                t=kp.t,
+                z=kp.z,
+            )
         
         # Publish event for service integration
         try:
@@ -71,7 +85,8 @@ class SessionAnnotationsMixin:
 
         pts = self.session_state.annotations.get(image_id, [])
         removed = 0
-        for kp in list(points):
+        requested_points = list(points)
+        for kp in requested_points:
             try:
                 pts.remove(kp)
             except ValueError:
@@ -81,6 +96,13 @@ class SessionAnnotationsMixin:
         if removed:
             self.set_dirty(True)
             self.annotations_changed.emit()            
+            if hasattr(self, "append_audit_event"):
+                self.append_audit_event(
+                    "annotation_deleted",
+                    image_id=image_id,
+                    count=removed,
+                    annotation_ids=[kp.annotation_id for kp in requested_points],
+                )
             # Publish event for service integration
             try:
                 event_service = get_event_service()
@@ -106,6 +128,14 @@ class SessionAnnotationsMixin:
         pts[idx] = new
         self.set_dirty(True)
         self.annotations_changed.emit()
+        if hasattr(self, "append_audit_event"):
+            self.append_audit_event(
+                "annotation_updated",
+                image_id=image_id,
+                annotation_id=new.annotation_id,
+                old_label=old.label,
+                new_label=new.label,
+            )
         
         # Publish event for service integration
         try:

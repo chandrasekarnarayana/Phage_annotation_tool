@@ -19,6 +19,12 @@ class SessionViewMixin:
         """Execute a view command and add to undo stack (P3.1)."""
         if command.execute():
             self._push_undo_view(command.to_dict())
+            if hasattr(self, "append_audit_event"):
+                self.append_audit_event(
+                    "view_command_executed",
+                    command_type=command.__class__.__name__,
+                    image_id=getattr(command, "image_id", None),
+                )
             self.state_changed.emit()
             return True
         return False

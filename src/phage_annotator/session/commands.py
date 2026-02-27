@@ -362,6 +362,28 @@ def command_from_dict(data: dict, controller: "SessionController") -> Optional[C
             search_radius=0.0,
             image_data=None,
         )
+    elif cmd_type == "AcceptSuggestionCommand":
+        from phage_annotator.session.suggestion_commands import AcceptSuggestionCommand
+
+        suggestion_id = (
+            after["data"].get("suggestion_id")
+            or before["data"].get("suggestion", {}).get("suggestion_id")
+            or ""
+        )
+        cmd = AcceptSuggestionCommand(controller, image_id, suggestion_id=str(suggestion_id))
+    elif cmd_type == "RejectSuggestionCommand":
+        from phage_annotator.session.suggestion_commands import RejectSuggestionCommand
+
+        suggestion_id = (
+            after["data"].get("suggestion_id")
+            or before["data"].get("suggestion", {}).get("suggestion_id")
+            or ""
+        )
+        cmd = RejectSuggestionCommand(controller, image_id, suggestion_id=str(suggestion_id))
+    elif cmd_type == "ClearSuggestionsCommand":
+        from phage_annotator.session.suggestion_commands import ClearSuggestionsCommand
+
+        cmd = ClearSuggestionsCommand(controller, image_id)
     else:
         return None
     

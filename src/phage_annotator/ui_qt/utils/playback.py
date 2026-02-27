@@ -19,7 +19,8 @@ class PlaybackMixin:
         """Start high-FPS playback along the time axis with prefetch buffer."""
         self._ensure_loaded(self.current_image_idx)
         # Heavy refresh once to ensure artists/vmin/vmax exist.
-        if self.im_frame is None or self._axis_scale(self.ax_frame) != 1.0:
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        if self.im_frame is None or frame_ax is None or self._axis_scale(frame_ax) != 1.0:
             self._refresh_image()
         self._playback_mode = True
         self.play_mode = "t"
@@ -91,8 +92,9 @@ class PlaybackMixin:
         if self.im_frame is None:
             return
         self.im_frame.set_data(frame)
-        if self.ax_frame is not None:
-            self.ax_frame.set_title(f"Frame (T={t_idx})")
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        if frame_ax is not None:
+            frame_ax.set_title(f"Frame (T={t_idx})")
         self._update_status()
         self.canvas.draw_idle()
 
@@ -104,9 +106,10 @@ class PlaybackMixin:
                 if dt > 0:
                     self._fps_times.append(1.0 / dt)
         self._playback_frame_counter += 1
-        if self._fps_text is None and self.ax_frame is not None:
-            self._fps_text = self.ax_frame.text(
-                0.02, 0.98, "", transform=self.ax_frame.transAxes, color="w"
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        if self._fps_text is None and frame_ax is not None:
+            self._fps_text = frame_ax.text(
+                0.02, 0.98, "", transform=frame_ax.transAxes, color="w"
             )
         if self._fps_text is not None and self._fps_times:
             fps = sum(self._fps_times) / len(self._fps_times)

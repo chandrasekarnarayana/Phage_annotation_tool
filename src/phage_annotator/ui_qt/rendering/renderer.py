@@ -198,8 +198,11 @@ class RenderingMixin:
         mean_display = mean_data
         std_display = std_data
         level = 0
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        mean_ax = self.renderer.axes.get("mean") if getattr(self, "renderer", None) is not None else None
+        std_ax = self.renderer.axes.get("std") if getattr(self, "renderer", None) is not None else None
         if self._interactive:
-            level = self._select_pyramid_level(self.ax_frame, slice_data.shape)
+            level = self._select_pyramid_level(frame_ax, slice_data.shape)
             if level > 0:
                 scale = 2**level
                 self._render_scales = {ax: scale for ax in self.renderer.axes.values()}
@@ -306,7 +309,7 @@ class RenderingMixin:
         if roi_type == "none" or roi_rect[2] <= 0 or roi_rect[3] <= 0:
             roi_type = "none"
             roi_rect = None
-        roi_scale = self._axis_scale(self.ax_frame) if self.ax_frame is not None else 1.0
+        roi_scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         roi_offset = (self.crop_rect[0], self.crop_rect[1]) if self.crop_rect else (0.0, 0.0)
         frame_mapping = self._get_display_mapping(prim.id, "frame", slice_data)
         mean_mapping = self._get_display_mapping(prim.id, "mean", mean_data)
@@ -388,13 +391,13 @@ class RenderingMixin:
             stride = max(1, int(self.downsample_factor))
             overlay_frame = overlay_frame[::stride, ::stride]
         loc_points = []
-        if self.show_smlm_points and self.ax_frame is not None:
+        if self.show_smlm_points and frame_ax is not None:
             # Validate that results are for the current image
             current_img_id = self.primary_image.id if hasattr(self, 'primary_image') else -1
             smlm_img_id = getattr(self, '_smlm_image_id', None)
             deepstorm_img_id = getattr(self, '_deepstorm_image_id', None)
             
-            scale = self._axis_scale(self.ax_frame)
+            scale = self._axis_scale(frame_ax)
             off_x = self.crop_rect[0] if self.crop_rect else 0.0
             off_y = self.crop_rect[1] if self.crop_rect else 0.0
             if self._smlm_results and smlm_img_id == current_img_id:
@@ -504,26 +507,26 @@ class RenderingMixin:
         self.im_support = self.renderer.image_artists.get("support")
         self.im_std = self.renderer.image_artists.get("std")
         self._refresh_orthoview(prim, t_idx, z_idx, norms["frame"], panel_cmaps["frame"])
-        if self.ax_mean is not None and not mean_ready:
-            self.ax_mean.text(
+        if mean_ax is not None and not mean_ready:
+            mean_ax.text(
                 0.5,
                 0.5,
                 "Computing mean...",
-                transform=self.ax_mean.transAxes,
+                transform=mean_ax.transAxes,
                 ha="center",
                 va="center",
             )
-        if self.ax_std is not None and not std_ready:
-            self.ax_std.text(
+        if std_ax is not None and not std_ready:
+            std_ax.text(
                 0.5,
                 0.5,
                 "Computing std...",
-                transform=self.ax_std.transAxes,
+                transform=std_ax.transAxes,
                 ha="center",
                 va="center",
             )
 
-        if self.ax_frame is not None:
+        if frame_ax is not None:
             self._restore_zoom(slice_display.shape)
         self._draw_diagnostics(slice_data, vmin, vmax)
         self._update_axes_info()
@@ -660,7 +663,8 @@ class RenderingMixin:
             return []
         if not self.particles_panel.show_labels_chk.isChecked():
             return []
-        scale = self._axis_scale(self.ax_frame)
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         labels: List[Tuple[float, float, str]] = []
         for idx, particle in enumerate(self._particles_results):
             x = (particle.centroid_x - (self.crop_rect[0] if self.crop_rect else 0.0)) / scale
@@ -685,8 +689,25 @@ class RenderingMixin:
                     continue  # Skip annotations from other modalities
             
             color = self._label_color(kp.label, faded=kp.image_id != self.primary_image.id)
-            selected = kp in self._table_rows
+            selected_ids = getattr(self, "_selected_annotation_ids", set()) or set()
+            selected = str(kp.annotation_id) in selected_ids
             points.append((kp.x, kp.y, color, selected))
+
+        if bool(getattr(self, "_show_suggestion_overlay", True)):
+            image_id = self.primary_image.id
+            t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
+            z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
+            min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
+            for suggestion in self.suggestions.get(image_id, []):
+                if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
+                    continue
+                if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
+                    continue
+                score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
+                if score < min_score:
+                    continue
+                color = "#ffd54f" if score >= 0.75 else "#ff8a65"
+                points.append((float(suggestion.x), float(suggestion.y), color, False))
 
         def _filter(panel: str) -> List[Tuple[float, float, str, bool]]:
             if panel == "frame":
@@ -703,7 +724,8 @@ class RenderingMixin:
             if not pts:
                 panel_annotations[panel] = []
                 continue
-            scale = self._axis_scale(getattr(self, f"ax_{panel}") or self.ax_frame)
+            panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
+            scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
             panel_annotations[panel] = [(x / scale, y / scale, c, s) for x, y, c, s in pts]
         return panel_annotations
 
@@ -715,8 +737,8 @@ class RenderingMixin:
             if not roi.visible:
                 continue
             for panel in overlays:
-                ax = getattr(self, f"ax_{panel}") or self.ax_frame
-                scale = self._axis_scale(ax)
+                panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
+                scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
                 if roi.roi_type == "circle" and len(roi.points) >= 2:
                     (cx, cy), (px, py) = roi.points[:2]
                     r = float(np.hypot(px - cx, py - cy))
@@ -753,8 +775,8 @@ class RenderingMixin:
                     overlays[panel].append((roi.roi_type, pts, roi.color))
         if self.crop_rect:
             for panel in overlays:
-                ax = getattr(self, f"ax_{panel}") or self.ax_frame
-                scale = self._axis_scale(ax)
+                panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
+                scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
                 x, y, w, h = self.crop_rect
                 overlays[panel].append(
                     ("box", (x / scale, y / scale, w / scale, h / scale), "#00c0ff")

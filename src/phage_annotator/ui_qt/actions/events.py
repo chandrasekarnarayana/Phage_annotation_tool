@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
-from phage_annotator.tools import Tool
+from phage_annotator.ui_qt.actions.keyboard_events import KeyboardEventsMixin
 
 
-class EventsMixin:
+class EventsMixin(KeyboardEventsMixin):
     """Mixin for Qt/matplotlib event handlers and interaction state."""
 
     def _bind_events(self) -> None:
@@ -125,6 +125,9 @@ class EventsMixin:
             self.auto_roi_area_spin.valueChanged.connect(self._persist_auto_roi_settings)
         self.annot_table.itemSelectionChanged.connect(self._on_table_selection)
         self.annot_table.itemChanged.connect(self._on_table_item_changed)
+        self.filter_current_chk.stateChanged.connect(lambda _state: self._refresh_table())
+        if hasattr(self, "auto_follow_table_chk"):
+            self.auto_follow_table_chk.stateChanged.connect(self._on_auto_follow_table_changed)
         self.show_ann_master_chk.stateChanged.connect(self._refresh_image)
         self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
         if self.roi_manager_widget is not None:
@@ -294,18 +297,6 @@ class EventsMixin:
         axes = []
         if getattr(self, "renderer", None) is not None:
             axes = [ax for ax in self.renderer.axes.values() if ax is not None]
-        if not axes:
-            axes = [
-                ax
-                for ax in [
-                    self.ax_frame,
-                    self.ax_mean,
-                    self.ax_comp,
-                    self.ax_support,
-                    self.ax_std,
-                ]
-                if ax is not None
-            ]
         for ax in axes:
             ax.callbacks.connect("xlim_changed", self._on_limits_changed)
             ax.callbacks.connect("ylim_changed", self._on_limits_changed)
@@ -316,14 +307,6 @@ class EventsMixin:
         axes = []
         if getattr(self, "renderer", None) is not None:
             axes = [ax for ax in self.renderer.axes.values() if ax is not None]
-        if not axes:
-            axes = [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
-            ]
         for ax in axes:
             if ax is None:
                 continue
@@ -351,63 +334,6 @@ class EventsMixin:
         """Reset zoom and contrast (ImageJ-like reset)."""
         self.reset_contrast()
         self.reset_view()
-
-    def _on_key(self, event) -> None:
-        """Handle keyboard shortcuts for reset zoom, colormap cycle, and quick-save."""
-        if event.key == "r":
-            self.reset_all_view()
-        elif event.key == "c":
-            self.current_cmap_idx = (self.current_cmap_idx + 1) % len(self.colormaps)
-            if self.lut_combo is not None:
-                self.lut_combo.setCurrentIndex(self.current_cmap_idx)
-            self._refresh_image()
-        elif event.key == "s":
-            self._quick_save_csv()
-
-    def keyPressEvent(self, event) -> None:
-        """Qt-level shortcuts for fast navigation; ignored when editing text fields."""
-        focused = QtWidgets.QApplication.focusWidget()
-        if isinstance(
-            focused,
-            (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit),
-        ):
-            return super().keyPressEvent(event)
-        key = event.key()
-        if key == QtCore.Qt.Key_Left:
-            self._step_slider(self.t_slider, -1)
-        elif key == QtCore.Qt.Key_Right:
-            self._step_slider(self.t_slider, 1)
-        elif key == QtCore.Qt.Key_Up:
-            self._step_slider(self.z_slider, -1)
-        elif key == QtCore.Qt.Key_Down:
-            self._step_slider(self.z_slider, 1)
-        elif key == QtCore.Qt.Key_Space:
-            self._toggle_play("t")
-        elif key in (QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
-            if self.tool_router and self.tool_router.tool in (
-                Tool.ROI_BOX,
-                Tool.ROI_CIRCLE,
-                Tool.ROI_EDIT,
-            ):
-                self._clear_roi()
-            else:
-                self._delete_selected_annotations()
-        elif key in (QtCore.Qt.Key_A, QtCore.Qt.Key_N):
-            self._set_status("Click on the image to add an annotation point.")
-        elif (
-            key == QtCore.Qt.Key_R and event.modifiers() & QtCore.Qt.KeyboardModifier.ShiftModifier
-        ):
-            if self.tool_router and self.tool_router.tool in (
-                Tool.ROI_BOX,
-                Tool.ROI_CIRCLE,
-                Tool.ROI_EDIT,
-            ):
-                self._clear_roi()
-            return
-        elif key == QtCore.Qt.Key_R:
-            self.reset_all_view()
-        else:
-            super().keyPressEvent(event)
 
     def _start_interaction(self) -> None:
         """Enter interactive mode (downsample rendering during continuous input)."""

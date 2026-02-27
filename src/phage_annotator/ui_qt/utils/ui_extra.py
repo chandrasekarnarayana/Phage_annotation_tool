@@ -195,6 +195,15 @@ class UiExtrasMixin:
         act.setToolTip("Show/hide annotation table")
         act.triggered.connect(self._toggle_annotation_dock)
         bar.addAction(act)
+        suggest_act = getattr(self, "suggest_points_act", None)
+        if suggest_act is not None:
+            bar.addAction(suggest_act)
+        suggest_image_act = getattr(self, "suggest_points_image_act", None)
+        if suggest_image_act is not None:
+            bar.addAction(suggest_image_act)
+        accept_roi_act = getattr(self, "accept_suggestions_in_roi_act", None)
+        if accept_roi_act is not None:
+            bar.addAction(accept_roi_act)
 
         self.annotation_toolbar = bar
         self.annotation_toolbar_action = act
@@ -510,24 +519,18 @@ class UiExtrasMixin:
             self.renderer.roi_interactor.set_tool("idle")
 
     def _get_target_axis(self):
+        axes = self.renderer.axes if getattr(self, "renderer", None) is not None else {}
         target_map = {
-            "frame": self.ax_frame,
-            "mean": self.ax_mean,
-            "support": self.ax_support,
+            "frame": axes.get("frame"),
+            "mean": axes.get("mean"),
+            "support": axes.get("support"),
         }
-        return target_map.get(self.annotate_target, self.ax_frame)
+        return target_map.get(self.annotate_target, axes.get("frame"))
 
     def _get_image_axes(self) -> Set[object]:
-        return {
-            ax
-            for ax in [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_support,
-                self.ax_std,
-            ]
-            if ax is not None
-        }
+        if getattr(self, "renderer", None) is None:
+            return set()
+        return {ax for ax in self.renderer.axes.values() if ax is not None}
 
     def _set_roi_shape(self, shape: str) -> None:
         if hasattr(self, "controller") and self.controller is not None:
@@ -675,10 +678,17 @@ class UiExtrasMixin:
         return actions
 
     def _show_command_palette(self) -> None:
+        existing = getattr(self, "_command_palette_dialog", None)
+        if existing is not None and existing.isVisible():
+            existing.raise_()
+            existing.activateWindow()
+            return
         actions = self._collect_command_actions()
         dlg = QtWidgets.QDialog(self)
+        self._command_palette_dialog = dlg
         dlg.setWindowTitle("Command Palette")
-        dlg.setWindowModality(QtCore.Qt.ApplicationModal)
+        dlg.setWindowModality(QtCore.Qt.NonModal)
+        dlg.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg.resize(520, 320)
         layout = QtWidgets.QVBoxLayout(dlg)
         search = QtWidgets.QLineEdit()
@@ -718,8 +728,9 @@ class UiExtrasMixin:
         search.textChanged.connect(lambda text: _populate(text.strip().lower()))
         search.returnPressed.connect(_activate)
         listw.itemActivated.connect(lambda _: _activate())
+        dlg.finished.connect(lambda _code: setattr(self, "_command_palette_dialog", None))
         search.setFocus()
-        dlg.exec()
+        dlg.open()
 
     def _apply_default_layout(self) -> None:
         """Save the initial layout as the default reset state."""

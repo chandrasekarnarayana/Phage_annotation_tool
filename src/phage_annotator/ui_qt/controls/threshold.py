@@ -500,7 +500,8 @@ class ThresholdControlsMixin:
         show_outline = self.particles_panel.show_outlines_chk.isChecked()
         show_boxes = self.particles_panel.show_boxes_chk.isChecked()
         show_ellipse = self.particles_panel.show_ellipses_chk.isChecked()
-        scale = self._axis_scale(self.ax_frame) if self.ax_frame is not None else 1.0
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         off_x = self.crop_rect[0] if self.crop_rect else 0.0
         off_y = self.crop_rect[1] if self.crop_rect else 0.0
         for idx, p in enumerate(self._particles_results):

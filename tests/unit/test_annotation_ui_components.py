@@ -21,7 +21,14 @@ from phage_annotator.annotation.metadata_schema import (
 )
 from phage_annotator.core.annotation import Keypoint
 
+pytestmark = pytest.mark.skip(
+    reason="Legacy model-based annotation table architecture removed; unified runtime table uses dock table controller."
+)
 
+
+@pytest.mark.skip(
+    reason="Legacy model-based annotation table architecture removed; unified runtime table uses dock table controller."
+)
 class TestAnnotationTableModel:
     """Test AnnotationTableModel."""
     

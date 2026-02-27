@@ -10,6 +10,7 @@ from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.annotation.core import (
     Keypoint,
+    PointSuggestion,
     keypoints_from_json,
     save_keypoints_csv,
     save_keypoints_json,
@@ -247,6 +248,8 @@ class SessionProjectMixin:
         self.session_state.annotations_loaded = {
             img.id: bool(self.session_state.annotations.get(img.id)) for img in images
         }
+        self.session_state.suggestions = {img.id: [] for img in images}
+        self.session_state.suggestion_history = {img.id: [] for img in images}
         self.session_state.image_states = {img.id: self._build_image_state(img) for img in images}
 
         if display_per_image:
@@ -268,6 +271,133 @@ class SessionProjectMixin:
         self.session_state.threshold_settings = dict(settings.get("threshold_settings", {}))
         self.session_state.threshold_configs_by_image = dict(settings.get("threshold_configs_by_image", {}))
         self.session_state.particles_configs_by_image = dict(settings.get("particles_configs_by_image", {}))
+        self.session_state.current_user = str(settings.get("current_user", "local_user"))
+        audit_log = settings.get("audit_log", [])
+        if isinstance(audit_log, list):
+            self.session_state.audit_log = [row for row in audit_log if isinstance(row, dict)]
+        suggestion_metrics = settings.get("suggestion_metrics", {})
+        if isinstance(suggestion_metrics, dict):
+            self.session_state.suggestion_metrics.update(
+                {k: float(v) for k, v in suggestion_metrics.items() if isinstance(v, (int, float))}
+            )
+        self.session_state.suggestion_strategy = str(settings.get("suggestion_strategy", "current_view"))
+        self.session_state.suggestion_score_threshold = float(
+            settings.get("suggestion_score_threshold", 0.0)
+        )
+        self.session_state.suggestion_auto_retrain_enabled = bool(
+            settings.get("suggestion_auto_retrain_enabled", True)
+        )
+        self.session_state.suggestion_auto_retrain_min_labels = int(
+            settings.get("suggestion_auto_retrain_min_labels", 25)
+        )
+        self.session_state.annotation_space = str(settings.get("annotation_space", "stack"))
+        self.session_state.generation_space = str(settings.get("generation_space", "stack"))
+        self.session_state.assist_min_total_labels = int(
+            settings.get("assist_min_total_labels", 30)
+        )
+        self.session_state.assist_min_positive_labels = int(
+            settings.get("assist_min_positive_labels", 15)
+        )
+        self.session_state.assist_min_negative_labels = int(
+            settings.get("assist_min_negative_labels", 15)
+        )
+        self.session_state.assist_min_labels_per_context = int(
+            settings.get("assist_min_labels_per_context", 10)
+        )
+        suggestion_payload = settings.get("suggestions_by_image", {})
+        if isinstance(suggestion_payload, dict):
+            for image_id, rows in suggestion_payload.items():
+                if not isinstance(rows, list):
+                    continue
+                try:
+                    iid = int(image_id)
+                except (TypeError, ValueError):
+                    continue
+                if iid not in self.session_state.suggestions:
+                    self.session_state.suggestions[iid] = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    self.session_state.suggestions[iid].append(
+                        PointSuggestion(
+                            image_id=int(row.get("image_id", iid)),
+                            image_name=str(row.get("image_name", "")),
+                            t=int(row.get("t", -1)),
+                            z=int(row.get("z", -1)),
+                            y=float(row.get("y", 0.0)),
+                            x=float(row.get("x", 0.0)),
+                            score=float(row.get("score", row.get("confidence", 0.0))),
+                            label=str(row.get("label", "phage")),
+                            suggestion_id=str(row.get("suggestion_id", "")),
+                            source_model=str(row.get("source_model", "unknown")),
+                            source_modality=str(row.get("source_modality", "raw")),
+                            scale_sigma=float(row.get("scale_sigma", 1.0)),
+                            psf_radius=float(row.get("psf_radius", 6.0)),
+                            roi_id=row.get("roi_id"),
+                            score_components=dict(row.get("score_components", {})),
+                            status=str(row.get("status", "proposed")),
+                            meta=dict(row.get("meta", {})),
+                        )
+                    )
+        suggestion_history_payload = settings.get("suggestion_history_by_image", {})
+        if isinstance(suggestion_history_payload, dict):
+            for image_id, rows in suggestion_history_payload.items():
+                if not isinstance(rows, list):
+                    continue
+                try:
+                    iid = int(image_id)
+                except (TypeError, ValueError):
+                    continue
+                if iid not in self.session_state.suggestion_history:
+                    self.session_state.suggestion_history[iid] = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    self.session_state.suggestion_history[iid].append(
+                        PointSuggestion(
+                            image_id=int(row.get("image_id", iid)),
+                            image_name=str(row.get("image_name", "")),
+                            t=int(row.get("t", -1)),
+                            z=int(row.get("z", -1)),
+                            y=float(row.get("y", 0.0)),
+                            x=float(row.get("x", 0.0)),
+                            score=float(row.get("score", row.get("confidence", 0.0))),
+                            label=str(row.get("label", "phage")),
+                            suggestion_id=str(row.get("suggestion_id", "")),
+                            source_model=str(row.get("source_model", "unknown")),
+                            source_modality=str(row.get("source_modality", "raw")),
+                            scale_sigma=float(row.get("scale_sigma", 1.0)),
+                            psf_radius=float(row.get("psf_radius", 6.0)),
+                            roi_id=row.get("roi_id"),
+                            score_components=dict(row.get("score_components", {})),
+                            status=str(row.get("status", "proposed")),
+                            meta=dict(row.get("meta", {})),
+                        )
+                    )
+        self.session_state.suggestion_ranker_state = dict(
+            settings.get("suggestion_ranker_state", {})
+        )
+        samples = settings.get("suggestion_training_samples", [])
+        if isinstance(samples, list):
+            self.session_state.suggestion_training_samples = [
+                row for row in samples if isinstance(row, dict)
+            ]
+        self.session_state.suggestion_training_pending = int(
+            settings.get("suggestion_training_pending", 0)
+        )
+        context_stats = settings.get("suggestion_context_stats", {})
+        if isinstance(context_stats, dict):
+            self.session_state.suggestion_context_stats = {
+                str(k): {
+                    "total": int(dict(v).get("total", 0)),
+                    "pos": int(dict(v).get("pos", 0)),
+                    "neg": int(dict(v).get("neg", 0)),
+                }
+                for k, v in context_stats.items()
+                if isinstance(v, dict)
+            }
+        if hasattr(self, "restore_suggestion_ranker"):
+            self.restore_suggestion_ranker()
         density_cfg = settings.get("density_config")
         if isinstance(density_cfg, dict):
             self.density_config = DensityConfig(**density_cfg)

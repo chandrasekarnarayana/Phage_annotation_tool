@@ -23,6 +23,28 @@ from phage_annotator.rendering.scalebar import ScaleBarSpec
 class ExportMixin:
     """Mixin for saving/loading annotations and projects."""
 
+    @staticmethod
+    def _serialize_suggestion(suggestion) -> dict:
+        return {
+            "image_id": int(getattr(suggestion, "image_id", -1)),
+            "image_name": str(getattr(suggestion, "image_name", "")),
+            "t": int(getattr(suggestion, "t", -1)),
+            "z": int(getattr(suggestion, "z", -1)),
+            "y": float(getattr(suggestion, "y", 0.0)),
+            "x": float(getattr(suggestion, "x", 0.0)),
+            "score": float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0))),
+            "label": str(getattr(suggestion, "label", "phage")),
+            "suggestion_id": str(getattr(suggestion, "suggestion_id", "")),
+            "source_model": str(getattr(suggestion, "source_model", "unknown")),
+            "source_modality": str(getattr(suggestion, "source_modality", "raw")),
+            "scale_sigma": float(getattr(suggestion, "scale_sigma", 1.0)),
+            "psf_radius": float(getattr(suggestion, "psf_radius", 6.0)),
+            "roi_id": getattr(suggestion, "roi_id", None),
+            "score_components": dict(getattr(suggestion, "score_components", {})),
+            "status": str(getattr(suggestion, "status", "proposed")),
+            "meta": dict(getattr(suggestion, "meta", {})),
+        }
+
     def _save_csv(self) -> None:
         csv_path, _ = self._default_export_paths()
         self.controller.save_csv(self, csv_path)
@@ -101,6 +123,57 @@ class ExportMixin:
             "auto_roi_area": int(self.auto_roi_area_spin.value())
             if getattr(self, "auto_roi_area_spin", None) is not None
             else 100 * 100,
+            "current_user": self.controller.session_state.current_user,
+            "audit_log": list(self.controller.session_state.audit_log),
+            "suggestion_metrics": dict(self.controller.session_state.suggestion_metrics),
+            "suggestions_by_image": {
+                int(image_id): [self._serialize_suggestion(s) for s in items]
+                for image_id, items in self.controller.session_state.suggestions.items()
+            },
+            "suggestion_history_by_image": {
+                int(image_id): [self._serialize_suggestion(s) for s in items]
+                for image_id, items in self.controller.session_state.suggestion_history.items()
+            },
+            "suggestion_strategy": str(getattr(self, "_suggestion_strategy", "raw")),
+            "suggestion_score_threshold": float(
+                getattr(self, "_suggestion_score_threshold", 0.0)
+            ),
+            "suggestion_ranker_state": dict(self.controller.suggestion_ranker.to_dict())
+            if hasattr(self.controller, "suggestion_ranker")
+            else {},
+            "suggestion_training_samples": list(
+                getattr(self.controller.session_state, "suggestion_training_samples", [])
+            ),
+            "suggestion_training_pending": int(
+                getattr(self.controller.session_state, "suggestion_training_pending", 0)
+            ),
+            "suggestion_context_stats": dict(
+                getattr(self.controller.session_state, "suggestion_context_stats", {})
+            ),
+            "suggestion_auto_retrain_enabled": bool(
+                getattr(self.controller.session_state, "suggestion_auto_retrain_enabled", True)
+            ),
+            "suggestion_auto_retrain_min_labels": int(
+                getattr(self.controller.session_state, "suggestion_auto_retrain_min_labels", 25)
+            ),
+            "annotation_space": str(
+                getattr(self.controller.session_state, "annotation_space", "stack")
+            ),
+            "generation_space": str(
+                getattr(self.controller.session_state, "generation_space", "stack")
+            ),
+            "assist_min_total_labels": int(
+                getattr(self.controller.session_state, "assist_min_total_labels", 30)
+            ),
+            "assist_min_positive_labels": int(
+                getattr(self.controller.session_state, "assist_min_positive_labels", 15)
+            ),
+            "assist_min_negative_labels": int(
+                getattr(self.controller.session_state, "assist_min_negative_labels", 15)
+            ),
+            "assist_min_labels_per_context": int(
+                getattr(self.controller.session_state, "assist_min_labels_per_context", 10)
+            ),
         }
         self.controller.save_project(
             self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
@@ -156,6 +229,63 @@ class ExportMixin:
             cfg = self.controller.session_state.threshold_configs_by_image.get(image_id)
             if cfg:
                 self._apply_threshold_settings(cfg)
+        self._suggestion_strategy = str(
+            getattr(self.controller.session_state, "suggestion_strategy", "current_view")
+        )
+        self._suggestion_score_threshold = float(
+            getattr(self.controller.session_state, "suggestion_score_threshold", 0.0)
+        )
+        if hasattr(self, "annotation_space_combo"):
+            self.annotation_space_combo.blockSignals(True)
+            self.annotation_space_combo.setCurrentText(
+                str(getattr(self.controller.session_state, "annotation_space", "stack"))
+            )
+            self.annotation_space_combo.blockSignals(False)
+        if hasattr(self, "suggestion_auto_retrain_chk"):
+            self.suggestion_auto_retrain_chk.blockSignals(True)
+            self.suggestion_auto_retrain_chk.setChecked(
+                bool(
+                    getattr(
+                        self.controller.session_state,
+                        "suggestion_auto_retrain_enabled",
+                        True,
+                    )
+                )
+            )
+            self.suggestion_auto_retrain_chk.blockSignals(False)
+        if hasattr(self, "suggestion_min_labels_spin"):
+            self.suggestion_min_labels_spin.blockSignals(True)
+            self.suggestion_min_labels_spin.setValue(
+                int(
+                    getattr(
+                        self.controller.session_state,
+                        "suggestion_auto_retrain_min_labels",
+                        25,
+                    )
+                )
+            )
+            self.suggestion_min_labels_spin.blockSignals(False)
+        if hasattr(self, "assist_min_total_spin"):
+            self.assist_min_total_spin.blockSignals(True)
+            self.assist_min_positive_spin.blockSignals(True)
+            self.assist_min_negative_spin.blockSignals(True)
+            self.assist_min_context_spin.blockSignals(True)
+            self.assist_min_total_spin.setValue(
+                int(getattr(self.controller.session_state, "assist_min_total_labels", 30))
+            )
+            self.assist_min_positive_spin.setValue(
+                int(getattr(self.controller.session_state, "assist_min_positive_labels", 15))
+            )
+            self.assist_min_negative_spin.setValue(
+                int(getattr(self.controller.session_state, "assist_min_negative_labels", 15))
+            )
+            self.assist_min_context_spin.setValue(
+                int(getattr(self.controller.session_state, "assist_min_labels_per_context", 10))
+            )
+            self.assist_min_total_spin.blockSignals(False)
+            self.assist_min_positive_spin.blockSignals(False)
+            self.assist_min_negative_spin.blockSignals(False)
+            self.assist_min_context_spin.blockSignals(False)
         if hasattr(self, "_sync_channel_panel_for_active_image"):
             self._sync_channel_panel_for_active_image()
         if self.density_panel is not None:

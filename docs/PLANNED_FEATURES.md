@@ -6,92 +6,47 @@ Last updated: February 27, 2026
 This file tracks only not-yet-implemented capabilities.
 Completed capabilities are documented in implementation summaries and test reports.
 
+GUI design principles were checked and operationalized in the runtime UI; they are now tracked under completed cleanup items below.
+
 ## Priority Backlog
 
-| Priority | Capability | Why It Matters | MVP Target |
-|---|---|---|---|
-| P0 | Assisted annotation (model-in-the-loop) | Biggest throughput gain for dense keypoint labeling | Suggest + accept/reject workflow with online quality tracking |
-| P1 | Standard export suite | Interop with external tooling and model training pipelines | COCO keypoints + normalized CSV/JSON export |
-| P1 | Collaboration and review workflow | Team-scale quality control and reproducibility | Review states, assignment, and audit trail in project data |
-| P2 | Reviewer analytics | Measure annotation velocity and disagreement hotspots | Per-user metrics and issue trend dashboard |
+### Remaining Cleanup Backlog
+No open cleanup items.
 
-## 1) Assisted Annotation (Model-in-the-Loop)
+### Completed Cleanup and Unification
 
-### Productized version for this tool
-- Point proposal mode for current T/Z slice and optional batch proposal for full stack.
-- Confidence-gated suggestions with color-coded certainty and one-click accept/reject.
-- "Correct and learn" loop: accepted/rejected edits are logged as training signals.
-- Slice-aware priors using existing local-maximum snapping and QC detectors.
+1. Table architecture unified to one active runtime path (dock table in `ui_setup.py` + `table_status.py`) with:
+   - sortable rows
+   - stack/slice scope visibility
+   - direct coordinate editing
+   - stable annotation identity mapping during edit/selection
+2. Legacy model/panel table architecture moved out of runtime tree to docs internal archive.
+3. Panel visibility synchronization expanded across major docks and centralized through shared dock action behavior.
+4. Settings proxy introduced (`UnifiedSettingsProxy`) and integrated into main window settings path.
+5. Actions decomposed with new feature mixins (`qc_actions.py`, `dock_actions.py`, `keyboard_events.py`).
+6. Action-module decomposition completed for navigation and export/reviewer analytics:
+   - `navigation_actions.py` owns jump/frame-Z command flow.
+   - `export_actions.py` owns standard export and reviewer analytics dialogs.
+   - `standard.py` orchestrator reduced by removing those duplicated method bodies.
+7. Keyboard shortcut registry completed as single source for menu labels, help dialog rows, and event dispatch:
+   - includes `F1` help mapping via action attribute binding.
+   - includes collision/behavior tests for shortcut consistency.
+8. Settings consolidation completion:
+   - fixed `UnifiedSettingsProxy` service bridge to use framework `SettingsService` API (`get/set/remove`) with fallback compatibility.
+   - added typed UI defaults + startup key migration module (`settings_schema.py`), applied during main window startup.
+   - added unit tests for proxy behavior.
+9. Renderer axis ownership cleanup completed for targeted helper modules; renderer-managed axes are now the active source in playback/state/threshold/ui-helper paths.
+10. Runtime/docs separation applied for QC integration guide (moved under `docs/_internal`).
+11. GUI design principles implementation pass completed:
+   - command palette is non-modal (does not block exploration while open).
+   - status bar now exposes operational context directly (dataset, T/Z frame, annotation space, active modality, assist status, background job state, autosave state).
+   - keyboard-first + review/QC paths remain exposed via command/menu/shortcut and QC issue workflows.
 
-### MVP
-- Add a `Suggest Points` action in the annotation toolbar.
-- Render suggestions as non-committed overlays.
-- Add bulk actions: `Accept Visible`, `Reject Visible`, `Accept In ROI`.
-- Track suggestion precision/recall proxy metrics:
-  - accept rate
-  - correction distance (suggested -> final)
-  - reject reasons
+## Assisted Annotation Terminology
 
-### Technical hooks
-- New session state bucket for ephemeral suggestions.
-- Command objects for accept/reject operations (undo/redo safe).
-- Lightweight model interface (`predict(image_slice) -> point proposals`).
-
-### Success criteria
-- 30%+ reduction in manual click count for dense annotation tasks.
-- No regression in final QC issue rate.
-
-## 2) Standard Export Suite
-
-### Productized version for this tool
-- COCO keypoints export for ML interoperability.
-- Flat CSV/JSON export with explicit T/Z/image/channel metadata.
-- Review-ready "evidence bundle" export:
-  - annotations
-  - QC report
-  - reviewer decisions
-  - tool/version metadata
-
-### MVP
-- Add export dialog with schema presets:
-  - `COCO Keypoints`
-  - `Canonical CSV`
-  - `Canonical JSON`
-- Add validation pass before export with actionable errors.
-- Add importer round-trip tests for each schema.
-
-### Technical hooks
-- Extend existing export module with schema adapters.
-- Version each export schema (`schema_version`) to preserve compatibility.
-
-### Success criteria
-- Deterministic export output for same project state.
-- Round-trip parity tests pass in CI for all supported formats.
-
-## 3) Collaboration and Review Workflow
-
-### Productized version for this tool
-- Annotation lifecycle states:
-  - `new`
-  - `in_review`
-  - `approved`
-  - `needs_changes`
-- Assignment fields on image regions or task queues.
-- Immutable audit trail for all annotation edits and review decisions.
-
-### MVP (desktop-first)
-- Add per-annotation review state and reviewer metadata.
-- Add project-level activity log with timestamped command history.
-- Add filtered views: "My queue", "Needs review", "Blocked by QC".
-
-### Phase 2 (multi-user service)
-- Optional server-backed project store with optimistic locking.
-- Conflict resolution UI for concurrent edits.
-- Role-based permissions (annotator/reviewer/admin).
-
-### Success criteria
-- Full traceability from final annotation to edit/review history.
-- Reduced review turnaround time via queue-based workflows.
+- `confidence` = calibrated `p_accept` from the ranker.
+- `generator score` = heuristic score from candidate generation.
+- Calibration is dataset-dependent; `p_accept` is meaningful only under similar acquisition conditions.
 
 ## Naming and Documentation Policy
 

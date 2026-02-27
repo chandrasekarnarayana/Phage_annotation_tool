@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from phage_annotator.ui_qt.keyboard_registry import dialog_rows, detect_conflicts, all_shortcuts
 
 
 class KeyboardShortcutsDialog(QtWidgets.QDialog):
@@ -46,27 +47,10 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
         
     def _populate_shortcuts(self) -> None:
         """Populate table with all known shortcuts."""
-        shortcuts = [
-            ("Ctrl+Z", "Undo", "Undo last annotation change"),
-            ("Ctrl+Shift+Z", "Redo", "Redo last undone annotation change"),
-            ("Ctrl+M", "Measure", "Open measurement/results panel"),
-            ("Ctrl+Shift+P", "Command Palette", "Open command palette"),
-            ("1", "Annotate Tool", "Switch to annotation tool"),
-            ("2", "Eraser Tool", "Switch to eraser tool"),
-            ("3", "Pan/Zoom Tool", "Switch to pan/zoom tool"),
-            ("4", "ROI Box Tool", "Switch to ROI box drawing tool"),
-            ("5", "ROI Circle Tool", "Switch to ROI circle drawing tool"),
-            ("6", "ROI Edit Tool", "Switch to ROI editing tool"),
-            ("7", "Profile Line Tool", "Switch to line profile tool"),
-            ("Space", "Play/Pause", "Toggle time series playback"),
-            ("Left/Right", "Navigate Time", "Move backward/forward in time"),
-            ("Up/Down", "Navigate Z", "Move up/down in Z-stack"),
-            ("Shift+Left/Right", "Step 10 Frames", "Jump 10 frames backward/forward"),
-            ("Ctrl+Scroll", "Zoom", "Zoom in/out on canvas"),
-            ("Middle Click Drag", "Pan", "Pan canvas view"),
-            ("Delete/Backspace", "Delete Point", "Delete selected annotation"),
-            ("Escape", "Cancel", "Cancel current operation/tool"),
-        ]
+        shortcuts = dialog_rows()
+        conflicts = detect_conflicts(all_shortcuts())
+        if conflicts:
+            shortcuts.append(("-", "Conflict Warning", f"{len(conflicts)} shortcut conflict(s) detected"))
         
         self.table.setRowCount(len(shortcuts))
         for i, (shortcut, action, desc) in enumerate(shortcuts):

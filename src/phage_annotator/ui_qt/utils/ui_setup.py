@@ -63,12 +63,38 @@ class UiSetupMixin:
         load_ann_all_act = actions["load_ann_all"]
         save_csv_act = actions["save_csv"]
         save_json_act = actions["save_json"]
+        export_standard_act = actions["export_standard"]
         export_view_act = actions["export_view"]
         save_proj_act = actions["save_proj"]
         load_proj_act = actions["load_proj"]
         prefs_act = actions["prefs"]
         reset_confirms_act = actions["reset_confirms"]
         reload_ann_act = actions["reload_ann"]
+        suggest_points_act = actions["suggest_points"]
+        suggest_points_image_act = actions["suggest_points_image"]
+        select_suggestion_strategy_act = actions["select_suggestion_strategy"]
+        load_suggestion_rule_config_act = actions["load_suggestion_rule_config"]
+        set_suggestion_score_threshold_act = actions["set_suggestion_score_threshold"]
+        accept_visible_suggestions_act = actions["accept_visible_suggestions"]
+        accept_suggestions_in_roi_act = actions["accept_suggestions_in_roi"]
+        reject_visible_suggestions_act = actions["reject_visible_suggestions"]
+        clear_suggestions_act = actions["clear_suggestions"]
+        show_suggestion_patch_act = actions["show_suggestion_patch"]
+        start_timed_session_assisted_act = actions["start_timed_session_assisted"]
+        start_timed_session_manual_act = actions["start_timed_session_manual"]
+        stop_timed_session_act = actions["stop_timed_session"]
+        assist_warmup_act = actions["assist_warmup"]
+        toggle_suggestions_overlay_act = actions["toggle_suggestions_overlay"]
+        set_current_user_act = actions["set_current_user"]
+        mark_selected_in_review_act = actions["mark_selected_in_review"]
+        mark_selected_approved_act = actions["mark_selected_approved"]
+        mark_selected_needs_changes_act = actions["mark_selected_needs_changes"]
+        assign_selected_act = actions["assign_selected"]
+        show_reviewer_analytics_act = actions["show_reviewer_analytics"]
+        queue_all_act = actions["queue_all"]
+        queue_my_act = actions["queue_my"]
+        queue_needs_review_act = actions["queue_needs_review"]
+        queue_blocked_qc_act = actions["queue_blocked_qc"]
         clear_hist_cache_act = actions.get("clear_hist_cache")
         exit_act = actions["exit"]
         about_act = actions["about"]
@@ -127,18 +153,30 @@ class UiSetupMixin:
         explore_layout.addLayout(primary_box)
 
         # Annotation table (own dock)
-        self.annot_table = QtWidgets.QTableWidget(0, 5)
-        self.annot_table.setHorizontalHeaderLabels(["T", "Z", "Y", "X", "Label"])
+        self.annot_table = QtWidgets.QTableWidget(0, 7)
+        self.annot_table.setHorizontalHeaderLabels(["ID", "Scope", "T", "Z", "Y", "X", "Label"])
         self.annot_table.setSelectionBehavior(
             QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
         )
         self.annot_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
+        self.annot_table.setSortingEnabled(True)
+        self.annot_table.setAlternatingRowColors(True)
         self.filter_current_chk = QtWidgets.QCheckBox("Show current slice only")
+        self.auto_follow_table_chk = QtWidgets.QCheckBox("Auto-follow T/Z")
+        self.auto_follow_table_chk.setChecked(
+            bool(self._settings.value("annotationTableAutoFollow", True, type=bool))
+        )
+        if self.auto_follow_table_chk.isChecked():
+            self.filter_current_chk.setChecked(True)
         self.annotation_table_panel = QtWidgets.QWidget()
         annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
         annot_layout.setContentsMargins(8, 8, 8, 8)
         annot_layout.setSpacing(8)
-        annot_layout.addWidget(self.filter_current_chk)
+        table_filter_row = QtWidgets.QHBoxLayout()
+        table_filter_row.addWidget(self.filter_current_chk)
+        table_filter_row.addWidget(self.auto_follow_table_chk)
+        table_filter_row.addStretch(1)
+        annot_layout.addLayout(table_filter_row)
         annot_layout.addWidget(self.annot_table)
 
         # Figure area
@@ -151,7 +189,6 @@ class UiSetupMixin:
         self.ax_frame = None
         self.ax_mean = None
         self.ax_comp = None
-        self.ax_composite = None  # Alias for ax_comp
         self.ax_support = None
         self.ax_std = None
         self.ax_line = None
@@ -237,6 +274,15 @@ class UiSetupMixin:
         playback_layout.addWidget(self.playback_mode_combo, 3, 1)
         playback_layout.addWidget(self.playback_target_combo, 3, 2)
         playback_layout.addWidget(self.playback_target_btn, 3, 3)
+        self.quick_hist_btn = QtWidgets.QPushButton("Histogram")
+        self.quick_profile_btn = QtWidgets.QPushButton("Profile")
+        self.quick_qc_btn = QtWidgets.QPushButton("QC Issues")
+        self.quick_hist_btn.setToolTip("Toggle histogram panel")
+        self.quick_profile_btn.setToolTip("Toggle line profile panel")
+        self.quick_qc_btn.setToolTip("Show QC issues panel")
+        playback_layout.addWidget(self.quick_hist_btn, 4, 1)
+        playback_layout.addWidget(self.quick_profile_btn, 4, 2)
+        playback_layout.addWidget(self.quick_qc_btn, 4, 3)
 
         display_group = QtWidgets.QGroupBox("Display")
         display_layout = QtWidgets.QGridLayout(display_group)
@@ -547,6 +593,96 @@ class UiSetupMixin:
         adv_layout.addWidget(self.apply_display_btn, r, 0, 1, 2)
         r += 1
 
+        # Assisted annotation ranker controls.
+        self.suggestion_auto_retrain_chk = QtWidgets.QCheckBox(
+            "Auto-retrain proposal ranker"
+        )
+        self.suggestion_auto_retrain_chk.setChecked(
+            bool(self.controller.session_state.suggestion_auto_retrain_enabled)
+        )
+        adv_layout.addWidget(self.suggestion_auto_retrain_chk, r, 0, 1, 2)
+        r += 1
+
+        self.suggestion_min_labels_spin = QtWidgets.QSpinBox()
+        self.suggestion_min_labels_spin.setRange(5, 5000)
+        self.suggestion_min_labels_spin.setValue(
+            int(self.controller.session_state.suggestion_auto_retrain_min_labels)
+        )
+        adv_layout.addWidget(QtWidgets.QLabel("Min labels for retrain"), r, 0)
+        adv_layout.addWidget(self.suggestion_min_labels_spin, r, 1)
+        r += 1
+
+        self.suggestion_train_now_btn = QtWidgets.QPushButton("Train Ranker Now")
+        adv_layout.addWidget(self.suggestion_train_now_btn, r, 0, 1, 2)
+        r += 1
+
+        self.annotation_space_combo = QtWidgets.QComboBox()
+        self.annotation_space_combo.addItems(["stack", "projection"])
+        self.annotation_space_combo.setCurrentText(
+            str(getattr(self.controller.session_state, "annotation_space", "stack"))
+        )
+        adv_layout.addWidget(QtWidgets.QLabel("Annotation space"), r, 0)
+        adv_layout.addWidget(self.annotation_space_combo, r, 1)
+        r += 1
+
+        self.assist_min_total_spin = QtWidgets.QSpinBox()
+        self.assist_min_total_spin.setRange(1, 5000)
+        self.assist_min_total_spin.setValue(
+            int(getattr(self.controller.session_state, "assist_min_total_labels", 30))
+        )
+        self.assist_min_positive_spin = QtWidgets.QSpinBox()
+        self.assist_min_positive_spin.setRange(1, 5000)
+        self.assist_min_positive_spin.setValue(
+            int(getattr(self.controller.session_state, "assist_min_positive_labels", 15))
+        )
+        self.assist_min_negative_spin = QtWidgets.QSpinBox()
+        self.assist_min_negative_spin.setRange(1, 5000)
+        self.assist_min_negative_spin.setValue(
+            int(getattr(self.controller.session_state, "assist_min_negative_labels", 15))
+        )
+        self.assist_min_context_spin = QtWidgets.QSpinBox()
+        self.assist_min_context_spin.setRange(1, 5000)
+        self.assist_min_context_spin.setValue(
+            int(getattr(self.controller.session_state, "assist_min_labels_per_context", 10))
+        )
+        self.qc_auto_show_chk = QtWidgets.QCheckBox("Auto-show QC panel on issues")
+        self.qc_auto_show_chk.setChecked(
+            bool(self._settings.value("qcAutoShowOnIssues", True, type=bool))
+        )
+        adv_layout.addWidget(QtWidgets.QLabel("Assist min total labels"), r, 0)
+        adv_layout.addWidget(self.assist_min_total_spin, r, 1)
+        r += 1
+        adv_layout.addWidget(QtWidgets.QLabel("Assist min positive labels"), r, 0)
+        adv_layout.addWidget(self.assist_min_positive_spin, r, 1)
+        r += 1
+        adv_layout.addWidget(QtWidgets.QLabel("Assist min negative labels"), r, 0)
+        adv_layout.addWidget(self.assist_min_negative_spin, r, 1)
+        r += 1
+        adv_layout.addWidget(QtWidgets.QLabel("Assist min labels/context"), r, 0)
+        adv_layout.addWidget(self.assist_min_context_spin, r, 1)
+        r += 1
+        adv_layout.addWidget(self.qc_auto_show_chk, r, 0, 1, 2)
+        r += 1
+
+        warmup_group = QtWidgets.QGroupBox("Assist Warmup Progress")
+        warmup_layout = QtWidgets.QGridLayout(warmup_group)
+        self.assist_warmup_status_lbl = QtWidgets.QLabel("Assist: Unavailable")
+        self.assist_warmup_counts_lbl = QtWidgets.QLabel("Labels total/+/-: 0/0/0")
+        self.assist_warmup_need_lbl = QtWidgets.QLabel("Need +0 total, +0 positive, +0 negative")
+        self.assist_warmup_context_lbl = QtWidgets.QLabel("Context labels: 0 (need +0)")
+        self.assist_warmup_queue_lbl = QtWidgets.QLabel("Visible uncertain queue: 0")
+        self.assist_warmup_next_btn = QtWidgets.QPushButton("Jump Next Uncertain")
+        self.assist_warmup_refresh_btn = QtWidgets.QPushButton("Refresh")
+        warmup_layout.addWidget(self.assist_warmup_status_lbl, 0, 0, 1, 2)
+        warmup_layout.addWidget(self.assist_warmup_counts_lbl, 1, 0, 1, 2)
+        warmup_layout.addWidget(self.assist_warmup_need_lbl, 2, 0, 1, 2)
+        warmup_layout.addWidget(self.assist_warmup_context_lbl, 3, 0, 1, 2)
+        warmup_layout.addWidget(self.assist_warmup_queue_lbl, 4, 0, 1, 2)
+        warmup_layout.addWidget(self.assist_warmup_next_btn, 5, 0)
+        warmup_layout.addWidget(self.assist_warmup_refresh_btn, 5, 1)
+        adv_layout.addWidget(warmup_group, r, 0, 1, 4)
+        r += 1
+
         self.settings_advanced_container.setLayout(adv_container_layout)
         self.advanced_group.setLayout(adv_layout)
         adv_container_layout.addWidget(self.advanced_group)
@@ -588,6 +724,7 @@ class UiSetupMixin:
         reload_ann_act.triggered.connect(self._reload_annotations_current)
         save_csv_act.triggered.connect(self._save_csv)
         save_json_act.triggered.connect(self._save_json)
+        export_standard_act.triggered.connect(self._export_standard_bundle_dialog)
         export_view_act.triggered.connect(self._export_view_dialog)
         save_proj_act.triggered.connect(self._save_project)
         load_proj_act.triggered.connect(self._load_project)
@@ -609,6 +746,49 @@ class UiSetupMixin:
             self.apply_roi_template_act.triggered.connect(self._apply_roi_template)
         if clear_hist_cache_act is not None:
             clear_hist_cache_act.triggered.connect(self._clear_histogram_cache)
+        suggest_points_act.triggered.connect(self._suggest_points_current_slice)
+        suggest_points_image_act.triggered.connect(self._suggest_points_current_image)
+        select_suggestion_strategy_act.triggered.connect(self._select_suggestion_strategy_dialog)
+        load_suggestion_rule_config_act.triggered.connect(
+            self._load_suggestion_rule_config_dialog
+        )
+        set_suggestion_score_threshold_act.triggered.connect(
+            self._set_suggestion_score_threshold_dialog
+        )
+        accept_visible_suggestions_act.triggered.connect(self._accept_visible_suggestions)
+        accept_suggestions_in_roi_act.triggered.connect(self._accept_suggestions_in_roi)
+        reject_visible_suggestions_act.triggered.connect(self._reject_visible_suggestions)
+        clear_suggestions_act.triggered.connect(self._clear_suggestions_current_image)
+        show_suggestion_patch_act.triggered.connect(self._show_current_suggestion_patch)
+        start_timed_session_assisted_act.triggered.connect(
+            lambda: self._start_timed_annotation_session(True)
+        )
+        start_timed_session_manual_act.triggered.connect(
+            lambda: self._start_timed_annotation_session(False)
+        )
+        stop_timed_session_act.triggered.connect(self._stop_timed_annotation_session)
+        assist_warmup_act.triggered.connect(self._start_assist_warmup)
+        toggle_suggestions_overlay_act.triggered.connect(self._toggle_suggestions_overlay)
+        set_current_user_act.triggered.connect(self._set_current_user_dialog)
+        mark_selected_in_review_act.triggered.connect(
+            lambda: self._set_selected_review_state("in_review")
+        )
+        mark_selected_approved_act.triggered.connect(
+            lambda: self._set_selected_review_state("approved")
+        )
+        mark_selected_needs_changes_act.triggered.connect(
+            lambda: self._set_selected_review_state("needs_changes")
+        )
+        assign_selected_act.triggered.connect(self._assign_selected_annotations_dialog)
+        show_reviewer_analytics_act.triggered.connect(self._show_reviewer_analytics_dialog)
+        queue_all_act.triggered.connect(lambda: self._set_review_queue_filter("all"))
+        queue_my_act.triggered.connect(lambda: self._set_review_queue_filter("my_queue"))
+        queue_needs_review_act.triggered.connect(
+            lambda: self._set_review_queue_filter("needs_review")
+        )
+        queue_blocked_qc_act.triggered.connect(
+            lambda: self._set_review_queue_filter("blocked_qc")
+        )
 
         self.toggle_profile_act.triggered.connect(self._toggle_profile_panel)
         self.toggle_hist_act.triggered.connect(self._toggle_hist_panel)
@@ -661,6 +841,42 @@ class UiSetupMixin:
         self.scalebar_text_chk.toggled.connect(self._on_scalebar_change)
         self.scalebar_background_chk.toggled.connect(self._on_scalebar_change)
         self.scalebar_export_chk.toggled.connect(self._on_scalebar_change)
+        self.suggestion_auto_retrain_chk.toggled.connect(
+            self._on_suggestion_auto_retrain_changed
+        )
+        self.suggestion_min_labels_spin.valueChanged.connect(
+            self._on_suggestion_min_labels_changed
+        )
+        self.suggestion_train_now_btn.clicked.connect(self._train_suggestion_ranker_now)
+        self.annotation_space_combo.currentTextChanged.connect(self._on_annotation_space_changed)
+        self.assist_min_total_spin.valueChanged.connect(self._on_assist_minima_changed)
+        self.assist_min_positive_spin.valueChanged.connect(self._on_assist_minima_changed)
+        self.assist_min_negative_spin.valueChanged.connect(self._on_assist_minima_changed)
+        self.assist_min_context_spin.valueChanged.connect(self._on_assist_minima_changed)
+        self.qc_auto_show_chk.toggled.connect(self._on_qc_auto_show_changed)
+        self.assist_warmup_next_btn.clicked.connect(self._next_uncertain_suggestion)
+        self.assist_warmup_refresh_btn.clicked.connect(self._refresh_assist_warmup_panel)
+        self.quick_hist_btn.clicked.connect(self._toggle_hist_panel)
+        self.quick_profile_btn.clicked.connect(self._toggle_profile_panel)
+        self.quick_qc_btn.clicked.connect(
+            lambda: (
+                getattr(self, "dock_qc_issues", None).setVisible(True)
+                if getattr(self, "dock_qc_issues", None) is not None
+                else None
+            )
+        )
+        for dock_attr in (
+            "dock_hist",
+            "dock_profile",
+            "dock_qc_issues",
+            "dock_density",
+            "dock_logs",
+            "dock_metadata",
+            "dock_results",
+        ):
+            dock = getattr(self, dock_attr, None)
+            if dock is not None:
+                dock.visibilityChanged.connect(lambda _v: self._sync_panel_visibility_state())
         if self.density_panel is not None:
             self.density_panel.model_browse_btn.clicked.connect(self._density_pick_model)
             self.density_panel.load_btn.clicked.connect(self._density_load_model)
@@ -681,6 +897,9 @@ class UiSetupMixin:
         if hasattr(self, "annotation_meta_apply_btn"):
             self.annotation_meta_apply_btn.clicked.connect(self._apply_annotation_metadata)
             self.annotation_meta_close_btn.clicked.connect(self._dismiss_annotation_meta_banner)
+        self._sync_panel_visibility_state()
+        self._update_qc_button_highlight(0)
+        self._refresh_assist_warmup_panel()
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
         self.controller.annotations_changed.connect(

@@ -14,14 +14,30 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.analysis.core import compute_roi_mean_for_path, fit_bleach_curve
+from phage_annotator.analysis.suggestion_rules import load_suggestion_rule_config
 from phage_annotator.config import SUPPORTED_SUFFIXES
+from phage_annotator.core.annotation import PointSuggestion
+from phage_annotator.session.suggestion_commands import (
+    AcceptSuggestionCommand,
+    ClearSuggestionsCommand,
+    RejectSuggestionCommand,
+)
+from phage_annotator.ui_qt.actions.dock_actions import DockActionsMixin
+from phage_annotator.ui_qt.actions.export_actions import ExportActionsMixin
+from phage_annotator.ui_qt.actions.navigation_actions import NavigationActionsMixin
+from phage_annotator.ui_qt.actions.qc_actions import QCActionsMixin
 from phage_annotator.ui_qt.utils.debug import debug_log
 from phage_annotator.ui_qt.utils.image_io import read_metadata
 from phage_annotator.ui_qt.rendering.lut_manager import lut_names
 from phage_annotator.io.metadata.reader import MetadataBundle
 
 
-class ActionsMixin:
+class ActionsMixin(
+    NavigationActionsMixin,
+    ExportActionsMixin,
+    DockActionsMixin,
+    QCActionsMixin,
+):
     """Mixin for File/View/Analyze actions and dialogs."""
 
     def _open_files(self) -> None:
@@ -199,12 +215,6 @@ class ActionsMixin:
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
         self._start_annotation_load_job(image_id, replace=True, pixel_size_nm=pixel_size_nm)
 
-    def _toggle_profile_panel(self) -> None:
-        self.profile_chk.setChecked(not self.profile_chk.isChecked())
-
-    def _toggle_hist_panel(self) -> None:
-        self.hist_chk.setChecked(not self.hist_chk.isChecked())
-
     def _toggle_left_pane(self) -> None:
         if self.dock_sidebar is None:
             return
@@ -243,248 +253,1036 @@ class ActionsMixin:
         dialog = KeyboardShortcutsDialog(self)
         dialog.exec()
 
-    def _execute_navigation_command(self, command) -> None:
-        """Execute a navigation command and refresh undo/redo state."""
-        if not self.controller.execute_view_command(command):
-            self._set_status("Navigation target is out of range.")
+    def _visible_suggestions(self) -> list[PointSuggestion]:
+        """Return suggestions visible on active image and T/Z slice."""
+        image_id = self.primary_image.id
+        t_idx = int(self.t_slider.value())
+        z_idx = int(self.z_slider.value())
+        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
+        return [
+            s
+            for s in self.suggestions.get(image_id, [])
+            if int(s.t) in (t_idx, -1) and int(s.z) in (z_idx, -1)
+            and float(getattr(s, "score", getattr(s, "confidence", 0.0))) >= min_score
+        ]
+
+    def _candidate_suggestion_strategies(self) -> list[str]:
+        """Return available suggestion strategies for the current context."""
+        options = [
+            "current_view",
+            "raw",
+            "corrected",
+            "mean_projection",
+            "max_projection",
+            "evidence_consensus",
+            "evidence_contradiction",
+        ]
+        image = getattr(self, "primary_image", None)
+        if image is not None and int(getattr(image, "channel_count", 1)) >= 2:
+            options.extend(
+                [
+                    "channel_a_only",
+                    "channel_b_only",
+                    "channel_a_peak_b_low",
+                    "channel_b_peak_a_low",
+                ]
+            )
+        return options
+
+    def _available_modality_frames(self, image, t_idx: int, z_idx: int) -> dict[str, np.ndarray]:
+        """Build a modality/evidence frame map for suggestion generation."""
+        out: dict[str, np.ndarray] = {}
+        raw = self._slice_data(image, t_override=t_idx, z_override=z_idx)
+        if raw is None:
+            return out
+        out["current_view"] = np.asarray(raw)
+        out["raw"] = np.asarray(raw)
+        model = getattr(self, "_suggestion_model", None)
+        if model is not None and hasattr(model, "_corrected_image"):
+            try:
+                out["corrected"] = np.asarray(model._corrected_image(np.asarray(raw)))
+            except Exception:
+                pass
+        if image.array is not None and image.array.ndim >= 4:
+            stack_t = np.asarray(image.array[t_idx, :, :, :], dtype=np.float32)
+            out["mean_projection"] = np.nanmean(stack_t, axis=0)
+            out["max_projection"] = np.nanmax(stack_t, axis=0)
+        return out
+
+    def _merge_modal_consensus(
+        self,
+        modality_candidates: dict[str, list[PointSuggestion]],
+        *,
+        k_required: int = 2,
+    ) -> list[PointSuggestion]:
+        """Merge per-modality candidates and require evidence in >= K modalities."""
+        if not modality_candidates:
+            return []
+        modality_ids = list(modality_candidates.keys())
+        seed_modality = "current_view" if "current_view" in modality_ids else modality_ids[0]
+        seeds = list(modality_candidates.get(seed_modality, []))
+        radius = float(getattr(self._suggestion_model, "min_distance_px", 6))
+        r2 = radius * radius
+        merged: list[PointSuggestion] = []
+        for seed in seeds:
+            bundle = {seed_modality: dict(seed.score_components)}
+            votes = 1
+            score_sum = float(seed.score)
+            for modality_id, rows in modality_candidates.items():
+                if modality_id == seed_modality:
+                    continue
+                hit = None
+                for row in rows:
+                    dx = float(row.x) - float(seed.x)
+                    dy = float(row.y) - float(seed.y)
+                    if dx * dx + dy * dy <= r2:
+                        hit = row
+                        break
+                if hit is not None:
+                    votes += 1
+                    score_sum += float(hit.score)
+                    bundle[modality_id] = dict(hit.score_components)
+            if votes < int(max(1, k_required)):
+                continue
+            combined = PointSuggestion(
+                image_id=seed.image_id,
+                image_name=seed.image_name,
+                t=seed.t,
+                z=seed.z,
+                y=seed.y,
+                x=seed.x,
+                score=float(score_sum / votes),
+                label=seed.label,
+                suggestion_id=seed.suggestion_id,
+                source_model=seed.source_model,
+                source_modality="consensus",
+                scale_sigma=seed.scale_sigma,
+                psf_radius=seed.psf_radius,
+                roi_id=seed.roi_id,
+                score_components=dict(seed.score_components),
+                status=seed.status,
+                meta=dict(seed.meta),
+            )
+            combined.meta["features"] = bundle
+            combined.meta["consensus_votes"] = int(votes)
+            merged.append(combined)
+        return merged
+
+    def _gating_strategy_candidates(
+        self,
+        *,
+        image,
+        t_idx: int,
+        z_idx: int,
+        strategy: str,
+        label: str,
+    ) -> list[PointSuggestion]:
+        """Generate candidates using generalized modality evidence strategies."""
+        model = getattr(self, "_suggestion_model", None)
+        if model is None or not hasattr(model, "predict"):
+            return []
+        frames = self._available_modality_frames(image, t_idx, z_idx)
+        if not frames:
+            return []
+        strategy_key = str(strategy or "current_view").lower()
+        roi_id = "active_roi" if self.roi_shape != "none" else None
+
+        def _predict_one(modality_id: str, frame: np.ndarray) -> list[PointSuggestion]:
+            rows = model.predict(
+                frame,
+                image_id=image.id,
+                image_name=image.name,
+                t=t_idx,
+                z=z_idx,
+                label=label,
+                strategy="raw",
+                roi_id=roi_id,
+            )
+            for row in rows:
+                row.source_modality = modality_id
+                row.meta.setdefault("features", {})
+                row.meta["features"][modality_id] = dict(row.score_components)
+            return rows
+
+        if strategy_key in frames:
+            return _predict_one(strategy_key, frames[strategy_key])
+
+        if strategy_key in ("evidence_consensus", "consensus"):
+            use_modalities = [mid for mid in ("raw", "corrected", "mean_projection") if mid in frames]
+            modality_candidates = {mid: _predict_one(mid, frames[mid]) for mid in use_modalities}
+            return self._merge_modal_consensus(modality_candidates, k_required=2)
+
+        if strategy_key in ("evidence_contradiction",):
+            base_ids = [mid for mid in ("raw", "corrected", "mean_projection") if mid in frames]
+            modality_candidates = {mid: _predict_one(mid, frames[mid]) for mid in base_ids}
+            seeds = self._merge_modal_consensus(modality_candidates, k_required=1)
+            cfg = getattr(self, "_suggestion_rule_config", None)
+            if cfg is None:
+                return seeds
+            rule = getattr(cfg, "semantic_rules", {}).get(strategy_key)
+            if rule is None:
+                return seeds
+            filtered = []
+            for suggestion in seeds:
+                features = dict(suggestion.meta.get("features", {}))
+                keep = True
+                for modality_id, threshold in dict(rule.positive_modalities).items():
+                    peak = float(dict(features.get(modality_id, {})).get("peak", -np.inf))
+                    if peak < float(threshold):
+                        keep = False
+                        break
+                if keep:
+                    for modality_id, threshold in dict(rule.negative_modalities).items():
+                        peak = float(dict(features.get(modality_id, {})).get("peak", np.inf))
+                        if peak > float(threshold):
+                            keep = False
+                            break
+                if keep:
+                    filtered.append(suggestion)
+            return filtered
+
+        # Legacy channel strategies still supported via existing gating.
+        seed_id = "current_view" if "current_view" in frames else next(iter(frames.keys()))
+        seeded = _predict_one(seed_id, frames[seed_id])
+        if strategy_key.startswith("channel_"):
+            return self._apply_cross_channel_gating(
+                seeded,
+                strategy=strategy_key,
+                t_idx=t_idx,
+                z_idx=z_idx,
+            )
+        return seeded
+
+    def _load_suggestion_rule_config_dialog(self) -> None:
+        """Load JSON/YAML experiment rule config for cross-channel gating."""
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Load Suggestion Rule Config",
+            str(pathlib.Path.cwd()),
+            "Config Files (*.json *.yaml *.yml)",
+        )
+        if not path:
             return
-        if hasattr(self, "t_slider"):
-            target_t = int(getattr(self.controller.view_state, "t", self.t_slider.value()))
-            if self.t_slider.value() != target_t:
-                self.t_slider.setValue(target_t)
-        if hasattr(self, "z_slider"):
-            target_z = int(getattr(self.controller.view_state, "z", self.z_slider.value()))
-            if self.z_slider.value() != target_z:
-                self.z_slider.setValue(target_z)
+        try:
+            self._suggestion_rule_config = load_suggestion_rule_config(pathlib.Path(path))
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Rule config load failed", str(exc))
+            return
+        self._set_status(f"Loaded suggestion rule config: {pathlib.Path(path).name}")
+
+    def _apply_cross_channel_gating(
+        self, suggestions: list[PointSuggestion], *, strategy: str, t_idx: int, z_idx: int
+    ) -> list[PointSuggestion]:
+        """Filter proposals by per-channel peak/low constraints."""
+        strategy_key = str(strategy or "raw").lower()
+        if strategy_key not in (
+            "channel_a_only",
+            "channel_b_only",
+            "channel_a_peak_b_low",
+            "channel_b_peak_a_low",
+        ):
+            return suggestions
+        image = self.primary_image
+        if int(getattr(image, "channel_count", 1)) < 2:
+            return suggestions
+        if not hasattr(self, "_get_channel_stack"):
+            return suggestions
+        ch0 = self._get_channel_stack(image, 0)
+        ch1 = self._get_channel_stack(image, 1)
+        if ch0 is None or ch1 is None:
+            return suggestions
+        frame0 = ch0[t_idx, z_idx]
+        frame1 = ch1[t_idx, z_idx]
+        high0 = float(np.nanquantile(frame0, 0.85))
+        low0 = float(np.nanquantile(frame0, 0.35))
+        high1 = float(np.nanquantile(frame1, 0.85))
+        low1 = float(np.nanquantile(frame1, 0.35))
+        rule = None
+        cfg = getattr(self, "_suggestion_rule_config", None)
+        if cfg is not None:
+            channels = getattr(cfg, "channels", {})
+            if "A" in channels:
+                ch = channels["A"]
+                high0 = float(ch.peak_min if ch.peak_min is not None else high0)
+                low0 = float(ch.background_max)
+            if "B" in channels:
+                ch = channels["B"]
+                high1 = float(ch.peak_min if ch.peak_min is not None else high1)
+                low1 = float(ch.background_max)
+            semantic_rules = getattr(cfg, "semantic_rules", {})
+            rule = semantic_rules.get(strategy_key)
+        filtered: list[PointSuggestion] = []
+        for suggestion in suggestions:
+            y = int(round(float(suggestion.y)))
+            x = int(round(float(suggestion.x)))
+            if y < 0 or x < 0 or y >= frame0.shape[0] or x >= frame0.shape[1]:
+                continue
+            v0 = float(frame0[y, x])
+            v1 = float(frame1[y, x])
+            keep = True
+            if strategy_key == "channel_a_only":
+                keep = v0 >= v1
+            elif strategy_key == "channel_b_only":
+                keep = v1 >= v0
+            elif strategy_key == "channel_a_peak_b_low":
+                keep = (v0 >= high0) and (v1 <= low1)
+            elif strategy_key == "channel_b_peak_a_low":
+                keep = (v1 >= high1) and (v0 <= low0)
+            if keep and rule is not None:
+                if rule.channel_a_peak_gt is not None and v0 <= float(rule.channel_a_peak_gt):
+                    keep = False
+                if rule.channel_b_peak_gt is not None and v1 <= float(rule.channel_b_peak_gt):
+                    keep = False
+                if rule.channel_a_lt is not None and v0 >= float(rule.channel_a_lt):
+                    keep = False
+                if rule.channel_b_lt is not None and v1 >= float(rule.channel_b_lt):
+                    keep = False
+                if rule.roi_id is not None and str(getattr(suggestion, "roi_id", "")) != str(
+                    rule.roi_id
+                ):
+                    keep = False
+            if keep:
+                filtered.append(suggestion)
+        return filtered
+
+    def _rank_and_calibrate_suggestions(self, suggestions: list[PointSuggestion]) -> list[PointSuggestion]:
+        """Apply lightweight ranker and calibrated p_accept if available."""
+        if not suggestions:
+            return suggestions
+        annotation_space = str(getattr(self.controller.session_state, "annotation_space", "stack"))
+        try:
+            ranked = self.controller.score_suggestions_for_context(
+                list(suggestions),
+                annotation_space=annotation_space,
+            )
+        except Exception:
+            ranked = list(suggestions)
+        ranked.sort(key=lambda s: float(getattr(s, "score", 0.0)), reverse=True)
+        return ranked
+
+    def _enrich_suggestions_for_training(
+        self, suggestions: list[PointSuggestion], image_data: np.ndarray
+    ) -> None:
+        """Attach microscopy context features and self-confirmation flags."""
+        anns = list(self.annotations.get(self.primary_image.id, []))
+        h, w = image_data.shape[:2]
+        for suggestion in suggestions:
+            y = float(suggestion.y)
+            x = float(suggestion.x)
+            min_border = min(x, y, float(w - 1) - x, float(h - 1) - y)
+            nearest = float("inf")
+            for kp in anns:
+                if int(kp.t) not in (int(suggestion.t), -1):
+                    continue
+                if int(kp.z) not in (int(suggestion.z), -1):
+                    continue
+                dx = float(kp.x) - x
+                dy = float(kp.y) - y
+                dist = float((dx * dx + dy * dy) ** 0.5)
+                if dist < nearest:
+                    nearest = dist
+            if not np.isfinite(nearest):
+                nearest = float(max(h, w))
+            suggestion.meta["distance_to_nearest_accepted"] = float(nearest)
+            suggestion.meta["border_proximity"] = float(max(0.0, min_border))
+            suggestion.meta["derived_from_accepted_area"] = bool(
+                nearest <= float(getattr(suggestion, "psf_radius", 6.0))
+            )
+
+    def _select_suggestion_strategy_dialog(self) -> None:
+        """Choose proposal strategy used by Suggest actions."""
+        strategies = self._candidate_suggestion_strategies()
+        current = str(getattr(self, "_suggestion_strategy", "raw"))
+        idx = strategies.index(current) if current in strategies else 0
+        selected, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            "Suggest Points Using",
+            "Strategy:",
+            strategies,
+            idx,
+            False,
+        )
+        if not ok:
+            return
+        self._suggestion_strategy = str(selected)
+        self.controller.session_state.suggestion_strategy = self._suggestion_strategy
+        self._set_status(f"Suggestion strategy: {self._suggestion_strategy}.")
+        self._refresh_assist_warmup_panel()
+
+    def _set_suggestion_score_threshold_dialog(self) -> None:
+        """Set display threshold for proposal score."""
+        current = float(getattr(self, "_suggestion_score_threshold", 0.0))
+        value, ok = QtWidgets.QInputDialog.getDouble(
+            self,
+            "Show Suggestions With Score >= X",
+            "Score threshold (0-1):",
+            current,
+            0.0,
+            1.0,
+            2,
+        )
+        if not ok:
+            return
+        self._suggestion_score_threshold = float(value)
+        self.controller.session_state.suggestion_score_threshold = self._suggestion_score_threshold
+        self._refresh_image()
+        self._set_status(
+            f"Show suggestions with confidence (calibrated p_accept) >= {self._suggestion_score_threshold:.2f}; generator score is heuristic."
+        )
+        self._refresh_assist_warmup_panel()
+
+    def _suggest_points_current_slice(self) -> None:
+        """Generate model suggestions for the current slice."""
+        image_data = self._slice_data(self.primary_image)
+        if image_data is None:
+            return
+        image_id = self.primary_image.id
+        t_idx = int(self.t_slider.value())
+        z_idx = int(self.z_slider.value())
+        generated = self._gating_strategy_candidates(
+            image=self.primary_image,
+            t_idx=t_idx,
+            z_idx=z_idx,
+            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
+            label=str(self.current_label),
+        )
+        generated = self._rank_and_calibrate_suggestions(generated)
+        self._enrich_suggestions_for_training(generated, image_data)
+        self.suggestions.setdefault(image_id, []).extend(generated)
+        self.controller.session_state.suggestion_history.setdefault(image_id, []).extend(
+            list(generated)
+        )
+        self.suggestions[image_id].sort(key=lambda s: float(s.score), reverse=True)
+        self.controller.update_suggestion_metrics(generated=len(generated))
+        self.controller.append_audit_event(
+            "suggestions_generated",
+            image_id=image_id,
+            model=getattr(getattr(self, "_suggestion_model", None), "model_name", "unknown"),
+            count=len(generated),
+            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
+        )
+        ctx_key = self.controller._context_key(
+            suggestion=(generated[0] if generated else PointSuggestion(image_id, self.primary_image.name, t_idx, z_idx, 0, 0, 0.0)),
+            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+        )
+        _, assist_txt = self.controller.assist_status(
+            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+            context_key=ctx_key,
+        )
+        self._suggestion_cursor = 0
+        self._refresh_image()
+        self._set_status(f"Generated {len(generated)} ranked suggestion(s). {assist_txt}")
+        self._refresh_assist_warmup_panel()
+
+    def _suggest_points_current_image(self) -> None:
+        """Generate suggestions for all T/Z slices in the active image."""
+        image = self.primary_image
+        if image.array is None:
+            return
+        image_id = image.id
+        total = 0
+        t_size = int(image.array.shape[0])
+        z_size = int(image.array.shape[1])
+        for t_idx in range(t_size):
+            for z_idx in range(z_size):
+                slice_data = self._slice_data(image, t_override=t_idx, z_override=z_idx)
+                generated = self._gating_strategy_candidates(
+                    image=image,
+                    t_idx=t_idx,
+                    z_idx=z_idx,
+                    strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
+                    label=str(self.current_label),
+                )
+                generated = self._rank_and_calibrate_suggestions(generated)
+                self._enrich_suggestions_for_training(generated, slice_data)
+                total += len(generated)
+                self.suggestions.setdefault(image_id, []).extend(generated)
+                self.controller.session_state.suggestion_history.setdefault(image_id, []).extend(
+                    list(generated)
+                )
+        self.suggestions.setdefault(image_id, []).sort(key=lambda s: float(s.score), reverse=True)
+        self.controller.update_suggestion_metrics(generated=total)
+        self.controller.append_audit_event(
+            "suggestions_generated",
+            image_id=image_id,
+            model=getattr(getattr(self, "_suggestion_model", None), "model_name", "unknown"),
+            count=total,
+            scope="all_slices",
+            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
+        )
+        self._suggestion_cursor = 0
+        self._refresh_image()
+        self._set_status(f"Generated {total} ranked suggestion(s) for full image.")
+        self._refresh_assist_warmup_panel()
+
+    def _accept_visible_suggestions(self) -> None:
+        """Accept all visible suggestions via undoable commands."""
+        visible = self._visible_suggestions()
+        accepted = 0
+        for suggestion in list(visible):
+            cmd = AcceptSuggestionCommand(
+                self.controller, self.primary_image.id, suggestion.suggestion_id
+            )
+            if self.controller.execute_view_command(cmd):
+                accepted += 1
+                self.controller.update_suggestion_metrics(correction_distance=0.0)
+                if bool(getattr(self, "_timed_session_active", False)):
+                    self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
+                    self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
-        self._update_status()
+        if accepted:
+            self._refresh_table()
+            self._refresh_image()
+            self._schedule_qc_validation(self.primary_image.id)
+        self._set_status(f"Accepted {accepted} suggestion(s).")
+        self._refresh_assist_warmup_panel()
 
-    def _jump_to_frame_dialog(self) -> None:
-        """Prompt for a 1-based frame index and jump to that frame."""
-        if self.primary_image.array is None:
-            return
-
-        max_frame = int(max(1, self.primary_image.array.shape[0]))
-        current_frame = int(self.t_slider.value()) + 1
-        value, ok = QtWidgets.QInputDialog.getInt(
-            self,
-            "Jump to Frame",
-            f"Frame (1-{max_frame}):",
-            current_frame,
-            1,
-            max_frame,
-            1,
-        )
-        if not ok:
-            return
-
-        target_t = int(value - 1)
-        if target_t == int(self.t_slider.value()):
-            return
-
-        from phage_annotator.session.navigation_commands import JumpToFrameCommand
-
-        self._execute_navigation_command(
-            JumpToFrameCommand(self.controller, self.primary_image.id, target_t=target_t)
-        )
-
-    def _jump_to_z_dialog(self) -> None:
-        """Prompt for a 1-based Z index and jump to that slice."""
-        if self.primary_image.array is None:
-            return
-
-        max_z = int(max(1, self.primary_image.array.shape[1]))
-        current_z = int(self.z_slider.value()) + 1
-        value, ok = QtWidgets.QInputDialog.getInt(
-            self,
-            "Jump to Z Slice",
-            f"Z slice (1-{max_z}):",
-            current_z,
-            1,
-            max_z,
-            1,
-        )
-        if not ok:
-            return
-
-        target_z = int(value - 1)
-        if target_z == int(self.z_slider.value()):
-            return
-
-        from phage_annotator.session.navigation_commands import JumpToZCommand
-
-        self._execute_navigation_command(
-            JumpToZCommand(self.controller, self.primary_image.id, target_z=target_z)
-        )
-
-    def _ensure_qc_runtime(self) -> None:
-        """Ensure QC state and timer are initialized."""
-        if getattr(self, "qc_state", None) is None:
-            from phage_annotator.session.qc_state import QCState
-
-            self.qc_state = QCState()
-        if getattr(self, "_qc_validation_timer", None) is None:
-            self._qc_pending_image_id: Optional[int] = None
-            self._qc_validation_timer = QtCore.QTimer(self)
-            self._qc_validation_timer.setSingleShot(True)
-            self._qc_validation_timer.setInterval(250)
-            self._qc_validation_timer.timeout.connect(self._execute_scheduled_qc_validation)
-        if getattr(self, "qc_issues_panel", None) is not None:
-            if self.qc_issues_panel.qc_state is not self.qc_state:
-                self.qc_issues_panel.set_qc_state(self.qc_state)
-
-    def _schedule_qc_validation(self, image_id: Optional[int] = None) -> None:
-        """Schedule debounced QC validation."""
-        self._ensure_qc_runtime()
-        if image_id is None:
-            self._qc_pending_image_id = None
-        elif getattr(self, "_qc_pending_image_id", None) is not None:
-            if self._qc_pending_image_id != image_id:
-                self._qc_pending_image_id = None
-        else:
-            self._qc_pending_image_id = int(image_id)
-        self._qc_validation_timer.start()
-
-    def _execute_scheduled_qc_validation(self) -> None:
-        """Run any queued debounced QC validation."""
-        image_id = getattr(self, "_qc_pending_image_id", None)
-        self._qc_pending_image_id = None
-        self._run_qc_validation(image_id=image_id)
-
-    def _trigger_qc_validation(self) -> None:
-        """Run QC validation immediately for all loaded images."""
-        self._ensure_qc_runtime()
-        if getattr(self, "_qc_validation_timer", None) is not None:
-            self._qc_validation_timer.stop()
-        self._qc_pending_image_id = None
-        self._run_qc_validation(image_id=None)
-
-    def _run_qc_validation(self, image_id: Optional[int]) -> None:
-        """Compute QC issues and refresh the QC issues panel."""
-        from phage_annotator.analysis.qc_validators import QCValidator
-
-        self._ensure_qc_runtime()
-
-        if image_id is None:
-            targets = [img.id for img in self.images]
-            self.qc_state.clear_issues()
-        else:
-            targets = [int(image_id)]
-            self.qc_state.issues = [
-                issue for issue in self.qc_state.issues if int(issue.image_id) != int(image_id)
-            ]
-
-        allowed_labels = list(self.labels) if self.labels else None
-
-        for target_id in targets:
-            image = next((img for img in self.images if img.id == target_id), None)
-            if image is None:
-                continue
-
-            annotations = list(self.annotations.get(target_id, []))
-            image_shape = None
-            array = getattr(image, "array", None)
-            if array is not None and getattr(array, "ndim", 0) >= 4:
-                image_shape = (int(array.shape[2]), int(array.shape[3]))
-            else:
-                shape = getattr(image, "shape", ())
-                if len(shape) >= 2:
-                    image_shape = (int(shape[-2]), int(shape[-1]))
-
-            issues = QCValidator.validate(
-                annotations,
-                image_id=target_id,
-                image_shape=image_shape,
-                allowed_labels=allowed_labels,
+    def _reject_visible_suggestions(self) -> None:
+        """Reject all visible suggestions via undoable commands."""
+        visible = self._visible_suggestions()
+        reason_key = "unspecified"
+        rejected = 0
+        for suggestion in list(visible):
+            cmd = RejectSuggestionCommand(
+                self.controller, self.primary_image.id, suggestion.suggestion_id
             )
-            for issue in issues:
-                self.qc_state.add_issue(issue)
+            if self.controller.execute_view_command(cmd):
+                rejected += 1
+                self.controller.update_suggestion_metrics(**{f"reject_reason::{reason_key}": 1})
+                if bool(getattr(self, "_timed_session_active", False)):
+                    self._timed_session_rejects = int(getattr(self, "_timed_session_rejects", 0)) + 1
+        self.undo_act.setEnabled(self.controller.can_undo())
+        self.redo_act.setEnabled(self.controller.can_redo())
+        if rejected:
+            self._refresh_image()
+            self.controller.append_audit_event(
+                "suggestions_rejected",
+                image_id=self.primary_image.id,
+                count=rejected,
+                reason=reason_key,
+            )
+        self._set_status(f"Rejected {rejected} suggestion(s).")
+        self._refresh_assist_warmup_panel()
 
-        self.qc_state.validation_timestamp = time.time()
-        if getattr(self, "qc_issues_panel", None) is not None:
-            self.qc_issues_panel.set_qc_state(self.qc_state)
-            self.qc_issues_panel.refresh()
+    def _accept_suggestions_in_roi(self) -> None:
+        """Accept visible suggestions that are currently inside ROI."""
+        visible = self._visible_suggestions()
+        candidates = [s for s in visible if self._point_in_roi(float(s.x), float(s.y))]
+        accepted = 0
+        for suggestion in list(candidates):
+            cmd = AcceptSuggestionCommand(
+                self.controller, self.primary_image.id, suggestion.suggestion_id
+            )
+            if self.controller.execute_view_command(cmd):
+                accepted += 1
+                self.controller.update_suggestion_metrics(correction_distance=0.0)
+                if bool(getattr(self, "_timed_session_active", False)):
+                    self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
+                    self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
+        self.undo_act.setEnabled(self.controller.can_undo())
+        self.redo_act.setEnabled(self.controller.can_redo())
+        if accepted:
+            self._refresh_table()
+            self._refresh_image()
+            self._schedule_qc_validation(self.primary_image.id)
+            self.controller.append_audit_event(
+                "suggestions_accepted_in_roi",
+                image_id=self.primary_image.id,
+                count=accepted,
+            )
+        self._set_status(f"Accepted {accepted} suggestion(s) in ROI.")
+        self._refresh_assist_warmup_panel()
 
-        self._set_status(f"QC validation complete: {len(self.qc_state.issues)} issue(s).")
-
-    def _jump_to_qc_issue(self, x: float, y: float, z: int, t: int, image_id: int) -> None:
-        """Navigate to an issue location from the QC issues panel."""
-        if image_id >= 0 and image_id < len(self.images) and image_id != self.current_image_idx:
-            self._set_fov(int(image_id))
-
-        if hasattr(self, "t_slider"):
-            clamped_t = max(self.t_slider.minimum(), min(int(t), self.t_slider.maximum()))
-            if self.t_slider.value() != clamped_t:
-                self.t_slider.setValue(clamped_t)
-        if hasattr(self, "z_slider"):
-            clamped_z = max(self.z_slider.minimum(), min(int(z), self.z_slider.maximum()))
-            if self.z_slider.value() != clamped_z:
-                self.z_slider.setValue(clamped_z)
-
-        if self.ax_frame is not None:
-            cx, cy = self._to_display_coords(self.ax_frame, float(x), float(y))
-            xlim = self.ax_frame.get_xlim()
-            ylim = self.ax_frame.get_ylim()
-            width = abs(float(xlim[1] - xlim[0]))
-            height = abs(float(ylim[1] - ylim[0]))
-            self.ax_frame.set_xlim(cx - width / 2.0, cx + width / 2.0)
-            if float(ylim[0]) > float(ylim[1]):
-                self.ax_frame.set_ylim(cy + height / 2.0, cy - height / 2.0)
-            else:
-                self.ax_frame.set_ylim(cy - height / 2.0, cy + height / 2.0)
-
+    def _clear_suggestions_current_image(self) -> None:
+        """Clear all pending suggestions for active image."""
+        cmd = ClearSuggestionsCommand(self.controller, self.primary_image.id)
+        if not self.controller.execute_view_command(cmd):
+            self._set_status("No suggestions to clear.")
+            return
+        self.undo_act.setEnabled(self.controller.can_undo())
+        self.redo_act.setEnabled(self.controller.can_redo())
         self._refresh_image()
-        self._set_status("Jumped to QC issue location.")
+        self._set_status("Cleared suggestions.")
+        self._refresh_assist_warmup_panel()
 
-    def _export_qc_report(self, export_format: str) -> None:
-        """Export QC issues in machine-readable format."""
-        from phage_annotator.io.qc_export import QCReportExporter
+    def _toggle_suggestions_overlay(self, checked: bool) -> None:
+        """Toggle suggestion overlay rendering."""
+        self._show_suggestion_overlay = bool(checked)
+        self._refresh_image()
 
-        self._ensure_qc_runtime()
-        issues = list(self.qc_state.issues)
-        if not issues:
-            QtWidgets.QMessageBox.information(self, "Export QC Report", "No QC issues to export.")
-            return
-
-        filters = {
-            "csv": "CSV Files (*.csv)",
-            "json": "JSON Files (*.json)",
-            "html": "HTML Files (*.html)",
-        }
-        ext = export_format.lower()
-        if ext not in filters:
-            return
-        default_path = pathlib.Path.cwd() / f"qc_report.{ext}"
-        path_str, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self,
-            "Export QC Report",
-            str(default_path),
-            filters[ext],
+    def _visible_suggestions_uncertain_first(self) -> list[PointSuggestion]:
+        """Visible suggestions ranked by uncertainty (lowest score first)."""
+        return sorted(
+            self._visible_suggestions(),
+            key=lambda s: float(
+                dict(getattr(s, "meta", {}) or {}).get(
+                    "p_accept", getattr(s, "score", getattr(s, "confidence", 0.0))
+                )
+            ),
         )
-        if not path_str:
+
+    def _refresh_assist_warmup_panel(self) -> None:
+        """Refresh assist warmup counters and queue state in the settings panel."""
+        if not hasattr(self, "assist_warmup_status_lbl"):
             return
-
-        output_path = pathlib.Path(path_str)
-        if output_path.suffix.lower() != f".{ext}":
-            output_path = output_path.with_suffix(f".{ext}")
-
-        if ext == "csv":
-            ok = QCReportExporter.export_csv(issues, output_path)
-        elif ext == "json":
-            ok = QCReportExporter.export_json(issues, output_path)
-        else:
-            ok = QCReportExporter.export_html_report(issues, output_path)
-
-        if ok:
-            self._set_status(f"Exported QC report to {output_path}.")
-        else:
-            QtWidgets.QMessageBox.critical(
-                self,
-                "Export QC Report",
-                f"Failed to export QC report to {output_path}.",
+        if not hasattr(self, "primary_image") or self.primary_image is None:
+            return
+        annotation_space = str(getattr(self.controller.session_state, "annotation_space", "stack"))
+        ranked = self._visible_suggestions_uncertain_first()
+        ref = ranked[0] if ranked else None
+        if ref is None:
+            all_rows = list(self.suggestions.get(self.primary_image.id, []))
+            proposed = [s for s in all_rows if str(getattr(s, "status", "proposed")) == "proposed"]
+            if proposed:
+                ref = sorted(
+                    proposed,
+                    key=lambda s: float(dict(getattr(s, "meta", {}) or {}).get("p_accept", s.score)),
+                )[0]
+        if ref is not None:
+            context_key = self.controller._context_key(
+                suggestion=ref,
+                annotation_space=annotation_space,
             )
+            breakdown = self.controller.assist_need_breakdown(
+                annotation_space=annotation_space,
+                context_key=context_key,
+            )
+            _, assist_txt = self.controller.assist_status(
+                annotation_space=annotation_space,
+                context_key=context_key,
+            )
+            self.assist_warmup_status_lbl.setText(assist_txt)
+            self.assist_warmup_context_lbl.setText(
+                f"Context labels: {breakdown['context_total']} (need +{breakdown['need_context']})"
+            )
+        else:
+            rows = list(getattr(self.controller.session_state, "suggestion_training_samples", []))
+            pos = sum(1 for row in rows if int(row.get("y", 0)) == 1)
+            neg = max(0, len(rows) - pos)
+            breakdown = {
+                "total": int(len(rows)),
+                "pos": int(pos),
+                "neg": int(neg),
+                "need_total": max(
+                    0, int(self.controller.session_state.assist_min_total_labels) - int(len(rows))
+                ),
+                "need_pos": max(
+                    0, int(self.controller.session_state.assist_min_positive_labels) - int(pos)
+                ),
+                "need_neg": max(
+                    0, int(self.controller.session_state.assist_min_negative_labels) - int(neg)
+                ),
+                "context_total": 0,
+                "need_context": int(self.controller.session_state.assist_min_labels_per_context),
+            }
+            self.assist_warmup_status_lbl.setText("Assist: Unavailable (generate suggestions first)")
+            self.assist_warmup_context_lbl.setText(
+                f"Context labels: 0 (need +{breakdown['need_context']})"
+            )
+        self.assist_warmup_counts_lbl.setText(
+            f"Labels total/+/-: {breakdown['total']}/{breakdown['pos']}/{breakdown['neg']}"
+        )
+        self.assist_warmup_need_lbl.setText(
+            "Need "
+            f"+{breakdown['need_total']} total, "
+            f"+{breakdown['need_pos']} positive, "
+            f"+{breakdown['need_neg']} negative"
+        )
+        self.assist_warmup_queue_lbl.setText(f"Visible uncertain queue: {len(ranked)}")
+        if hasattr(self, "assist_warmup_next_btn"):
+            self.assist_warmup_next_btn.setEnabled(bool(ranked))
 
+    def _focus_suggestion(self, suggestion: PointSuggestion) -> None:
+        """Jump view to a suggestion with fixed zoom."""
+        if hasattr(self, "t_slider"):
+            self.t_slider.setValue(
+                max(self.t_slider.minimum(), min(int(suggestion.t), self.t_slider.maximum()))
+            )
+        if hasattr(self, "z_slider"):
+            self.z_slider.setValue(
+                max(self.z_slider.minimum(), min(int(suggestion.z), self.z_slider.maximum()))
+            )
+        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        if frame_ax is not None:
+            zoom_px = float(getattr(self, "_suggestion_focus_zoom_px", 160.0))
+            half = zoom_px / 2.0
+            frame_ax.set_xlim(float(suggestion.x) - half, float(suggestion.x) + half)
+            frame_ax.set_ylim(float(suggestion.y) + half, float(suggestion.y) - half)
+        self._refresh_image()
+
+    def _focus_current_uncertain_suggestion(self) -> None:
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = int(
+            max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
+        )
+        current = ranked[self._suggestion_cursor]
+        self._focus_suggestion(current)
+        self._set_status(
+            f"Suggestion {self._suggestion_cursor + 1}/{len(ranked)} score={float(current.score):.3f}"
+        )
+
+    def _next_uncertain_suggestion(self) -> None:
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = (int(getattr(self, "_suggestion_cursor", 0)) + 1) % len(ranked)
+        self._focus_current_uncertain_suggestion()
+
+    def _prev_uncertain_suggestion(self) -> None:
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = (int(getattr(self, "_suggestion_cursor", 0)) - 1) % len(ranked)
+        self._focus_current_uncertain_suggestion()
+
+    def _accept_current_uncertain_suggestion(self) -> None:
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = int(
+            max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
+        )
+        current = ranked[self._suggestion_cursor]
+        cmd = AcceptSuggestionCommand(self.controller, self.primary_image.id, current.suggestion_id)
+        if self.controller.execute_view_command(cmd):
+            self.undo_act.setEnabled(self.controller.can_undo())
+            self.redo_act.setEnabled(self.controller.can_redo())
+            self._refresh_table()
+            self._refresh_image()
+            self._schedule_qc_validation(self.primary_image.id)
+            if bool(getattr(self, "_timed_session_active", False)):
+                self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
+                self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
+            self._refresh_assist_warmup_panel()
+        self._focus_current_uncertain_suggestion()
+
+    def _reject_current_uncertain_suggestion(self) -> None:
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = int(
+            max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
+        )
+        current = ranked[self._suggestion_cursor]
+        cmd = RejectSuggestionCommand(self.controller, self.primary_image.id, current.suggestion_id)
+        if self.controller.execute_view_command(cmd):
+            self.undo_act.setEnabled(self.controller.can_undo())
+            self.redo_act.setEnabled(self.controller.can_redo())
+            self._refresh_image()
+            if bool(getattr(self, "_timed_session_active", False)):
+                self._timed_session_rejects = int(getattr(self, "_timed_session_rejects", 0)) + 1
+            self._refresh_assist_warmup_panel()
+        self._focus_current_uncertain_suggestion()
+
+    def _show_current_suggestion_patch(self) -> None:
+        """Show a small snap-view patch around the current uncertain suggestion."""
+        ranked = self._visible_suggestions_uncertain_first()
+        if not ranked:
+            self._set_status("No visible suggestions above threshold.")
+            return
+        self._suggestion_cursor = int(
+            max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
+        )
+        suggestion = ranked[self._suggestion_cursor]
+        frame = self._slice_data(
+            self.primary_image,
+            t_override=int(suggestion.t),
+            z_override=int(suggestion.z),
+        )
+        if frame is None:
+            return
+        half = 24
+        y = int(round(float(suggestion.y)))
+        x = int(round(float(suggestion.x)))
+        y0 = max(0, y - half)
+        x0 = max(0, x - half)
+        y1 = min(frame.shape[0], y + half)
+        x1 = min(frame.shape[1], x + half)
+        patch = np.asarray(frame[y0:y1, x0:x1], dtype=np.float32)
+        if patch.size == 0:
+            return
+        pmin = float(np.nanmin(patch))
+        pmax = float(np.nanmax(patch))
+        denom = (pmax - pmin) if pmax > pmin else 1.0
+        norm = ((patch - pmin) / denom * 255.0).clip(0, 255).astype(np.uint8)
+        rgb = np.stack([norm, norm, norm], axis=-1)
+        h, w = rgb.shape[:2]
+        image = QtGui.QImage(rgb.data, w, h, 3 * w, QtGui.QImage.Format.Format_RGB888)
+        pixmap = QtGui.QPixmap.fromImage(image.copy()).scaled(
+            240,
+            240,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.FastTransformation,
+        )
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Suggestion Snap View")
+        layout = QtWidgets.QVBoxLayout(dlg)
+        label = QtWidgets.QLabel(dlg)
+        label.setPixmap(pixmap)
+        layout.addWidget(label)
+        meta = QtWidgets.QLabel(
+            f"score={float(suggestion.score):.3f} | id={suggestion.suggestion_id[:8]}",
+            dlg,
+        )
+        layout.addWidget(meta)
+        dlg.exec()
+
+    def _on_suggestion_auto_retrain_changed(self, checked: bool) -> None:
+        """Enable/disable periodic ranker retraining from labels."""
+        self.controller.set_suggestion_retrain_config(enabled=bool(checked))
+        self._settings.setValue("suggestionAutoRetrainEnabled", bool(checked))
+        self._set_status(
+            "Auto-retrain enabled." if bool(checked) else "Auto-retrain disabled."
+        )
+
+    def _on_suggestion_min_labels_changed(self, value: int) -> None:
+        """Set minimum labeled samples required before auto-retrain."""
+        min_labels = int(max(1, value))
+        self.controller.set_suggestion_retrain_config(min_labels=min_labels)
+        self._settings.setValue("suggestionAutoRetrainMinLabels", min_labels)
+        self._set_status(f"Auto-retrain min labels set to {min_labels}.")
+
+    def _train_suggestion_ranker_now(self) -> None:
+        """Force immediate ranker training from current labeled history."""
+        ok = self.controller.train_suggestion_ranker_now()
+        if ok:
+            self._set_status("Suggestion ranker trained.")
+        else:
+            self._set_status("Not enough labeled suggestions to train ranker.")
+        self._refresh_assist_warmup_panel()
+
+    def _on_annotation_space_changed(self, value: str) -> None:
+        """Switch annotation space between stack and projection contexts."""
+        space = str(value or "stack").strip().lower()
+        if space not in ("stack", "projection"):
+            space = "stack"
+        self.controller.session_state.annotation_space = space
+        self._set_status(f"Annotation space: {space}.")
+        self._refresh_assist_warmup_panel()
+
+    def _on_assist_minima_changed(self, _value: int) -> None:
+        """Update assist-level minimum label gates."""
+        self.controller.set_assist_minima(
+            min_total=int(self.assist_min_total_spin.value()),
+            min_positive=int(self.assist_min_positive_spin.value()),
+            min_negative=int(self.assist_min_negative_spin.value()),
+            min_per_context=int(self.assist_min_context_spin.value()),
+        )
+        self._settings.setValue("assistMinTotalLabels", int(self.assist_min_total_spin.value()))
+        self._settings.setValue(
+            "assistMinPositiveLabels", int(self.assist_min_positive_spin.value())
+        )
+        self._settings.setValue(
+            "assistMinNegativeLabels", int(self.assist_min_negative_spin.value())
+        )
+        self._settings.setValue(
+            "assistMinLabelsPerContext", int(self.assist_min_context_spin.value())
+        )
+        self._set_status("Assist minima updated.")
+        self._refresh_assist_warmup_panel()
+
+    def _on_qc_auto_show_changed(self, checked: bool) -> None:
+        """Enable/disable automatically showing QC panel when issues are found."""
+        self._settings.setValue("qcAutoShowOnIssues", bool(checked))
+        self._set_status(
+            "QC panel auto-show enabled."
+            if bool(checked)
+            else "QC panel auto-show disabled."
+        )
+
+    def _start_assist_warmup(self) -> None:
+        """Guide early balanced accept/reject triage to bootstrap learned assist."""
+        self._refresh_assist_warmup_panel()
+        self._focus_current_uncertain_suggestion()
+        visible = self._visible_suggestions_uncertain_first()
+        if not visible:
+            self._set_status("Warmup: generate suggestions first.")
+            return
+        annotation_space = str(getattr(self.controller.session_state, "annotation_space", "stack"))
+        context_key = self.controller._context_key(
+            suggestion=visible[0],
+            annotation_space=annotation_space,
+        )
+        b = self.controller.assist_need_breakdown(
+            annotation_space=annotation_space,
+            context_key=context_key,
+        )
+        self._set_status(
+            "Warmup mode: use N/P to move, A accept, R reject. "
+            f"Need +{b['need_pos']} positives, +{b['need_neg']} negatives, +{b['need_context']} context labels."
+        )
+
+    def _start_timed_annotation_session(self, assisted: bool) -> None:
+        """Start timed benchmark session for throughput metrics."""
+        self._timed_session_active = True
+        self._timed_session_assisted = bool(assisted)
+        self._timed_session_started_at = time.time()
+        self._timed_session_accepts = 0
+        self._timed_session_rejects = 0
+        self._timed_session_points = 0
+        self._timed_session_correction_time = 0.0
+        mode = "with assist" if assisted else "without assist"
+        self._set_status(f"Timed annotation session started ({mode}).")
+
+    def _stop_timed_annotation_session(self) -> None:
+        """Stop timed benchmark session and report metrics."""
+        if not bool(getattr(self, "_timed_session_active", False)):
+            self._set_status("No active timed session.")
+            return
+        elapsed = max(1e-6, time.time() - float(getattr(self, "_timed_session_started_at", time.time())))
+        points = int(getattr(self, "_timed_session_points", 0))
+        accepts = int(getattr(self, "_timed_session_accepts", 0))
+        rejects = int(getattr(self, "_timed_session_rejects", 0))
+        ppm = 60.0 * float(points) / elapsed
+        correction = float(getattr(self, "_timed_session_correction_time", 0.0))
+        correction_avg = correction / max(1, accepts + rejects)
+        msg = (
+            f"Duration: {elapsed:.1f}s\n"
+            f"Points/min: {ppm:.2f}\n"
+            f"Acceptance rate: {(accepts / max(1, accepts + rejects)):.3f}\n"
+            f"Avg correction time: {correction_avg:.2f}s\n"
+        )
+        QtWidgets.QMessageBox.information(self, "Timed Annotation Session", msg)
+        self.controller.append_audit_event(
+            "timed_annotation_session_completed",
+            assisted=bool(getattr(self, "_timed_session_assisted", True)),
+            duration_s=elapsed,
+            points=points,
+            points_per_min=ppm,
+            acceptance_rate=(accepts / max(1, accepts + rejects)),
+            correction_time_avg_s=correction_avg,
+        )
+        self._timed_session_active = False
+
+    def _selected_table_keypoints(self) -> list:
+        """Return currently selected keypoints from annotation table."""
+        if getattr(self, "annot_table", None) is None or self.annot_table.selectionModel() is None:
+            return []
+        rows = sorted({idx.row() for idx in self.annot_table.selectionModel().selectedRows()})
+        selected = []
+        for row in rows:
+            kp = self._keypoint_for_table_row(row) if hasattr(self, "_keypoint_for_table_row") else None
+            if kp is not None:
+                selected.append(kp)
+        return selected
+
+    def _set_selected_review_state(self, state: str) -> None:
+        """Set review state on selected annotations."""
+        selected = self._selected_table_keypoints()
+        if not selected:
+            self._set_status("Select one or more annotations first.")
+            return
+        updated = 0
+        now_ts = time.time()
+        for kp in selected:
+            new_meta = dict(kp.meta)
+            new_meta["review_state"] = state
+            new_meta["reviewer"] = self.controller.session_state.current_user
+            new_meta["reviewed_at"] = now_ts
+            replacement = type(kp)(
+                image_id=kp.image_id,
+                image_name=kp.image_name,
+                t=kp.t,
+                z=kp.z,
+                y=kp.y,
+                x=kp.x,
+                label=kp.label,
+                annotation_id=kp.annotation_id,
+                image_key=kp.image_key,
+                source=kp.source,
+                meta=new_meta,
+                modality_idx=kp.modality_idx,
+            )
+            if self.controller.update_annotation(kp.image_id, kp, replacement):
+                updated += 1
+        if updated:
+            self.controller.append_audit_event(
+                "review_state_updated", state=state, count=updated
+            )
+            self._refresh_table()
+            self._refresh_image()
+        self._set_status(f"Updated review state for {updated} annotation(s).")
+
+    def _assign_selected_annotations_dialog(self) -> None:
+        """Set assignee for selected annotations."""
+        selected = self._selected_table_keypoints()
+        if not selected:
+            self._set_status("Select one or more annotations first.")
+            return
+        assignee, ok = QtWidgets.QInputDialog.getText(
+            self,
+            "Assign Selected Annotations",
+            "Assignee:",
+            text=self.controller.session_state.current_user,
+        )
+        if not ok:
+            return
+        assignee = assignee.strip()
+        updated = 0
+        for kp in selected:
+            new_meta = dict(kp.meta)
+            new_meta["assignee"] = assignee
+            replacement = type(kp)(
+                image_id=kp.image_id,
+                image_name=kp.image_name,
+                t=kp.t,
+                z=kp.z,
+                y=kp.y,
+                x=kp.x,
+                label=kp.label,
+                annotation_id=kp.annotation_id,
+                image_key=kp.image_key,
+                source=kp.source,
+                meta=new_meta,
+                modality_idx=kp.modality_idx,
+            )
+            if self.controller.update_annotation(kp.image_id, kp, replacement):
+                updated += 1
+        if updated:
+            self.controller.append_audit_event(
+                "assignee_updated", assignee=assignee, count=updated
+            )
+            self._refresh_table()
+            self._refresh_image()
+        self._set_status(f"Assigned {updated} annotation(s) to '{assignee}'.")
+
+    def _set_current_user_dialog(self) -> None:
+        """Set current local user identity for review/audit actions."""
+        current = self.controller.session_state.current_user
+        user, ok = QtWidgets.QInputDialog.getText(self, "Set Current User", "User:", text=current)
+        if not ok:
+            return
+        user = user.strip() or "local_user"
+        self.controller.session_state.current_user = user
+        self.controller.append_audit_event("current_user_changed", user=user)
+        self._set_status(f"Current user set to '{user}'.")
+
+    def _set_review_queue_filter(self, mode: str) -> None:
+        """Switch annotation table queue filter mode."""
+        self._review_queue_filter = str(mode)
+        action_map = {
+            "all": getattr(self, "queue_all_act", None),
+            "my_queue": getattr(self, "queue_my_act", None),
+            "needs_review": getattr(self, "queue_needs_review_act", None),
+            "blocked_qc": getattr(self, "queue_blocked_qc_act", None),
+        }
+        for key, action in action_map.items():
+            if action is None:
+                continue
+            action.blockSignals(True)
+            action.setChecked(key == self._review_queue_filter)
+            action.blockSignals(False)
+        self._refresh_table()
+        self._refresh_image()
+        self._set_status(f"Review queue: {self._review_queue_filter}.")
 
     def _show_profile_dialog(self) -> None:
         """Open a dialog showing line profiles (vertical, horizontal, diagonals) raw vs corrected."""

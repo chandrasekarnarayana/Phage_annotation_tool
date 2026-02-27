@@ -5,7 +5,17 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 import numpy as np
-from matplotlib.backends.qt_compat import QtWidgets
+try:
+    from matplotlib.backends.qt_compat import QtCore, QtWidgets
+except ImportError:  # pragma: no cover - exercised in headless CI/test envs
+    class _MissingQtWidgets:
+        def __getattr__(self, name: str) -> object:
+            raise ImportError(
+                "Qt bindings are required for GUI table/status operations."
+            )
+
+    QtWidgets = _MissingQtWidgets()
+    QtCore = _MissingQtWidgets()
 
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.tools import Tool
@@ -14,24 +24,114 @@ from phage_annotator.tools import Tool
 class TableStatusMixin:
     """Mixin for annotation table and status rendering."""
 
+    def _refresh_table(self) -> None:
+        """Refresh table rows and keep selection focused for current T/Z when enabled."""
+        self._populate_table()
+        self._focus_table_current_slice_row()
+
+    def _on_auto_follow_table_changed(self, state: int) -> None:
+        """Persist auto-follow preference and refresh table view."""
+        enabled = bool(state)
+        if hasattr(self, "_settings"):
+            self._settings.setValue("annotationTableAutoFollow", enabled)
+        if enabled:
+            self.filter_current_chk.blockSignals(True)
+            self.filter_current_chk.setChecked(True)
+            self.filter_current_chk.blockSignals(False)
+        self._refresh_table()
+
     def _populate_table(self) -> None:
         """Populate the table from current keypoints."""
         pts = self._current_keypoints()
         self._table_rows = list(pts)
+        sorting = bool(self.annot_table.isSortingEnabled())
+        if sorting:
+            self.annot_table.setSortingEnabled(False)
         self.annot_table.blockSignals(True)
         self.annot_table.setRowCount(len(pts))
         for row, kp in enumerate(pts):
-            self.annot_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(kp.t)))
-            self.annot_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(kp.z)))
-            self.annot_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{kp.y:.2f}"))
-            self.annot_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{kp.x:.2f}"))
-            self.annot_table.setItem(row, 4, QtWidgets.QTableWidgetItem(kp.label))
+            ann_id = str(kp.annotation_id)
+            id_item = QtWidgets.QTableWidgetItem(ann_id[:8])
+            id_item.setData(QtCore.Qt.ItemDataRole.UserRole, ann_id)
+            id_item.setFlags(id_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            scope = "stack" if int(kp.t) == -1 and int(kp.z) == -1 else "slice"
+            scope_item = QtWidgets.QTableWidgetItem(scope)
+            scope_item.setData(QtCore.Qt.ItemDataRole.UserRole, ann_id)
+            scope_item.setFlags(scope_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            self.annot_table.setItem(row, 0, id_item)
+            self.annot_table.setItem(row, 1, scope_item)
+            self.annot_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(kp.t)))
+            self.annot_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(kp.z)))
+            self.annot_table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{kp.y:.2f}"))
+            self.annot_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{kp.x:.2f}"))
+            self.annot_table.setItem(row, 6, QtWidgets.QTableWidgetItem(kp.label))
         self.annot_table.blockSignals(False)
         self.annot_table.resizeColumnsToContents()
+        if sorting:
+            self.annot_table.setSortingEnabled(True)
+
+    def _keypoint_for_table_row(self, row: int) -> Optional[Keypoint]:
+        """Resolve a keypoint from the currently visible table row using annotation id."""
+        if row < 0:
+            return None
+        id_item = self.annot_table.item(int(row), 0)
+        if id_item is None:
+            return None
+        ann_id = str(id_item.data(QtCore.Qt.ItemDataRole.UserRole) or "").strip()
+        if not ann_id:
+            return None
+        for kp in self.annotations.get(self.primary_image.id, []):
+            if str(kp.annotation_id) == ann_id:
+                return kp
+        return None
+
+    def _focus_table_current_slice_row(self) -> None:
+        """Auto-select and scroll to the first row matching current T/Z."""
+        if not bool(getattr(self, "auto_follow_table_chk", None) and self.auto_follow_table_chk.isChecked()):
+            return
+        if self.annot_table.rowCount() <= 0:
+            self.annot_table.clearSelection()
+            return
+        t_idx = int(self.t_slider.value())
+        z_idx = int(self.z_slider.value())
+        target_row = None
+        for row in range(self.annot_table.rowCount()):
+            t_item = self.annot_table.item(row, 2)
+            z_item = self.annot_table.item(row, 3)
+            if t_item is None or z_item is None:
+                continue
+            try:
+                t_val = int(t_item.text())
+                z_val = int(z_item.text())
+            except ValueError:
+                continue
+            if t_val in (t_idx, -1) and z_val in (z_idx, -1):
+                target_row = row
+                break
+        if target_row is None:
+            self.annot_table.clearSelection()
+            return
+        self._block_table = True
+        try:
+            self.annot_table.selectRow(int(target_row))
+            item = self.annot_table.item(int(target_row), 0)
+            if item is not None:
+                self.annot_table.scrollToItem(
+                    item, QtWidgets.QAbstractItemView.ScrollHint.PositionAtCenter
+                )
+        finally:
+            self._block_table = False
 
     def _on_table_selection(self) -> None:
         if self._block_table:
             return
+        selected_ids = set()
+        if self.annot_table.selectionModel() is not None:
+            for idx in self.annot_table.selectionModel().selectedRows():
+                kp = self._keypoint_for_table_row(idx.row())
+                if kp is not None:
+                    selected_ids.add(str(kp.annotation_id))
+        self._selected_annotation_ids = selected_ids
         self._refresh_image()
 
     def _on_table_item_changed(self, item: "QtWidgets.QTableWidgetItem") -> None:
@@ -39,31 +139,35 @@ class TableStatusMixin:
             return
         row = item.row()
         col = item.column()
-        if row < 0 or row >= len(self._table_rows):
+        kp = self._keypoint_for_table_row(row)
+        if kp is None:
             return
-        kp = self._table_rows[row]
         text = item.text()
         try:
-            if col == 0:
+            if col == 2:
                 new_kp = Keypoint(kp.image_id, kp.image_name, int(text), kp.z, kp.y, kp.x, kp.label)
-            elif col == 1:
+            elif col == 3:
                 new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, int(text), kp.y, kp.x, kp.label)
-            elif col == 2:
+            elif col == 4:
                 new_kp = Keypoint(
                     kp.image_id, kp.image_name, kp.t, kp.z, float(text), kp.x, kp.label
                 )
-            elif col == 3:
+            elif col == 5:
                 new_kp = Keypoint(
                     kp.image_id, kp.image_name, kp.t, kp.z, kp.y, float(text), kp.label
                 )
-            elif col == 4:
+            elif col == 6:
                 new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, kp.z, kp.y, kp.x, text)
             else:
                 return
         except ValueError:
             return
+        new_kp.annotation_id = kp.annotation_id
+        new_kp.meta = dict(kp.meta)
+        new_kp.modality_idx = kp.modality_idx
         self.controller.update_annotation(self.primary_image.id, kp, new_kp)
         self._mark_dirty()
+        self._refresh_table()
         self._refresh_image()
 
     def _delete_selected_annotations(self) -> None:
@@ -71,12 +175,13 @@ class TableStatusMixin:
         if self.annot_table.selectionModel() is None:
             return
         rows = sorted({idx.row() for idx in self.annot_table.selectionModel().selectedRows()})
-        if not rows or not self._table_rows:
+        if not rows:
             return
         removed: List[Keypoint] = []
         for row in reversed(rows):
-            if 0 <= row < len(self._table_rows):
-                removed.append(self._table_rows[row])
+            kp = self._keypoint_for_table_row(row)
+            if kp is not None:
+                removed.append(kp)
         if not removed:
             return
         # Confirmation dialog (P3.3)
@@ -103,6 +208,24 @@ class TableStatusMixin:
         current = len(
             [kp for kp in self._current_keypoints() if kp.t == self.t_slider.value() or kp.t == -1]
         )
+        dataset_name = str(getattr(self.primary_image, "name", "unknown"))
+        frame_txt = f"T{int(self.t_slider.value()) + 1}/Z{int(self.z_slider.value()) + 1}"
+        annotation_space = str(
+            getattr(getattr(self, "controller", None).session_state, "annotation_space", "stack")
+            if getattr(self, "controller", None) is not None
+            else "stack"
+        )
+        modality_txt = f"Modality {int(getattr(self, '_active_modality_idx', -1))}"
+        manager = getattr(getattr(self, "controller", None).session_state, "modality_manager", None) if getattr(self, "controller", None) is not None else None
+        if manager is not None:
+            try:
+                for modality in manager.get_all_modalities():
+                    if int(modality.image_id) == int(self.primary_image.id):
+                        modality_txt = str(modality.display_name)
+                        break
+            except Exception:
+                pass
+
         pts_view, area_um2 = self._view_density_stats()
         density_txt = ""
         if area_um2 > 0:
@@ -129,9 +252,45 @@ class TableStatusMixin:
             diag_flags.append("Memmap")
         
         diag_txt = f" | {'; '.join(diag_flags)}" if diag_flags else ""
+        assist_txt = ""
+        controller = getattr(self, "controller", None)
+        if controller is not None and hasattr(controller, "assist_status"):
+            suggestions = self.suggestions.get(self.primary_image.id, []) if hasattr(self, "suggestions") else []
+            annotation_space = str(getattr(controller.session_state, "annotation_space", "stack"))
+            if suggestions:
+                context_key = controller._context_key(suggestion=suggestions[0], annotation_space=annotation_space)
+            else:
+                context_key = f"{self.primary_image.name}|{annotation_space}|current_view"
+            _level, msg = controller.assist_status(
+                annotation_space=annotation_space,
+                context_key=context_key,
+            )
+            assist_txt = f" | {msg}"
+        jobs_txt = ""
+        if getattr(self, "jobs", None) is not None:
+            try:
+                job_count = int(self.jobs.active_job_count())
+                if job_count > 0:
+                    jobs_txt = f" | Jobs: {job_count} ({getattr(self, '_active_job_name', 'running')})"
+                else:
+                    jobs_txt = " | Jobs: idle"
+            except Exception:
+                pass
+        autosave_enabled = bool(
+            getattr(self, "_settings", None).value("autosaveRecoveryEnabled", True, type=bool)
+            if getattr(self, "_settings", None) is not None
+            else True
+        )
+        autosave_txt = "Autosave: off"
+        if autosave_enabled:
+            if getattr(self, "_last_autosave_timestamp", None):
+                autosave_txt = "Autosave: recent"
+            else:
+                autosave_txt = "Autosave: on"
         self._status_base = (
-            f"Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} "
-            f"| Speed {self.speed_slider.value()} fps{density_txt}{cache_txt}{diag_txt}"
+            f"{dataset_name} | {frame_txt} | Space: {annotation_space} | Modality: {modality_txt} "
+            f"| Label: {self.current_label} | Current slice pts: {current} | Total pts: {total} "
+            f"| Speed {self.speed_slider.value()} fps | {autosave_txt}{density_txt}{cache_txt}{diag_txt}{assist_txt}{jobs_txt}"
         )
         self._render_status()
         if self.tool_label is not None and self.tool_router is not None:
@@ -176,17 +335,9 @@ class TableStatusMixin:
         return color
 
     def _view_density_stats(self) -> Tuple[int, float]:
-        axes = [
-            ax
-            for ax in [
-                self.ax_frame,
-                self.ax_mean,
-                self.ax_comp,
-                self.ax_support,
-                self.ax_std,
-            ]
-            if ax is not None
-        ]
+        axes = []
+        if getattr(self, "renderer", None) is not None:
+            axes = [ax for ax in self.renderer.axes.values() if ax is not None]
         if not axes:
             return 0, 0.0
         scale = self._axis_scale(axes[0])
@@ -242,6 +393,25 @@ class TableStatusMixin:
             t = self.t_slider.value()
             z = self.z_slider.value()
             pts = [kp for kp in pts if (kp.t in (t, -1) and kp.z in (z, -1))]
+
+        queue_mode = getattr(self, "_review_queue_filter", "all")
+        if queue_mode == "my_queue":
+            user = getattr(self.controller.session_state, "current_user", "local_user")
+            pts = [kp for kp in pts if kp.meta.get("assignee", "") == user]
+        elif queue_mode == "needs_review":
+            pts = [
+                kp
+                for kp in pts
+                if kp.meta.get("review_state", "new") in ("new", "in_review", "needs_changes")
+            ]
+        elif queue_mode == "blocked_qc":
+            qc_state = getattr(self, "qc_state", None)
+            affected_ids = (
+                qc_state.get_affected_annotation_ids(respect_filters=False)
+                if qc_state is not None
+                else set()
+            )
+            pts = [kp for kp in pts if kp.annotation_id in affected_ids]
         
         # Phase ζ: Filter by current modality_idx if enabled
         if hasattr(self, '_filter_by_modality') and self._filter_by_modality:
@@ -270,18 +440,6 @@ class TableStatusMixin:
         axes = []
         if getattr(self, "renderer", None) is not None:
             axes = [ax for ax in self.renderer.axes.values() if ax is not None]
-        if not axes:
-            axes = [
-                ax
-                for ax in [
-                    self.ax_frame,
-                    self.ax_mean,
-                    self.ax_comp,
-                    self.ax_support,
-                    self.ax_std,
-                ]
-                if ax is not None
-            ]
         if not axes:
             return
         if self.link_zoom:
@@ -312,18 +470,6 @@ class TableStatusMixin:
         axes = []
         if getattr(self, "renderer", None) is not None:
             axes = [ax for ax in self.renderer.axes.values() if ax is not None]
-        if not axes:
-            axes = [
-                ax
-                for ax in [
-                    self.ax_frame,
-                    self.ax_mean,
-                    self.ax_comp,
-                    self.ax_support,
-                    self.ax_std,
-                ]
-                if ax is not None
-            ]
         if not axes:
             return
         ax = axes[0]

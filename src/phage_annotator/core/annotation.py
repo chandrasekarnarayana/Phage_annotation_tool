@@ -22,6 +22,7 @@ import pandas as pd
 
 __all__ = [
     "Keypoint",
+    "PointSuggestion",
     "ANNOTATION_META_DEFAULTS",
     "normalize_annotation_meta",
     "keypoints_to_dataframe",
@@ -38,6 +39,10 @@ ANNOTATION_META_DEFAULTS = {
     "timestamp": None,
     "comment": "",
     "uncertain": False,
+    "review_state": "new",
+    "assignee": "",
+    "reviewer": "",
+    "reviewed_at": None,
 }
 
 
@@ -94,6 +99,40 @@ class Keypoint:
 
     def __post_init__(self) -> None:
         self.meta = normalize_annotation_meta(self.meta)
+
+
+@dataclass
+class PointSuggestion:
+    """Model-generated candidate point pending user decision."""
+
+    image_id: int
+    image_name: str
+    t: int
+    z: int
+    y: float
+    x: float
+    score: float
+    label: str = "phage"
+    suggestion_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    source_model: str = "local_peaks"
+    source_modality: str = "raw"
+    scale_sigma: float = 1.0
+    psf_radius: float = 6.0
+    roi_id: str | None = None
+    score_components: dict = field(default_factory=dict)
+    status: str = "proposed"
+    meta: dict = field(default_factory=dict)
+
+    @property
+    def confidence(self) -> float:
+        """Backward-compatible alias for legacy callers."""
+        p_accept = self.meta.get("p_accept") if isinstance(self.meta, dict) else None
+        if p_accept is not None:
+            try:
+                return float(p_accept)
+            except (TypeError, ValueError):
+                return float(self.score)
+        return float(self.score)
 
 
 def keypoints_to_dataframe(keypoints: Iterable[Keypoint]) -> pd.DataFrame:

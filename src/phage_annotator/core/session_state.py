@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from phage_annotator.io.metadata.index import AnnotationIndexEntry
-    from phage_annotator.core.annotation import Keypoint
+    from phage_annotator.core.annotation import Keypoint, PointSuggestion
     from phage_annotator.data.models import LazyImage
     from phage_annotator.session.modality import ModalityManager
 
@@ -137,3 +137,31 @@ class SessionState:
     # Phase β: M2 Multi-channel viewer support
     # Channel display settings for multi-channel composition
     channel_display_settings: Optional[Dict[str, object]] = None  # Serialized MultiChannelDisplaySettings
+    # Assisted annotation: ephemeral suggestions pending accept/reject.
+    suggestions: Dict[int, List["PointSuggestion"]] = field(default_factory=dict)
+    suggestion_history: Dict[int, List["PointSuggestion"]] = field(default_factory=dict)
+    suggestion_metrics: Dict[str, float] = field(
+        default_factory=lambda: {
+            "generated": 0.0,
+            "accepted": 0.0,
+            "rejected": 0.0,
+            "mean_correction_distance": 0.0,
+        }
+    )
+    suggestion_ranker_state: Dict[str, object] = field(default_factory=dict)
+    suggestion_training_samples: List[Dict[str, object]] = field(default_factory=list)
+    suggestion_training_pending: int = 0
+    suggestion_strategy: str = "current_view"
+    suggestion_score_threshold: float = 0.0
+    suggestion_auto_retrain_enabled: bool = True
+    suggestion_auto_retrain_min_labels: int = 25
+    annotation_space: str = "stack"  # stack | projection
+    generation_space: str = "stack"  # stack | projection
+    assist_min_total_labels: int = 30
+    assist_min_positive_labels: int = 15
+    assist_min_negative_labels: int = 15
+    assist_min_labels_per_context: int = 10
+    suggestion_context_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    # Collaboration metadata for local workflows.
+    current_user: str = "local_user"
+    audit_log: List[Dict[str, object]] = field(default_factory=list)

@@ -5,5 +5,10 @@ __all__ = [
     "file",
     "standard",
     "events",
+    "navigation_actions",
+    "export_actions",
+    "qc_actions",
+    "dock_actions",
+    "keyboard_events",
     "command_registry",
 ]
