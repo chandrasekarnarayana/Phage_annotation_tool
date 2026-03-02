@@ -10,8 +10,142 @@ from phage_annotator.ui_qt.utils.sidebar_manager import SidebarManager
 from phage_annotator.tools import Tool, ToolCallbacks, ToolRouter
 
 
+class _LogicalVisibilityLabel(QtWidgets.QLabel):
+    """QLabel that reports logical visibility even when parent containers are hidden."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._logical_visible = True
+
+    def setVisible(self, visible: bool) -> None:  # noqa: N802 - Qt API
+        self._logical_visible = bool(visible)
+        super().setVisible(bool(visible))
+
+    def isVisible(self) -> bool:  # noqa: N802 - Qt API
+        if not self._logical_visible:
+            return False
+        return not self.isHidden()
+
+
 class UiExtrasMixin:
     """Mixin for sidebar pages, tools, and layout/command palette actions."""
+
+    def _install_delayed_micro_help(self, widget: QtWidgets.QWidget, text: str) -> None:
+        """Register long-hover micro-help bubble (quiet, delayed)."""
+        if widget is None:
+            return
+        timers = getattr(self, "_micro_help_timers", None)
+        if timers is None:
+            timers = {}
+            self._micro_help_timers = timers
+        payload = str(text).strip()
+        if not payload:
+            return
+        if widget in timers:
+            timers[widget].stop()
+            try:
+                timers[widget].deleteLater()
+            except Exception:
+                pass
+        timer = QtCore.QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(850)
+
+        def _show_tip() -> None:
+            if widget is None or not widget.isVisible():
+                return
+            center = widget.rect().center()
+            pos = widget.mapToGlobal(center)
+            QtWidgets.QToolTip.showText(pos, payload, widget)
+
+        timer.timeout.connect(_show_tip)
+        timers[widget] = timer
+        widget.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 - Qt API
+        """Drive delayed micro-help display on long-hover."""
+        timers = getattr(self, "_micro_help_timers", None)
+        if isinstance(timers, dict) and obj in timers:
+            ev_type = event.type()
+            if ev_type == QtCore.QEvent.Type.Enter:
+                timers[obj].start()
+            elif ev_type in (
+                QtCore.QEvent.Type.Leave,
+                QtCore.QEvent.Type.MouseButtonPress,
+                QtCore.QEvent.Type.FocusOut,
+                QtCore.QEvent.Type.Hide,
+            ):
+                timers[obj].stop()
+                QtWidgets.QToolTip.hideText()
+        return QtWidgets.QMainWindow.eventFilter(self, obj, event)
+
+    def _available_annotation_views(self) -> dict[str, bool]:
+        """Return currently available canvas views for annotation visibility controls."""
+        primary = getattr(self, "primary_image", None)
+        has_stack = False
+        if primary is not None and hasattr(primary, "shape"):
+            try:
+                shape = tuple(int(v) for v in primary.shape)
+                has_stack = len(shape) >= 2 and int(shape[1]) > 1
+            except Exception:
+                has_stack = False
+        support_available = (
+            len(getattr(self, "images", []) or []) > 1
+            and int(getattr(self, "support_image_idx", 0)) != int(getattr(self, "current_image_idx", 0))
+        )
+        return {
+            "frame": True,
+            "mean": bool(has_stack),
+            "support": bool(support_available),
+            "std": bool(has_stack),
+        }
+
+    def _refresh_annotation_view_controls(self) -> None:
+        """Sync dynamic visible-view checklist and target constraints."""
+        availability = self._available_annotation_views()
+        checkboxes = dict(getattr(self, "_annotation_view_checkboxes", {}) or {})
+        panel_actions = dict(getattr(self, "panel_actions", {}) or {})
+        for key, chk in checkboxes.items():
+            available = bool(availability.get(str(key), False))
+            chk.setVisible(available)
+            if not available:
+                continue
+            action = panel_actions.get(str(key))
+            if action is not None:
+                chk.blockSignals(True)
+                chk.setChecked(bool(action.isChecked()))
+                chk.blockSignals(False)
+        self._refresh_annotation_target_constraints()
+
+    def _refresh_annotation_target_constraints(self) -> None:
+        """Enable/disable target choices based on currently available views."""
+        availability = self._available_annotation_views()
+        targets = dict(getattr(self, "_target_buttons", {}) or {})
+        unavailable = []
+        for key in ("frame", "mean", "support"):
+            btn = targets.get(key)
+            if btn is None:
+                continue
+            available = bool(availability.get(key, False))
+            btn.setEnabled(available)
+            if available:
+                btn.setToolTip("")
+            else:
+                unavailable.append(btn.text())
+                btn.setToolTip("Unavailable for current modality/view context")
+        hint = getattr(self, "target_unavailable_hint_lbl", None)
+        if hint is not None:
+            if unavailable:
+                hint.setText("Other targets unavailable for this modality.")
+                hint.setVisible(True)
+            else:
+                hint.setVisible(False)
+        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        if not bool(availability.get(current_target, False)):
+            frame_btn = targets.get("frame")
+            if frame_btn is not None:
+                frame_btn.setChecked(True)
+            self.annotate_target = "frame"
 
     def _build_sidebar_stack(self) -> QtWidgets.QWidget:
         """Create the 10-panel stacked sidebar with activity bar and toggle behavior.
@@ -35,17 +169,16 @@ class UiExtrasMixin:
         # Breadcrumb label for the current sidebar section
         self.sidebar_breadcrumb = QtWidgets.QLabel()
         self.sidebar_breadcrumb.setObjectName("sidebar_breadcrumb")
-        self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text("Explore"))
+        self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text("Annotate"))
         self.sidebar_breadcrumb.setStyleSheet("font-weight: 600; padding: 6px 8px;")
         
         # Use the 10-panel registry if sidebar_pages are built
         pages = getattr(self, "sidebar_pages", None)
         if pages:
-            # Add all panel widgets to the stack (skip Playback since it's bottom bar only)
+            # Add all panel widgets to the stack.
             for idx, (label, icon, widget) in enumerate(pages):
-                if label != "Playback":  # Playback is bottom bar only
-                    self.sidebar_stack.addWidget(widget)
-                    widget.setObjectName(f"sidebar_panel_{idx}")
+                self.sidebar_stack.addWidget(widget)
+                widget.setObjectName(f"sidebar_panel_{idx}")
         else:
             # Fallback to 3-panel (should not reach here with proper setup)
             self.sidebar_stack.addWidget(self.explore_panel)
@@ -68,27 +201,35 @@ class UiExtrasMixin:
         
         if pages:
             stack_idx = 0
+            default_action_idx = 0
             for page_idx, (label, icon, widget) in enumerate(pages):
                 act = QtWidgets.QAction(self.style().standardIcon(icon), label, self)
                 act.setObjectName(f"sidebar_action_{label.lower().replace('/', '_').replace(' ', '_')}")
                 act.setCheckable(True)
                 act.setToolTip(label)
+                if label == "Annotate":
+                    default_action_idx = page_idx
                 
                 # Connect with toggle behavior
                 act.triggered.connect(lambda checked, i=page_idx: self._on_sidebar_action_triggered(i))
                 self.sidebar_actions.append(act)
                 bar.addAction(act)
                 
-                # Map to stack index (skip Playback)
-                if label != "Playback":
-                    self.sidebar_panel_indices[page_idx] = stack_idx
-                    stack_idx += 1
-                else:
-                    self.sidebar_panel_indices[page_idx] = -1  # Not in stack
+                # Map to stack index.
+                self.sidebar_panel_indices[page_idx] = stack_idx
+                stack_idx += 1
             
-            # Check first action by default
+            # Default to Annotate page for annotation-first workflow.
             if self.sidebar_actions:
-                self.sidebar_actions[0].setChecked(True)
+                self.sidebar_actions[default_action_idx].setChecked(True)
+                stack_default_idx = self.sidebar_panel_indices.get(default_action_idx, 0)
+                if stack_default_idx >= 0:
+                    self.sidebar_stack.setCurrentIndex(stack_default_idx)
+                self.sidebar_breadcrumb.setText(
+                    self.sidebar_manager.breadcrumb_text(
+                        self.sidebar_actions[default_action_idx].text()
+                    )
+                )
         else:
             # Fallback actions
             explore_act = QtWidgets.QAction(
@@ -152,10 +293,7 @@ class UiExtrasMixin:
         
         # Get the stack index for this action
         stack_idx = self.sidebar_panel_indices.get(action_idx, -1)
-        if stack_idx == -1:  # Playback panel (no stack widget)
-            # Just check the action, don't change stack
-            for i, act in enumerate(self.sidebar_actions):
-                act.setChecked(i == action_idx)
+        if stack_idx < 0:
             return
         
         # Check if this is the currently active panel
@@ -173,44 +311,112 @@ class UiExtrasMixin:
             self._set_sidebar_mode(action_idx)
 
     def _setup_annotation_toolbar(self) -> None:
-        """Add a right toolbar toggle for the annotation dock."""
+        """Add a fixed right icon rail that toggles inspect-side docks."""
         if getattr(self, "dock_annotations", None) is None:
             return
 
-        bar = QtWidgets.QToolBar("Annotation Controls", self)
-        bar.setObjectName("annotation_toolbar")
+        bar = QtWidgets.QToolBar("Right Sidebar", self)
+        bar.setObjectName("right_sidebar_toolbar")
         bar.setOrientation(QtCore.Qt.Orientation.Vertical)
         bar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         bar.setMovable(False)
         bar.setIconSize(QtCore.QSize(16, 16))
+        bar.setFloatable(False)
+        bar.setAllowedAreas(QtCore.Qt.ToolBarArea.RightToolBarArea)
 
-        act = QtWidgets.QAction(
+        table_act = QtWidgets.QAction(
             self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
-            "Annotations",
+            "Annotation Table",
             self,
         )
-        act.setObjectName("annotation_toolbar_toggle")
-        act.setCheckable(True)
-        act.setChecked(True)
-        act.setToolTip("Show/hide annotation table")
-        act.triggered.connect(self._toggle_annotation_dock)
-        bar.addAction(act)
-        suggest_act = getattr(self, "suggest_points_act", None)
-        if suggest_act is not None:
-            bar.addAction(suggest_act)
-        suggest_image_act = getattr(self, "suggest_points_image_act", None)
-        if suggest_image_act is not None:
-            bar.addAction(suggest_image_act)
-        accept_roi_act = getattr(self, "accept_suggestions_in_roi_act", None)
-        if accept_roi_act is not None:
-            bar.addAction(accept_roi_act)
+        table_act.setObjectName("right_sidebar_table_toggle")
+        table_act.setCheckable(True)
+        table_act.setChecked(True)
+        table_act.setToolTip("Annotation Table")
+        table_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("annotations")
+        )
+        bar.addAction(table_act)
+
+        queue_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowRight),
+            "Review Queue",
+            self,
+        )
+        queue_act.setObjectName("right_sidebar_queue_toggle")
+        queue_act.setCheckable(True)
+        queue_act.setChecked(False)
+        queue_act.setToolTip("Review Queue")
+        queue_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("review_queue")
+        )
+        bar.addAction(queue_act)
+
+        explain_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation),
+            "Why This Suggestion?",
+            self,
+        )
+        explain_act.setObjectName("right_sidebar_why_toggle")
+        explain_act.setCheckable(True)
+        explain_act.setChecked(False)
+        explain_act.setToolTip("Why This Suggestion?")
+        explain_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("suggestion_explain")
+        )
+        bar.addAction(explain_act)
+
+        layers_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
+            "Modality Layers",
+            self,
+        )
+        layers_act.setObjectName("right_sidebar_layers_toggle")
+        layers_act.setCheckable(True)
+        layers_act.setChecked(False)
+        layers_act.setToolTip("Modality Layers")
+        layers_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("modality_layers")
+        )
+        bar.addAction(layers_act)
+
+        advanced_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMenuButton),
+            "Advanced Analysis",
+            self,
+        )
+        advanced_act.setObjectName("right_sidebar_advanced_toggle")
+        advanced_act.setCheckable(True)
+        advanced_act.setChecked(False)
+        advanced_act.setToolTip("Advanced Analysis")
+        advanced_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("advanced_analysis")
+        )
+        bar.addAction(advanced_act)
 
         self.annotation_toolbar = bar
-        self.annotation_toolbar_action = act
+        self.annotation_toolbar_action = table_act
+        self.right_sidebar_actions = {
+            "annotations": table_act,
+            "review_queue": queue_act,
+            "suggestion_explain": explain_act,
+            "modality_layers": layers_act,
+            "advanced_analysis": advanced_act,
+        }
 
         self.addToolBar(QtCore.Qt.RightToolBarArea, bar)
 
-        self.dock_annotations.visibilityChanged.connect(self._sync_annotation_toolbar)
+        for panel_id in (
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "modality_layers",
+            "advanced_analysis",
+        ):
+            dock = getattr(self, f"dock_{panel_id}", None)
+            if dock is not None:
+                dock.visibilityChanged.connect(self._sync_annotation_toolbar)
+        self._sync_annotation_toolbar(True)
 
     def _toggle_annotation_dock(self, checked: bool) -> None:
         """Show or hide the annotation dock when the toolbar toggles."""
@@ -222,12 +428,48 @@ class UiExtrasMixin:
             self.dock_annotations.raise_()
 
     def _sync_annotation_toolbar(self, visible: bool) -> None:
-        """Keep the toolbar toggle in sync with the annotation dock visibility."""
-        action = getattr(self, "annotation_toolbar_action", None)
-        if action is not None:
+        """Keep right-toolbar toggles in sync with inspect dock visibility."""
+        _ = visible  # Qt signal arg; sync uses current dock states.
+        actions = dict(getattr(self, "right_sidebar_actions", {}) or {})
+        for panel_id, action in actions.items():
+            dock = getattr(self, f"dock_{panel_id}", None)
+            if dock is None:
+                continue
+            checked = bool(dock.isVisible())
             action.blockSignals(True)
-            action.setChecked(visible)
+            action.setChecked(checked)
             action.blockSignals(False)
+
+    def _toggle_right_sidebar_panel(self, panel_id: str) -> None:
+        """VSCode-like right rail behavior: select one panel or collapse current."""
+        panel_id = str(panel_id)
+        inspect_ids = [
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "modality_layers",
+            "advanced_analysis",
+        ]
+        target_dock = getattr(self, f"dock_{panel_id}", None)
+        if target_dock is None:
+            return
+        any_other_visible = False
+        for pid in inspect_ids:
+            if pid == panel_id:
+                continue
+            dock = getattr(self, f"dock_{pid}", None)
+            if dock is not None and dock.isVisible():
+                any_other_visible = True
+                break
+        is_only_visible = bool(target_dock.isVisible()) and not any_other_visible
+        if is_only_visible:
+            self.set_panel_visible(panel_id, False, source="right_sidebar")
+            self._sync_annotation_toolbar(False)
+            return
+        for pid in inspect_ids:
+            self.set_panel_visible(pid, pid == panel_id, source="right_sidebar")
+        target_dock.raise_()
+        self._sync_annotation_toolbar(True)
     
     def _collapse_sidebar(self) -> None:
         """Collapse sidebar to slim activity bar only."""
@@ -237,6 +479,7 @@ class UiExtrasMixin:
                 self.sidebar_breadcrumb.setVisible(False)
             self._sidebar_collapsed = True
             self._settings.setValue("sidebarCollapsed", True)
+            self._set_sidebar_expanded(False)
             self._apply_canvas_priority_layout()
     
     def _expand_sidebar(self) -> None:
@@ -247,6 +490,7 @@ class UiExtrasMixin:
                 self.sidebar_breadcrumb.setVisible(True)
             self._sidebar_collapsed = False
             self._settings.setValue("sidebarCollapsed", False)
+            self._set_sidebar_expanded(True)
             self._apply_canvas_priority_layout()
 
     def _build_annotate_panel(self) -> QtWidgets.QWidget:
@@ -254,20 +498,30 @@ class UiExtrasMixin:
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
-        vis_group = QtWidgets.QGroupBox("Annotation visibility")
+        vis_group = QtWidgets.QGroupBox("Visible views")
         vis_layout = QtWidgets.QVBoxLayout(vis_group)
         self.show_ann_master_chk = QtWidgets.QCheckBox("Show annotations")
         self.show_ann_master_chk.setChecked(True)
-        row = QtWidgets.QHBoxLayout()
-        self.show_frame_chk = QtWidgets.QCheckBox("Frame")
-        self.show_mean_chk = QtWidgets.QCheckBox("Mean")
-        self.show_support_chk = QtWidgets.QCheckBox("Support")
-        self.show_frame_chk.setChecked(True)
-        self.show_mean_chk.setChecked(True)
-        self.show_support_chk.setChecked(False)
-        row.addWidget(self.show_frame_chk)
-        row.addWidget(self.show_mean_chk)
-        row.addWidget(self.show_support_chk)
+        row = QtWidgets.QVBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(4)
+        self._annotation_view_checkboxes = {}
+        view_specs = [
+            ("frame", "Frame"),
+            ("mean", "Mean Projection"),
+            ("support", "Support"),
+            ("std", "Std Projection"),
+        ]
+        for key, label in view_specs:
+            chk = QtWidgets.QCheckBox(label)
+            act = getattr(self, "panel_actions", {}).get(key)
+            chk.setChecked(bool(act.isChecked()) if act is not None else True)
+            chk.toggled.connect(lambda checked, k=key: self._on_panel_toggle(k, bool(checked)))
+            row.addWidget(chk)
+            self._annotation_view_checkboxes[key] = chk
+        self.show_frame_chk = self._annotation_view_checkboxes.get("frame")
+        self.show_mean_chk = self._annotation_view_checkboxes.get("mean")
+        self.show_support_chk = self._annotation_view_checkboxes.get("support")
         vis_layout.addWidget(self.show_ann_master_chk)
         vis_layout.addLayout(row)
         layout.addWidget(vis_group)
@@ -293,17 +547,30 @@ class UiExtrasMixin:
                 btn.setChecked(True)
             self.scope_group.addButton(btn)
             scope_layout.addWidget(btn)
+        scope_buttons = self.scope_group.buttons()
+        if len(scope_buttons) > 1:
+            self._install_delayed_micro_help(
+                scope_buttons[1],
+                "Annotations will be applied to all Z planes.\nUse with caution.",
+            )
         layout.addWidget(scope_group)
 
         target_group = QtWidgets.QGroupBox("Target panel")
         target_layout = QtWidgets.QVBoxLayout(target_group)
         self.target_group = QtWidgets.QButtonGroup()
-        for label in ["Frame", "Mean", "Support"]:
+        self._target_buttons = {}
+        for key, label in [("frame", "Frame"), ("mean", "Mean Projection"), ("support", "Support")]:
             btn = QtWidgets.QRadioButton(label)
-            if label == "Mean":
+            if key == "mean":
                 btn.setChecked(True)
             self.target_group.addButton(btn)
             target_layout.addWidget(btn)
+            self._target_buttons[key] = btn
+        self.target_unavailable_hint_lbl = _LogicalVisibilityLabel("")
+        self.target_unavailable_hint_lbl.setWordWrap(True)
+        self.target_unavailable_hint_lbl.setStyleSheet("color: #546e7a; font-style: italic;")
+        self.target_unavailable_hint_lbl.setVisible(False)
+        target_layout.addWidget(self.target_unavailable_hint_lbl)
         layout.addWidget(target_group)
 
         tool_group = QtWidgets.QGroupBox("Tools")
@@ -316,12 +583,110 @@ class UiExtrasMixin:
         # Phase 2D: This should be part of ToolState dataclass
         self.profile_mode_chk = QtWidgets.QCheckBox("Profile mode (click two points)")
         self.profile_mode_chk.setChecked(False)
+        self._install_delayed_micro_help(
+            self.profile_mode_chk,
+            "Profile mode:\nClick two points to extract an intensity profile\nalong the line between them.",
+        )
         tool_layout.addWidget(self.profile_mode_chk)
         
         layout.addWidget(tool_group)
 
         layout.addStretch(1)
+        self._refresh_annotation_view_controls()
         return panel
+
+    def _cycle_label(self, delta: int) -> None:
+        """Cycle active label selection without leaving canvas workflow."""
+        group = getattr(self, "label_buttons", None)
+        if group is None:
+            return
+        buttons = list(group.buttons())
+        if not buttons:
+            return
+        current_idx = 0
+        for i, btn in enumerate(buttons):
+            if btn.isChecked():
+                current_idx = i
+                break
+        next_idx = (current_idx + int(delta)) % len(buttons)
+        target = buttons[next_idx]
+        target.setChecked(True)
+        self.current_label = str(target.text())
+        self._set_status(f"Active label: {self.current_label}")
+        self._update_status()
+
+    def _toggle_focus_canvas_mode(self) -> None:
+        """Canvas-dominant focus mode with true space reclaim."""
+        right_ids = [
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "advanced_analysis",
+            "modality_layers",
+        ]
+        bottom_ids = [
+            "qc_issues",
+            "results",
+            "threshold",
+            "particles",
+            "hist",
+            "profile",
+            "logs",
+            "roi",
+            "roi_manager",
+        ]
+        active = bool(getattr(self, "_focus_canvas_mode_active", False))
+        target_on = not active
+        self._focus_canvas_mode_active = target_on
+        if target_on:
+            self._focus_canvas_prev_right = {
+                key: bool(getattr(self, "panel_docks", {}).get(key) and self.panel_docks[key].isVisible())
+                for key in right_ids
+            }
+            self._focus_canvas_prev_bottom = {
+                key: bool(getattr(self, "panel_docks", {}).get(key) and self.panel_docks[key].isVisible())
+                for key in bottom_ids
+            }
+            self._collapse_sidebar()
+            for key in right_ids:
+                self.set_panel_visible(key, False, source="focus_canvas_mode")
+            for key in bottom_ids:
+                self.set_panel_visible(key, False, source="focus_canvas_mode")
+            self.set_panel_visible("review_queue", True, source="focus_canvas_mode")
+            self._set_right_handle_compact(True)
+            self._set_status("Focus Canvas mode enabled.")
+        else:
+            self._set_right_handle_compact(False)
+            self._expand_sidebar()
+            for key, visible in dict(getattr(self, "_focus_canvas_prev_right", {}) or {}).items():
+                self.set_panel_visible(key, bool(visible), source="focus_canvas_mode_restore")
+            for key, visible in dict(getattr(self, "_focus_canvas_prev_bottom", {}) or {}).items():
+                self.set_panel_visible(key, bool(visible), source="focus_canvas_mode_restore")
+            self._set_status("Focus Canvas mode disabled.")
+        self._apply_canvas_priority_layout()
+
+    def _set_right_handle_compact(self, compact: bool) -> None:
+        """Shrink right dock to a thin handle-like strip when compact mode is active."""
+        dock = getattr(self, "dock_review_queue", None) or getattr(self, "dock_annotations", None)
+        if dock is None:
+            return
+        if compact:
+            self._focus_prev_right_features = int(dock.features())
+            dock.setFeatures(
+                dock.features() | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetVerticalTitleBar
+            )
+            dock.setMinimumWidth(28)
+            dock.setMaximumWidth(36)
+            self.resizeDocks([dock], [32], QtCore.Qt.Orientation.Horizontal)
+        else:
+            prev = getattr(self, "_focus_prev_right_features", None)
+            if prev is not None:
+                try:
+                    dock.setFeatures(QtWidgets.QDockWidget.DockWidgetFeatures(prev))
+                except Exception:
+                    pass
+            dock.setMaximumWidth(16777215)
+            dock.setMinimumWidth(180)
 
     def _build_analyze_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
@@ -495,6 +860,58 @@ class UiExtrasMixin:
         self._sync_nav_mode(tool)
         if self.tool_label is not None:
             self.tool_label.setText(f"Tool: {self._tool_label(tool)}")
+        if tool == Tool.ANNOTATE_POINT and hasattr(self, "_set_right_dock_mode"):
+            self._set_right_dock_mode("annotate")
+
+    def _set_right_dock_mode(self, mode: str) -> None:
+        """Mode-aware right dock behavior: annotate/review/inspect."""
+        target = str(mode or "").strip().lower()
+        right_ids = ("annotations", "review_queue", "suggestion_explain")
+        if target == "annotate":
+            for panel_id in right_ids:
+                self.set_panel_visible(panel_id, False, source="mode_right_dock")
+            self.set_panel_visible("review_queue", True, source="mode_right_dock")
+            self._set_right_handle_compact(True)
+            return
+        if target == "review":
+            self._set_right_handle_compact(False)
+            self.set_panel_visible("review_queue", True, source="mode_right_dock")
+            dock = getattr(self, "dock_review_queue", None)
+            if dock is not None:
+                dock.raise_()
+            return
+        if target == "inspect":
+            self._set_right_handle_compact(False)
+            self.set_panel_visible("suggestion_explain", True, source="mode_right_dock")
+            dock = getattr(self, "dock_suggestion_explain", None)
+            if dock is not None:
+                dock.raise_()
+
+    def _set_assist_mode(self, enabled: bool, *, source: str = "user") -> None:
+        """Toggle assist-focused UI emphasis without hiding core panels."""
+        enabled = bool(enabled)
+        self._assist_mode_enabled = enabled
+        self._settings.setValue("assistModeEnabled", enabled)
+        btn = getattr(self, "status_assist_mode_btn", None)
+        if btn is not None:
+            btn.blockSignals(True)
+            btn.setChecked(enabled)
+            btn.setText("Assist Mode: On" if enabled else "Assist Mode: Off")
+            btn.blockSignals(False)
+        if enabled:
+            self.set_panel_visible("review_queue", True, source=f"assist_mode:{source}")
+            self.set_panel_visible("suggestion_explain", True, source=f"assist_mode:{source}")
+            if getattr(self, "dock_review_queue", None) is not None:
+                self.dock_review_queue.raise_()
+            self.statusBar().showMessage("Assist Mode enabled.", 2500)
+            return
+        # OFF: keep review queue available, but raise table and reduce inspect clutter.
+        self.set_panel_visible("review_queue", True, source=f"assist_mode:{source}")
+        self.set_panel_visible("suggestion_explain", False, source=f"assist_mode:{source}")
+        if getattr(self, "dock_annotations", None) is not None:
+            self.set_panel_visible("annotations", True, source=f"assist_mode:{source}")
+            self.dock_annotations.raise_()
+        self.statusBar().showMessage("Assist Mode disabled.", 2500)
 
     def _sync_nav_mode(self, tool: Tool) -> None:
         if self.toolbar is None:
@@ -546,7 +963,8 @@ class UiExtrasMixin:
         """Switch to the specified sidebar panel and update action states."""
         if not self.sidebar_stack or not self.sidebar_actions:
             return
-        
+        current_idx = self.sidebar_stack.currentIndex()
+
         # Map action index to stack index (skip Playback)
         stack_idx = self.sidebar_panel_indices.get(idx, -1)
         if stack_idx == -1:
@@ -557,6 +975,8 @@ class UiExtrasMixin:
         
         # Switch to the panel
         self.sidebar_stack.setCurrentIndex(stack_idx)
+        if current_idx != stack_idx:
+            self._collapse_sidebar_context_docks_for_stack_index(stack_idx)
         self._settings.setValue("sidebarMode", idx)
 
         # Update breadcrumb label to match the selected panel
@@ -568,9 +988,72 @@ class UiExtrasMixin:
         for i, act in enumerate(self.sidebar_actions):
             act.setChecked(i == idx)
 
+    def _focus_playback_controls(self) -> None:
+        """Focus playback controls in the bottom bar from sidebar launcher page."""
+        slider = getattr(self, "t_slider", None)
+        if slider is not None:
+            slider.setFocus(QtCore.Qt.FocusReason.ShortcutFocusReason)
+            self.statusBar().showMessage("Playback controls are active in the bottom bar.", 3500)
+
+    def _collapse_sidebar_context_docks_for_stack_index(self, stack_idx: int) -> None:
+        """Collapse context docks from previous mode; keep only mode-relevant side panels."""
+        mode_label = ""
+        for action_idx, mapped_idx in dict(getattr(self, "sidebar_panel_indices", {}) or {}).items():
+            if int(mapped_idx) == int(stack_idx):
+                actions = getattr(self, "sidebar_actions", []) or []
+                if 0 <= int(action_idx) < len(actions):
+                    mode_label = str(actions[int(action_idx)].text()).strip().lower()
+                break
+        mode_to_keep = {
+            "annotate": {
+                "annotations",
+                "review_queue",
+                "suggestion_explain",
+                "advanced_analysis",
+                "modality_layers",
+            },
+            "analyze": {"roi", "roi_manager", "results", "orthoview", "metadata"},
+            "display": {"hist", "profile"},
+            "playback": set(),
+            "preferences": {"advanced_analysis"},
+            "explore": set(),
+            "roi/crop": {"roi", "roi_manager"},
+            "results": {"results", "qc_issues"},
+            "project": set(),
+            "export": set(),
+        }
+        keep = set(mode_to_keep.get(mode_label, set()))
+        managed = {
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "advanced_analysis",
+            "modality_layers",
+            "roi",
+            "roi_manager",
+            "results",
+            "orthoview",
+            "metadata",
+            "hist",
+            "profile",
+        }
+        for panel_id in managed:
+            if panel_id in keep:
+                continue
+            if hasattr(self, "is_panel_pinned") and self.is_panel_pinned(panel_id):
+                continue
+            if hasattr(self, "get_panel_opened_by") and self.get_panel_opened_by(panel_id) == "user":
+                continue
+            self.set_panel_visible(panel_id, False, source="sidebar_mode_switch")
+
     def _sidebar_action_index_for_label(self, label: str) -> int:
         """Return sidebar action index by label, or -1 if not found."""
         want = str(label).strip().lower()
+        aliases = {
+            "playback": "playback settings",
+            "results": "results hub",
+        }
+        want = aliases.get(want, want)
         for i, act in enumerate(getattr(self, "sidebar_actions", []) or []):
             if str(act.text()).strip().lower() == want:
                 return i
@@ -584,19 +1067,31 @@ class UiExtrasMixin:
         pref_idx = self._sidebar_action_index_for_label("Preferences")
         if pref_idx >= 0:
             self._set_sidebar_mode(pref_idx)
-        if section != "training_controls":
+        if section not in {"training_controls", "panel_policy"}:
             return
 
         if getattr(self, "settings_advanced_container", None) is not None:
             self.settings_advanced_container.setVisible(True)
         if getattr(self, "advanced_group", None) is not None:
             self.advanced_group.setChecked(True)
+        if section == "panel_policy" and hasattr(self, "_refresh_panel_policy_controls"):
+            self._refresh_panel_policy_controls()
 
         scroll = self.sidebar_stack.currentWidget() if self.sidebar_stack is not None else None
         if isinstance(scroll, QtWidgets.QScrollArea):
-            scroll.ensureWidgetVisible(self.settings_advanced_container, 0, 24)
+            target = (
+                getattr(self, "panel_policy_group", None)
+                if section == "panel_policy"
+                else self.settings_advanced_container
+            )
+            if target is not None:
+                scroll.ensureWidgetVisible(target, 0, 24)
 
-        focus_widget = getattr(self, "suggestion_auto_retrain_chk", None)
+        focus_widget = (
+            getattr(self, "suggestion_auto_retrain_chk", None)
+            if section == "training_controls"
+            else getattr(self, "panel_policy_reset_btn", None)
+        )
         if focus_widget is not None:
             focus_widget.setFocus(QtCore.Qt.FocusReason.ShortcutFocusReason)
 
@@ -641,17 +1136,25 @@ class UiExtrasMixin:
         sizes: List[int] = []
 
         sidebar_visible = getattr(self, "dock_sidebar", None) is not None and self.dock_sidebar.isVisible()
-        annotations_visible = (
-            (getattr(self, "dock_annotations", None) is not None and self.dock_annotations.isVisible())
-            or (getattr(self, "dock_review_queue", None) is not None and self.dock_review_queue.isVisible())
-            or (getattr(self, "dock_suggestion_explain", None) is not None and self.dock_suggestion_explain.isVisible())
-        )
+        right_dock = None
+        for attr in (
+            "dock_annotations",
+            "dock_review_queue",
+            "dock_suggestion_explain",
+            "dock_advanced_analysis",
+            "dock_modality_layers",
+        ):
+            candidate = getattr(self, attr, None)
+            if candidate is not None and candidate.isVisible():
+                right_dock = candidate
+                break
+        annotations_visible = right_dock is not None
 
         for key in self.sidebar_manager.dock_order(sidebar_visible, annotations_visible):
             if key == "sidebar":
                 docks.append(self.dock_sidebar)
             elif key == "annotations":
-                docks.append(self.dock_annotations)
+                docks.append(right_dock)
 
         sizes = self.sidebar_manager.dock_sizes(
             sidebar_visible=sidebar_visible,
@@ -717,15 +1220,44 @@ class UiExtrasMixin:
 
         for act in self.sidebar_actions:
             _add_action(act)
+        # Backward-compatible aliases for renamed sidebar pages.
+        if not isinstance(getattr(self, "_sidebar_alias_actions", None), dict):
+            self._sidebar_alias_actions = {}
+        for alias, target in (("Playback", "Playback Settings"), ("Results", "Results Hub")):
+            idx = self._sidebar_action_index_for_label(target)
+            if idx < 0:
+                continue
+            alias_act = self._sidebar_alias_actions.get(alias)
+            if alias_act is None:
+                alias_act = QtWidgets.QAction(alias, self)
+                alias_act.setObjectName(f"sidebar_alias_{alias.lower()}")
+                self._sidebar_alias_actions[alias] = alias_act
+            try:
+                alias_act.triggered.disconnect()
+            except Exception:
+                pass
+            alias_act.triggered.connect(
+                lambda _checked=False, i=idx: self._on_sidebar_action_triggered(i)
+            )
+            _add_action(alias_act)
 
         if self.command_palette_act is not None:
             _add_action(self.command_palette_act)
         if self.reset_view_act is not None:
             _add_action(self.reset_view_act)
+        for act in dict(getattr(self, "panel_open_actions", {}) or {}).values():
+            _add_action(act)
 
         return actions
 
     def _show_command_palette(self) -> None:
+        self._show_command_palette_with_query("")
+
+    def _show_panel_switcher(self) -> None:
+        """Open command palette in panel-only mode."""
+        self._show_command_palette_with_query("panel ")
+
+    def _show_command_palette_with_query(self, initial_query: str = "") -> None:
         existing = getattr(self, "_command_palette_dialog", None)
         if existing is not None and existing.isVisible():
             existing.raise_()
@@ -748,10 +1280,21 @@ class UiExtrasMixin:
         layout.addWidget(listw)
         layout.addWidget(rationale_lbl)
 
-        action_map: List[Tuple[str, QtWidgets.QAction]] = []
+        action_map: List[Tuple[str, QtWidgets.QAction, str]] = []
         for act in actions:
             label = act.text().replace("&", "").strip()
-            action_map.append((label, act))
+            object_name = str(act.objectName() or "")
+            search_blob = label.lower()
+            if object_name.startswith("open_panel_"):
+                panel_id = object_name.replace("open_panel_", "", 1)
+                panel_specs = dict(getattr(self, "panel_specs_by_id", {}) or {})
+                spec = panel_specs.get(panel_id)
+                if spec is not None:
+                    label = f"{label} [{str(spec.bucket).title()}]"
+                    aliases = tuple(getattr(spec, "search_aliases", ()) or ())
+                    if aliases:
+                        search_blob = f"{search_blob} " + " ".join(str(a).lower() for a in aliases)
+            action_map.append((label, act, search_blob))
 
         if not hasattr(self, "_command_usage_count"):
             self._command_usage_count = {}
@@ -790,13 +1333,21 @@ class UiExtrasMixin:
 
         def _populate(filter_text: str = "") -> None:
             listw.clear()
+            panel_only = False
+            filter_expr = filter_text
+            if filter_text.startswith("panel "):
+                panel_only = True
+                filter_expr = filter_text[len("panel "):].strip()
             ranked = sorted(
                 action_map,
                 key=lambda row: _score(row[0], row[1], filter_text),
                 reverse=True,
             )
-            for label, act in ranked:
-                if filter_text and filter_text not in label.lower():
+            for label, act, search_blob in ranked:
+                object_name = str(act.objectName() or "")
+                if panel_only and not object_name.startswith("open_panel_"):
+                    continue
+                if filter_expr and filter_expr not in search_blob:
                     continue
                 item = QtWidgets.QListWidgetItem(label)
                 item.setData(QtCore.Qt.UserRole, act)
@@ -806,10 +1357,13 @@ class UiExtrasMixin:
             if listw.count():
                 listw.setCurrentRow(0)
             mode = _current_palette_mode()
-            rationale_lbl.setText(
-                f"Ranking: frequency + recency + mode boost ({mode}). "
-                "Review mode boosts review/QC commands."
-            )
+            if panel_only:
+                rationale_lbl.setText("Panel switcher mode: searching panel commands only.")
+            else:
+                rationale_lbl.setText(
+                    f"Ranking: frequency + recency + mode boost ({mode}). "
+                    "Review mode boosts review/QC commands."
+                )
 
         def _activate() -> None:
             item = listw.currentItem()
@@ -823,17 +1377,20 @@ class UiExtrasMixin:
                 self._command_last_used_ts[key] = float(time.time())
                 act.trigger()
 
-        _populate()
+        _populate(initial_query.strip().lower())
         search.textChanged.connect(lambda text: _populate(text.strip().lower()))
         search.returnPressed.connect(_activate)
         listw.itemActivated.connect(lambda _: _activate())
         dlg.finished.connect(lambda _code: setattr(self, "_command_palette_dialog", None))
+        if initial_query:
+            search.setText(initial_query)
+            search.selectAll()
         search.setFocus()
         dlg.open()
 
     def _toggle_review_context_pack(self) -> None:
         """One-click toggle for Table + Queue + Why review context pack."""
-        keys = ("annotations", "review_queue", "suggestion_explain")
+        keys = ("annotations", "review_queue", "suggestion_explain", "modality_layers")
         visible_now = [
             bool(getattr(self, "panel_docks", {}).get(k).isVisible())
             for k in keys
@@ -850,13 +1407,15 @@ class UiExtrasMixin:
             self.set_panel_visible("annotations", True, source="review_context_pack")
             self.set_panel_visible("review_queue", False, source="review_context_pack")
             self.set_panel_visible("suggestion_explain", False, source="review_context_pack")
+            self.set_panel_visible("modality_layers", False, source="review_context_pack")
             self._set_status("Review Context Pack collapsed to table.")
 
     def _apply_default_layout(self) -> None:
         """Save the initial layout as the default reset state."""
-        self._apply_panel_defaults()
+        self.apply_preset("Default")
         self._default_geometry = self.saveGeometry()
         self._default_state = self.saveState()
+        self._preset_active = False
         self._apply_canvas_priority_layout()
 
     def _restore_layout(self) -> None:
@@ -884,15 +1443,43 @@ class UiExtrasMixin:
         self._settings.setValue("customGeometry", self.saveGeometry())
         self._settings.setValue("customState", self.saveState())
 
+    def _capture_layout_snapshot(self) -> None:
+        """Capture one-step layout undo state before major layout changes."""
+        self._layout_prev_geometry = self.saveGeometry()
+        self._layout_prev_state = self.saveState()
+        act = getattr(self, "undo_layout_change_act", None)
+        if act is not None:
+            act.setEnabled(True)
+
+    def _undo_layout_change(self) -> None:
+        """Restore the previous saved layout snapshot once."""
+        geometry = getattr(self, "_layout_prev_geometry", None)
+        state = getattr(self, "_layout_prev_state", None)
+        if geometry is None or state is None:
+            return
+        self.restoreGeometry(geometry)
+        self.restoreState(state)
+        self._apply_canvas_priority_layout()
+        self._layout_prev_geometry = None
+        self._layout_prev_state = None
+        act = getattr(self, "undo_layout_change_act", None)
+        if act is not None:
+            act.setEnabled(False)
+        self.statusBar().showMessage("Layout restored.", 3000)
+
     def _reset_layout(self) -> None:
         """Reset dock placement to PanelSpec defaults without removing docks."""
+        self._capture_layout_snapshot()
         self._apply_panel_defaults()
         self._preset_active = False
         self._apply_canvas_priority_layout()
+        self.statusBar().showMessage("Layout changed. Use Layout > Layouts > Undo Layout Change.", 8000)
 
     def apply_preset(self, name: str) -> None:
         """Apply a named layout preset without overwriting saved custom layout."""
+        self._capture_layout_snapshot()
         self._preset_active = True
+        self._active_layout_preset = str(name)
 
         if name == "Default_Legacy":
             if self._default_geometry is not None:
@@ -921,6 +1508,7 @@ class UiExtrasMixin:
             _dock_to_area("orthoview", QtCore.Qt.RightDockWidgetArea)
         if name == "Assist Expert":
             _dock_to_area("suggestion_explain", QtCore.Qt.RightDockWidgetArea)
+            _dock_to_area("modality_layers", QtCore.Qt.RightDockWidgetArea)
 
         preset_visibility: dict[str, dict[str, bool]] = {
             "Default": {
@@ -938,6 +1526,7 @@ class UiExtrasMixin:
                 "threshold": False,
                 "particles": False,
                 "qc_issues": True,
+                "modality_layers": False,
                 "orthoview": False,
             },
             "Minimal": {
@@ -955,6 +1544,7 @@ class UiExtrasMixin:
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
+                "modality_layers": False,
                 "orthoview": False,
             },
             "Annotate": {
@@ -972,6 +1562,7 @@ class UiExtrasMixin:
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
+                "modality_layers": False,
                 "orthoview": False,
             },
             "Analyze": {
@@ -990,6 +1581,7 @@ class UiExtrasMixin:
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
+                "modality_layers": False,
             },
             "Assist Expert": {
                 "sidebar": True,
@@ -1008,13 +1600,14 @@ class UiExtrasMixin:
                 "logs": False,
                 "metadata": False,
                 "density": False,
+                "modality_layers": True,
                 "orthoview": False,
             },
         }
 
         if name == "Default":
             self._set_sidebar_mode(0)
-            self._expand_sidebar()
+            self._collapse_sidebar()
         elif name == "Minimal":
             self._collapse_sidebar()
         elif name == "Annotate":
@@ -1032,6 +1625,15 @@ class UiExtrasMixin:
         preset = preset_visibility.get(name)
         if preset is not None:
             self.apply_panel_visibility_preset(preset, source=f"preset:{name.lower().replace(' ', '_')}")
+        if name == "Default":
+            for key in ("annotations", "suggestion_explain", "advanced_analysis", "modality_layers"):
+                self.set_panel_visible(key, False, source="preset:default_canvas_home")
+            self.set_panel_visible("review_queue", True, source="preset:default_canvas_home")
+            self._set_right_handle_compact(True)
+            self._set_bottom_docks_compact(True)
+        else:
+            self._set_right_handle_compact(False)
+            self._set_bottom_docks_compact(False)
         if name == "Assist Expert" and self.dock_annotations is not None:
             self.dock_annotations.resize(
                 self.dock_annotations.width(),
@@ -1039,8 +1641,34 @@ class UiExtrasMixin:
             )
         if name == "Assist Expert" and self.dock_review_queue is not None:
             self.dock_review_queue.raise_()
+        if name == "Default" and self.dock_annotations is not None:
+            self.dock_annotations.raise_()
+        self.statusBar().showMessage(
+            "Layout changed. Use Layout > Layouts > Undo Layout Change.",
+            8000,
+        )
         self._apply_canvas_priority_layout()
         return
+
+    def _set_bottom_docks_compact(self, compact: bool) -> None:
+        """Keep bottom-dock footprint minimal in canvas-first modes."""
+        panel_docks = dict(getattr(self, "panel_docks", {}) or {})
+        bottom_visible = []
+        for dock in panel_docks.values():
+            if dock is None or not dock.isVisible():
+                continue
+            try:
+                if self.dockWidgetArea(dock) == QtCore.Qt.DockWidgetArea.BottomDockWidgetArea:
+                    bottom_visible.append(dock)
+            except Exception:
+                continue
+        if not bottom_visible:
+            return
+        if compact:
+            per = max(44, int(max(1, self.height()) * 0.10))
+        else:
+            per = max(120, int(max(1, self.height()) * 0.20))
+        self.resizeDocks(bottom_visible, [per for _ in bottom_visible], QtCore.Qt.Orientation.Vertical)
 
     def closeEvent(self, event) -> None:
         """Persist layout before closing the main window."""

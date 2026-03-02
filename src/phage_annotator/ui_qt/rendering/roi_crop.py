@@ -101,8 +101,10 @@ class RoiCropMixin:
             "panel_visibility": panel_visibility,
         }
 
-    def _roi_mask(self, shape: Tuple[int, int]) -> np.ndarray:
-        h, w = shape
+    def _roi_mask(self, shape: Tuple[int, ...]) -> np.ndarray:
+        if len(shape) < 2:
+            raise ValueError(f"Invalid shape for ROI mask: {shape}")
+        h, w = int(shape[0]), int(shape[1])
         y = np.arange(h)[:, None]
         x = np.arange(w)[None, :]
         rx, ry, rw, rh = self.roi_rect
@@ -119,7 +121,8 @@ class RoiCropMixin:
         mask = self._roi_mask(slice_data.shape)
         if not mask.any():
             return slice_data.flatten()
-        return slice_data[mask]
+        # For multi-channel views, apply 2D ROI mask over spatial dimensions.
+        return np.asarray(slice_data[mask]).reshape(-1)
 
     def _clear_roi(self) -> None:
         """Clear the active ROI selection (P3.3: confirmation added)."""
@@ -475,6 +478,8 @@ class RoiCropMixin:
                 self.panel_actions[key].setChecked(True)
             return
         self._panel_visibility[key] = checked
+        if hasattr(self, "_refresh_annotation_view_controls"):
+            self._refresh_annotation_view_controls()
         self._rebuild_figure_layout()
         self._refresh_image()
 

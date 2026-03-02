@@ -422,6 +422,11 @@ class DisplayControlsMixin:
         self.primary_combo.blockSignals(True)
         self.primary_combo.setCurrentIndex(idx)
         self.primary_combo.blockSignals(False)
+        status_combo = getattr(self, "status_modality_combo", None)
+        if status_combo is not None:
+            status_combo.blockSignals(True)
+            status_combo.setCurrentIndex(idx)
+            status_combo.blockSignals(False)
         if self.threshold_panel is not None:
             cfg = self.controller.session_state.threshold_configs_by_image.get(idx)
             if cfg:
@@ -432,6 +437,8 @@ class DisplayControlsMixin:
         self._maybe_autoload_annotations(self.primary_image.id)
         if hasattr(self, "_sync_channel_panel_for_active_image"):
             self._sync_channel_panel_for_active_image()
+        if hasattr(self, "_refresh_annotation_view_controls"):
+            self._refresh_annotation_view_controls()
         self._refresh_image()
 
     def _set_primary_combo(self, idx: int) -> None:
@@ -451,6 +458,14 @@ class DisplayControlsMixin:
             self._binary_view_mask = None
             self._binary_view_enabled = False
             self.current_image_idx = idx
+            self.primary_combo.blockSignals(True)
+            self.primary_combo.setCurrentIndex(idx)
+            self.primary_combo.blockSignals(False)
+            status_combo = getattr(self, "status_modality_combo", None)
+            if status_combo is not None:
+                status_combo.blockSignals(True)
+                status_combo.setCurrentIndex(idx)
+                status_combo.blockSignals(False)
             self.fov_list.blockSignals(True)
             self.fov_list.setCurrentRow(idx)
             self.fov_list.blockSignals(False)
@@ -464,6 +479,8 @@ class DisplayControlsMixin:
             self._maybe_autoload_annotations(self.primary_image.id)
             if hasattr(self, "_sync_channel_panel_for_active_image"):
                 self._sync_channel_panel_for_active_image()
+            if hasattr(self, "_refresh_annotation_view_controls"):
+                self._refresh_annotation_view_controls()
             self._refresh_image()
             # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
             self._schedule_adjacent_fov_prefetch()
@@ -546,6 +563,8 @@ class DisplayControlsMixin:
             self.support_image_idx = idx
             self.support_combo.setCurrentIndex(idx)
             self._maybe_autoload_annotations(self.support_image.id)
+            if hasattr(self, "_refresh_annotation_view_controls"):
+                self._refresh_annotation_view_controls()
             self._refresh_image()
 
     def _toggle_play(self, axis: str) -> None:
@@ -635,6 +654,14 @@ class DisplayControlsMixin:
         if updated:
             self.proj_cache.invalidate_image(self.primary_image.id)
             self._refresh_image()
+            if hasattr(self, "_append_assist_change_log"):
+                self._append_assist_change_log(
+                    "projection_changed",
+                    projection_type=str(projection_type),
+                    projection_axis=str(projection_axis),
+                )
+            if hasattr(self, "_maybe_emit_assist_context_delta"):
+                self._maybe_emit_assist_context_delta("projection")
         self._refresh_image()
 
     def _on_projection_changed(self, projection_type: str, projection_axis: str) -> None:
@@ -845,29 +872,86 @@ class DisplayControlsMixin:
             self._update_status()
 
     def _on_scope_change(self) -> None:
-        self.annotation_scope = (
-            "current" if self.scope_group.buttons()[0].isChecked() else "all"
-        )
+        old_scope = str(getattr(self, "annotation_scope", "current"))
+        new_scope = "current" if self.scope_group.buttons()[0].isChecked() else "all"
+        if old_scope == "current" and new_scope == "all":
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Confirm Stack Annotation Mode",
+                "Switch to Stack Annotation Mode (All Z)?\n"
+                "New annotations will apply globally across Z.",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel,
+                QtWidgets.QMessageBox.Cancel,
+            )
+            if reply != QtWidgets.QMessageBox.Yes:
+                self.scope_group.buttons()[0].setChecked(True)
+                return
+        self.annotation_scope = new_scope
+        if hasattr(self, "controller") and hasattr(self.controller, "append_audit_event"):
+            self.controller.append_audit_event(
+                "annotation_scope_changed",
+                image_id=self.primary_image.id if getattr(self, "primary_image", None) is not None else -1,
+                old_scope=old_scope,
+                new_scope=new_scope,
+            )
+        if hasattr(self, "_append_assist_change_log"):
+            self._append_assist_change_log(
+                "scope_changed",
+                old_scope=str(old_scope),
+                new_scope=str(new_scope),
+            )
+        if new_scope == "all":
+            QtWidgets.QToolTip.showText(
+                self.mapToGlobal(QtCore.QPoint(20, 20)),
+                "Switched to Stack Annotation Mode (All Z)",
+                self,
+            )
+        else:
+            QtWidgets.QToolTip.showText(
+                self.mapToGlobal(QtCore.QPoint(20, 20)),
+                "Switched to Slice Annotation Mode (Current Z)",
+                self,
+            )
         self._update_status()
         self._refresh_image()
+        if hasattr(self, "_maybe_emit_assist_context_delta"):
+            self._maybe_emit_assist_context_delta("scope")
 
     def _on_target_change(self) -> None:
         old_target = str(getattr(self, "annotate_target", "frame"))
-        buttons = self.target_group.buttons()
-        if buttons[0].isChecked():
-            self.annotate_target = "frame"
-        elif buttons[1].isChecked():
-            self.annotate_target = "mean"
+        target_buttons = dict(getattr(self, "_target_buttons", {}) or {})
+        if target_buttons:
+            selected = None
+            for key in ("frame", "mean", "support"):
+                btn = target_buttons.get(key)
+                if btn is not None and btn.isChecked():
+                    selected = key
+                    break
+            self.annotate_target = str(selected or "frame")
         else:
-            self.annotate_target = "support"
+            buttons = self.target_group.buttons()
+            if buttons[0].isChecked():
+                self.annotate_target = "frame"
+            elif buttons[1].isChecked():
+                self.annotate_target = "mean"
+            else:
+                self.annotate_target = "support"
         if old_target != str(self.annotate_target) and hasattr(
             self, "_mark_annotation_context_changed"
         ):
             self._mark_annotation_context_changed(
                 f"target panel changed ({old_target} -> {self.annotate_target})"
             )
+        if old_target != str(self.annotate_target) and hasattr(self, "_append_assist_change_log"):
+            self._append_assist_change_log(
+                "target_changed",
+                old_target=str(old_target),
+                new_target=str(self.annotate_target),
+            )
         self._update_status()
         self._refresh_image()
+        if old_target != str(self.annotate_target) and hasattr(self, "_maybe_emit_assist_context_delta"):
+            self._maybe_emit_assist_context_delta("target")
 
     def _on_marker_size_change(self, val: int) -> None:
         self.marker_size = float(val)
@@ -1153,6 +1237,11 @@ class DisplayControlsMixin:
 
     def _mark_dirty(self, dirty: bool = True) -> None:
         self._annotations_dirty = dirty
+        if dirty and hasattr(self, "_note_annotation_edit"):
+            try:
+                self._note_annotation_edit(self.primary_image.id)
+            except Exception:
+                pass
 
     def _autosave_tick(self) -> None:
         path = self.controller.autosave_if_needed(self, self._current_keypoints)
@@ -1199,7 +1288,8 @@ class DisplayControlsMixin:
                 elif img.has_z and not img.has_time:
                     t, z, y, x = 1, shape[0], shape[1], shape[2]
                 else:
-                    t, z, y, x = 1, 1, shape[1], shape[2]
+                    # RGB/multi-channel 2D image.
+                    t, z, y, x = 1, 1, shape[0], shape[1]
             else:
                 t, z, y, x = shape[0], shape[1], shape[2], shape[3]
 
@@ -1251,7 +1341,9 @@ class DisplayControlsMixin:
         shape = getattr(self, "_last_display_shape", None)
         if shape is None:
             return
-        _, w = shape
+        if len(shape) < 2:
+            return
+        w = int(shape[1])
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
         span_x = max(1e-6, abs(xlim[1] - xlim[0]))
@@ -1431,13 +1523,13 @@ class DisplayControlsMixin:
         if getattr(self, "renderer", None) is not None:
             ax = self.renderer.axes.get(panel_key)
         if ax is None:
-            ax = getattr(self, f"ax_{panel_key}", None)
-        if ax is None:
             return
         shape = getattr(self, "_last_display_shape", None)
         if shape is None:
             return
-        h, w = shape
+        if len(shape) < 2:
+            return
+        h, w = int(shape[0]), int(shape[1])
         span_x = max(1.0, w / max(0.1, zoom))
         span_y = max(1.0, h / max(0.1, zoom))
         x0 = max(0.0, min(pan_x, max(0.0, w - span_x)))

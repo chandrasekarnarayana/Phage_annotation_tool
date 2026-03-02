@@ -25,15 +25,44 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.header_lbl = QtWidgets.QLabel("Review Queue - T:- Z:-")
         self.header_lbl.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.header_lbl)
+        self.context_lbl = QtWidgets.QLabel("Effective Assist Context: -")
+        self.context_lbl.setWordWrap(True)
+        self.context_lbl.setStyleSheet("color: #37474f;")
+        layout.addWidget(self.context_lbl)
+        self.context_delta_lbl = QtWidgets.QLabel("")
+        self.context_delta_lbl.setWordWrap(True)
+        self.context_delta_lbl.setStyleSheet("color: #ef6c00;")
+        self.context_delta_lbl.setVisible(False)
+        layout.addWidget(self.context_delta_lbl)
+        self.legend_lbl = QtWidgets.QLabel(
+            "Legend: <span style='color:#9e9e9e;'>■ heuristic</span> | "
+            "<span style='color:#2e7d32;'>■ high</span> | "
+            "<span style='color:#f9a825;'>■ medium</span> | "
+            "<span style='color:#c62828;'>■ low</span>"
+        )
+        self.legend_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        layout.addWidget(self.legend_lbl)
 
         self.remaining_lbl = QtWidgets.QLabel("Uncertain remaining: 0")
         layout.addWidget(self.remaining_lbl)
+        self.telemetry_lbl = QtWidgets.QLabel("Throughput: n/a")
+        self.telemetry_lbl.setStyleSheet("color: #546e7a;")
+        layout.addWidget(self.telemetry_lbl)
+        self.calib_spark_lbl = QtWidgets.QLabel("Calibration: -")
+        self.calib_spark_lbl.setStyleSheet("color: #546e7a;")
+        layout.addWidget(self.calib_spark_lbl)
+        self.first_run_hint_lbl = QtWidgets.QLabel(
+            "Tip: Use A/R/N/P for fast triage. Check context line before bulk actions."
+        )
+        self.first_run_hint_lbl.setWordWrap(True)
+        self.first_run_hint_lbl.setStyleSheet("color: #455a64; font-style: italic;")
+        layout.addWidget(self.first_run_hint_lbl)
 
         current_group = QtWidgets.QGroupBox("Current")
         current_layout = QtWidgets.QVBoxLayout(current_group)
         current_layout.setContentsMargins(8, 8, 8, 8)
         self.coords_lbl = QtWidgets.QLabel("(x=-, y=-)")
-        self.score_lbl = QtWidgets.QLabel("p_accept: n/a")
+        self.score_lbl = QtWidgets.QLabel("Acceptance likelihood (p_accept): n/a")
         self.stale_lbl = QtWidgets.QLabel("staleness: n/a")
         self.assist_lbl = QtWidgets.QLabel("Assist state: Off")
         self.details_lbl = QtWidgets.QLabel("")

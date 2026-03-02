@@ -6,18 +6,19 @@ import pathlib
 from typing import List, Optional
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 from matplotlib.figure import Figure
 
 from phage_annotator.roi.widgets import RoiManagerWidget
 from phage_annotator.ui_qt.panels.particles import AnalyzeParticlesPanel
 from phage_annotator.ui_qt.panels.channel_controls import ChannelControlPanel
 from phage_annotator.ui_qt.panels.density import DensityPanel
+from phage_annotator.ui_qt.panels.modality_layers_panel import ModalityLayersPanel
 from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
 from phage_annotator.ui_qt.panels.review_queue_panel import ReviewQueuePanel
 from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
 from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
-from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.registry_legacy import PanelConstraints, PanelSpec
 from phage_annotator.ui_qt.panels.threshold import ThresholdPanel
 from phage_annotator.ui_qt.docks.metadata_dock import MetadataDock
 from phage_annotator.ui_qt.widgets.table_legacy import ResultsTableWidget
@@ -26,38 +27,451 @@ from phage_annotator.ui_qt.widgets.slider_panel_double import SliderPanelDouble
 from phage_annotator.ui_qt.panels.smlm import SmlmPanel
 
 
+PANEL_TAB_GROUPS = {
+    "inspect_main": (
+        "annotations",
+        "review_queue",
+        "suggestion_explain",
+        "advanced_analysis",
+        "modality_layers",
+    ),
+    "tools_roi": ("roi", "roi_manager", "results", "orthoview", "metadata"),
+    "plots_hist": ("hist", "profile"),
+    "system": ("logs", "performance", "recorder"),
+}
+# so placement recipes are defined in one declarative source of truth.
+
+
+def _panel_auto_open_key(panel_id: str) -> str:
+    return f"ui/panels/{str(panel_id)}/autoOpenEnabled"
+
+
+def _panel_pinned_key(panel_id: str) -> str:
+    return f"ui/panels/{str(panel_id)}/pinned"
+
+
+def _panel_auto_open_trigger_key(panel_id: str, trigger: str) -> str:
+    return f"ui/panels/{str(panel_id)}/autoOpenEnabled/{str(trigger)}"
+
+
+def _is_auto_reason(reason: str) -> bool:
+    text = str(reason or "").strip().lower()
+    return "auto" in text
+
+
+def _auto_trigger_from_reason(reason: str) -> str:
+    text = str(reason or "").strip().lower()
+    if not text:
+        return "default"
+    if ":" in text:
+        tail = text.split(":", 1)[1].strip()
+        if tail:
+            return tail
+    if "_" in text:
+        tail = text.split("_", 1)[1].strip()
+        if tail:
+            return tail
+    return "default"
+
+
+def _is_user_intent_reason(reason: str) -> bool:
+    text = str(reason or "").strip().lower()
+    if text in {"user", "command_palette", "panel_switcher"}:
+        return True
+    return text.startswith(("menu:", "quick_button:", "right_dock_segment"))
+
+
+def _show_status_message(self, text: str, timeout_ms: int = 3500) -> None:
+    try:
+        bar = self.statusBar()
+    except Exception:
+        bar = None
+    if bar is not None:
+        bar.showMessage(str(text), int(timeout_ms))
+
+
+def _hide_auto_open_toast(self) -> None:
+    frame = getattr(self, "_auto_open_toast_frame", None)
+    if frame is not None:
+        try:
+            frame.hide()
+        except Exception:
+            pass
+        try:
+            frame.deleteLater()
+        except Exception:
+            pass
+    self._auto_open_toast_frame = None
+    timer = getattr(self, "_auto_open_toast_timer", None)
+    if timer is not None:
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        try:
+            timer.deleteLater()
+        except Exception:
+            pass
+    self._auto_open_toast_timer = None
+
+
+def _show_auto_open_toast(self, panel_id: str, panel_title: str, *, timeout_ms: int = 7000) -> None:
+    """Show interactive toast for auto-open events with Pin/Disable actions."""
+    _hide_auto_open_toast(self)
+    bar = None
+    try:
+        bar = self.statusBar()
+    except Exception:
+        bar = None
+    if bar is None:
+        return
+
+    frame = QtWidgets.QFrame(self)
+    frame.setObjectName("auto_open_toast")
+    frame.setStyleSheet(
+        "#auto_open_toast {"
+        "background:#263238; color:#eceff1; border:1px solid #455a64; border-radius:4px;}"
+        "#auto_open_toast QToolButton { padding:2px 6px; }"
+    )
+    row = QtWidgets.QHBoxLayout(frame)
+    row.setContentsMargins(8, 3, 8, 3)
+    row.setSpacing(6)
+    msg = QtWidgets.QLabel(f"Opened {panel_title} (auto).")
+    msg.setStyleSheet("color:#eceff1;")
+    pin_btn = QtWidgets.QToolButton(frame)
+    pin_btn.setText("Pin")
+    disable_btn = QtWidgets.QToolButton(frame)
+    disable_btn.setText("Disable auto-open")
+    close_btn = QtWidgets.QToolButton(frame)
+    close_btn.setText("×")
+    close_btn.setAutoRaise(True)
+
+    row.addWidget(msg)
+    row.addWidget(pin_btn)
+    row.addWidget(disable_btn)
+    row.addWidget(close_btn)
+    bar.addPermanentWidget(frame)
+    self._auto_open_toast_frame = frame
+
+    def _close_toast() -> None:
+        try:
+            frame.hide()
+        except Exception:
+            pass
+        try:
+            frame.deleteLater()
+        except Exception:
+            pass
+        if getattr(self, "_auto_open_toast_frame", None) is frame:
+            self._auto_open_toast_frame = None
+        self._auto_open_toast_timer = None
+
+    def _on_pin() -> None:
+        set_panel_pinned(self, str(panel_id), True)
+        _show_status_message(self, f"Pinned {panel_title}.")
+        _close_toast()
+
+    def _on_disable() -> None:
+        set_panel_auto_open_enabled(self, str(panel_id), False)
+        _show_status_message(self, f"Auto-open disabled for {panel_title}.")
+        _close_toast()
+
+    pin_btn.clicked.connect(_on_pin)
+    disable_btn.clicked.connect(_on_disable)
+    close_btn.clicked.connect(_close_toast)
+    # Keep interactive toast stable under test teardown; close on explicit user action
+    # or when a new auto-open toast replaces it.
+    self._auto_open_toast_timer = None
+
+
+def _merge_system_docks(self) -> None:
+    """Merge logs/performance/recorder into a single tabbed System dock."""
+    dock_logs = getattr(self, "dock_logs", None)
+    dock_perf = getattr(self, "dock_performance", None)
+    dock_rec = getattr(self, "dock_recorder", None)
+    if dock_logs is None or dock_perf is None or dock_rec is None:
+        return
+    if getattr(self, "dock_system", None) is not None:
+        return
+
+    logs_w = dock_logs.widget()
+    perf_w = dock_perf.widget()
+    rec_w = dock_rec.widget()
+    if logs_w is None or perf_w is None or rec_w is None:
+        return
+
+    tabs = QtWidgets.QTabWidget(self)
+    tabs.setObjectName("system_tabs")
+    tabs.addTab(logs_w, "Diagnostics")
+    tabs.addTab(perf_w, "Performance")
+    tabs.addTab(rec_w, "Recorder")
+
+    container = QtWidgets.QWidget(self)
+    layout = QtWidgets.QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(tabs)
+    self.system_tabs = tabs
+
+    system_dock = create_dock(self, "system", "System", container)
+    self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, system_dock)
+    self.dock_system = system_dock
+
+    # Remove old standalone docks and remap panel ids to unified dock.
+    for old in (dock_logs, dock_perf, dock_rec):
+        try:
+            self.removeDockWidget(old)
+        except Exception:
+            pass
+        try:
+            old.hide()
+        except Exception:
+            pass
+    self.panel_docks["logs"] = system_dock
+    self.panel_docks["performance"] = system_dock
+    self.panel_docks["recorder"] = system_dock
+    self.panel_docks["system"] = system_dock
+    self.dock_logs = system_dock
+    self.dock_performance = system_dock
+    self.dock_recorder = system_dock
+
+
+def _select_system_tab_for_panel(self, panel_id: str) -> None:
+    """Select the appropriate tab inside merged System dock for a panel id."""
+    tabs = getattr(self, "system_tabs", None)
+    if tabs is None:
+        return
+    panel_id = str(panel_id)
+    target_idx = {"logs": 0, "performance": 1, "recorder": 2}.get(panel_id)
+    if target_idx is None:
+        return
+    if 0 <= int(target_idx) < int(tabs.count()):
+        tabs.setCurrentIndex(int(target_idx))
+
+
+def _iter_unique_dock_specs(self):
+    """Yield first spec for each unique dock object in current panel mapping."""
+    seen = set()
+    for spec in getattr(self, "panel_specs", []) or []:
+        dock = getattr(self, "panel_docks", {}).get(spec.id)
+        if dock is None:
+            continue
+        key = id(dock)
+        if key in seen:
+            continue
+        seen.add(key)
+        yield spec, dock
+
+
+def _find_tab_for_dock(self, dock: QtWidgets.QDockWidget) -> tuple[Optional[QtWidgets.QTabBar], int]:
+    """Find QTabBar/index entry corresponding to a dock title."""
+    title = str(dock.windowTitle() or "")
+    for bar in self.findChildren(QtWidgets.QTabBar):
+        try:
+            for idx in range(bar.count()):
+                if str(bar.tabText(idx) or "") == title:
+                    return bar, idx
+        except Exception:
+            continue
+    return None, -1
+
+
+def _init_panel_auto_policy_state(self) -> None:
+    settings = getattr(self, "_settings", None)
+    self._panel_auto_open_enabled = {}
+    self._panel_auto_open_enabled_by_trigger = {}
+    self._panel_pinned = {}
+    self._panel_opened_by = {}
+    self._panel_auto_notice_shown = set()
+    for spec in getattr(self, "panel_specs", []) or []:
+        panel_id = str(spec.id)
+        enabled = True
+        pinned = False
+        if settings is not None:
+            try:
+                enabled = bool(settings.value(_panel_auto_open_key(panel_id), True, type=bool))
+            except Exception:
+                enabled = True
+            try:
+                pinned = bool(settings.value(_panel_pinned_key(panel_id), False, type=bool))
+            except Exception:
+                pinned = False
+        self._panel_auto_open_enabled[panel_id] = enabled
+        self._panel_pinned[panel_id] = pinned
+
+
+def refresh_panel_policy_actions(self) -> None:
+    """Synchronize menu quick-policy action check states from policy state."""
+    auto_actions = dict(getattr(self, "panel_policy_quick_auto_actions", {}) or {})
+    pin_actions = dict(getattr(self, "panel_policy_quick_pin_actions", {}) or {})
+    for panel_id, action in auto_actions.items():
+        if action is None:
+            continue
+        desired = bool(is_panel_auto_open_enabled(self, panel_id))
+        if action.isChecked() != desired:
+            action.blockSignals(True)
+            action.setChecked(desired)
+            action.blockSignals(False)
+    for panel_id, action in pin_actions.items():
+        if action is None:
+            continue
+        desired = bool(is_panel_pinned(self, panel_id))
+        if action.isChecked() != desired:
+            action.blockSignals(True)
+            action.setChecked(desired)
+            action.blockSignals(False)
+
+
+def is_panel_auto_open_enabled(self, panel_id: str) -> bool:
+    state = getattr(self, "_panel_auto_open_enabled", {}) or {}
+    return bool(state.get(str(panel_id), True))
+
+
+def is_panel_auto_open_enabled_for_trigger(self, panel_id: str, trigger: str) -> bool:
+    trigger_state = getattr(self, "_panel_auto_open_enabled_by_trigger", {}) or {}
+    panel_id = str(panel_id)
+    trigger = str(trigger or "default")
+    panel_map = trigger_state.get(panel_id)
+    if not isinstance(panel_map, dict):
+        panel_map = {}
+        self._panel_auto_open_enabled_by_trigger[panel_id] = panel_map
+    if trigger not in panel_map:
+        settings = getattr(self, "_settings", None)
+        enabled = True
+        if settings is not None:
+            try:
+                enabled = bool(
+                    settings.value(
+                        _panel_auto_open_trigger_key(panel_id, trigger),
+                        True,
+                        type=bool,
+                    )
+                )
+            except Exception:
+                enabled = True
+        panel_map[trigger] = enabled
+    return bool(panel_map.get(trigger, True))
+
+
+def set_panel_auto_open_enabled(self, panel_id: str, enabled: bool) -> None:
+    key = str(panel_id)
+    if not hasattr(self, "_panel_auto_open_enabled") or not isinstance(
+        getattr(self, "_panel_auto_open_enabled", None), dict
+    ):
+        self._panel_auto_open_enabled = {}
+    self._panel_auto_open_enabled[key] = bool(enabled)
+    settings = getattr(self, "_settings", None)
+    if settings is not None:
+        try:
+            settings.setValue(_panel_auto_open_key(key), bool(enabled))
+        except Exception:
+            pass
+    refresh_panel_policy_actions(self)
+    if hasattr(self, "_refresh_panel_policy_controls"):
+        try:
+            self._refresh_panel_policy_controls()
+        except Exception:
+            pass
+
+
+def set_panel_auto_open_enabled_for_trigger(
+    self,
+    panel_id: str,
+    trigger: str,
+    enabled: bool,
+) -> None:
+    panel_key = str(panel_id)
+    trigger_key = str(trigger or "default")
+    if not isinstance(getattr(self, "_panel_auto_open_enabled_by_trigger", None), dict):
+        self._panel_auto_open_enabled_by_trigger = {}
+    panel_map = self._panel_auto_open_enabled_by_trigger.get(panel_key)
+    if not isinstance(panel_map, dict):
+        panel_map = {}
+        self._panel_auto_open_enabled_by_trigger[panel_key] = panel_map
+    panel_map[trigger_key] = bool(enabled)
+    settings = getattr(self, "_settings", None)
+    if settings is not None:
+        try:
+            settings.setValue(
+                _panel_auto_open_trigger_key(panel_key, trigger_key),
+                bool(enabled),
+            )
+        except Exception:
+            pass
+
+
+def is_panel_pinned(self, panel_id: str) -> bool:
+    state = getattr(self, "_panel_pinned", {}) or {}
+    return bool(state.get(str(panel_id), False))
+
+
+def set_panel_pinned(self, panel_id: str, pinned: bool) -> None:
+    key = str(panel_id)
+    if not hasattr(self, "_panel_pinned") or not isinstance(
+        getattr(self, "_panel_pinned", None), dict
+    ):
+        self._panel_pinned = {}
+    self._panel_pinned[key] = bool(pinned)
+    settings = getattr(self, "_settings", None)
+    if settings is not None:
+        try:
+            settings.setValue(_panel_pinned_key(key), bool(pinned))
+        except Exception:
+            pass
+    refresh_panel_policy_actions(self)
+    if hasattr(self, "_refresh_panel_policy_controls"):
+        try:
+            self._refresh_panel_policy_controls()
+        except Exception:
+            pass
+
+
+def get_panel_opened_by(self, panel_id: str) -> str:
+    state = getattr(self, "_panel_opened_by", {}) or {}
+    return str(state.get(str(panel_id), "unknown"))
+
+
 def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     """Create dock widgets and corresponding View menu actions."""
     self.panel_specs = build_panel_registry(self)
     self.panel_docks.clear()
     self.dock_actions.clear()
+    self.panel_open_actions = {}
+    self.panel_policy_quick_auto_actions = {}
+    self.panel_policy_quick_pin_actions = {}
+    self.panel_policy_quick_open_actions = {}
+    self.panel_specs_by_id = {spec.id: spec for spec in self.panel_specs}
+    _init_panel_auto_policy_state(self)
+    grouped_menus = {
+        "inspect": dock_menu.addMenu("Inspect (Right)"),
+        "tools": dock_menu.addMenu("Tools (Left)"),
+        "plots": dock_menu.addMenu("Plots & Diagnostics (Bottom)"),
+    }
+    advanced_panels_menu = dock_menu.addMenu("Advanced Panels…")
 
     for spec in self.panel_specs:
         widget = spec.widget_factory()
         dock = create_dock(self, spec.id, spec.title, widget)
+        _apply_panel_constraints(self, dock, spec)
         if spec.id == "sidebar":
-            dock.setFeatures(
-                QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
-                | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
-            )
-            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea)
             dock.setMinimumWidth(48)
-        elif spec.id in ("annotations", "review_queue", "suggestion_explain", "advanced_analysis"):
-            dock.setFeatures(
-                QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
-                | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
-            )
-            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
-        if spec.id in ("annotations", "review_queue", "suggestion_explain", "advanced_analysis"):
-            dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.RightDockWidgetArea)
         self.panel_docks[spec.id] = dock
         self.addDockWidget(spec.default_area, dock)
-        action = dock_menu.addAction(spec.toggle_action_text)
+        parent_menu = grouped_menus.get(str(spec.bucket), dock_menu)
+        action = parent_menu.addAction(spec.toggle_action_text)
+        advanced_panels_menu.addAction(action)
         action.setCheckable(True)
         action.setChecked(spec.default_visible)
         if spec.shortcut:
             action.setShortcut(spec.shortcut)
         self.dock_actions[spec.id] = action
+        open_action = QtWidgets.QAction(f"Open Panel: {spec.title}", self)
+        open_action.setObjectName(f"open_panel_{spec.id}")
+        open_action.triggered.connect(
+            lambda _checked=False, panel_id=spec.id: open_panel(
+                self, panel_id, reason="command_palette"
+            )
+        )
+        self.panel_open_actions[spec.id] = open_action
         # Some checkboxes are created by panel factories, so guard lookup here.
         checkbox = None
         if spec.id == "hist":
@@ -66,6 +480,32 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
             checkbox = getattr(self, "profile_chk", None)
         wire_dock_action(self, dock, action, checkbox)
         dock.setVisible(spec.default_visible)
+
+    quick_policy_menu = dock_menu.addMenu("Quick Policy")
+    for spec in self.panel_specs:
+        panel_id = str(spec.id)
+        panel_menu = quick_policy_menu.addMenu(str(spec.title))
+        open_act = panel_menu.addAction("Open")
+        open_act.setObjectName(f"panel_policy_open_{panel_id}")
+        open_act.triggered.connect(
+            lambda _checked=False, pid=panel_id: open_panel(self, pid, reason="panel_switcher")
+        )
+        auto_act = panel_menu.addAction("Auto-open")
+        auto_act.setObjectName(f"panel_policy_auto_{panel_id}")
+        auto_act.setCheckable(True)
+        auto_act.toggled.connect(
+            lambda checked, pid=panel_id: set_panel_auto_open_enabled(self, pid, bool(checked))
+        )
+        pin_act = panel_menu.addAction("Pinned")
+        pin_act.setObjectName(f"panel_policy_pin_{panel_id}")
+        pin_act.setCheckable(True)
+        pin_act.toggled.connect(
+            lambda checked, pid=panel_id: set_panel_pinned(self, pid, bool(checked))
+        )
+        self.panel_policy_quick_open_actions[panel_id] = open_act
+        self.panel_policy_quick_auto_actions[panel_id] = auto_act
+        self.panel_policy_quick_pin_actions[panel_id] = pin_act
+    refresh_panel_policy_actions(self)
 
     self.dock_sidebar = self.panel_docks.get("sidebar")
     self.dock_annotations = self.panel_docks.get("annotations")
@@ -85,19 +525,25 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_recorder = self.panel_docks.get("recorder")
     self.dock_metadata = self.panel_docks.get("metadata")
     self.dock_density = self.panel_docks.get("density")
+    self.dock_modality_layers = self.panel_docks.get("modality_layers")
     self.dock_channels = self.panel_docks.get("channels")
     self.dock_performance = self.panel_docks.get("performance")
     self.dock_qc_issues = self.panel_docks.get("qc_issues")
+    self.dock_system = None
+
+    _merge_system_docks(self)
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
     if self.dock_annotations and self.dock_review_queue:
         self.tabifyDockWidget(self.dock_annotations, self.dock_review_queue)
-        self.dock_review_queue.raise_()
+        self.dock_annotations.raise_()
     if self.dock_review_queue and self.dock_suggestion_explain:
         self.tabifyDockWidget(self.dock_review_queue, self.dock_suggestion_explain)
     if self.dock_suggestion_explain and self.dock_advanced_analysis:
         self.tabifyDockWidget(self.dock_suggestion_explain, self.dock_advanced_analysis)
+    if self.dock_suggestion_explain and self.dock_modality_layers:
+        self.tabifyDockWidget(self.dock_suggestion_explain, self.dock_modality_layers)
     if self.dock_roi and self.dock_roi_manager:
         self.tabifyDockWidget(self.dock_roi, self.dock_roi_manager)
     if self.dock_roi and self.dock_results:
@@ -121,6 +567,240 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self._restore_sidebar_mode()
 
 
+def get_panel_spec(self, panel_id: str) -> Optional[PanelSpec]:
+    """Return panel spec by id."""
+    specs = getattr(self, "panel_specs_by_id", {})
+    if isinstance(specs, dict):
+        return specs.get(str(panel_id))
+    for spec in getattr(self, "panel_specs", []) or []:
+        if spec.id == str(panel_id):
+            return spec
+    return None
+
+
+def get_dock(self, panel_id: str) -> Optional[QtWidgets.QDockWidget]:
+    """Return the dock widget for a panel id."""
+    panel_docks = getattr(self, "panel_docks", {})
+    if isinstance(panel_docks, dict):
+        dock = panel_docks.get(str(panel_id))
+        if dock is not None:
+            return dock
+    return getattr(self, f"dock_{str(panel_id)}", None)
+
+
+def _apply_panel_constraints(self, dock: QtWidgets.QDockWidget, spec: PanelSpec) -> None:
+    """Apply floatability and allowed-area constraints from PanelSpec."""
+    constraints = spec.constraints if isinstance(spec.constraints, PanelConstraints) else PanelConstraints()
+    features = (
+        QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
+        | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
+    )
+    if constraints.floatable:
+        features |= QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable
+    dock.setFeatures(features)
+    if constraints.allowed_areas:
+        allowed = QtCore.Qt.DockWidgetAreas(0)
+        for area in constraints.allowed_areas:
+            allowed |= area
+        dock.setAllowedAreas(allowed)
+    else:
+        dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.AllDockWidgetAreas)
+
+
+def _canonical_area_for_panel(self, spec: PanelSpec) -> QtCore.Qt.DockWidgetArea:
+    """Return canonical dock area for the panel."""
+    constraints = spec.constraints if isinstance(spec.constraints, PanelConstraints) else PanelConstraints()
+    if constraints.allowed_areas:
+        return constraints.allowed_areas[0]
+    return spec.default_area
+
+
+def _tabify_group_for_panel(self, panel_id: str) -> None:
+    """Ensure panel is tabified into its configured group."""
+    spec = get_panel_spec(self, panel_id)
+    if spec is None or not spec.tab_group:
+        return
+    group_ids = PANEL_TAB_GROUPS.get(str(spec.tab_group), ())
+    if len(group_ids) < 2:
+        return
+    anchor = get_dock(self, group_ids[0])
+    target = get_dock(self, panel_id)
+    if anchor is None or target is None or anchor is target:
+        return
+    try:
+        self.tabifyDockWidget(anchor, target)
+    except Exception:
+        return
+
+
+def _flash_dock(self, dock: QtWidgets.QDockWidget) -> None:
+    """Flash the dock tab entry with a short animation (fallback to dock border)."""
+    if dock is None:
+        return
+    tabbar, tab_idx = _find_tab_for_dock(self, dock)
+    if tabbar is not None and tab_idx >= 0:
+        rect = tabbar.tabRect(tab_idx).adjusted(2, 2, -2, -2)
+        overlay = QtWidgets.QWidget(tabbar)
+        overlay.setObjectName("dock_tab_flash_overlay")
+        overlay.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        overlay.setGeometry(rect)
+        overlay.setStyleSheet(
+            "#dock_tab_flash_overlay {"
+            "background: rgba(30, 136, 229, 120); border-radius: 4px; }"
+        )
+        effect = QtWidgets.QGraphicsOpacityEffect(overlay)
+        overlay.setGraphicsEffect(effect)
+        effect.setOpacity(0.0)
+        overlay.show()
+        anim = QtCore.QPropertyAnimation(effect, b"opacity", overlay)
+        anim.setDuration(700)
+        anim.setStartValue(0.0)
+        anim.setKeyValueAt(0.4, 0.95)
+        anim.setEndValue(0.0)
+        anim.setEasingCurve(QtCore.QEasingCurve.Type.InOutSine)
+
+        def _cleanup() -> None:
+            try:
+                overlay.hide()
+            except Exception:
+                pass
+            try:
+                overlay.deleteLater()
+            except Exception:
+                pass
+
+        anim.finished.connect(_cleanup)
+        if not isinstance(getattr(tabbar, "_flash_anims", None), list):
+            tabbar._flash_anims = []
+        tabbar._flash_anims.append(anim)
+        self._tab_flash_anims = tabbar._flash_anims
+
+        def _remove_anim() -> None:
+            anims = getattr(tabbar, "_flash_anims", None)
+            if isinstance(anims, list):
+                try:
+                    anims.remove(anim)
+                except ValueError:
+                    pass
+
+        anim.finished.connect(_remove_anim)
+        anim.start()
+        return
+
+    # Fallback for non-tabified docks.
+    original = dock.styleSheet()
+    dock.setStyleSheet(
+        f"{original}\nQDockWidget {{ border: 2px solid #1976d2; background: #e3f2fd; }}"
+    )
+
+    def _restore() -> None:
+        try:
+            dock.setStyleSheet(original)
+        except RuntimeError:
+            return
+
+    QtCore.QTimer.singleShot(650, _restore)
+
+
+class PanelManager:
+    """Single entrypoint for panel open/place/raise/flash behavior."""
+
+    def __init__(self, window) -> None:
+        self.window = window
+
+    def open_panel(self, panel_id: str, *, reason: str = "user") -> Optional[QtWidgets.QDockWidget]:
+        spec = get_panel_spec(self.window, panel_id)
+        dock = get_dock(self.window, panel_id)
+        if spec is None or dock is None:
+            return dock
+        reason_text = str(reason or "user")
+        is_auto = _is_auto_reason(reason_text)
+        panel_key = str(panel_id)
+        auto_trigger = _auto_trigger_from_reason(reason_text)
+        if is_auto and not is_panel_auto_open_enabled(self.window, panel_key):
+            _show_status_message(self.window, f"Auto-open skipped for {spec.title} (disabled).")
+            return dock
+        if is_auto and not is_panel_auto_open_enabled_for_trigger(
+            self.window, panel_key, auto_trigger
+        ):
+            _show_status_message(
+                self.window,
+                f"Auto-open skipped for {spec.title} ({auto_trigger} disabled).",
+            )
+            return dock
+        _apply_panel_constraints(self.window, dock, spec)
+        if spec.constraints.fixed_area:
+            try:
+                self.window.addDockWidget(_canonical_area_for_panel(self.window, spec), dock)
+            except Exception:
+                pass
+        _tabify_group_for_panel(self.window, panel_id)
+        dock.show()
+        _select_system_tab_for_panel(self.window, panel_key)
+        dock.raise_()
+        try:
+            dock.activateWindow()
+        except Exception:
+            pass
+        self._focus_panel_widget(dock)
+        opened_by = "auto" if is_auto else "user"
+        if not isinstance(getattr(self.window, "_panel_opened_by", None), dict):
+            self.window._panel_opened_by = {}
+        if not isinstance(getattr(self.window, "_panel_opened_reason", None), dict):
+            self.window._panel_opened_reason = {}
+        self.window._panel_opened_by[panel_key] = opened_by
+        self.window._panel_opened_reason[panel_key] = reason_text
+        if (not is_auto) and _is_user_intent_reason(reason_text):
+            set_panel_pinned(self.window, panel_key, True)
+        if is_auto:
+            shown = getattr(self.window, "_panel_auto_notice_shown", set())
+            if panel_key not in shown:
+                _show_auto_open_toast(self.window, panel_key, str(spec.title))
+                shown.add(panel_key)
+                self.window._panel_auto_notice_shown = shown
+        if str(reason) in {"user", "command_palette", "panel_switcher"}:
+            _flash_dock(self.window, dock)
+        return dock
+
+    @staticmethod
+    def _focus_panel_widget(dock: QtWidgets.QDockWidget) -> None:
+        try:
+            root = dock.widget()
+        except Exception:
+            root = None
+        if root is None:
+            return
+        try:
+            if root.focusPolicy() != QtCore.Qt.FocusPolicy.NoFocus:
+                root.setFocus(QtCore.Qt.FocusReason.ShortcutFocusReason)
+                return
+        except Exception:
+            pass
+        for child in root.findChildren(QtWidgets.QWidget):
+            try:
+                if not child.isVisible():
+                    continue
+                if child.focusPolicy() == QtCore.Qt.FocusPolicy.NoFocus:
+                    continue
+                child.setFocus(QtCore.Qt.FocusReason.ShortcutFocusReason)
+                return
+            except Exception:
+                continue
+
+
+def _panel_manager(self) -> PanelManager:
+    manager = getattr(self, "_panel_manager_obj", None)
+    if not isinstance(manager, PanelManager):
+        manager = PanelManager(self)
+        self._panel_manager_obj = manager
+    return manager
+
+
+def open_panel(self, panel_id: str, *, reason: str = "user") -> Optional[QtWidgets.QDockWidget]:
+    """Open panel by id with canonical placement, raise, and flash."""
+    return _panel_manager(self).open_panel(panel_id, reason=reason)
+
+
 def build_panel_registry(self) -> List[PanelSpec]:
     """Return the declarative list of dock panel specs."""
     return [
@@ -131,6 +811,12 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=True,
             widget_factory=self._make_sidebar_widget,
             toggle_action_text="Toggle Sidebar",
+            bucket="tools",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.LeftDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="annotations",
@@ -139,6 +825,13 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=True,
             widget_factory=self._make_annotations_widget,
             toggle_action_text="Annotation Table",
+            bucket="inspect",
+            tab_group="inspect_main",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="review_queue",
@@ -147,6 +840,13 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=True,
             widget_factory=self._make_review_queue_widget,
             toggle_action_text="Review Queue",
+            bucket="inspect",
+            tab_group="inspect_main",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="suggestion_explain",
@@ -155,6 +855,13 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_suggestion_explain_widget,
             toggle_action_text="Why This Suggestion?",
+            bucket="inspect",
+            tab_group="inspect_main",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="advanced_analysis",
@@ -163,6 +870,13 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_advanced_analysis_widget,
             toggle_action_text="Advanced Analysis",
+            bucket="inspect",
+            tab_group="inspect_main",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="roi",
@@ -171,6 +885,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,  # Hidden by default, opened from ROI/Crop panel
             widget_factory=self._make_roi_widget,
             toggle_action_text="ROI Controls",
+            bucket="tools",
+            tab_group="tools_roi",
         ),
         PanelSpec(
             id="roi_manager",
@@ -179,6 +895,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_roi_manager_widget,
             toggle_action_text="ROI Manager",
+            bucket="tools",
+            tab_group="tools_roi",
         ),
         PanelSpec(
             id="results",
@@ -187,6 +905,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_results_widget,
             toggle_action_text="Results",
+            bucket="plots",
+            search_aliases=("results table", "results hub"),
         ),
         PanelSpec(
             id="recorder",
@@ -195,6 +915,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_recorder_widget,
             toggle_action_text="Recorder",
+            bucket="plots",
+            tab_group="system",
         ),
         PanelSpec(
             id="hist",
@@ -203,6 +925,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,  # Hidden by default per Task G
             widget_factory=self._make_hist_widget,
             toggle_action_text="Histogram",
+            bucket="plots",
+            tab_group="plots_hist",
         ),
         PanelSpec(
             id="profile",
@@ -211,6 +935,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,  # Hidden by default per Task G
             widget_factory=self._make_profile_widget,
             toggle_action_text="Line Profile",
+            bucket="plots",
+            tab_group="plots_hist",
         ),
         PanelSpec(
             id="orthoview",
@@ -219,6 +945,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_orthoview_widget,
             toggle_action_text="Ortho Views",
+            bucket="tools",
+            tab_group="tools_roi",
         ),
         PanelSpec(
             id="smlm",
@@ -227,6 +955,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_smlm_widget,
             toggle_action_text="SMLM (ROI)",
+            bucket="tools",
         ),
         PanelSpec(
             id="threshold",
@@ -235,6 +964,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_threshold_widget,
             toggle_action_text="Threshold",
+            bucket="tools",
         ),
         PanelSpec(
             id="particles",
@@ -243,6 +973,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_particles_widget,
             toggle_action_text="Analyze Particles",
+            bucket="tools",
         ),
         PanelSpec(
             id="density",
@@ -251,6 +982,22 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_density_widget,
             toggle_action_text="Density",
+            bucket="tools",
+        ),
+        PanelSpec(
+            id="modality_layers",
+            title="Modality Layers",
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_modality_layers_widget,
+            toggle_action_text="Modality Layers",
+            bucket="inspect",
+            tab_group="inspect_main",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="channels",
@@ -259,6 +1006,7 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_channel_controls_widget,
             toggle_action_text="Channels",
+            bucket="tools",
         ),
         PanelSpec(
             id="logs",
@@ -267,6 +1015,9 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_logs_widget,
             toggle_action_text="Diagnostics",
+            bucket="plots",
+            tab_group="system",
+            search_aliases=("logs", "system logs"),
         ),
         PanelSpec(
             id="metadata",
@@ -275,6 +1026,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_metadata_widget,
             toggle_action_text="Metadata",
+            bucket="tools",
+            tab_group="tools_roi",
         ),
         PanelSpec(
             id="performance",
@@ -283,6 +1036,8 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=False,
             widget_factory=self._make_performance_widget,
             toggle_action_text="Performance Monitor",
+            bucket="plots",
+            tab_group="system",
         ),
         PanelSpec(
             id="qc_issues",
@@ -291,20 +1046,31 @@ def build_panel_registry(self) -> List[PanelSpec]:
             default_visible=True,
             widget_factory=self._make_qc_issues_widget,
             toggle_action_text="QC Issues",
+            bucket="plots",
         ),
     ]
 
 
 def apply_panel_defaults(self) -> None:
     """Reset dock placement/visibility using PanelSpec defaults."""
-    for spec in self.panel_specs:
-        dock = self.panel_docks.get(spec.id)
-        if dock is None:
-            continue
+    for spec, dock in _iter_unique_dock_specs(self):
+        _apply_panel_constraints(self, dock, spec)
         self.addDockWidget(spec.default_area, dock)
         dock.setVisible(spec.default_visible)
-    if self.panel_docks.get("hist") and self.panel_docks.get("profile"):
-        self.tabifyDockWidget(self.panel_docks["hist"], self.panel_docks["profile"])
+    for group_id, members in PANEL_TAB_GROUPS.items():
+        if len(members) < 2:
+            continue
+        anchor = self.panel_docks.get(members[0])
+        if anchor is None:
+            continue
+        for member in members[1:]:
+            dock = self.panel_docks.get(member)
+            if dock is None:
+                continue
+            try:
+                self.tabifyDockWidget(anchor, dock)
+            except Exception:
+                continue
 
 
 def create_dock(self, name: str, title: str, widget: QtWidgets.QWidget) -> QtWidgets.QDockWidget:
@@ -330,7 +1096,12 @@ def wire_dock_action(
     """Keep dock visibility, menu toggle, and optional checkbox in sync."""
 
     def _set_visible(checked: bool) -> None:
-        dock.setVisible(checked)
+        setter = getattr(self, "set_panel_visible", None)
+        panel_id = str(dock.objectName() or "")
+        if callable(setter) and panel_id:
+            setter(panel_id, bool(checked), source="menu:panels")
+        else:
+            dock.setVisible(bool(checked))
 
     def _sync_action(visible: bool) -> None:
         action.blockSignals(True)
@@ -340,7 +1111,10 @@ def wire_dock_action(
             checkbox.blockSignals(True)
             checkbox.setChecked(visible)
             checkbox.blockSignals(False)
-            self._refresh_image()
+            try:
+                self._refresh_image()
+            except RuntimeError:
+                return
 
     action.toggled.connect(_set_visible)
     dock.visibilityChanged.connect(_sync_action)
@@ -695,6 +1469,12 @@ def make_density_widget(self) -> QtWidgets.QWidget:
     return widget
 
 
+def make_modality_layers_widget(self) -> QtWidgets.QWidget:
+    widget = ModalityLayersPanel(parent=self)
+    self.modality_layers_panel = widget
+    return widget
+
+
 def make_qc_issues_widget(self) -> QtWidgets.QWidget:
     widget = QCIssuesPanel(qc_state=getattr(self, "qc_state", None), parent=self)
     self.qc_issues_panel = widget
@@ -713,22 +1493,43 @@ def setup_status_bar(self) -> None:
 
     # Permanent operational state widgets (single source of truth).
     self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -")
+    self.status_label_lbl = QtWidgets.QLabel("Label: -")
     self.status_tz_lbl = QtWidgets.QLabel("T: -/- | Z: -/-")
     self.status_scope_lbl = QtWidgets.QLabel("Scope: Slice")
     self.status_target_lbl = QtWidgets.QLabel("Target: Frame")
+    self.status_modality_combo = QtWidgets.QComboBox()
+    self.status_modality_combo.setMinimumContentsLength(16)
     self.status_context_lock_lbl = QtWidgets.QLabel("Write Context: Locked")
+    self.status_effective_context_lbl = QtWidgets.QLabel("Effective Assist Context: -")
     self.status_assist_lbl = QtWidgets.QLabel("Assist: Off")
+    self.status_suggestion_fresh_lbl = QtWidgets.QLabel("Suggestions: n/a")
     self.status_qc_lbl = QtWidgets.QLabel("QC: 0 warnings")
+    self.status_results_lbl = QtWidgets.QLabel("Results: empty")
+    self.status_strategy_combo = QtWidgets.QComboBox()
+    self.status_strategy_combo.setMinimumContentsLength(14)
+    self.status_assist_mode_btn = QtWidgets.QToolButton()
+    self.status_assist_mode_btn.setCheckable(True)
+    self.status_assist_mode_btn.setText("Assist Mode: Off")
     for widget in (
         self.status_dataset_lbl,
+        self.status_label_lbl,
         self.status_tz_lbl,
         self.status_scope_lbl,
         self.status_target_lbl,
+        QtWidgets.QLabel("Modality:"),
+        self.status_modality_combo,
         self.status_context_lock_lbl,
+        self.status_effective_context_lbl,
+        QtWidgets.QLabel("Strategy:"),
+        self.status_strategy_combo,
+        self.status_assist_mode_btn,
         self.status_assist_lbl,
+        self.status_suggestion_fresh_lbl,
         self.status_qc_lbl,
+        self.status_results_lbl,
     ):
-        widget.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.NoTextInteraction)
+        if isinstance(widget, QtWidgets.QLabel):
+            widget.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.NoTextInteraction)
         status_bar.addPermanentWidget(widget)
     
     self.progress_label = QtWidgets.QLabel("Working:")

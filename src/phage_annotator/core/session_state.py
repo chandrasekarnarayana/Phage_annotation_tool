@@ -162,6 +162,9 @@ class SessionState:
     assist_min_negative_labels: int = 15
     assist_min_labels_per_context: int = 10
     suggestion_context_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    evidence_layer_config: Dict[str, dict] = field(default_factory=dict)
+    evidence_layer_presets: Dict[str, dict] = field(default_factory=dict)
+    disable_bulk_accept_when_stale: bool = True
     # Collaboration metadata for local workflows.
     current_user: str = "local_user"
     audit_log: List[Dict[str, object]] = field(default_factory=list)

@@ -253,6 +253,10 @@ class Renderer:
         self.canvas.draw_idle()
         return axes
 
+    def get_axis(self, panel: str):
+        """Return renderer-owned axis for panel key, if available."""
+        return self.axes.get(str(panel))
+
     def init_external_axes(
         self,
         axes: Dict[str, matplotlib.axes.Axes],

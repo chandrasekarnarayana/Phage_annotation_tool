@@ -304,6 +304,15 @@ class SessionProjectMixin:
         self.session_state.assist_min_labels_per_context = int(
             settings.get("assist_min_labels_per_context", 10)
         )
+        self.session_state.evidence_layer_config = dict(
+            settings.get("evidence_layer_config", {})
+        )
+        self.session_state.evidence_layer_presets = dict(
+            settings.get("evidence_layer_presets", {})
+        )
+        self.session_state.disable_bulk_accept_when_stale = bool(
+            settings.get("disable_bulk_accept_when_stale", True)
+        )
         suggestion_payload = settings.get("suggestions_by_image", {})
         if isinstance(suggestion_payload, dict):
             for image_id, rows in suggestion_payload.items():

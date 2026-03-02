@@ -9,6 +9,7 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
 from phage_annotator.ui_qt.utils import ui_actions, ui_docks
+from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
 from phage_annotator.ui_qt.panels.right_dock_segment_header import RightDockSegmentHeader
@@ -509,6 +510,7 @@ class UiSetupMixin:
         self.advanced_group.setCheckable(True)
         self.advanced_group.setChecked(False)
         adv_layout = QtWidgets.QGridLayout()
+        self.advanced_layout = adv_layout
         r = 0
 
         self.axis_mode_combo = QtWidgets.QComboBox()
@@ -716,6 +718,7 @@ class UiSetupMixin:
         warmup_layout.addWidget(self.assist_warmup_refresh_btn, 5, 1)
         adv_layout.addWidget(warmup_group, r, 0, 1, 4)
         r += 1
+        self._advanced_layout_row = r
 
         self.settings_advanced_container.setLayout(adv_container_layout)
         self.advanced_group.setLayout(adv_layout)
@@ -743,6 +746,19 @@ class UiSetupMixin:
         # Panels/docks + sidebar (status bar must be set up first for logs widget)
         self._setup_status_bar()
         self._init_panels(dock_panels_menu)
+        self.open_panel_switcher_act = QtWidgets.QAction("Panels: Open Panel…", self)
+        self.open_panel_switcher_act.setObjectName("open_panel_switcher")
+        self.open_panel_switcher_act.triggered.connect(self._show_panel_switcher)
+        self.open_panel_switcher_act.setShortcut("Ctrl+Alt+P")
+        first_action = dock_panels_menu.actions()[0] if dock_panels_menu.actions() else None
+        if first_action is not None:
+            dock_panels_menu.insertAction(first_action, self.open_panel_switcher_act)
+        else:
+            dock_panels_menu.addAction(self.open_panel_switcher_act)
+        self.addAction(self.open_panel_switcher_act)
+        # Re-apply registry shortcuts now that panel-switcher action exists.
+        apply_menu_shortcuts(self)
+        self._init_panel_policy_controls()
         self.review_segment_header = RightDockSegmentHeader(self.review_queue_panel)
         self.review_segment_header.segment_requested.connect(self._activate_right_dock_segment)
         self.review_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
@@ -794,6 +810,28 @@ class UiSetupMixin:
         suggest_points_act.triggered.connect(self._suggest_points_current_slice)
         suggest_points_image_act.triggered.connect(self._suggest_points_current_image)
         select_suggestion_strategy_act.triggered.connect(self._select_suggestion_strategy_dialog)
+        if getattr(self, "status_strategy_combo", None) is not None:
+            self._sync_status_strategy_selector()
+            self.status_strategy_combo.currentTextChanged.connect(
+                lambda text: self._set_suggestion_strategy(text, source="status_bar")
+            )
+            self.status_strategy_combo.setToolTip(
+                "Suggestion strategy:\n"
+                "- raw: peaks in raw signal\n"
+                "- corrected: peaks after correction\n"
+                "- evidence_consensus: strong across modalities\n"
+                "- evidence_contradiction: enforce positive/negative evidence rules"
+            )
+        if getattr(self, "status_modality_combo", None) is not None:
+            self.status_modality_combo.currentIndexChanged.connect(
+                lambda idx: self._set_primary_combo(int(idx))
+            )
+        if getattr(self, "status_assist_mode_btn", None) is not None:
+            self.status_assist_mode_btn.toggled.connect(
+                lambda checked: self._set_assist_mode(bool(checked), source="status_bar")
+            )
+            default_assist_mode = bool(self._settings.value("assistModeEnabled", False, type=bool))
+            self._set_assist_mode(default_assist_mode, source="startup")
         load_suggestion_rule_config_act.triggered.connect(
             self._load_suggestion_rule_config_dialog
         )
@@ -815,6 +853,21 @@ class UiSetupMixin:
         stop_timed_session_act.triggered.connect(self._stop_timed_annotation_session)
         assist_warmup_act.triggered.connect(self._start_assist_warmup)
         train_ranker_now_act.triggered.connect(self._train_suggestion_ranker_now)
+        if getattr(self, "show_calibration_visualizer_act", None) is not None:
+            self.show_calibration_visualizer_act.triggered.connect(
+                self._show_calibration_visualizer
+            )
+        if getattr(self, "compare_layer_presets_act", None) is not None:
+            def _compare_from_panel() -> None:
+                panel = getattr(self, "modality_layers_panel", None)
+                if panel is None:
+                    self._compare_modality_layer_presets("default", "default")
+                    return
+                a_name = str(panel.compare_a_edit.text() or "default")
+                b_name = str(panel.compare_b_edit.text() or "default")
+                self._compare_modality_layer_presets(a_name, b_name)
+
+            self.compare_layer_presets_act.triggered.connect(_compare_from_panel)
         batch_correct_suggestions_act.triggered.connect(
             self._batch_correct_suggestions_dialog
         )
@@ -861,6 +914,17 @@ class UiSetupMixin:
         )
         self.layout_preset_minimal_act.triggered.connect(lambda: self.apply_preset("Minimal"))
         self.layout_preset_default_act.triggered.connect(lambda: self.apply_preset("Default"))
+        if getattr(self, "advanced_panels_act", None) is not None:
+            self.advanced_panels_act.triggered.connect(self._show_command_palette)
+        if getattr(self, "undo_layout_change_act", None) is not None:
+            self.undo_layout_change_act.triggered.connect(self._undo_layout_change)
+        if getattr(self, "open_panel_policy_act", None) is not None:
+            self.open_panel_policy_act.triggered.connect(
+                lambda: self.open_preferences(section="panel_policy")
+            )
+        self.focus_canvas_mode_act.triggered.connect(
+            lambda _checked=False: self._toggle_focus_canvas_mode()
+        )
         self.command_palette_act.triggered.connect(self._show_command_palette)
         self.toggle_logs_act.triggered.connect(
             lambda checked: self.set_panel_visible("logs", bool(checked), source="menu:layout")
@@ -933,6 +997,23 @@ class UiSetupMixin:
             self.review_queue_panel.apply_offset_requested.connect(
                 self._apply_review_queue_offset
             )
+        if getattr(self, "modality_layers_panel", None) is not None:
+            self.modality_layers_panel.layer_changed.connect(self._on_modality_layer_changed)
+            self.modality_layers_panel.save_preset_requested.connect(
+                self._save_modality_layer_preset
+            )
+            self.modality_layers_panel.load_preset_requested.connect(
+                self._load_modality_layer_preset
+            )
+            self.modality_layers_panel.compare_presets_requested.connect(
+                self._compare_modality_layer_presets
+            )
+            self._refresh_modality_layers_panel()
+            if getattr(self, "_settings", None) is not None:
+                show_hint = bool(self._settings.value("firstRunHintModalityLayers", True, type=bool))
+                self.modality_layers_panel.first_run_hint_lbl.setVisible(show_hint)
+                if show_hint:
+                    self._settings.setValue("firstRunHintModalityLayers", False)
         self.quick_hist_btn.clicked.connect(self._toggle_hist_panel)
         self.quick_profile_btn.clicked.connect(self._toggle_profile_panel)
         self.quick_qc_btn.clicked.connect(
@@ -943,6 +1024,7 @@ class UiSetupMixin:
             "dock_profile",
             "dock_qc_issues",
             "dock_density",
+            "dock_modality_layers",
             "dock_logs",
             "dock_metadata",
             "dock_results",
@@ -976,6 +1058,7 @@ class UiSetupMixin:
             self.annotation_meta_close_btn.clicked.connect(self._dismiss_annotation_meta_banner)
         self._sync_panel_visibility_state()
         self._update_qc_button_highlight(0)
+        self._refresh_panel_policy_controls()
         self._refresh_assist_warmup_panel()
         self._refresh_right_dock_segment_headers()
         if hasattr(self, "advanced_open_explain_btn"):
@@ -989,7 +1072,7 @@ class UiSetupMixin:
         if hasattr(self, "advanced_train_now_btn"):
             self.advanced_train_now_btn.clicked.connect(self._train_suggestion_ranker_now)
         if hasattr(self, "advanced_open_calib_btn"):
-            self.advanced_open_calib_btn.clicked.connect(self._show_reviewer_analytics_dialog)
+            self.advanced_open_calib_btn.clicked.connect(self._show_calibration_visualizer)
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
         self.controller.annotations_changed.connect(
@@ -999,6 +1082,7 @@ class UiSetupMixin:
         self._apply_default_layout()
         self._restore_layout()
         self._apply_default_preferences()
+        QtCore.QTimer.singleShot(0, self._sync_channel_panel_for_active_image)
         QtCore.QTimer.singleShot(0, self._maybe_show_first_run_welcome)
 
     def _apply_default_preferences(self) -> None:
@@ -1091,18 +1175,40 @@ class UiSetupMixin:
             return
         channel_count = int(getattr(self.primary_image, "channel_count", 1) or 1)
         dock = getattr(self, "dock_channels", None)
+        hidden_for_single = bool(
+            getattr(self, "_channel_panel_hidden_for_single_channel", False)
+        )
         if channel_count <= 1:
             panel.setEnabled(False)
             if dock is not None:
-                dock.setVisible(False)
+                if hasattr(self, "set_panel_visible"):
+                    self.set_panel_visible(
+                        "channels", False, source="channel_panel:auto_single_channel"
+                    )
+                else:
+                    dock.setVisible(False)
+                self._channel_panel_hidden_for_single_channel = True
             return
         panel.setEnabled(True)
         settings = integration.initialize_from_session(channel_count)
         self.controller.session_state.channel_display_settings = settings.to_dict()
         panel.set_channel_settings(settings)
-        if dock is not None and not getattr(self, "_channel_panel_autoshown", False):
-            dock.setVisible(True)
+        should_show = (
+            hidden_for_single
+            or not getattr(self, "_channel_panel_autoshown", False)
+            or (dock is not None and not dock.isVisible())
+        )
+        if dock is not None and should_show:
+            if hasattr(self, "set_panel_visible"):
+                self.set_panel_visible("channels", True, source="channel_panel:auto_multi_channel")
+            else:
+                dock.setVisible(True)
+            try:
+                dock.raise_()
+            except Exception:
+                pass
             self._channel_panel_autoshown = True
+            self._channel_panel_hidden_for_single_channel = False
 
     def _build_panel_registry(self) -> List[PanelSpec]:
         return ui_docks.build_panel_registry(self)
@@ -1122,6 +1228,116 @@ class UiSetupMixin:
         checkbox: Optional[QtWidgets.QCheckBox] = None,
     ) -> None:
         ui_docks.wire_dock_action(self, dock, action, checkbox)
+
+    def get_dock(self, panel_id: str) -> Optional[QtWidgets.QDockWidget]:
+        return ui_docks.get_dock(self, panel_id)
+
+    def open_panel(self, panel_id: str, *, reason: str = "user") -> Optional[QtWidgets.QDockWidget]:
+        return ui_docks.open_panel(self, panel_id, reason=reason)
+
+    def is_panel_auto_open_enabled(self, panel_id: str) -> bool:
+        return ui_docks.is_panel_auto_open_enabled(self, panel_id)
+
+    def set_panel_auto_open_enabled(self, panel_id: str, enabled: bool) -> None:
+        ui_docks.set_panel_auto_open_enabled(self, panel_id, enabled)
+
+    def is_panel_auto_open_enabled_for_trigger(self, panel_id: str, trigger: str) -> bool:
+        return ui_docks.is_panel_auto_open_enabled_for_trigger(self, panel_id, trigger)
+
+    def set_panel_auto_open_enabled_for_trigger(
+        self, panel_id: str, trigger: str, enabled: bool
+    ) -> None:
+        ui_docks.set_panel_auto_open_enabled_for_trigger(self, panel_id, trigger, enabled)
+
+    def is_panel_pinned(self, panel_id: str) -> bool:
+        return ui_docks.is_panel_pinned(self, panel_id)
+
+    def set_panel_pinned(self, panel_id: str, pinned: bool) -> None:
+        ui_docks.set_panel_pinned(self, panel_id, pinned)
+
+    def get_panel_opened_by(self, panel_id: str) -> str:
+        return ui_docks.get_panel_opened_by(self, panel_id)
+
+    def _init_panel_policy_controls(self) -> None:
+        """Build per-panel auto-open and pin controls in Preferences."""
+        if getattr(self, "advanced_layout", None) is None:
+            return
+        if getattr(self, "panel_policy_group", None) is not None:
+            return
+
+        group = QtWidgets.QGroupBox("Panel Auto-Open & Pinning")
+        group.setCheckable(False)
+        layout = QtWidgets.QGridLayout(group)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(6)
+        layout.addWidget(QtWidgets.QLabel("Panel"), 0, 0)
+        layout.addWidget(QtWidgets.QLabel("Auto-open"), 0, 1)
+        layout.addWidget(QtWidgets.QLabel("Pinned"), 0, 2)
+
+        self.panel_policy_auto_checks = {}
+        self.panel_policy_pin_checks = {}
+        self.panel_policy_open_btns = {}
+        row = 1
+        for spec in list(getattr(self, "panel_specs", []) or []):
+            panel_id = str(spec.id)
+            title = str(spec.title)
+            label = QtWidgets.QLabel(title)
+            auto_chk = QtWidgets.QCheckBox()
+            pin_chk = QtWidgets.QCheckBox()
+            open_btn = QtWidgets.QPushButton("Open")
+            open_btn.setMaximumWidth(56)
+            open_btn.clicked.connect(
+                lambda _checked=False, pid=panel_id: self.open_panel(pid, reason="panel_policy")
+            )
+            auto_chk.toggled.connect(
+                lambda checked, pid=panel_id: self.set_panel_auto_open_enabled(pid, bool(checked))
+            )
+            pin_chk.toggled.connect(
+                lambda checked, pid=panel_id: self.set_panel_pinned(pid, bool(checked))
+            )
+            layout.addWidget(label, row, 0)
+            layout.addWidget(auto_chk, row, 1)
+            layout.addWidget(pin_chk, row, 2)
+            layout.addWidget(open_btn, row, 3)
+            self.panel_policy_auto_checks[panel_id] = auto_chk
+            self.panel_policy_pin_checks[panel_id] = pin_chk
+            self.panel_policy_open_btns[panel_id] = open_btn
+            row += 1
+
+        reset_btn = QtWidgets.QPushButton("Reset Auto-Open Defaults")
+        reset_btn.clicked.connect(self._reset_panel_auto_open_defaults)
+        layout.addWidget(reset_btn, row, 0, 1, 2)
+        self.panel_policy_reset_btn = reset_btn
+        self.panel_policy_group = group
+        self.advanced_layout.addWidget(group, self._advanced_layout_row, 0, 1, 4)
+        self._advanced_layout_row += 1
+
+    def _refresh_panel_policy_controls(self) -> None:
+        """Sync panel policy checkboxes with persisted/current policy state."""
+        if hasattr(ui_docks, "refresh_panel_policy_actions"):
+            try:
+                ui_docks.refresh_panel_policy_actions(self)
+            except Exception:
+                pass
+        for panel_id, chk in dict(getattr(self, "panel_policy_auto_checks", {}) or {}).items():
+            desired = bool(self.is_panel_auto_open_enabled(panel_id))
+            if chk.isChecked() != desired:
+                chk.blockSignals(True)
+                chk.setChecked(desired)
+                chk.blockSignals(False)
+        for panel_id, chk in dict(getattr(self, "panel_policy_pin_checks", {}) or {}).items():
+            desired = bool(self.is_panel_pinned(panel_id))
+            if chk.isChecked() != desired:
+                chk.blockSignals(True)
+                chk.setChecked(desired)
+                chk.blockSignals(False)
+
+    def _reset_panel_auto_open_defaults(self) -> None:
+        """Reset all panel auto-open toggles to enabled defaults."""
+        for spec in list(getattr(self, "panel_specs", []) or []):
+            self.set_panel_auto_open_enabled(str(spec.id), True)
+        self._refresh_panel_policy_controls()
 
     def _make_sidebar_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_sidebar_widget(self)
@@ -1170,6 +1386,9 @@ class UiSetupMixin:
 
     def _make_density_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_density_widget(self)
+
+    def _make_modality_layers_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_modality_layers_widget(self)
 
     def _make_channel_controls_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_channel_controls_widget(self)
@@ -1263,11 +1482,15 @@ class UiSetupMixin:
         playback_layout = QtWidgets.QVBoxLayout(playback_panel)
         playback_layout.setContentsMargins(8, 8, 8, 8)
         playback_layout.setSpacing(8)
-        playback_layout.addWidget(QtWidgets.QLabel("Playback controls are in the bottom bar."))
+        playback_layout.addWidget(QtWidgets.QLabel("This page configures tools. Working views open as panels."))
+        playback_layout.addWidget(QtWidgets.QLabel("Playback controls are in the fixed bottom bar."))
+        open_playback_btn = QtWidgets.QPushButton("Open Playback Controls")
+        open_playback_btn.clicked.connect(self._focus_playback_controls)
+        playback_layout.addWidget(open_playback_btn)
         playback_layout.addWidget(self.axis_warning)
         playback_layout.addWidget(self.axes_info_label)
         playback_layout.addStretch(1)
-        pages.append(("Playback", QtWidgets.QStyle.StandardPixmap.SP_MediaPlay, _make_scroll(playback_panel)))
+        pages.append(("Playback Settings", QtWidgets.QStyle.StandardPixmap.SP_MediaPlay, _make_scroll(playback_panel)))
 
         # ROI/Crop
         roi_panel = QtWidgets.QWidget()
@@ -1302,9 +1525,15 @@ class UiSetupMixin:
         results_layout = QtWidgets.QVBoxLayout(results_panel)
         results_layout.setContentsMargins(8, 8, 8, 8)
         results_layout.setSpacing(8)
-        results_layout.addWidget(_dock_button("Show Results Table", "dock_results"))
+        results_layout.addWidget(QtWidgets.QLabel("This page configures tools. Working views open as panels."))
+        open_results_btn = QtWidgets.QPushButton("Open Results Table")
+        open_results_btn.clicked.connect(
+            lambda: self.open_panel("results", reason="sidebar_button")
+        )
+        results_layout.addWidget(open_results_btn)
+        results_layout.addWidget(_dock_button("Open Export Panel", "dock_results"))
         results_layout.addStretch(1)
-        pages.append(("Results", QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton, _make_scroll(results_panel)))
+        pages.append(("Results Hub", QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton, _make_scroll(results_panel)))
 
         # Project
         project_panel = QtWidgets.QWidget()

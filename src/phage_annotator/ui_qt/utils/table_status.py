@@ -127,6 +127,59 @@ class TableStatusMixin:
             header.set_counts(table_count=table_count, queue_count=queue_count)
             header.set_active(active)
 
+    def _bottom_task_counts(self) -> tuple[int, int, int]:
+        """Return counts for task-specific bottom tabs: (qc_issues, results_rows, log_alerts)."""
+        qc_count = 0
+        qc_state = getattr(self, "qc_state", None)
+        if qc_state is not None:
+            qc_count = int(len(getattr(qc_state, "issues", []) or []))
+        results_rows = 0
+        results_widget = getattr(self, "results_widget", None)
+        if results_widget is not None and getattr(results_widget, "table", None) is not None:
+            results_rows = int(results_widget.table.rowCount())
+        log_alerts = 0
+        all_logs = list(getattr(self, "_all_logs", []) or [])
+        for row in all_logs[-200:]:
+            txt = str(row).upper()
+            if "ERROR" in txt or "WARNING" in txt or "[EXCEPTION]" in txt:
+                log_alerts += 1
+        return qc_count, results_rows, log_alerts
+
+    def _update_bottom_task_panels(self) -> None:
+        """Auto-collapse bottom panel by default; expand only for non-empty task tabs."""
+        qc_count, results_rows, log_alerts = self._bottom_task_counts()
+        has_qc = qc_count > 0
+        if str(getattr(self, "_active_layout_preset", "")) == "Assist Expert":
+            has_qc = True
+        has_results = results_rows > 0
+        has_logs = log_alerts > 0
+        if hasattr(self, "set_panel_visible"):
+            self.set_panel_visible("qc_issues", has_qc, source="bottom_task_auto")
+            self.set_panel_visible("results", has_results, source="bottom_task_auto")
+            self.set_panel_visible("logs", has_logs, source="bottom_task_auto")
+        # Keep Results/QC/Diagnostics tabbed together when active.
+        dock_results = getattr(self, "dock_results", None)
+        dock_qc = getattr(self, "dock_qc_issues", None)
+        dock_logs = getattr(self, "dock_logs", None)
+        if dock_results is not None and dock_qc is not None:
+            try:
+                self.tabifyDockWidget(dock_results, dock_qc)
+            except Exception:
+                pass
+        if dock_qc is not None and dock_logs is not None:
+            try:
+                self.tabifyDockWidget(dock_qc, dock_logs)
+            except Exception:
+                pass
+        # Collapse bottom to slim footprint when empty; expand modestly when active.
+        bottom_docks = [d for d in (dock_results, dock_qc, dock_logs) if d is not None and d.isVisible()]
+        if bottom_docks:
+            try:
+                target = max(64, int(max(1, self.height()) * 0.12))
+                self.resizeDocks(bottom_docks, [target for _ in bottom_docks], QtCore.Qt.Orientation.Vertical)
+            except Exception:
+                pass
+
     def _on_auto_follow_table_changed(self, state: int) -> None:
         """Persist auto-follow preference and refresh table view."""
         enabled = bool(state)
@@ -388,19 +441,39 @@ class TableStatusMixin:
                     qc_warnings += 1
                 elif sev == "error":
                     qc_errors += 1
-        qc_label = f"QC: {qc_warnings} warnings"
+        qc_total = qc_warnings + qc_errors
+        qc_label = "QC: no issues" if qc_total == 0 else f"QC: {qc_warnings} warnings"
         if qc_errors > 0:
             qc_label += f", {qc_errors} errors"
 
         # Permanent status widgets are the primary operational state display.
         if getattr(self, "status_dataset_lbl", None) is not None:
             self.status_dataset_lbl.setText(f"Dataset: {dataset_name}")
+        if getattr(self, "status_label_lbl", None) is not None:
+            self.status_label_lbl.setText(f"Label: {self.current_label}")
         if getattr(self, "status_tz_lbl", None) is not None:
             self.status_tz_lbl.setText(frame_txt)
         if getattr(self, "status_scope_lbl", None) is not None:
             self.status_scope_lbl.setText(f"Scope: {scope_state}")
+            if str(getattr(self, "annotation_scope", "current")) == "all":
+                self.status_scope_lbl.setStyleSheet("color: #ef6c00; font-weight: 600;")
+            else:
+                self.status_scope_lbl.setStyleSheet("")
         if getattr(self, "status_target_lbl", None) is not None:
             self.status_target_lbl.setText(f"Target: {target_state}")
+        status_modality_combo = getattr(self, "status_modality_combo", None)
+        if status_modality_combo is not None and getattr(self, "primary_combo", None) is not None:
+            status_modality_combo.blockSignals(True)
+            status_modality_combo.clear()
+            for idx in range(self.primary_combo.count()):
+                status_modality_combo.addItem(self.primary_combo.itemText(idx), idx)
+            if 0 <= int(getattr(self, "current_image_idx", 0)) < status_modality_combo.count():
+                status_modality_combo.setCurrentIndex(int(self.current_image_idx))
+            status_modality_combo.setToolTip(
+                f"Active modality/view source: {modality_txt}. "
+                "Use this selector to switch annotation/suggestion source."
+            )
+            status_modality_combo.blockSignals(False)
         if getattr(self, "status_context_lock_lbl", None) is not None:
             pending = bool(
                 hasattr(self, "_is_annotation_context_guard_pending")
@@ -412,6 +485,15 @@ class TableStatusMixin:
             else:
                 self.status_context_lock_lbl.setText("Write Context: Locked")
                 self.status_context_lock_lbl.setStyleSheet("")
+        if getattr(self, "status_effective_context_lbl", None) is not None:
+            context_line = (
+                self._effective_assist_context_line()
+                if hasattr(self, "_effective_assist_context_line")
+                else "-"
+            )
+            self.status_effective_context_lbl.setText(
+                f"Effective Assist Context: {context_line}"
+            )
         need = self._assist_context_need_count()
         suffix = f" (Need {need} more labels in this context)" if assist_state == AssistState.HEURISTIC and need > 0 else ""
         self._style_assist_state_label(
@@ -419,6 +501,26 @@ class TableStatusMixin:
             assist_state,
             suffix=suffix,
         )
+        state_name = str(getattr(assist_state, "name", ""))
+        prev_state = getattr(self, "_last_assist_state_name", None)
+        if prev_state is None:
+            self._last_assist_state_name = state_name
+        elif prev_state != state_name:
+            self._last_assist_state_name = state_name
+            transition_txt = (
+                f"Assist state transitioned: {prev_state.lower()} -> {state_name.lower()}."
+            )
+            self._set_status(transition_txt)
+            if getattr(self, "canvas", None) is not None:
+                try:
+                    from matplotlib.backends.qt_compat import QtCore, QtWidgets
+                    QtWidgets.QToolTip.showText(
+                        self.canvas.mapToGlobal(QtCore.QPoint(16, 16)),
+                        transition_txt,
+                        self.canvas,
+                    )
+                except Exception:
+                    pass
         readiness = (
             f"Assist readiness: heuristic-only, need {need} more labels in this context."
             if assist_state == AssistState.HEURISTIC and need > 0
@@ -437,6 +539,37 @@ class TableStatusMixin:
                 action.setStatusTip(readiness)
         if getattr(self, "status_qc_lbl", None) is not None:
             self.status_qc_lbl.setText(qc_label)
+        if getattr(self, "status_results_lbl", None) is not None:
+            _, results_rows, _ = self._bottom_task_counts()
+            self.status_results_lbl.setText(
+                "Results: empty" if results_rows <= 0 else f"Results: {results_rows} rows"
+            )
+        freshness = (
+            self._suggestion_freshness_state(self.primary_image.id)
+            if hasattr(self, "_suggestion_freshness_state")
+            else {"has_suggestions": False, "age_text": "n/a", "is_stale": False}
+        )
+        if getattr(self, "status_suggestion_fresh_lbl", None) is not None:
+            if not freshness.get("has_suggestions", False):
+                self.status_suggestion_fresh_lbl.setText("Suggestions: n/a")
+                self.status_suggestion_fresh_lbl.setStyleSheet("")
+            elif freshness.get("is_stale", False):
+                self.status_suggestion_fresh_lbl.setText(
+                    f"Suggestions: {freshness.get('age_text', 'n/a')} old (Stale)"
+                )
+                self.status_suggestion_fresh_lbl.setStyleSheet("color: #d84315; font-weight: 600;")
+            else:
+                self.status_suggestion_fresh_lbl.setText(
+                    f"Suggestions: {freshness.get('age_text', 'n/a')} old"
+                )
+                self.status_suggestion_fresh_lbl.setStyleSheet("")
+        for act_name in ("accept_visible_suggestions_act", "accept_green_suggestions_act"):
+            act = getattr(self, act_name, None)
+            if act is not None:
+                if freshness.get("is_stale", False):
+                    act.setToolTip(
+                        "Stale suggestions detected: preview dialog will require one-shot override acknowledgement."
+                    )
         if getattr(self, "evidence_strip_lbl", None) is not None:
             projection_txt = "raw"
             if getattr(self, "projection_selector", None) is not None:
@@ -448,7 +581,7 @@ class TableStatusMixin:
             modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
             target_txt = str(getattr(self, "annotate_target", "frame"))
             self.evidence_strip_lbl.setText(
-                f"Evidence: target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
+                f"Evidence: modality={modality_txt} | target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
             )
 
         self._status_base = (
@@ -456,6 +589,7 @@ class TableStatusMixin:
             f"| Speed {self.speed_slider.value()} fps | {autosave_txt}{density_txt}{cache_txt}{diag_txt}{jobs_txt}"
         )
         self._render_status()
+        self._update_bottom_task_panels()
         if self.tool_label is not None and self.tool_router is not None:
             self.tool_label.setText(f"Tool: {self._tool_label(self.tool_router.tool)}")
         if self.cache_stats_label is not None:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import gc
+import json
+import os
 import pathlib
 import time
 from typing import List, Optional, Tuple
@@ -20,6 +22,7 @@ from phage_annotator.core.annotation import PointSuggestion
 from phage_annotator.ui_qt.assist_state import assist_state_label
 from phage_annotator.session.suggestion_commands import (
     AcceptSuggestionCommand,
+    AcceptSuggestionsBatchCommand,
     ClearSuggestionsCommand,
     RejectSuggestionCommand,
 )
@@ -411,7 +414,158 @@ class ActionsMixin(
             stack_t = np.asarray(image.array[t_idx, :, :, :], dtype=np.float32)
             out["mean_projection"] = np.nanmean(stack_t, axis=0)
             out["max_projection"] = np.nanmax(stack_t, axis=0)
-        return out
+        config = dict(getattr(self, "_evidence_layer_config", {}) or {})
+        filtered: dict[str, np.ndarray] = {}
+        for modality_id, frame in out.items():
+            entry = dict(config.get(modality_id, {}) or {})
+            visible = bool(entry.get("visible", True))
+            role = str(entry.get("role", "proposal evidence"))
+            if not visible:
+                continue
+            if role.strip().lower() == "view only":
+                continue
+            filtered[modality_id] = frame
+        return filtered or out
+
+    def _default_evidence_layer_config(self) -> dict[str, dict]:
+        """Return default layer config for modality/evidence controls."""
+        default_lut = lut_names()[0] if lut_names() else "gray"
+        return {
+            "current_view": {"visible": True, "opacity": 1.0, "lut": default_lut, "role": "proposal evidence"},
+            "raw": {"visible": True, "opacity": 1.0, "lut": default_lut, "role": "proposal evidence"},
+            "corrected": {"visible": True, "opacity": 1.0, "lut": default_lut, "role": "proposal evidence"},
+            "mean_projection": {"visible": True, "opacity": 1.0, "lut": default_lut, "role": "proposal evidence"},
+            "max_projection": {"visible": True, "opacity": 1.0, "lut": default_lut, "role": "proposal evidence"},
+        }
+
+    def _refresh_modality_layers_panel(self) -> None:
+        """Sync layer-like modality/evidence controls with current state."""
+        panel = getattr(self, "modality_layers_panel", None)
+        if panel is None:
+            return
+        base = self._default_evidence_layer_config()
+        current = dict(getattr(self, "_evidence_layer_config", {}) or {})
+        for key, value in current.items():
+            base[str(key)] = {
+                "visible": bool(dict(value).get("visible", True)),
+                "opacity": float(dict(value).get("opacity", 1.0)),
+                "lut": str(dict(value).get("lut", base.get(str(key), {}).get("lut", "gray"))),
+                "role": str(dict(value).get("role", "proposal evidence")),
+            }
+        self._evidence_layer_config = base
+        rows = []
+        for modality_id, entry in base.items():
+            rows.append(
+                {
+                    "modality_id": modality_id,
+                    "visible": bool(entry.get("visible", True)),
+                    "opacity": float(entry.get("opacity", 1.0)),
+                    "lut": str(entry.get("lut", "gray")),
+                    "role": str(entry.get("role", "proposal evidence")),
+                }
+            )
+        panel.set_layers(rows)
+
+    def _on_modality_layer_changed(
+        self,
+        modality_id: str,
+        visible: bool,
+        opacity: float,
+        lut: str,
+        role: str,
+    ) -> None:
+        """Persist one layer-row update and refresh dependent views."""
+        config = dict(getattr(self, "_evidence_layer_config", {}) or {})
+        config[str(modality_id)] = {
+            "visible": bool(visible),
+            "opacity": float(max(0.0, min(1.0, opacity))),
+            "lut": str(lut),
+            "role": str(role),
+        }
+        self._evidence_layer_config = config
+        self._active_evidence_preset_name = "custom"
+        self.controller.session_state.evidence_layer_config = dict(config)
+        self._set_status(f"Layer updated: {modality_id} ({role}, visible={visible}).")
+        self._refresh_image()
+        self._append_assist_change_log(
+            "modality_layer_changed",
+            modality_id=str(modality_id),
+            visible=bool(visible),
+            opacity=float(opacity),
+            lut=str(lut),
+            role=str(role),
+        )
+        self._maybe_emit_assist_context_delta("modality_layer")
+
+    def _save_modality_layer_preset(self, name: str) -> None:
+        """Save current layer config as a named preset."""
+        preset_name = str(name or "default").strip() or "default"
+        presets = dict(getattr(self, "_evidence_layer_presets", {}) or {})
+        presets[preset_name] = dict(getattr(self, "_evidence_layer_config", {}) or {})
+        self._evidence_layer_presets = presets
+        self._active_evidence_preset_name = preset_name
+        self.controller.session_state.evidence_layer_presets = dict(presets)
+        if getattr(self, "_settings", None) is not None:
+            self._settings.setValue("evidenceLayerPresets", json.dumps(presets))
+        self._set_status(f"Saved modality/evidence preset: {preset_name}.")
+        self._append_assist_change_log("modality_preset_saved", preset=preset_name)
+        self._maybe_emit_assist_context_delta("preset_save")
+
+    def _load_modality_layer_preset(self, name: str) -> None:
+        """Load a named layer preset if present."""
+        preset_name = str(name or "default").strip() or "default"
+        presets = dict(getattr(self, "_evidence_layer_presets", {}) or {})
+        if not presets and getattr(self, "_settings", None) is not None:
+            raw = self._settings.value("evidenceLayerPresets", "", type=str)
+            if raw:
+                try:
+                    presets = dict(json.loads(raw))
+                except Exception:
+                    presets = {}
+                self._evidence_layer_presets = presets
+        preset = dict(presets.get(preset_name, {}) or {})
+        if not preset:
+            self._set_status(f"No modality/evidence preset named '{preset_name}'.")
+            return
+        self._evidence_layer_config = preset
+        self._active_evidence_preset_name = preset_name
+        self.controller.session_state.evidence_layer_config = dict(preset)
+        self._refresh_modality_layers_panel()
+        self._refresh_image()
+        self._set_status(f"Loaded modality/evidence preset: {preset_name}.")
+        self._append_assist_change_log("modality_preset_loaded", preset=preset_name)
+        self._maybe_emit_assist_context_delta("preset_load")
+
+    def _compare_modality_layer_presets(self, preset_a: str, preset_b: str) -> None:
+        """One-click A/B compare mode for modality-layer presets with preserved camera."""
+        a_name = str(preset_a or "default").strip() or "default"
+        b_name = str(preset_b or "default").strip() or "default"
+        toggle = int(getattr(self, "_modality_compare_toggle_state", 0))
+        target = a_name if toggle % 2 == 0 else b_name
+        xlim = None
+        ylim = None
+        frame_ax = None
+        if getattr(self, "renderer", None) is not None:
+            frame_ax = self.renderer.get_axis("frame")
+        if frame_ax is not None:
+            try:
+                xlim = tuple(frame_ax.get_xlim())
+                ylim = tuple(frame_ax.get_ylim())
+            except Exception:
+                xlim = None
+                ylim = None
+        self._modality_compare_toggle_state = toggle + 1
+        self._load_modality_layer_preset(target)
+        if frame_ax is not None and xlim is not None and ylim is not None:
+            try:
+                frame_ax.set_xlim(xlim)
+                frame_ax.set_ylim(ylim)
+                if getattr(self, "canvas", None) is not None:
+                    self.canvas.draw_idle()
+            except Exception:
+                pass
+        self._set_status(f"A/B compare: loaded {target}.")
+        self._append_assist_change_log("modality_preset_compare", preset=target, a=a_name, b=b_name)
 
     def _merge_modal_consensus(
         self,
@@ -490,6 +644,8 @@ class ActionsMixin(
             return []
         strategy_key = str(strategy or "current_view").lower()
         roi_id = "active_roi" if self.roi_shape != "none" else None
+        roi_shape = str(self.roi_shape)
+        roi_rect = tuple(self.roi_rect)
 
         def _predict_one(modality_id: str, frame: np.ndarray) -> list[PointSuggestion]:
             rows = model.predict(
@@ -501,6 +657,8 @@ class ActionsMixin(
                 label=label,
                 strategy="raw",
                 roi_id=roi_id,
+                roi_shape=roi_shape,
+                roi_rect=roi_rect,
             )
             for row in rows:
                 row.source_modality = modality_id
@@ -693,6 +851,164 @@ class ActionsMixin(
                 nearest <= float(getattr(suggestion, "psf_radius", 6.0))
             )
 
+    def _note_annotation_edit(self, image_id: Optional[int] = None) -> None:
+        """Record latest annotation-edit timestamp for staleness guardrails."""
+        target_id = int(self.primary_image.id if image_id is None else image_id)
+        by_image = getattr(self, "_annotation_edit_ts_by_image", None)
+        if by_image is None:
+            by_image = {}
+            self._annotation_edit_ts_by_image = by_image
+        by_image[target_id] = float(time.time())
+
+    def _format_age_short(self, seconds: float) -> str:
+        """Return compact age string for status labels."""
+        age = max(0.0, float(seconds))
+        if age < 60.0:
+            return f"{int(round(age))}s"
+        if age < 3600.0:
+            return f"{int(round(age / 60.0))} min"
+        return f"{age / 3600.0:.1f} h"
+
+    def _suggestion_freshness_state(
+        self,
+        image_id: Optional[int] = None,
+        suggestions: Optional[list[PointSuggestion]] = None,
+    ) -> dict:
+        """Return freshness metadata for pending suggestions on an image."""
+        target_id = int(self.primary_image.id if image_id is None else image_id)
+        rows = (
+            list(self.suggestions.get(target_id, []))
+            if suggestions is None
+            else list(suggestions)
+        )
+        ts_vals = []
+        for row in rows:
+            ts = dict(getattr(row, "meta", {}) or {}).get("generated_at_ts")
+            if ts is None:
+                continue
+            try:
+                ts_vals.append(float(ts))
+            except Exception:
+                continue
+        if not ts_vals:
+            return {
+                "has_suggestions": bool(rows),
+                "has_timestamp": False,
+                "age_seconds": None,
+                "age_text": "n/a",
+                "is_stale": False,
+                "reason": "",
+            }
+        latest_gen_ts = max(ts_vals)
+        age_seconds = max(0.0, float(time.time()) - latest_gen_ts)
+        by_image = getattr(self, "_annotation_edit_ts_by_image", {}) or {}
+        last_edit_ts = float(by_image.get(target_id, 0.0))
+        is_stale = last_edit_ts > latest_gen_ts
+        reason = "Edits happened after suggestion generation." if is_stale else ""
+        return {
+            "has_suggestions": bool(rows),
+            "has_timestamp": True,
+            "age_seconds": age_seconds,
+            "age_text": self._format_age_short(age_seconds),
+            "is_stale": bool(is_stale),
+            "reason": reason,
+        }
+
+    def _effective_assist_context_parts(self, suggestions: Optional[list[PointSuggestion]] = None) -> dict[str, str]:
+        """Return compact effective assist context components for trust-critical display."""
+        projection_txt = "raw"
+        if getattr(self, "projection_selector", None) is not None:
+            try:
+                p_name, p_axis = self.projection_selector.current_selection()
+                projection_txt = f"{p_name} ({p_axis})"
+            except Exception:
+                projection_txt = "raw"
+        scope = "stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "slice"
+        target = str(getattr(self, "annotate_target", "frame"))
+        strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
+        preset = str(getattr(self, "_active_evidence_preset_name", "custom"))
+        freshness = self._suggestion_freshness_state(self.primary_image.id, suggestions)
+        stale_txt = "stale" if freshness.get("is_stale", False) else "fresh"
+        return {
+            "strategy": strategy,
+            "preset": preset,
+            "projection": projection_txt,
+            "scope": scope,
+            "target": target,
+            "stale": stale_txt,
+        }
+
+    def _effective_assist_context_line(self, suggestions: Optional[list[PointSuggestion]] = None) -> str:
+        """Build immutable one-line context summary for status/review surfaces."""
+        p = self._effective_assist_context_parts(suggestions)
+        return (
+            f"Strategy={p['strategy']} | Preset={p['preset']} | Projection={p['projection']} | "
+            f"Scope={p['scope']} | Target={p['target']} | State={p['stale']}"
+        )
+
+    def _remember_generation_context(self, suggestions: Optional[list[PointSuggestion]] = None) -> None:
+        """Persist context snapshot at suggestion-generation time for delta notices."""
+        parts = self._effective_assist_context_parts(suggestions)
+        self._last_generation_context_signature = dict(parts)
+        self._last_generation_context_text = self._effective_assist_context_line(suggestions)
+        self._last_assist_context_delta_text = ""
+
+    def _maybe_emit_assist_context_delta(self, source: str) -> None:
+        """Emit concise context-delta hint when effective generation context changed."""
+        last = dict(getattr(self, "_last_generation_context_signature", {}) or {})
+        if not last:
+            return
+        now = self._effective_assist_context_parts()
+        watched_keys = ("strategy", "preset", "projection")
+        changed = [k for k in watched_keys if str(last.get(k, "")) != str(now.get(k, ""))]
+        if not changed:
+            return
+        delta = ", ".join(f"{k}: {last.get(k)} -> {now.get(k)}" for k in changed)
+        text = f"Assist context changed ({source}): {delta}"
+        self._last_assist_context_delta_text = text
+        self._set_status(text)
+        self._append_assist_change_log("context_delta", source=source, delta=delta)
+        self._refresh_assist_warmup_panel()
+
+    def _append_assist_change_log(self, event: str, **details) -> None:
+        """Append assist context log entries for reproducibility and export."""
+        payload = {"event": str(event), "details": dict(details), "ts": float(time.time())}
+        if hasattr(self.controller, "append_audit_event"):
+            self.controller.append_audit_event("assist_change", **payload)
+        if hasattr(self, "_append_log"):
+            self._append_log(f"[ASSIST] {event}: {details}")
+
+    def _sync_status_strategy_selector(self) -> None:
+        """Keep status-bar strategy selector in sync with available/current strategy."""
+        combo = getattr(self, "status_strategy_combo", None)
+        if combo is None:
+            return
+        options = self._candidate_suggestion_strategies()
+        current = str(getattr(self, "_suggestion_strategy", "current_view"))
+        combo.blockSignals(True)
+        combo.clear()
+        for opt in options:
+            combo.addItem(opt)
+        idx = combo.findText(current)
+        combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.blockSignals(False)
+
+    def _set_suggestion_strategy(self, strategy: str, *, source: str = "ui") -> None:
+        """Set suggestion strategy from any UI surface."""
+        selected = str(strategy or "current_view")
+        strategies = self._candidate_suggestion_strategies()
+        if selected not in strategies:
+            selected = strategies[0] if strategies else "current_view"
+        self._suggestion_strategy = selected
+        self.controller.session_state.suggestion_strategy = self._suggestion_strategy
+        self._sync_status_strategy_selector()
+        self._set_status(f"Suggestion strategy ({source}): {self._suggestion_strategy}.")
+        self._append_assist_change_log(
+            "strategy_changed", source=str(source), strategy=self._suggestion_strategy
+        )
+        self._maybe_emit_assist_context_delta("strategy")
+        self._refresh_assist_warmup_panel()
+
     def _select_suggestion_strategy_dialog(self) -> None:
         """Choose proposal strategy used by Suggest actions."""
         strategies = self._candidate_suggestion_strategies()
@@ -708,10 +1024,7 @@ class ActionsMixin(
         )
         if not ok:
             return
-        self._suggestion_strategy = str(selected)
-        self.controller.session_state.suggestion_strategy = self._suggestion_strategy
-        self._set_status(f"Suggestion strategy: {self._suggestion_strategy}.")
-        self._refresh_assist_warmup_panel()
+        self._set_suggestion_strategy(str(selected), source="dialog")
 
     def _set_suggestion_score_threshold_dialog(self) -> None:
         """Set display threshold for proposal score."""
@@ -731,7 +1044,7 @@ class ActionsMixin(
         self.controller.session_state.suggestion_score_threshold = self._suggestion_score_threshold
         self._refresh_image()
         self._set_status(
-            f"Show suggestions with confidence (calibrated p_accept) >= {self._suggestion_score_threshold:.2f}; generator score is heuristic."
+            f"Show suggestions with acceptance likelihood (p_accept) >= {self._suggestion_score_threshold:.2f}; generator score is heuristic."
         )
         self._refresh_assist_warmup_panel()
 
@@ -768,6 +1081,7 @@ class ActionsMixin(
             count=len(generated),
             strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
         )
+        self._remember_generation_context(generated)
         ctx_key = self.controller._context_key(
             suggestion=(generated[0] if generated else PointSuggestion(image_id, self.primary_image.name, t_idx, z_idx, 0, 0, 0.0)),
             annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
@@ -820,30 +1134,51 @@ class ActionsMixin(
             scope="all_slices",
             strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
         )
+        self._remember_generation_context(self.suggestions.get(image_id, []))
         self._suggestion_cursor = 0
         self._refresh_image()
         self._set_status(f"Generated {total} ranked suggestion(s) for full image.")
         self._refresh_assist_warmup_panel()
 
     def _accept_visible_suggestions(self) -> None:
-        """Accept all visible suggestions via undoable commands."""
+        """Accept visible suggestions as one reviewed batch command."""
         if not self._ensure_annotation_write_context_confirmed("Accept suggestions"):
             return
         visible = self._visible_suggestions()
+        if not visible:
+            self._set_status("No visible suggestions to accept.")
+            return
+        freshness = self._suggestion_freshness_state(self.primary_image.id, visible)
+        selected_ids = self._preview_batch_accept_dialog(
+            candidates=list(visible),
+            title="Preview Batch Accept (Visible Suggestions)",
+            description=(
+                "Select visible suggestions to accept. "
+                "This will be applied as one batch undo step."
+            ),
+            stale_override_required=bool(
+                bool(getattr(self, "_disable_bulk_accept_when_stale", True))
+                and freshness.get("is_stale", False)
+            ),
+        )
+        if selected_ids is None:
+            self._set_status("Batch accept cancelled.")
+            return
+        if not selected_ids:
+            self._set_status("Batch accept cancelled (no suggestions selected).")
+            return
+        cmd = AcceptSuggestionsBatchCommand(self.controller, self.primary_image.id, selected_ids)
         accepted = 0
-        for suggestion in list(visible):
-            cmd = AcceptSuggestionCommand(
-                self.controller, self.primary_image.id, suggestion.suggestion_id
-            )
-            if self.controller.execute_view_command(cmd):
-                accepted += 1
-                self.controller.update_suggestion_metrics(correction_distance=0.0)
-                if bool(getattr(self, "_timed_session_active", False)):
-                    self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
-                    self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
+        if self.controller.execute_view_command(cmd):
+            accepted = len(selected_ids)
+            self.controller.update_suggestion_metrics(correction_distance=0.0)
+            if bool(getattr(self, "_timed_session_active", False)):
+                self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + accepted
+                self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + accepted
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         if accepted:
+            self._note_annotation_edit(self.primary_image.id)
             self._refresh_table()
             self._refresh_image()
             self._schedule_qc_validation(self.primary_image.id)
@@ -861,22 +1196,112 @@ class ActionsMixin(
             if bool(dict(getattr(s, "meta", {}) or {}).get("confidence_available", False))
             and float(dict(getattr(s, "meta", {}) or {}).get("p_accept", 0.0)) >= 0.75
         ]
+        if not candidates:
+            self._set_status("No high-confidence suggestions to accept.")
+            return
+        freshness = self._suggestion_freshness_state(self.primary_image.id, visible)
+        selected_ids = self._preview_batch_accept_dialog(
+            candidates=candidates,
+            title="Preview Batch Accept (Green Suggestions)",
+            description=(
+                "Select high-confidence suggestions to accept. "
+                "This will be applied as one batch undo step."
+            ),
+            stale_override_required=bool(
+                bool(getattr(self, "_disable_bulk_accept_when_stale", True))
+                and freshness.get("is_stale", False)
+            ),
+        )
+        if selected_ids is None:
+            self._set_status("Batch accept cancelled.")
+            return
+        if not selected_ids:
+            self._set_status("Batch accept cancelled (no suggestions selected).")
+            return
+        cmd = AcceptSuggestionsBatchCommand(self.controller, self.primary_image.id, selected_ids)
         accepted = 0
-        for suggestion in list(candidates):
-            cmd = AcceptSuggestionCommand(
-                self.controller, self.primary_image.id, suggestion.suggestion_id
-            )
-            if self.controller.execute_view_command(cmd):
-                accepted += 1
-                self.controller.update_suggestion_metrics(correction_distance=0.0)
+        if self.controller.execute_view_command(cmd):
+            accepted = len(selected_ids)
+            self.controller.update_suggestion_metrics(correction_distance=0.0)
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         if accepted:
+            self._note_annotation_edit(self.primary_image.id)
             self._refresh_table()
             self._refresh_image()
             self._schedule_qc_validation(self.primary_image.id)
         self._set_status(f"Accepted {accepted} high-confidence suggestion(s).")
         self._refresh_assist_warmup_panel()
+
+    def _preview_batch_accept_dialog(
+        self,
+        *,
+        candidates: List[PointSuggestion],
+        title: str,
+        description: str,
+        stale_override_required: bool = False,
+    ) -> Optional[List[str]]:
+        """Show checkbox preview dialog and return selected suggestion IDs.
+
+        Returns None when user cancels.
+        """
+        if not candidates:
+            return []
+        if stale_override_required and os.environ.get("QT_QPA_PLATFORM", "").lower() == "offscreen":
+            self._set_status("Batch blocked: stale suggestions require one-shot override confirmation.")
+            return []
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(str(title))
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.addWidget(QtWidgets.QLabel(str(description)))
+        stale_chk = None
+        if stale_override_required:
+            warn = QtWidgets.QLabel(
+                "Stale detected: annotations changed after suggestion generation.\n"
+                "Regenerate is recommended. To proceed once, acknowledge below."
+            )
+            warn.setStyleSheet("color: #d84315; font-weight: 600;")
+            warn.setWordWrap(True)
+            layout.addWidget(warn)
+            stale_chk = QtWidgets.QCheckBox("Accept stale suggestions for this batch only")
+            stale_chk.setChecked(False)
+            layout.addWidget(stale_chk)
+        table = QtWidgets.QTableWidget(len(candidates), 5, dialog)
+        table.setHorizontalHeaderLabels(
+            ["Use", "x", "y", "generator score", "Acceptance likelihood (p_accept)"]
+        )
+        for row, suggestion in enumerate(candidates):
+            use_item = QtWidgets.QTableWidgetItem()
+            use_item.setFlags(use_item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+            use_item.setCheckState(QtCore.Qt.CheckState.Checked)
+            table.setItem(row, 0, use_item)
+            table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(int(round(float(suggestion.x))))))
+            table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(int(round(float(suggestion.y))))))
+            table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{float(suggestion.score):.2f}"))
+            p_accept = float(dict(getattr(suggestion, "meta", {}) or {}).get("p_accept", 0.0))
+            conf_avail = bool(dict(getattr(suggestion, "meta", {}) or {}).get("confidence_available", False))
+            p_text = f"{p_accept:.2f}" if conf_avail else "heuristic"
+            table.setItem(row, 4, QtWidgets.QTableWidgetItem(p_text))
+        table.resizeColumnsToContents()
+        layout.addWidget(table)
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
+            parent=dialog,
+        )
+        layout.addWidget(buttons)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return None
+        if stale_override_required and (stale_chk is None or not stale_chk.isChecked()):
+            self._set_status("Batch blocked: stale suggestions require one-shot override confirmation.")
+            return []
+        selected_ids: List[str] = []
+        for row, suggestion in enumerate(candidates):
+            item = table.item(row, 0)
+            if item is not None and item.checkState() == QtCore.Qt.CheckState.Checked:
+                selected_ids.append(str(suggestion.suggestion_id))
+        return selected_ids
 
     def _reject_visible_suggestions(self) -> None:
         """Reject all visible suggestions via undoable commands."""
@@ -923,6 +1348,7 @@ class ActionsMixin(
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         if accepted:
+            self._note_annotation_edit(self.primary_image.id)
             self._refresh_table()
             self._refresh_image()
             self._schedule_qc_validation(self.primary_image.id)
@@ -1087,6 +1513,8 @@ class ActionsMixin(
         image_name = str(image.name)
         label = str(self.current_label)
         strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
+        roi_shape = str(self.roi_shape)
+        roi_rect = tuple(self.roi_rect)
 
         def _job(progress, cancel_token):
             out: list[PointSuggestion] = []
@@ -1103,6 +1531,8 @@ class ActionsMixin(
                     z=int(z_idx),
                     label=label,
                     strategy=strategy,
+                    roi_shape=roi_shape,
+                    roi_rect=roi_rect,
                 )
                 out.extend(generated)
                 progress(int((idx + 1) / total * 100), f"{idx + 1}/{total} slices")
@@ -1133,6 +1563,7 @@ class ActionsMixin(
                 mode=str(mode_key),
                 strategy=strategy,
             )
+            self._remember_generation_context(generated)
             if generated:
                 first = generated[0]
                 self.t_slider.setValue(max(self.t_slider.minimum(), min(int(first.t), self.t_slider.maximum())))
@@ -1162,6 +1593,62 @@ class ActionsMixin(
                 )
             ),
         )
+
+    def _review_throughput_snapshot(self) -> tuple[str, float]:
+        """Return compact throughput text and avg sec/decision for current session."""
+        metrics = dict(getattr(self.controller.session_state, "suggestion_metrics", {}) or {})
+        accepted = int(metrics.get("accepted", 0))
+        rejected = int(metrics.get("rejected", 0))
+        start_ts = getattr(self, "_review_telemetry_started_ts", None)
+        if start_ts is None:
+            self._review_telemetry_started_ts = float(time.time())
+            self._review_telemetry_baseline_accepted = accepted
+            self._review_telemetry_baseline_rejected = rejected
+            return ("Throughput: n/a", 0.0)
+        elapsed_min = max(1e-6, (float(time.time()) - float(start_ts)) / 60.0)
+        d_acc = max(0, accepted - int(getattr(self, "_review_telemetry_baseline_accepted", 0)))
+        d_rej = max(0, rejected - int(getattr(self, "_review_telemetry_baseline_rejected", 0)))
+        total = d_acc + d_rej
+        acc_pm = d_acc / elapsed_min
+        rej_pm = d_rej / elapsed_min
+        sec_per = (float(time.time()) - float(start_ts)) / max(1, total)
+        txt = f"Throughput: A/min {acc_pm:.1f} | R/min {rej_pm:.1f} | s/decision {sec_per:.1f}"
+        return (txt, sec_per)
+
+    def _calibration_sparkline_text(self) -> str:
+        """Return tiny reliability sparkline from p_accept bins."""
+        history = getattr(self.controller.session_state, "suggestion_history", {}) or {}
+        rows = []
+        for items in history.values():
+            for row in items:
+                status = str(getattr(row, "status", ""))
+                if status not in ("accepted", "rejected"):
+                    continue
+                meta = dict(getattr(row, "meta", {}) or {})
+                if not bool(meta.get("confidence_available", False)):
+                    continue
+                p_accept = meta.get("p_accept")
+                if p_accept is None:
+                    continue
+                try:
+                    rows.append((float(p_accept), 1 if status == "accepted" else 0))
+                except Exception:
+                    continue
+        if not rows:
+            return "Calibration: -"
+        bins = np.linspace(0.0, 1.0, 6)
+        levels = "▁▂▃▄▅▆▇█"
+        parts = []
+        for i in range(len(bins) - 1):
+            lo, hi = bins[i], bins[i + 1]
+            slice_rows = [v for p, v in rows if (p >= lo and (p < hi or (i == len(bins) - 2 and p <= hi)))]
+            if not slice_rows:
+                parts.append("·")
+                continue
+            rate = float(sum(slice_rows)) / float(len(slice_rows))
+            idx = int(round(rate * (len(levels) - 1)))
+            parts.append(levels[max(0, min(len(levels) - 1, idx))])
+        return f"Calibration: {''.join(parts)}"
 
     def _review_queue_progress_counts(self) -> tuple[int, int]:
         """Return (processed, total) counts for current image and T/Z context."""
@@ -1193,22 +1680,40 @@ class ActionsMixin(
         t_idx = int(self.t_slider.value())
         z_idx = int(self.z_slider.value())
         ranked = self._visible_suggestions_uncertain_first()
+        if ranked and hasattr(self, "_set_right_dock_mode"):
+            self._set_right_dock_mode("review")
         panel.header_lbl.setText(f"Review Queue - T={t_idx + 1} Z={z_idx + 1}")
+        panel.context_lbl.setText(f"Effective Assist Context: {self._effective_assist_context_line(ranked)}")
+        delta_txt = str(getattr(self, "_last_assist_context_delta_text", "")).strip()
+        panel.context_delta_lbl.setText(delta_txt)
+        panel.context_delta_lbl.setVisible(bool(delta_txt))
         panel.remaining_lbl.setText(f"Uncertain remaining: {len(ranked)}")
+        throughput_txt, _sec_per = self._review_throughput_snapshot()
+        panel.telemetry_lbl.setText(throughput_txt)
+        panel.calib_spark_lbl.setText(self._calibration_sparkline_text())
+        if getattr(self, "_settings", None) is not None:
+            show_hint = bool(self._settings.value("firstRunHintReviewQueue", True, type=bool))
+            panel.first_run_hint_lbl.setVisible(show_hint)
+            if show_hint:
+                self._settings.setValue("firstRunHintReviewQueue", False)
         processed, total = self._review_queue_progress_counts()
         panel.progress_lbl.setText(f"Progress: {processed} / {total}")
         pct = int(round(100.0 * float(processed) / max(1, float(total)))) if total > 0 else 0
         panel.progress_bar.setValue(max(0, min(100, pct)))
+        freshness = self._suggestion_freshness_state(self.primary_image.id, ranked)
         assist_state = self._canonical_assist_state(ranked)
         assist_label = assist_state_label(assist_state)
         need = self._assist_context_need_count(ranked)
+        metrics = dict(getattr(self.controller.session_state, "suggestion_metrics", {}) or {})
+        trained_pos = int(metrics.get("accepted", 0))
+        trained_neg = int(metrics.get("rejected", 0))
         readiness_txt = (
             f" (Need {need} more labels in this context)"
             if assist_state.name == "HEURISTIC" and need > 0
             else ""
         )
         panel.header_lbl.setText(
-            f"Review Queue - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_label}{readiness_txt}"
+            f"Review Queue - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_label}{readiness_txt} | trained on: {trained_pos} pos / {trained_neg} neg"
         )
         self._style_assist_state_label(
             panel.assist_lbl,
@@ -1219,7 +1724,7 @@ class ActionsMixin(
 
         if not ranked:
             panel.coords_lbl.setText("(x=-, y=-)")
-            panel.score_lbl.setText("p_accept: n/a")
+            panel.score_lbl.setText("Acceptance likelihood (p_accept): n/a")
             panel.stale_lbl.setText("staleness: n/a")
             panel.details_lbl.setText("No uncertain suggestions on current frame/scope.")
             panel.accept_btn.setEnabled(False)
@@ -1245,18 +1750,34 @@ class ActionsMixin(
         generated_ts = dict(getattr(current, "meta", {}) or {}).get("generated_at_ts")
         panel.coords_lbl.setText(f"(x={int(round(float(current.x)))}, y={int(round(float(current.y)))})")
         if p_accept is None:
-            panel.score_lbl.setText(f"p_accept: n/a | generator score: {float(current.score):.2f}")
+            panel.score_lbl.setText(
+                f"Acceptance likelihood (p_accept): n/a | generator score: {float(current.score):.2f}"
+            )
             panel.details_lbl.setText("Heuristic-only proposal; review required.")
         else:
             p_val = float(p_accept)
-            suffix = "(review)" if p_val < 0.5 else ""
-            panel.score_lbl.setText(f"p_accept: {p_val:.2f} {suffix}".strip())
+            if p_val >= 0.75:
+                triage = "likely accept"
+            elif p_val >= 0.5:
+                triage = "needs review"
+            else:
+                triage = "unlikely accept"
+            panel.score_lbl.setText(
+                f"Acceptance likelihood (p_accept): {p_val:.2f} ({triage})"
+            )
             panel.details_lbl.setText(f"Generator score: {float(current.score):.2f}")
-        if generated_ts is None:
+        if freshness.get("is_stale", False):
+            panel.stale_lbl.setText(
+                f"staleness: Stale - regenerate recommended (generated {freshness.get('age_text', 'n/a')} ago)"
+            )
+            panel.stale_lbl.setStyleSheet("color: #d84315; font-weight: 600;")
+        elif generated_ts is None:
             panel.stale_lbl.setText("staleness: unknown")
+            panel.stale_lbl.setStyleSheet("")
         else:
             age_s = max(0.0, float(time.time()) - float(generated_ts))
-            panel.stale_lbl.setText(f"staleness: {age_s:.1f}s")
+            panel.stale_lbl.setText(f"staleness: Suggestions {self._format_age_short(age_s)} old")
+            panel.stale_lbl.setStyleSheet("")
         panel.accept_btn.setEnabled(True)
         panel.accept_next_btn.setEnabled(True)
         panel.reject_btn.setEnabled(True)
@@ -1275,7 +1796,16 @@ class ActionsMixin(
             if bool(dict(getattr(s, "meta", {}) or {}).get("confidence_available", False))
             and float(dict(getattr(s, "meta", {}) or {}).get("p_accept", 0.0)) >= 0.75
         )
+        stale_required = bool(
+            bool(getattr(self, "_disable_bulk_accept_when_stale", True))
+            and freshness.get("is_stale", False)
+        )
         panel.accept_green_btn.setEnabled(green_count > 0)
+        panel.accept_green_btn.setToolTip(
+            "Accept all green suggestions (acceptance likelihood >= 0.75)."
+            if not stale_required
+            else "Stale suggestions detected: preview dialog will require one-shot override acknowledgement."
+        )
         panel.accept_green_btn.setText(
             f"Accept All Green ({green_count})" if green_count > 0 else "Accept All Green"
         )
@@ -1290,7 +1820,7 @@ class ActionsMixin(
         if suggestion is None:
             panel.coords_lbl.setText("(x=-, y=-, t=-, z=-)")
             panel.score_lbl.setText("generator score: n/a")
-            panel.calib_lbl.setText("calibrated p_accept: n/a")
+            panel.calib_lbl.setText("Acceptance likelihood (p_accept): n/a")
             panel.nn_lbl.setText("nearest accepted distance: n/a")
             panel.stale_lbl.setText("staleness: n/a")
             panel.components_txt.setPlainText("No suggestion selected.")
@@ -1317,9 +1847,13 @@ class ActionsMixin(
         panel.score_lbl.setText(f"generator score: {float(getattr(suggestion, 'score', 0.0)):.3f}")
         p_accept = meta.get("p_accept")
         if p_accept is None:
-            panel.calib_lbl.setText("calibrated p_accept: n/a (heuristic-only)")
+            panel.calib_lbl.setText("Acceptance likelihood (p_accept): n/a (heuristic-only)")
         else:
-            panel.calib_lbl.setText(f"calibrated p_accept: {float(p_accept):.3f}")
+            panel.calib_lbl.setText(f"Acceptance likelihood (p_accept): {float(p_accept):.3f}")
+        panel.calib_lbl.setToolTip(
+            "Acceptance likelihood (p_accept) predicts your acceptance behavior, "
+            "not ground-truth correctness."
+        )
         nn = meta.get("distance_to_nearest_accepted")
         panel.nn_lbl.setText(
             "nearest accepted distance: n/a"
@@ -1543,6 +2077,7 @@ class ActionsMixin(
         current = ranked[self._suggestion_cursor]
         cmd = AcceptSuggestionCommand(self.controller, self.primary_image.id, current.suggestion_id)
         if self.controller.execute_view_command(cmd):
+            self._note_annotation_edit(self.primary_image.id)
             self.undo_act.setEnabled(self.controller.can_undo())
             self.redo_act.setEnabled(self.controller.can_redo())
             self._refresh_table()
@@ -1594,6 +2129,8 @@ class ActionsMixin(
             max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
         )
         suggestion = ranked[self._suggestion_cursor]
+        if hasattr(self, "_set_right_dock_mode"):
+            self._set_right_dock_mode("inspect")
         frame = self._slice_data(
             self.primary_image,
             t_override=int(suggestion.t),
@@ -1663,6 +2200,89 @@ class ActionsMixin(
             self._set_status("Not enough labeled suggestions to train ranker.")
         self._refresh_assist_warmup_panel()
         self._update_status()
+
+    def _show_calibration_visualizer(self) -> None:
+        """Plot reliability-style p_accept calibration bins from reviewed suggestions."""
+        if getattr(self, "_settings", None) is not None and bool(
+            self._settings.value("firstRunHintCalibration", True, type=bool)
+        ):
+            QtWidgets.QMessageBox.information(
+                self,
+                "Calibration Hint",
+                "Calibration compares acceptance likelihood bins to observed acceptance.\n"
+                "Use it to validate whether p_accept is reliable for this dataset.",
+            )
+            self._settings.setValue("firstRunHintCalibration", False)
+        rows = []
+        history = getattr(self.controller.session_state, "suggestion_history", {}) or {}
+        for items in history.values():
+            for row in items:
+                status = str(getattr(row, "status", ""))
+                if status not in ("accepted", "rejected"):
+                    continue
+                meta = dict(getattr(row, "meta", {}) or {})
+                if not bool(meta.get("confidence_available", False)):
+                    continue
+                p_accept = meta.get("p_accept")
+                if p_accept is None:
+                    continue
+                try:
+                    rows.append((float(p_accept), 1 if status == "accepted" else 0))
+                except Exception:
+                    continue
+        if not rows:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Calibration Visualizer",
+                "No reviewed suggestions with calibrated p_accept are available yet.",
+            )
+            return
+
+        bins = np.linspace(0.0, 1.0, 11)
+        centers = (bins[:-1] + bins[1:]) * 0.5
+        counts = np.zeros(len(centers), dtype=int)
+        acc_sum = np.zeros(len(centers), dtype=float)
+        for p_accept, accepted in rows:
+            idx = int(np.clip(np.digitize([p_accept], bins, right=False)[0] - 1, 0, len(centers) - 1))
+            counts[idx] += 1
+            acc_sum[idx] += float(accepted)
+        rates = np.divide(acc_sum, np.maximum(1, counts), where=np.ones_like(acc_sum, dtype=bool))
+
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("Calibration Visualizer (Acceptance Likelihood)")
+        layout = QtWidgets.QVBoxLayout(dlg)
+
+        fig = plt.Figure(figsize=(6.5, 4.8), dpi=100)
+        canvas = FigureCanvasQTAgg(fig)
+        ax = fig.add_subplot(111)
+        ax.plot([0, 1], [0, 1], "--", color="#9e9e9e", linewidth=1.2, label="Ideal")
+        mask = counts > 0
+        ax.plot(centers[mask], rates[mask], "o-", color="#2e7d32", label="Observed acceptance rate")
+        for idx in np.where(mask)[0]:
+            ax.annotate(str(int(counts[idx])), (centers[idx], rates[idx]), textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
+        ax.set_xlim(0.0, 1.0)
+        ax.set_ylim(0.0, 1.0)
+        ax.set_xlabel("Acceptance likelihood (p_accept) bin")
+        ax.set_ylabel("Observed acceptance rate")
+        ax.set_title("Calibration by p_accept bins")
+        ax.grid(alpha=0.25)
+        ax.legend(loc="lower right")
+        fig.tight_layout()
+
+        summary = QtWidgets.QLabel(
+            f"Samples: {len(rows)} reviewed suggestions "
+            f"(accepted={sum(v for _, v in rows)}, rejected={len(rows) - sum(v for _, v in rows)})"
+        )
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+        layout.addWidget(canvas)
+
+        close_btn = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close, parent=dlg)
+        close_btn.rejected.connect(dlg.reject)
+        close_btn.accepted.connect(dlg.accept)
+        layout.addWidget(close_btn)
+        dlg.resize(760, 560)
+        dlg.exec()
 
     def _on_annotation_space_changed(self, value: str) -> None:
         """Switch annotation space between stack and projection contexts."""
@@ -1901,7 +2521,9 @@ class ActionsMixin(
         if self.primary_image.array is None:
             return
         data = self._apply_crop(self._slice_data(self.primary_image))
-        h, w = data.shape
+        if data.ndim > 2:
+            data = np.mean(data, axis=-1)
+        h, w = data.shape[:2]
         cy, cx = h // 2, w // 2
         vertical = data[:, cx]
         horizontal = data[cy, :]
@@ -1987,8 +2609,10 @@ class ActionsMixin(
                 y1 = int(min(frame.shape[0], y + h))
                 return frame[y0:y1, x0:x1]
 
-            def _roi_mask_local(shape: Tuple[int, int]) -> np.ndarray:
-                h, w = shape
+            def _roi_mask_local(shape: Tuple[int, ...]) -> np.ndarray:
+                if len(shape) < 2:
+                    raise ValueError(f"Invalid frame shape for ROI mask: {shape}")
+                h, w = int(shape[0]), int(shape[1])
                 yy = np.arange(h)[:, None]
                 xx = np.arange(w)[None, :]
                 rx, ry, rw, rh = roi_rect

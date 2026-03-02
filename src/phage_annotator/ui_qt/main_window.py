@@ -179,6 +179,20 @@ class KeypointAnnotator(
         self._annotation_context_change_reason = ""
         self._annotation_write_context_pending_value = None
         self._annotation_write_context_confirmed = None
+        self._annotation_edit_ts_by_image: Dict[int, float] = {}
+        self._disable_bulk_accept_when_stale = True
+        self._evidence_layer_config: Dict[str, dict] = {}
+        self._evidence_layer_presets: Dict[str, dict] = {}
+        self._active_evidence_preset_name: str = "custom"
+        self._modality_compare_toggle_state: int = 0
+        self._last_generation_context_signature: Dict[str, str] = {}
+        self._last_generation_context_text: str = ""
+        self._last_assist_context_delta_text: str = ""
+        self._review_telemetry_started_ts: Optional[float] = None
+        self._review_telemetry_last_ts: Optional[float] = None
+        self._review_telemetry_baseline_accepted: int = 0
+        self._review_telemetry_baseline_rejected: int = 0
+        self._last_assist_state_name = None
         self._default_geometry: Optional[QtCore.QByteArray] = None
         self._default_state: Optional[QtCore.QByteArray] = None
         self._preset_active = False
@@ -238,6 +252,7 @@ class KeypointAnnotator(
         self.dock_logs = None
         self.dock_metadata = None
         self.dock_density = None
+        self.dock_modality_layers = None
         self.dock_sidebar = None
         self.sidebar_stack = None
         self.sidebar_actions = []
@@ -285,6 +300,7 @@ class KeypointAnnotator(
         self._show_suggestion_overlay = True
         self._suggestion_model = LocalPeakSuggestionModel()
         self._suggestion_strategy = "current_view"
+        self._canvas_header_verbose_context = True
         self._suggestion_score_threshold = 0.0
         self._suggestion_cursor = 0
         self._suggestion_focus_zoom_px = 160.0
@@ -339,8 +355,8 @@ class KeypointAnnotator(
             colormaps=lut_names(),
         )
         self.modality_facade = ModalityFacade(self.controller.session_state)
-        self.modality_playback = ModalityPlaybackManager(self)
-        self.view_sync = ViewSyncManager(self)
+        self.modality_playback = ModalityPlaybackManager(None)
+        self.view_sync = ViewSyncManager(None)
         self.colormaps = lut_names()
         self._autosave_timer = QtCore.QTimer()
         self._autosave_timer.setInterval(120000)

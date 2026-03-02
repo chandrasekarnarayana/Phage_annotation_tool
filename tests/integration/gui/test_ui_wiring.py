@@ -54,6 +54,87 @@ def test_command_palette_action_inventory(qtbot, tmp_path):
 
 
 @pytest.mark.gui
+def test_status_bar_operational_state_contract(qtbot, tmp_path):
+    """Status bar must expose key operational state fields at all times."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_status_contract.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    required = [
+        ("status_dataset_lbl", "Dataset:"),
+        ("status_tz_lbl", "T:"),
+        ("status_scope_lbl", "Scope:"),
+        ("status_target_lbl", "Target:"),
+        ("status_assist_lbl", "Assist:"),
+        ("status_qc_lbl", "QC:"),
+    ]
+    for attr, prefix in required:
+        widget = getattr(win, attr, None)
+        assert widget is not None, f"Missing status widget: {attr}"
+        assert widget.text().startswith(prefix), f"Unexpected text for {attr}: {widget.text()}"
+
+
+@pytest.mark.gui
+def test_dynamic_target_constraints_for_single_modality(qtbot, tmp_path):
+    """Target controls should disable unavailable options and show hint."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_target_constraints_single.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._refresh_annotation_view_controls()
+    qtbot.wait(30)
+
+    targets = dict(getattr(win, "_target_buttons", {}) or {})
+    assert "frame" in targets
+    assert "support" in targets
+    assert targets["frame"].isEnabled()
+    assert not targets["support"].isEnabled(), "Support target should be disabled with single-modality context"
+    hint = getattr(win, "target_unavailable_hint_lbl", None)
+    assert hint is not None and hint.isVisible()
+    assert "unavailable" in hint.text().lower()
+
+
+@pytest.mark.gui
+def test_right_dock_mode_contract(qtbot, tmp_path):
+    """Right dock should adapt by mode: annotate -> review -> inspect."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_right_dock_mode_contract.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._set_right_dock_mode("annotate")
+    qtbot.wait(30)
+    assert win.dock_review_queue.isVisible(), "Review queue handle should remain available in annotate mode"
+    assert not win.dock_annotations.isVisible()
+    assert not win.dock_suggestion_explain.isVisible()
+
+    win._set_right_dock_mode("review")
+    qtbot.wait(30)
+    assert win.dock_review_queue.isVisible()
+
+    win._set_right_dock_mode("inspect")
+    qtbot.wait(30)
+    assert win.dock_suggestion_explain.isVisible()
+
+
+@pytest.mark.gui
 def test_view_menu_toggle_wiring(qtbot, tmp_path):
     """Test View menu toggles for docks, panels, and overlays."""
     pytest.importorskip("PyQt5")
@@ -109,7 +190,7 @@ def test_keyboard_shortcuts_consistency(qtbot, tmp_path):
             shortcuts_found.add(key)
 
     # Verify critical shortcuts are registered.
-    for shortcut in ["Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+M", "Ctrl+Shift+P", "F1"]:
+    for shortcut in ["Ctrl+Z", "Ctrl+Shift+Z", "Ctrl+M", "Ctrl+Shift+P", "Ctrl+Alt+P", "F1"]:
         assert shortcut in shortcuts_found, f"Shortcut '{shortcut}' not registered"
 
 
@@ -332,6 +413,7 @@ def test_assist_expert_preset_expected_visibility_set(qtbot, tmp_path):
         "annotations": True,
         "review_queue": True,
         "suggestion_explain": True,
+        "modality_layers": True,
         "advanced_analysis": False,
         "qc_issues": True,
         "roi": False,
@@ -354,6 +436,590 @@ def test_assist_expert_preset_expected_visibility_set(qtbot, tmp_path):
     assert actual == expected, f"Assist Expert visibility mismatch: {actual}"
 
 
+@pytest.mark.gui
+def test_stale_suggestions_require_one_shot_override_and_show_badge(qtbot, tmp_path):
+    """Stale suggestions should warn and require one-shot override in batch preview."""
+    pytest.importorskip("PyQt5")
+    import time
+    from phage_annotator.core.annotation import PointSuggestion
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_stale_guard.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    image_id = int(win.primary_image.id)
+    ts = float(time.time()) - 120.0
+    row = PointSuggestion(
+        image_id=image_id,
+        image_name=str(win.primary_image.name),
+        t=int(win.t_slider.value()),
+        z=int(win.z_slider.value()),
+        y=24.0,
+        x=24.0,
+        score=0.8,
+        label=str(win.current_label),
+        suggestion_id="stale-1",
+    )
+    row.meta["generated_at_ts"] = ts
+    row.meta["confidence_available"] = True
+    row.meta["p_accept"] = 0.8
+    win.suggestions[image_id] = [row]
+    win._annotation_edit_ts_by_image[image_id] = ts + 5.0
+    win._disable_bulk_accept_when_stale = True
+
+    # Stale no longer hard-disables actions; override is required in preview step.
+    win._refresh_assist_warmup_panel()
+    win._update_status()
+    qtbot.wait(40)
+
+    assert win.accept_visible_suggestions_act.isEnabled()
+    assert win.accept_green_suggestions_act.isEnabled()
+    assert "Stale" in win.status_suggestion_fresh_lbl.text()
+    assert getattr(win.review_queue_panel, "stale_lbl", None) is not None
+    assert "regenerate recommended" in win.review_queue_panel.stale_lbl.text().lower()
+
+    # The batch preview should block if stale override checkbox is not acknowledged.
+    selected = win._preview_batch_accept_dialog(
+        candidates=[row],
+        title="Accept stale visible suggestions",
+        description="Review stale candidates.",
+        stale_override_required=True,
+    )
+    assert selected == [], "Stale batch should be blocked without explicit override acknowledgement"
+
+
+@pytest.mark.gui
+def test_effective_assist_context_line_mirrors_status_and_queue(qtbot, tmp_path):
+    """Effective Assist Context must be visible and synchronized in status + review queue."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_effective_context_sync.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._suggestion_strategy = "current_view"
+    win._active_evidence_preset_name = "default"
+    win.annotate_target = "frame"
+    win.annotation_scope = "current"
+    win._refresh_assist_warmup_panel()
+    win._update_status()
+    qtbot.wait(40)
+
+    status_txt = win.status_effective_context_lbl.text()
+    queue_txt = win.review_queue_panel.context_lbl.text()
+    assert status_txt.startswith("Effective Assist Context: ")
+    assert queue_txt.startswith("Effective Assist Context: ")
+    assert "Strategy=" in status_txt and "Preset=" in status_txt
+    assert status_txt == queue_txt
+
+
+@pytest.mark.gui
+def test_modality_ab_compare_preserves_camera_limits(qtbot, tmp_path):
+    """A/B layer preset compare should preserve frame-axis camera limits."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_ab_compare_camera.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._evidence_layer_presets = {
+        "A": {"current_view": {"visible": True, "opacity": 1.0, "lut": "gray", "role": "view"}},
+        "B": {"current_view": {"visible": True, "opacity": 0.5, "lut": "magma", "role": "proposal"}},
+    }
+    frame_ax = win.renderer.get_axis("frame")
+    assert frame_ax is not None
+    frame_ax.set_xlim(20.0, 70.0)
+    frame_ax.set_ylim(80.0, 10.0)
+    before = (tuple(frame_ax.get_xlim()), tuple(frame_ax.get_ylim()))
+
+    win._compare_modality_layer_presets("A", "B")
+    qtbot.wait(40)
+    after = (tuple(frame_ax.get_xlim()), tuple(frame_ax.get_ylim()))
+    assert after == before, f"Camera limits should stay unchanged during compare: {before} -> {after}"
+
+
+@pytest.mark.gui
+def test_status_modality_combo_switches_active_view(qtbot, tmp_path):
+    """Status-bar modality selector should switch primary view like main combo."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    p0 = generate_dummy_image(tmp_path / "test_modality_status_0.tif", mode="2d")
+    p1 = generate_dummy_image(tmp_path / "test_modality_status_1.tif", mode="2d")
+    win = create_app([p0, p1])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    assert win.primary_combo.count() >= 2
+    assert win.status_modality_combo.count() >= 2
+
+    initial = int(win.current_image_idx)
+    target = 1 if initial == 0 else 0
+    win.status_modality_combo.setCurrentIndex(target)
+    qtbot.wait(60)
+
+    assert int(win.current_image_idx) == target
+    assert int(win.primary_combo.currentIndex()) == target
+
+
+@pytest.mark.gui
+def test_review_context_pack_toggles_modality_layers_panel(qtbot, tmp_path):
+    """Review context pack should include modality-layers panel in its visible set."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_review_pack_layers.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    if "modality_layers" not in win.panel_docks or win.panel_docks["modality_layers"] is None:
+        pytest.skip("modality_layers dock unavailable")
+
+    # Collapse then enable pack.
+    win.set_panel_visible("review_queue", False, source="test")
+    win.set_panel_visible("suggestion_explain", False, source="test")
+    win.set_panel_visible("modality_layers", False, source="test")
+    qtbot.wait(20)
+
+    win._toggle_review_context_pack()
+    qtbot.wait(40)
+    assert win.panel_docks["review_queue"].isVisible()
+    assert win.panel_docks["suggestion_explain"].isVisible()
+    assert win.panel_docks["modality_layers"].isVisible()
+
+
+@pytest.mark.gui
+def test_panel_auto_open_policy_can_block_auto_reason(qtbot, tmp_path):
+    """Auto-open reasons should respect per-panel auto-open policy."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_auto_policy.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    win.set_panel_visible(panel_id, False, source="test")
+    qtbot.wait(20)
+    assert not win.panel_docks[panel_id].isVisible()
+
+    win.set_panel_auto_open_enabled(panel_id, False)
+    win.open_panel(panel_id, reason="job:auto_error")
+    qtbot.wait(20)
+    assert not win.panel_docks[panel_id].isVisible()
+
+    win.open_panel(panel_id, reason="user")
+    qtbot.wait(20)
+    assert win.panel_docks[panel_id].isVisible()
+
+
+@pytest.mark.gui
+def test_panel_open_source_and_pin_tracking(qtbot, tmp_path):
+    """Panel switcher should track opened-by source and pin explicit user opens."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_open_tracking.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    win.set_panel_visible(panel_id, False, source="test")
+    qtbot.wait(10)
+    win.set_panel_auto_open_enabled(panel_id, True)
+    win.set_panel_pinned(panel_id, False)
+    assert not win.is_panel_pinned(panel_id)
+
+    win.open_panel(panel_id, reason="job:auto_error")
+    qtbot.wait(20)
+    assert win.get_panel_opened_by(panel_id) == "auto"
+    assert not win.is_panel_pinned(panel_id)
+
+    win.open_panel(panel_id, reason="menu:view")
+    qtbot.wait(20)
+    assert win.get_panel_opened_by(panel_id) == "user"
+    assert win.is_panel_pinned(panel_id)
+
+
+@pytest.mark.gui
+def test_panel_auto_open_trigger_disabled_blocks_matching_trigger(qtbot, tmp_path):
+    """Per-trigger auto-open policy should block matching auto reasons."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_auto_trigger_disabled.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    trigger = "roi_mode"
+    win.set_panel_visible(panel_id, False, source="test")
+    win.set_panel_auto_open_enabled(panel_id, True)
+    win.set_panel_auto_open_enabled_for_trigger(panel_id, trigger, False)
+
+    win.open_panel(panel_id, reason=f"auto:{trigger}")
+    qtbot.wait(20)
+    assert not win.panel_docks[panel_id].isVisible()
+
+
+@pytest.mark.gui
+def test_panel_auto_open_trigger_enabled_allows_matching_trigger(qtbot, tmp_path):
+    """Per-trigger auto-open policy should allow matching auto reasons when enabled."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_auto_trigger_enabled.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    trigger = "review_mode"
+    win.set_panel_visible(panel_id, False, source="test")
+    win.set_panel_auto_open_enabled(panel_id, True)
+    win.set_panel_auto_open_enabled_for_trigger(panel_id, trigger, True)
+
+    win.open_panel(panel_id, reason=f"auto:{trigger}")
+    qtbot.wait(20)
+    assert win.panel_docks[panel_id].isVisible()
+
+
+@pytest.mark.gui
+def test_panel_auto_open_trigger_policy_persists_after_reload(qtbot, tmp_path):
+    """Per-trigger auto-open preference should persist across window reloads."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_auto_trigger_persist.tif", mode="2d")
+    panel_id = "advanced_analysis"
+    trigger = "roi_mode"
+
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    win.set_panel_auto_open_enabled(panel_id, True)
+    win.set_panel_auto_open_enabled_for_trigger(panel_id, trigger, False)
+    qtbot.wait(20)
+    win.close()
+    qtbot.wait(20)
+
+    win2 = create_app([path])
+    qtbot.addWidget(win2)
+    win2.show()
+    qtbot.waitExposed(win2)
+    assert not win2.is_panel_auto_open_enabled_for_trigger(panel_id, trigger)
+    win2.set_panel_visible(panel_id, False, source="test")
+    win2.open_panel(panel_id, reason=f"auto:{trigger}")
+    qtbot.wait(20)
+    assert not win2.panel_docks[panel_id].isVisible()
+
+
+@pytest.mark.gui
+def test_open_panel_policy_action_navigates_preferences(qtbot, tmp_path):
+    """Layout action should jump to Preferences panel-policy section."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_policy_nav.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    assert getattr(win, "open_panel_policy_act", None) is not None
+    win.open_panel_policy_act.trigger()
+    qtbot.wait(40)
+
+    assert getattr(win, "panel_policy_group", None) is not None
+    assert win.panel_policy_group.isVisible()
+    assert win.panel_policy_group.hasFocus() or getattr(win, "panel_policy_reset_btn", None) is not None
+
+
+@pytest.mark.gui
+def test_panel_policy_controls_update_switcher_state(qtbot, tmp_path):
+    """Panel-policy checkboxes should drive persisted auto-open and pin state."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_panel_policy_controls.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    auto_chk = win.panel_policy_auto_checks.get(panel_id)
+    pin_chk = win.panel_policy_pin_checks.get(panel_id)
+    assert auto_chk is not None
+    assert pin_chk is not None
+
+    auto_chk.setChecked(False)
+    qtbot.wait(20)
+    assert not win.is_panel_auto_open_enabled(panel_id)
+
+    pin_chk.setChecked(True)
+    qtbot.wait(20)
+    assert win.is_panel_pinned(panel_id)
+
+
+@pytest.mark.gui
+def test_layout_panels_quick_policy_menu_updates_state(qtbot, tmp_path):
+    """Quick policy actions in Layout->Panels should update panel policy state."""
+    pytest.importorskip("PyQt5")
+    from PyQt5 import QtWidgets
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_quick_policy_menu.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    auto_act = win.findChild(QtWidgets.QAction, f"panel_policy_auto_{panel_id}")
+    pin_act = win.findChild(QtWidgets.QAction, f"panel_policy_pin_{panel_id}")
+    open_act = win.findChild(QtWidgets.QAction, f"panel_policy_open_{panel_id}")
+    assert auto_act is not None
+    assert pin_act is not None
+    assert open_act is not None
+
+    auto_act.setChecked(False)
+    qtbot.wait(20)
+    assert not win.is_panel_auto_open_enabled(panel_id)
+
+    pin_act.setChecked(True)
+    qtbot.wait(20)
+    assert win.is_panel_pinned(panel_id)
+
+    win.set_panel_visible(panel_id, False, source="test")
+    qtbot.wait(20)
+    open_act.trigger()
+    qtbot.wait(20)
+    assert win.panel_docks[panel_id].isVisible()
+
+
+@pytest.mark.gui
+def test_right_sidebar_rail_icons_toggle_exclusive_panels(qtbot, tmp_path):
+    """Right icon rail should open one inspect panel at a time and collapse on second click."""
+    pytest.importorskip("PyQt5")
+    from PyQt5 import QtWidgets
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_right_sidebar_rail.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_queue_toggle")
+    table_act = win.findChild(QtWidgets.QAction, "right_sidebar_table_toggle")
+    assert queue_act is not None
+    assert table_act is not None
+
+    win.set_panel_visible("review_queue", False, source="test")
+    win.set_panel_visible("annotations", False, source="test")
+    qtbot.wait(30)
+
+    queue_act.trigger()
+    qtbot.wait(30)
+    assert win.dock_review_queue.isVisible()
+    assert not win.dock_annotations.isVisible()
+
+    queue_act.trigger()
+    qtbot.wait(30)
+    assert not win.dock_review_queue.isVisible()
+
+    table_act.trigger()
+    qtbot.wait(30)
+    assert win.dock_annotations.isVisible()
+
+
+@pytest.mark.gui
+def test_left_sidebar_mode_switch_collapses_previous_context_docks(qtbot, tmp_path):
+    """Switching left sidebar pages should collapse context docks from the previous mode."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_left_sidebar_mode_collapse.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    analyze_idx = win._sidebar_action_index_for_label("Analyze")
+    annotate_idx = win._sidebar_action_index_for_label("Annotate")
+    if analyze_idx < 0 or annotate_idx < 0:
+        pytest.skip("Sidebar mode labels unavailable")
+
+    win._set_sidebar_mode(analyze_idx)
+    win.set_panel_visible("roi", True, source="test:auto")
+    qtbot.wait(30)
+    assert win.panel_docks["roi"].isVisible()
+
+    win._set_sidebar_mode(annotate_idx)
+    qtbot.wait(30)
+    assert not win.panel_docks["roi"].isVisible()
+
+
+@pytest.mark.gui
+def test_left_and_right_rails_follow_same_toggle_contract(qtbot, tmp_path):
+    """Both rails: click icon opens, click active icon collapses, click again reopens."""
+    pytest.importorskip("PyQt5")
+    from PyQt5 import QtWidgets
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_rail_contract_parity.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    # Left rail contract on currently active icon/page.
+    active_idx = 0
+    for i, act in enumerate(getattr(win, "sidebar_actions", []) or []):
+        if act.isChecked():
+            active_idx = i
+            break
+    win._expand_sidebar()
+    qtbot.wait(20)
+    assert win.sidebar_stack.isVisible()
+
+    win._on_sidebar_action_triggered(active_idx)
+    qtbot.wait(20)
+    assert not win.sidebar_stack.isVisible()
+
+    win._on_sidebar_action_triggered(active_idx)
+    qtbot.wait(20)
+    assert win.sidebar_stack.isVisible()
+
+    # Right rail contract on Review Queue icon.
+    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_queue_toggle")
+    assert queue_act is not None
+    win.set_panel_visible("review_queue", False, source="test")
+    qtbot.wait(20)
+    assert not win.dock_review_queue.isVisible()
+
+    queue_act.trigger()
+    qtbot.wait(20)
+    assert win.dock_review_queue.isVisible()
+
+
+@pytest.mark.gui
+def test_auto_open_toast_actions_pin_and_disable(qtbot, tmp_path):
+    """Auto-open toast should expose Pin/Disable actions and update policy state."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_auto_toast_actions.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    panel_id = "advanced_analysis"
+    win.set_panel_auto_open_enabled(panel_id, True)
+    win.set_panel_pinned(panel_id, False)
+    win.open_panel(panel_id, reason="test:auto_open")
+    qtbot.wait(30)
+
+    frame = getattr(win, "_auto_open_toast_frame", None)
+    assert frame is not None
+    buttons = [b for b in frame.findChildren(type(win.status_assist_mode_btn)) if b.text()]
+    labels = {b.text() for b in buttons}
+    assert "Pin" in labels
+    assert "Disable auto-open" in labels
+
+    for b in buttons:
+        if b.text() == "Disable auto-open":
+            b.click()
+            break
+    qtbot.wait(30)
+    assert not win.is_panel_auto_open_enabled(panel_id)
+
+
+@pytest.mark.gui
+def test_system_dock_is_single_merged_container(qtbot, tmp_path):
+    """Logs/Performance/Recorder should route to one merged System dock with tabs."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_system_dock_merge.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    assert getattr(win, "dock_system", None) is not None
+    assert win.panel_docks.get("logs") is win.dock_system
+    assert win.panel_docks.get("performance") is win.dock_system
+    assert win.panel_docks.get("recorder") is win.dock_system
+    tabs = getattr(win, "system_tabs", None)
+    assert tabs is not None
+    assert tabs.count() >= 3
+
+    win.open_panel("performance", reason="test")
+    qtbot.wait(30)
+    assert tabs.currentIndex() == 1
+    win.open_panel("recorder", reason="test")
+    qtbot.wait(30)
+    assert tabs.currentIndex() == 2
+
+
+@pytest.mark.gui
+def test_tab_flash_uses_tabbar_animation_when_tabified(qtbot, tmp_path):
+    """Flash for tabified docks should use tabbar animation list."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_tab_flash_anim.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win.open_panel("review_queue", reason="panel_switcher")
+    qtbot.wait(20)
+    anims = list(getattr(win, "_tab_flash_anims", []) or [])
+    assert len(anims) >= 1
 @pytest.mark.gui
 def test_undo_redo_wiring(qtbot, tmp_path):
     """Test undo/redo command wiring for both annotations and view state."""

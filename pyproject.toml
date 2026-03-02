@@ -31,6 +31,7 @@ dev = [
   "pytest-cov>=4.0",
   "pytest-qt>=4.4",
   "pytest-benchmark>=4.0",
+  "zstandard>=0.22",
 ]
 cache = [
   "zstandard>=0.22",
@@ -42,6 +43,7 @@ testpaths = ["tests"]
 markers = [
   "gui: GUI tests that require a Qt backend (run under Xvfb in CI)",
   "benchmark: performance benchmark tests requiring pytest-benchmark",
+  "order: execution-order marker used by selected test modules",
 ]
 
 [tool.coverage.run]

@@ -450,20 +450,21 @@ class EventsMixin(KeyboardEventsMixin):
         if confidence_available:
             p_accept = float(meta.get("p_accept", getattr(best, "score", 0.0)))
             if p_accept >= 0.75:
-                triage = "likely correct"
+                triage = "likely accept"
             elif p_accept >= 0.5:
-                triage = "review recommended"
+                triage = "needs review"
             else:
-                triage = "likely reject"
+                triage = "unlikely accept"
             lines = [
                 f"Generator score: {generator_score:.2f}",
-                f"Calibrated p_accept: {p_accept:.2f} ({triage})",
+                f"Acceptance likelihood (p_accept): {p_accept:.2f} ({triage})",
+                "p_accept predicts acceptance behavior, not ground-truth correctness.",
                 f"Assist state: {state_txt}",
             ]
         else:
             lines = [
                 f"Generator score: {generator_score:.2f}",
-                "Calibrated p_accept: not available (heuristic only)",
+                "Acceptance likelihood (p_accept): not available (heuristic only)",
                 f"Assist state: {state_txt}",
             ]
         QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), "\n".join(lines), self.canvas)

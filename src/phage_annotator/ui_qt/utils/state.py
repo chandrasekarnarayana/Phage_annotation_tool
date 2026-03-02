@@ -482,10 +482,12 @@ class StateMixin:
     def _apply_crop_rect(
         self,
         data: np.ndarray,
-        crop_rect: Tuple[float, float, float, float],
+        crop_rect: Optional[Tuple[float, float, float, float]],
         full_shape: Tuple[int, int],
     ) -> np.ndarray:
         """Apply a crop rect (X, Y, W, H) to a 2D array."""
+        if crop_rect is None:
+            return data
         x, y, w, h = crop_rect
         full_h, full_w = full_shape
         if w <= 0 or h <= 0:
@@ -661,6 +663,14 @@ class StateMixin:
         )
         return None, False
 
+    def _normalize_projection_for_display(self, proj: np.ndarray) -> np.ndarray:
+        """Normalize projection output to display-friendly spatial-first shape."""
+        arr = np.asarray(proj)
+        if arr.ndim == 3 and arr.shape[-1] not in (3, 4) and arr.shape[0] in (3, 4):
+            # Convert channel-first (C, Y, X) projections into (Y, X, C).
+            arr = np.moveaxis(arr, 0, -1)
+        return arr
+
     def _request_projection_job(
         self,
         img: "LazyImage",
@@ -699,7 +709,7 @@ class StateMixin:
         prefetch_enabled = not getattr(self, '_prefetch_disabled', False)
         if self.pyramid_enabled and img.array is not None and prefetch_enabled:
             arr = img.array
-            full_shape = (arr.shape[2], arr.shape[3])
+            full_shape = (arr.shape[-2], arr.shape[-1])
             generation = self._job_generation
             
             # Schedule pyramid levels 3, 2, 1 (8x, 4x, 2x downsampling factors)
@@ -723,8 +733,12 @@ class StateMixin:
                             if cancel_token.is_cancelled():
                                 return None
                             proj = compute_projection(data, kind_l, axis=axis)
-                            proj = self._apply_crop_rect(proj, crop_rect, full_shape)
-                            result = downsample_mean_pool(proj, scale)
+                            proj = self._normalize_projection_for_display(proj)
+                            proj = self._apply_crop_rect(proj, crop_rect, proj.shape[:2])
+                            if proj.ndim == 3:
+                                result = proj[::scale, ::scale]
+                            else:
+                                result = downsample_mean_pool(proj, scale)
                             return (pyramid_key, result, generation, kind_l, level_l)
                         
                         def _pyramid_result(result, pkey=pyramid_key):
@@ -751,7 +765,7 @@ class StateMixin:
         generation = self._job_generation
         arr = img.array
         job_name = f"Projections:{img.id}"
-        full_shape = (arr.shape[2], arr.shape[3])
+        full_shape = (arr.shape[-2], arr.shape[-1])
 
         def _job(progress, cancel_token):
             if cancel_token.is_cancelled():
@@ -762,7 +776,8 @@ class StateMixin:
             if cancel_token.is_cancelled():
                 return None
             for k in list(proj_map.keys()):
-                proj_map[k] = self._apply_crop_rect(proj_map[k], crop_rect, full_shape)
+                proj = self._normalize_projection_for_display(proj_map[k])
+                proj_map[k] = self._apply_crop_rect(proj, crop_rect, full_shape)
             progress(100, "Done")
             return (proj_map, img.id, generation, crop_rect, t_sel, z_sel)
 
@@ -791,7 +806,10 @@ class StateMixin:
             # → _request_projection_job() → _on_result() → _refresh_image() → loop.
             # The debounce timer breaks the recursion by deferring the refresh to the next event loop cycle.
             if hasattr(self, '_debounce_timer'):
-                self._debounce_timer.start()
+                try:
+                    self._debounce_timer.start()
+                except RuntimeError:
+                    return
             else:
                 # Fallback: direct call with guard (shouldn't happen in normal flow)
                 self._refresh_image()

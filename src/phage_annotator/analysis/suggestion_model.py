@@ -106,6 +106,43 @@ class LocalPeakSuggestionModel:
         corrected -= float(np.nanmin(corrected))
         return corrected
 
+    @staticmethod
+    def _point_in_roi(
+        y: float, x: float, roi_shape: str, roi_rect: tuple[float, float, float, float]
+    ) -> bool:
+        """Check if point (y, x) is within ROI bounds.
+        
+        Parameters
+        ----------
+        y : float
+            Y coordinate.
+        x : float
+            X coordinate.
+        roi_shape : str
+            ROI type: "none", "box", or "circle".
+        roi_rect : tuple
+            For box: (x0, y0, w, h). For circle: (cx, cy, r, _).
+        
+        Returns
+        -------
+        bool
+            True if point is within ROI (or no ROI active).
+        """
+        if roi_shape == "none":
+            return True
+        
+        if roi_shape == "box":
+            x0, y0, w, h = roi_rect
+            return x0 <= x <= (x0 + w) and y0 <= y <= (y0 + h)
+        
+        if roi_shape == "circle":
+            cx, cy, r, _ = roi_rect
+            dx = x - cx
+            dy = y - cy
+            return (dx * dx + dy * dy) <= (r * r)
+        
+        return True
+
     def _collect_candidates(
         self,
         arr: np.ndarray,
@@ -118,6 +155,8 @@ class LocalPeakSuggestionModel:
         z: int,
         label: str,
         roi_id: str | None,
+        roi_shape: str = "none",
+        roi_rect: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
     ) -> list[PointSuggestion]:
         finite = np.isfinite(arr)
         if not finite.any():
@@ -130,6 +169,10 @@ class LocalPeakSuggestionModel:
         rows: list[tuple[float, PointSuggestion]] = []
         for y in range(1, h - 1):
             for x in range(1, w - 1):
+                # Skip points outside ROI
+                if not self._point_in_roi(float(y), float(x), roi_shape, roi_rect):
+                    continue
+                
                 center = float(arr[y, x])
                 if not np.isfinite(center) or center < threshold:
                     continue
@@ -260,6 +303,8 @@ class LocalPeakSuggestionModel:
         strategy: str = "raw",
         threshold_min_score: float = 0.0,
         roi_id: str | None = None,
+        roi_shape: str = "none",
+        roi_rect: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
     ) -> List[PointSuggestion]:
         arr = np.asarray(image_slice)
         if arr.ndim != 2 or arr.size == 0:
@@ -275,6 +320,8 @@ class LocalPeakSuggestionModel:
             z=z,
             label=label,
             roi_id=roi_id,
+            roi_shape=roi_shape,
+            roi_rect=roi_rect,
         )
         corrected = self._corrected_image(arr)
         corrected_candidates = self._collect_candidates(
@@ -287,6 +334,8 @@ class LocalPeakSuggestionModel:
             z=z,
             label=label,
             roi_id=roi_id,
+            roi_shape=roi_shape,
+            roi_rect=roi_rect,
         )
         if strategy_key in ("corrected",):
             selected = corrected_candidates

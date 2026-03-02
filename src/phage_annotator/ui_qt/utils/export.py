@@ -174,6 +174,11 @@ class ExportMixin:
             "assist_min_labels_per_context": int(
                 getattr(self.controller.session_state, "assist_min_labels_per_context", 10)
             ),
+            "evidence_layer_config": dict(getattr(self, "_evidence_layer_config", {}) or {}),
+            "evidence_layer_presets": dict(getattr(self, "_evidence_layer_presets", {}) or {}),
+            "disable_bulk_accept_when_stale": bool(
+                getattr(self, "_disable_bulk_accept_when_stale", True)
+            ),
         }
         self.controller.save_project(
             self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
@@ -234,6 +239,15 @@ class ExportMixin:
         )
         self._suggestion_score_threshold = float(
             getattr(self.controller.session_state, "suggestion_score_threshold", 0.0)
+        )
+        self._evidence_layer_config = dict(
+            getattr(self.controller.session_state, "evidence_layer_config", {}) or {}
+        )
+        self._evidence_layer_presets = dict(
+            getattr(self.controller.session_state, "evidence_layer_presets", {}) or {}
+        )
+        self._disable_bulk_accept_when_stale = bool(
+            getattr(self.controller.session_state, "disable_bulk_accept_when_stale", True)
         )
         if hasattr(self, "annotation_space_combo"):
             self.annotation_space_combo.blockSignals(True)
@@ -308,6 +322,8 @@ class ExportMixin:
                 self.density_panel.target_combo.setCurrentText(target.capitalize())
         self._refresh_roi_manager()
         self._refresh_metadata_dock(self.primary_image.id)
+        if hasattr(self, "_refresh_modality_layers_panel"):
+            self._refresh_modality_layers_panel()
         self._refresh_image()
         self._mark_dirty(False)
         self._check_recovery()

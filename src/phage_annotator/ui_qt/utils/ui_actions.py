@@ -64,6 +64,8 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.stop_timed_session_act = assist_menu.addAction("Stop Timed Session")
     self.assist_warmup_act = assist_menu.addAction("Warmup (Balanced A/R)")
     self.train_ranker_now_act = assist_menu.addAction("Train Ranker Now")
+    self.show_calibration_visualizer_act = assist_menu.addAction("Show Calibration Visualizer")
+    self.compare_layer_presets_act = assist_menu.addAction("Compare Layer Presets A/B")
     self.batch_correct_suggestions_act = assist_menu.addAction("Batch Correct Offset...")
     self.propagate_suggestions_act = assist_menu.addAction(
         "Propagate Suggestions to Remaining T/Z..."
@@ -99,6 +101,8 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
 
     layout_menu = menubar.addMenu("&Layout")
     dock_panels_menu = layout_menu.addMenu("Panels")
+    self.advanced_panels_act = layout_menu.addAction("Advanced Panels…")
+    self.open_panel_policy_act = layout_menu.addAction("Panel Auto-Open & Pinning…")
     self.toggle_profile_act = layout_menu.addAction("Toggle Line Profile")
     self.toggle_profile_act.setCheckable(True)
     self.toggle_profile_act.setChecked(True)
@@ -116,12 +120,20 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.toggle_overlay_act.setChecked(True)
     self.overlay_act = self.toggle_overlay_act
     self.view_overlay_act = self.toggle_overlay_act
-    self.save_layout_act = layout_menu.addAction("Save Layout")
-    self.layout_preset_default_act = layout_menu.addAction("Preset: Default")
-    self.layout_preset_annotate_act = layout_menu.addAction("Preset: Annotate")
-    self.layout_preset_analyze_act = layout_menu.addAction("Preset: Analyze")
-    self.layout_preset_assist_expert_act = layout_menu.addAction("Preset: Assist Expert")
-    self.layout_preset_minimal_act = layout_menu.addAction("Preset: Minimal")
+    layouts_menu = layout_menu.addMenu("Layouts")
+    self.save_layout_act = layouts_menu.addAction("Save Current Layout As…")
+    self.undo_layout_change_act = layouts_menu.addAction("Undo Layout Change")
+    self.undo_layout_change_act.setEnabled(False)
+    layouts_menu.addSeparator()
+    self.layout_preset_default_act = layouts_menu.addAction("Reset to Default")
+    self.layout_preset_annotate_act = layouts_menu.addAction("Preset: Annotate")
+    self.layout_preset_analyze_act = layouts_menu.addAction("Preset: Analyze")
+    self.layout_preset_assist_expert_act = layouts_menu.addAction("Preset: Assist Expert")
+    self.layout_preset_minimal_act = layouts_menu.addAction("Preset: Minimal")
+    self.focus_canvas_mode_act = layout_menu.addAction("Focus Canvas Mode")
+    self.focus_canvas_mode_act.setCheckable(True)
+    self.focus_canvas_mode_act.setChecked(False)
+    self.focus_canvas_mode_act.setShortcut("F")
     self.preset_default_act = layout_menu.addAction("Default (Legacy Shortcut)")
     self.preset_default_act.setVisible(False)
     self.preset_annotate_act = layout_menu.addAction("Annotate (Legacy Shortcut)")
@@ -216,6 +228,10 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "copy_display": self.copy_display_act,
         "reset_confirms": self.reset_confirms_act,
         "measure": self.measure_act,
+        "focus_canvas_mode": self.focus_canvas_mode_act,
+        "advanced_panels": self.advanced_panels_act,
+        "open_panel_policy": self.open_panel_policy_act,
+        "undo_layout_change": self.undo_layout_change_act,
         "show_recorder": self.show_recorder_act,
         "clear_hist_cache": self.clear_hist_cache_act,
         "suggest_points": self.suggest_points_act,
@@ -234,6 +250,8 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "stop_timed_session": self.stop_timed_session_act,
         "assist_warmup": self.assist_warmup_act,
         "train_ranker_now": self.train_ranker_now_act,
+        "show_calibration_visualizer": self.show_calibration_visualizer_act,
+        "compare_layer_presets": self.compare_layer_presets_act,
         "batch_correct_suggestions": self.batch_correct_suggestions_act,
         "propagate_suggestions": self.propagate_suggestions_act,
         "toggle_suggestions_overlay": self.toggle_suggestions_overlay_act,

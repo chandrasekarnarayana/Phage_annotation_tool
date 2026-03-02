@@ -16,6 +16,13 @@ from phage_annotator.tools import Tool
 class KeyboardEventsMixin:
     """Qt and Matplotlib keyboard shortcut handlers."""
 
+    def _dispatch_base_key_press(self, event) -> None:
+        """Fallback Qt key dispatch when this mixin does not handle a key."""
+        try:
+            QtWidgets.QMainWindow.keyPressEvent(self, event)
+        except Exception:
+            event.ignore()
+
     def _suggestion_shortcut_context_available(self) -> bool:
         """Return True when suggestion triage shortcuts are safe to execute."""
         if not bool(getattr(self, "_show_suggestion_overlay", True)):
@@ -55,9 +62,33 @@ class KeyboardEventsMixin:
             focused,
             (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit, QtWidgets.QTextEdit),
         ):
-            return super().keyPressEvent(event)
+            self._dispatch_base_key_press(event)
+            return
         key = event.key()
         mods = event.modifiers()
+        if key == QtCore.Qt.Key_Z and mods == QtCore.Qt.KeyboardModifier.ControlModifier:
+            if hasattr(self, "undo_last_action"):
+                self.undo_last_action()
+            return
+        if key == QtCore.Qt.Key_Z and mods == (
+            QtCore.Qt.KeyboardModifier.ControlModifier
+            | QtCore.Qt.KeyboardModifier.ShiftModifier
+        ):
+            if hasattr(self, "redo_last_action"):
+                self.redo_last_action()
+            return
+        # Fast label selection: 1..9 map directly to label buttons.
+        if mods == QtCore.Qt.KeyboardModifier.NoModifier and QtCore.Qt.Key_1 <= key <= QtCore.Qt.Key_9:
+            idx = int(key - QtCore.Qt.Key_1)
+            buttons = list(getattr(self, "label_buttons", QtWidgets.QButtonGroup()).buttons())
+            if 0 <= idx < len(buttons):
+                buttons[idx].setChecked(True)
+                self.current_label = buttons[idx].text()
+                if hasattr(self, "_set_status"):
+                    self._set_status(f"Active label: {self.current_label}")
+                if hasattr(self, "_update_status"):
+                    self._update_status()
+                return
         action_id = ""
         for bind_key, bind_mods, bind_id in qt_key_bindings():
             if key == bind_key and mods == bind_mods:
@@ -87,6 +118,13 @@ class KeyboardEventsMixin:
             else:
                 self._delete_selected_annotations()
         elif action_id == "accept_suggestion":
+            if self._suggestion_shortcut_context_available() and hasattr(
+                self, "_accept_visible_suggestions"
+            ):
+                self._accept_visible_suggestions()
+            else:
+                self._suggestion_shortcut_noop_hint()
+        elif action_id == "accept_current_suggestion":
             if self._suggestion_shortcut_context_available() and hasattr(
                 self, "_accept_current_uncertain_suggestion"
             ):
@@ -124,5 +162,14 @@ class KeyboardEventsMixin:
                 self._reject_current_uncertain_suggestion()
             else:
                 self._suggestion_shortcut_noop_hint()
+        elif action_id == "label_prev":
+            if hasattr(self, "_cycle_label"):
+                self._cycle_label(-1)
+        elif action_id == "label_next":
+            if hasattr(self, "_cycle_label"):
+                self._cycle_label(1)
+        elif action_id == "focus_canvas_mode":
+            if hasattr(self, "_toggle_focus_canvas_mode"):
+                self._toggle_focus_canvas_mode()
         else:
-            super().keyPressEvent(event)
+            self._dispatch_base_key_press(event)

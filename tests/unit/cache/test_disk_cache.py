@@ -10,13 +10,17 @@ import unittest
 import numpy as np
 
 try:
-    from phage_annotator.cache.disk_cache import DiskCache, DiskCacheConfig
+    from phage_annotator.cache.disk_cache import HAS_ZSTD, DiskCache, DiskCacheConfig
     HAS_DISK_CACHE = True
 except ImportError:
     HAS_DISK_CACHE = False
+    HAS_ZSTD = False
 
 
-@unittest.skipIf(not HAS_DISK_CACHE, "disk_cache module not available")
+@unittest.skipIf(
+    (not HAS_DISK_CACHE) or (not HAS_ZSTD),
+    "disk cache requires optional zstandard dependency",
+)
 class TestDiskCache(unittest.TestCase):
     """Tests for DiskCache functionality."""
 
@@ -194,7 +198,10 @@ class TestDiskCache(unittest.TestCase):
         self.assertEqual(self.cache.stats.loads, 1)
 
 
-@unittest.skipIf(not HAS_DISK_CACHE, "disk_cache module not available")
+@unittest.skipIf(
+    (not HAS_DISK_CACHE) or (not HAS_ZSTD),
+    "disk cache requires optional zstandard dependency",
+)
 class TestDiskCacheIntegration(unittest.TestCase):
     """Integration tests for disk cache."""
 
@@ -308,7 +315,10 @@ class TestDiskCacheConfiguration(unittest.TestCase):
         self.assertIsNone(loaded)
 
 
-@unittest.skipIf(not HAS_DISK_CACHE, "disk_cache module not available")
+@unittest.skipIf(
+    (not HAS_DISK_CACHE) or (not HAS_ZSTD),
+    "disk cache requires optional zstandard dependency",
+)
 class TestProjectionCacheDiskIntegration(unittest.TestCase):
     """Test integration between ProjectionCache and DiskCache."""
 

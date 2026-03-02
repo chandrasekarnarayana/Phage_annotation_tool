@@ -1,6 +1,6 @@
 # Planned Features (Active Backlog)
 
-Last updated: February 27, 2026
+Last updated: March 2, 2026
 
 ## Scope
 This file tracks only not-yet-implemented capabilities.
@@ -59,6 +59,61 @@ No open cleanup items.
 16. New `Assist Expert` layout preset completed:
    - optimizes for power users with centered canvas, visible Review Queue + Explain surfaces, QC visibility, and minimized sidebar footprint.
    - exposed in layout actions and quick-layout controls.
+17. Suggestion freshness/staleness guardrails completed:
+   - tracks suggestion generation age and edit-after-generation staleness.
+   - surfaces stale state in status bar, review queue, and canvas diagnostics.
+   - blocks bulk accept actions when stale (with explicit regenerate guidance).
+18. Assisted confidence terminology/semantics clarification completed:
+   - UI now uses `Acceptance likelihood (p_accept)` wording for calibrated ranker output.
+   - tooltips explicitly state this predicts user acceptance behavior, not ground-truth correctness.
+19. Modality/evidence control and calibration diagnostics completed:
+   - added status-bar active modality selector and canvas modality/projection context text.
+   - added layer-style `Modality Layers` panel (visibility, opacity, colormap, role) with preset save/load.
+   - added calibration visualizer (reliability-style p_accept bin vs observed acceptance).
+20. Effective assist context unification completed:
+   - added immutable `Effective Assist Context` line (strategy, modality/evidence preset, projection, scope, target, stale/fresh state).
+   - mirrored this line in both status bar and Review Queue header context line.
+21. Stale bulk-accept safety override completed:
+   - stale bulk-accept remains safety-gated by default.
+   - added explicit one-shot confirmation path in batch preview (`Accept stale suggestions for this batch only`).
+22. Always-visible assist color semantics legend completed:
+   - Review Queue now includes persistent legend for heuristic gray + acceptance-likelihood bands.
+23. Assist context-delta messaging completed:
+   - when strategy/preset/projection changes after suggestion generation, concise context-delta notice is emitted in transient status and queue subtext.
+24. Inline review throughput telemetry completed:
+   - Review Queue now shows accepted/min, rejected/min, and seconds/decision for active review sessions.
+25. Quick compare mode for layer presets completed:
+   - added one-click A/B layer preset compare in Modality Layers + Assist action entry.
+   - compare now preserves current camera limits during toggles.
+26. Mini calibration sparkline completed:
+   - compact reliability sparkline surfaced in Review Queue for lightweight calibration awareness.
+27. Panel-aware first-run snippets completed:
+   - short first-run contextual hints added for Review Queue, Modality Layers, and Calibration surfaces.
+28. Session-level assist change log completed:
+   - strategy/preset/projection/scope/target context changes are recorded with timestamps for reproducibility and audit/export pipelines.
+29. GUI expectation contract operationalization completed (from `GUI_EXPECTATION_SPEC.md`):
+   - canvas-first defaults and Focus Canvas behavior implemented with real space reclaim.
+   - explicit always-visible operational state in status bar maintained (dataset, T/Z, scope, target, assist, QC/results).
+   - progressive disclosure + mode-aware docks implemented (annotate/review/inspect right-dock behavior).
+   - dynamic context-aware view/target controls implemented with invalid-choice disabling and explanatory hints.
+   - long-hover micro-help implemented for high-risk/high-ambiguity controls.
+   - bottom task panel behavior simplified to Results/QC/Diagnostics with auto-collapse when empty.
+   - enforcement moved to GUI integration tests for state-level expectation checks.
+   - specification doc removed after implementation consolidation to avoid drift.
+30. Interactive auto-open policy toast hardened and completed:
+   - inline `Pin` / `Disable auto-open` actions remain available directly in the toast.
+   - lifecycle stabilized for GUI teardown to prevent callback-related crashes.
+31. System diagnostics surfaces fully unified into a single `System` dock:
+   - Logs/Diagnostics, Performance, and Recorder now share one dock widget with internal tabs.
+   - panel switching routes to the same dock and selects the correct tab.
+32. Dock flash refinement completed with tabbar-driven pulse:
+   - tabified docks now use dedicated `QTabBar` flash animation path.
+   - non-tabified docks retain deterministic fallback highlight.
+33. Production-readiness hardening completed:
+   - full GUI suite pass verified in venv/headless mode (`-m gui --run-gui`).
+   - full repository test pass verified in venv.
+   - optional disk-cache tests now dependency-aware (skip when `zstandard` is unavailable).
+   - release checklist added under `docs/PRODUCTION_READINESS_CHECKLIST.md`.
 
 ## Assisted Annotation Terminology
 

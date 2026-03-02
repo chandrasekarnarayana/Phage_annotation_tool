@@ -117,6 +117,14 @@ class AnnotationsMixin:
             return
         if not self.controller.undo():
             return
+        if hasattr(self, "t_slider"):
+            target_t = int(getattr(self.controller.view_state, "t", self.t_slider.value()))
+            if self.t_slider.value() != target_t:
+                self.t_slider.setValue(target_t)
+        if hasattr(self, "z_slider"):
+            target_z = int(getattr(self.controller.view_state, "z", self.z_slider.value()))
+            if self.z_slider.value() != target_z:
+                self.z_slider.setValue(target_z)
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         self._refresh_image()
@@ -127,6 +135,14 @@ class AnnotationsMixin:
             return
         if not self.controller.redo():
             return
+        if hasattr(self, "t_slider"):
+            target_t = int(getattr(self.controller.view_state, "t", self.t_slider.value()))
+            if self.t_slider.value() != target_t:
+                self.t_slider.setValue(target_t)
+        if hasattr(self, "z_slider"):
+            target_z = int(getattr(self.controller.view_state, "z", self.z_slider.value()))
+            if self.z_slider.value() != target_z:
+                self.z_slider.setValue(target_z)
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         self._refresh_image()

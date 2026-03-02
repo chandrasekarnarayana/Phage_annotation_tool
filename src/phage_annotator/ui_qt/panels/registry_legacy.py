@@ -8,9 +8,21 @@ View menu toggles without duplicating setup code.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple, Literal
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+
+
+PanelBucket = Literal["inspect", "tools", "plots"]
+
+
+@dataclass(frozen=True)
+class PanelConstraints:
+    """Behavior constraints for panel placement and floating."""
+
+    allowed_areas: Optional[Tuple[QtCore.Qt.DockWidgetArea, ...]] = None
+    floatable: bool = True
+    fixed_area: bool = False
 
 
 @dataclass(frozen=True)
@@ -33,6 +45,14 @@ class PanelSpec:
         User-facing label for the View menu toggle action.
     shortcut : str, optional
         Optional keyboard shortcut for the toggle action.
+    bucket : PanelBucket
+        High-level UX grouping used by panel switcher.
+    tab_group : str, optional
+        Tab group identifier used for canonical tabification.
+    constraints : PanelConstraints
+        Dock placement constraints enforced by panel switcher.
+    search_aliases : tuple[str, ...]
+        Optional command-palette synonyms mapped to this panel.
     """
 
     id: str
@@ -42,6 +62,10 @@ class PanelSpec:
     widget_factory: Callable[[], QtWidgets.QWidget]
     toggle_action_text: str
     shortcut: Optional[str] = None
+    bucket: PanelBucket = "tools"
+    tab_group: Optional[str] = None
+    constraints: PanelConstraints = PanelConstraints()
+    search_aliases: Tuple[str, ...] = ()
 
 
 def roi_manager_spec(widget_factory) -> PanelSpec:

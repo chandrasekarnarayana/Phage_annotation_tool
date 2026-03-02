@@ -112,6 +112,11 @@ class JobsMixin:
         if hasattr(self, '_all_logs'):
             self._all_logs.append(text)
         self.log_view.appendPlainText(text)
+        if hasattr(self, "_update_bottom_task_panels"):
+            try:
+                self._update_bottom_task_panels()
+            except Exception:
+                pass
 
     def _install_exception_hook(self) -> None:
         """Install a global exception hook for GUI thread errors."""

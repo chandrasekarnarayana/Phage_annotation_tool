@@ -25,6 +25,9 @@ class UnifiedSettingsProxy:
                 return value
             except Exception:
                 pass
+        # PyQt's QSettings.value does not accept `type=None` on some runtimes.
+        if type is None:
+            return self._qsettings.value(key, default)
         return self._qsettings.value(key, default, type=type)
 
     def setValue(self, key: str, value: Any) -> None:

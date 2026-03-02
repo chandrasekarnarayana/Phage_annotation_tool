@@ -31,7 +31,13 @@ class DockActionsMixin:
         if dock is None:
             return
         target = bool(visible)
-        if dock.isVisible() != target:
+        if target:
+            opener = getattr(self, "open_panel", None)
+            if callable(opener):
+                opener(_key, reason=str(source))
+            elif dock.isVisible() != target:
+                dock.setVisible(target)
+        elif dock.isVisible() != target:
             dock.setVisible(target)
         self._sync_panel_visibility_state()
 
@@ -50,6 +56,10 @@ class DockActionsMixin:
 
     def _sync_panel_visibility_state(self) -> None:
         """Sync visibility state across dock, menu toggles, and panel checkboxes."""
+        try:
+            _ = self.objectName() if hasattr(self, "objectName") else None
+        except RuntimeError:
+            return
         panel_keys = (
             "sidebar",
             "hist",
@@ -65,26 +75,41 @@ class DockActionsMixin:
             "advanced_analysis",
         )
         for key in panel_keys:
-            dock = None
-            panel_docks = getattr(self, "panel_docks", {})
+            try:
+                dock = None
+                panel_docks = getattr(self, "panel_docks", {})
+            except RuntimeError:
+                return
             if isinstance(panel_docks, dict):
                 dock = panel_docks.get(key)
             if dock is None:
-                dock = getattr(self, f"dock_{key}", None)
+                try:
+                    dock = getattr(self, f"dock_{key}", None)
+                except RuntimeError:
+                    return
             if dock is None:
                 continue
             visible = bool(dock.isVisible())
-            chk = getattr(self, f"{key}_chk", None)
+            try:
+                chk = getattr(self, f"{key}_chk", None)
+            except RuntimeError:
+                return
             if chk is not None and chk.isChecked() != visible:
                 chk.blockSignals(True)
                 chk.setChecked(visible)
                 chk.blockSignals(False)
-            toggle = getattr(self, f"toggle_{key}_act", None)
+            try:
+                toggle = getattr(self, f"toggle_{key}_act", None)
+            except RuntimeError:
+                return
             if toggle is not None and toggle.isChecked() != visible:
                 toggle.blockSignals(True)
                 toggle.setChecked(visible)
                 toggle.blockSignals(False)
-            dock_actions = getattr(self, "dock_actions", {})
+            try:
+                dock_actions = getattr(self, "dock_actions", {})
+            except RuntimeError:
+                return
             if isinstance(dock_actions, dict):
                 act = dock_actions.get(key)
                 if act is not None and act.isChecked() != visible:

@@ -23,7 +23,11 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
 
         self.coords_lbl = QtWidgets.QLabel("(x=-, y=-, t=-, z=-)")
         self.score_lbl = QtWidgets.QLabel("generator score: n/a")
-        self.calib_lbl = QtWidgets.QLabel("calibrated p_accept: n/a")
+        self.calib_lbl = QtWidgets.QLabel("Acceptance likelihood (p_accept): n/a")
+        self.calib_lbl.setToolTip(
+            "Acceptance likelihood (p_accept) predicts your acceptance behavior, "
+            "not ground-truth correctness."
+        )
         self.nn_lbl = QtWidgets.QLabel("nearest accepted distance: n/a")
         self.stale_lbl = QtWidgets.QLabel("staleness: n/a")
         layout.addWidget(self.coords_lbl)

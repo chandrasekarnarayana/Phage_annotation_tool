@@ -40,6 +40,13 @@ SHORTCUTS: Tuple[ShortcutEntry, ...] = (
         "Open command palette",
         menu_action_attr="command_palette_act",
     ),
+    ShortcutEntry(
+        "panel_switcher",
+        "Ctrl+Alt+P",
+        "Panel Switcher",
+        "Open panel switcher (panel commands only)",
+        menu_action_attr="open_panel_switcher_act",
+    ),
     ShortcutEntry("jump_frame", "Ctrl+G", "Jump to Frame", "Open jump-to-frame dialog", menu_action_attr="jump_to_frame_act"),
     ShortcutEntry("jump_z", "Ctrl+Shift+G", "Jump to Z Slice", "Open jump-to-Z dialog", menu_action_attr="jump_to_z_act"),
     ShortcutEntry(
@@ -56,6 +63,7 @@ SHORTCUTS: Tuple[ShortcutEntry, ...] = (
     ShortcutEntry("nav_z_prev", "Up", "Navigate Z", "Move up in Z-stack"),
     ShortcutEntry("nav_z_next", "Down", "Navigate Z", "Move down in Z-stack"),
     ShortcutEntry("accept_suggestion", "A", "Accept Suggestion", "Accept current suggestion (assist mode)"),
+    ShortcutEntry("accept_current_suggestion", "Alt+A / Enter", "Accept Current Suggestion", "Accept focused suggestion only (assist mode)"),
     ShortcutEntry("reject_suggestion", "R", "Reject Suggestion", "Reject current suggestion (assist mode)"),
     ShortcutEntry("next_suggestion", "N", "Next Suggestion", "Jump to next uncertain suggestion"),
     ShortcutEntry("prev_suggestion", "P", "Previous Suggestion", "Jump to previous uncertain suggestion"),
@@ -71,6 +79,9 @@ SHORTCUTS: Tuple[ShortcutEntry, ...] = (
     ShortcutEntry("delete_selected", "Delete / Backspace", "Delete Point", "Delete selected annotation(s)"),
     ShortcutEntry("cycle_colormap", "C", "Cycle Colormap", "Cycle current colormap"),
     ShortcutEntry("quick_save", "S", "Quick Save CSV", "Quick-save annotations CSV"),
+    ShortcutEntry("label_prev", "[", "Previous Label", "Cycle to previous label"),
+    ShortcutEntry("label_next", "]", "Next Label", "Cycle to next label"),
+    ShortcutEntry("focus_canvas_mode", "F", "Focus Canvas", "Toggle canvas-focused mode"),
 )
 
 
@@ -138,9 +149,15 @@ def qt_key_bindings() -> tuple[tuple[int, Any, str], ...]:
         (QtCore.Qt.Key_Delete, QtCore.Qt.KeyboardModifier.NoModifier, "delete_selected"),
         (QtCore.Qt.Key_Backspace, QtCore.Qt.KeyboardModifier.NoModifier, "delete_selected"),
         (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.NoModifier, "accept_suggestion"),
+        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.AltModifier, "accept_current_suggestion"),
+        (QtCore.Qt.Key_Return, QtCore.Qt.KeyboardModifier.NoModifier, "accept_current_suggestion"),
+        (QtCore.Qt.Key_Enter, QtCore.Qt.KeyboardModifier.NoModifier, "accept_current_suggestion"),
         (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.ShiftModifier, "clear_roi"),
         (QtCore.Qt.Key_N, QtCore.Qt.KeyboardModifier.NoModifier, "next_suggestion"),
         (QtCore.Qt.Key_P, QtCore.Qt.KeyboardModifier.NoModifier, "prev_suggestion"),
+        (QtCore.Qt.Key_BracketLeft, QtCore.Qt.KeyboardModifier.NoModifier, "label_prev"),
+        (QtCore.Qt.Key_BracketRight, QtCore.Qt.KeyboardModifier.NoModifier, "label_next"),
+        (QtCore.Qt.Key_F, QtCore.Qt.KeyboardModifier.NoModifier, "focus_canvas_mode"),
         (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.ControlModifier, "reset_view"),
         (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.NoModifier, "reject_suggestion"),
     )

@@ -907,6 +907,14 @@ class RenderingMixin:
             if visible_suggestions > 0
             else ""
         )
+        stale_badge = ""
+        if hasattr(self, "_suggestion_freshness_state"):
+            try:
+                freshness = self._suggestion_freshness_state(self.primary_image.id)
+                if freshness.get("is_stale", False):
+                    stale_badge = "\nStale - regenerate recommended"
+            except Exception:
+                stale_badge = ""
 
         return (
             f"{img.name}\n"
@@ -916,7 +924,7 @@ class RenderingMixin:
             f"vmin/vmax: {vmin}/{vmax}\n"
             f"Crop: {crop_txt} {crop_rect}\n"
             f"ROI: {roi_txt} {roi_rect}\n"
-            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}{stale_txt}"
+            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}{stale_txt}{stale_badge}"
         )
 
     def _build_canvas_header_text(self) -> str:
@@ -943,7 +951,32 @@ class RenderingMixin:
             and self._is_annotation_context_guard_pending()
         )
         lock_txt = " | Write Context: Pending Confirm" if lock_pending else ""
-        return f"{target_txt} | {scope_txt}{lock_txt}"
+        base_text = f"{target_txt} | {scope_txt}{lock_txt}"
+        if not bool(getattr(self, "_canvas_header_verbose_context", False)):
+            return base_text
+        strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
+        active_label = str(getattr(self, "current_label", "phage"))
+        modality_txt = f"Modality {int(getattr(self, '_active_modality_idx', -1))}"
+        manager = getattr(getattr(self, "controller", None).session_state, "modality_manager", None) if getattr(self, "controller", None) is not None else None
+        if manager is not None:
+            try:
+                for modality in manager.get_all_modalities():
+                    if int(modality.image_id) == int(self.primary_image.id):
+                        modality_txt = str(modality.display_name)
+                        break
+            except Exception:
+                pass
+        projection_txt = "raw"
+        if getattr(self, "projection_selector", None) is not None:
+            try:
+                p_name, p_axis = self.projection_selector.current_selection()
+                projection_txt = f"{p_name} ({p_axis})"
+            except Exception:
+                projection_txt = "raw"
+        return (
+            f"{base_text} | Modality: {modality_txt} ({projection_txt}) | "
+            f"Strategy: {strategy} | Label: {active_label}"
+        )
 
     def _get_display_mapping(
         self, image_id: int, panel: str, data: Optional[np.ndarray]
@@ -1128,8 +1161,9 @@ class RenderingMixin:
                             frame, crop_rect, (frame.shape[0], frame.shape[1])
                         )
                     if region == "roi":
-                        if roi_mask is None or roi_mask_shape != frame.shape:
-                            h, w = frame.shape
+                        frame_hw = frame.shape[:2]
+                        if roi_mask is None or roi_mask_shape != frame_hw:
+                            h, w = frame_hw
                             y = np.arange(h)[:, None]
                             x = np.arange(w)[None, :]
                             rx, ry, rw, rh = roi_rect
@@ -1139,7 +1173,7 @@ class RenderingMixin:
                                 roi_mask = (x - cx) ** 2 + (y - cy) ** 2 <= r**2
                             else:
                                 roi_mask = (rx <= x) & (x <= rx + rw) & (ry <= y) & (y <= ry + rh)
-                            roi_mask_shape = frame.shape
+                            roi_mask_shape = frame_hw
                         samples.append(frame[roi_mask])
                     else:
                         samples.append(frame.ravel())
