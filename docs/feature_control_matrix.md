@@ -369,7 +369,7 @@ This matrix enumerates user-facing controls and their wiring based on code inspe
 - **P3** (7 items): undo/redo, deterministic seeding, confirmation management, layer export, label defaults, retry logic upgrade, Cancel All badge
 - **P4** (4 items): UI wiring tests (11 unit tests), export validation (35 unit tests with preflight), cache telemetry in projection_cache.py, widget objectName pattern (gui_export.py)
 - **P5** (2 items): Performance panel (390+ lines in gui_panel_performance.py), multi-image ROI copy (roi_manager.py)
-- **P7** (5 items): 
+- **P7** (5 items):
   - P7a: Async Disk I/O (ThreadPoolExecutor, Future tracking, 15-30% latency improvement)
   - P7b: Lazy Decompression (CompressedBuffer, region-aware decompress_region(), 2-3× bandwidth savings)
   - P7c: Predictive FOV Prefetch (FOV grid detection, adjacent FOV scheduling, Gap #1 fix resolved)

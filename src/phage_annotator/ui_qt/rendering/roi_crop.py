@@ -52,11 +52,17 @@ class RoiCropMixin:
                 if modality.image_id == support_id and support_modality is None:
                     support_modality = modality
 
+        frame_name = "Frame"
+        frame_projection = ProjectionType.RAW
+        if primary_modality is not None:
+            if getattr(primary_modality, "display_name", ""):
+                frame_name = str(primary_modality.display_name)
+            frame_projection = getattr(primary_modality, "projection_type", ProjectionType.RAW)
         self._panel_modality_map["frame"] = ModalitySpec(
             idx=-100,
             image_id=primary_id,
-            display_name="Frame",
-            projection_type=ProjectionType.RAW,
+            display_name=frame_name,
+            projection_type=frame_projection,
             display_settings=_clone_settings(
                 primary_modality.display_settings if primary_modality else None
             ),
@@ -70,11 +76,21 @@ class RoiCropMixin:
                 primary_modality.display_settings if primary_modality else None
             ),
         )
+        support_name = "Modality 2"
+        support_projection = ProjectionType.RAW
+        if support_modality is not None:
+            if getattr(support_modality, "display_name", ""):
+                support_name = str(support_modality.display_name)
+            support_projection = getattr(support_modality, "projection_type", ProjectionType.RAW)
+        elif getattr(self, "support_combo", None) is not None and self.support_combo.count() > 0:
+            idx = int(getattr(self, "support_image_idx", self.support_combo.currentIndex()))
+            if 0 <= idx < self.support_combo.count():
+                support_name = self.support_combo.itemText(idx)
         self._panel_modality_map["support"] = ModalitySpec(
             idx=-102,
             image_id=support_id,
-            display_name="Support",
-            projection_type=ProjectionType.RAW,
+            display_name=support_name,
+            projection_type=support_projection,
             display_settings=_clone_settings(
                 support_modality.display_settings if support_modality else None
             ),
@@ -88,13 +104,41 @@ class RoiCropMixin:
                 primary_modality.display_settings if primary_modality else None
             ),
         )
+        builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+        mean_cfg = dict(builtin.get("mean", {}) or {})
+        std_cfg = dict(builtin.get("std", {}) or {})
+        for key, cfg, default_projection in (
+            ("mean", mean_cfg, ProjectionType.MEAN),
+            ("std", std_cfg, ProjectionType.STD),
+        ):
+            spec = self._panel_modality_map.get(key)
+            if spec is None:
+                continue
+            image_id = int(cfg.get("image_id", spec.image_id))
+            spec.image_id = image_id
+            if str(cfg.get("name", "")).strip():
+                spec.display_name = str(cfg["name"]).strip()
+            projection_key = str(cfg.get("projection", default_projection.value)).strip().lower()
+            try:
+                spec.projection_type = ProjectionType(projection_key)
+            except Exception:
+                spec.projection_type = default_projection
+            source_modality = None
+            if manager is not None:
+                for modality in manager.get_all_modalities():
+                    if int(getattr(modality, "image_id", -1)) == image_id:
+                        source_modality = modality
+                        break
+            spec.display_settings = _clone_settings(
+                source_modality.display_settings if source_modality else spec.display_settings
+            )
         if manager is not None:
             for modality in manager.get_all_modalities():
                 if modality.idx < 2:
                     continue
                 key = f"modality_{modality.idx}"
                 order.append(key)
-                panel_visibility[key] = True
+                panel_visibility[key] = bool(panel_visibility.get(key, True))
                 self._panel_modality_map[key] = modality
         return {
             "order": order,
@@ -476,8 +520,24 @@ class RoiCropMixin:
         if not checked and sum(self._panel_visibility.values()) <= 1:
             if key in self.panel_actions:
                 self.panel_actions[key].setChecked(True)
+            if hasattr(self, "_annotation_view_checkboxes"):
+                chk = dict(getattr(self, "_annotation_view_checkboxes", {}) or {}).get(str(key))
+                if chk is not None:
+                    chk.blockSignals(True)
+                    chk.setChecked(True)
+                    chk.blockSignals(False)
             return
         self._panel_visibility[key] = checked
+        if key in self.panel_actions and self.panel_actions[key].isChecked() != checked:
+            self.panel_actions[key].blockSignals(True)
+            self.panel_actions[key].setChecked(checked)
+            self.panel_actions[key].blockSignals(False)
+        if hasattr(self, "_annotation_view_checkboxes"):
+            chk = dict(getattr(self, "_annotation_view_checkboxes", {}) or {}).get(str(key))
+            if chk is not None and chk.isChecked() != checked:
+                chk.blockSignals(True)
+                chk.setChecked(checked)
+                chk.blockSignals(False)
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
         self._rebuild_figure_layout()
@@ -502,8 +562,13 @@ class RoiCropMixin:
         visible = [key for key in order if panel_visibility.get(key, False)]
         axes = {}
         if getattr(self, "modality_canvas", None) is not None:
-            panel_indices = {"frame": 0, "mean": 1, "support": 2, "std": 3}
-            specs = [(panel_indices[key], key.title()) for key in visible]
+            panel_indices = {key: i for i, key in enumerate(visible)}
+            panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+            specs = []
+            for key in visible:
+                modality = panel_map.get(key)
+                title = str(getattr(modality, "display_name", key.title()))
+                specs.append((panel_indices[key], title))
             self.modality_canvas.set_layout_mode(LayoutMode.AUTO)
             self.modality_canvas.set_modalities(specs)
             for key in visible:

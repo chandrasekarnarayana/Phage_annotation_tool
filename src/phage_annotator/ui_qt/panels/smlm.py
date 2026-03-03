@@ -24,7 +24,7 @@ class SmlmPanel(QtWidgets.QWidget):
         modality_row = QtWidgets.QHBoxLayout()
         modality_row.addWidget(QtWidgets.QLabel("Run on modality"))
         self.modality_combo = QtWidgets.QComboBox()
-        self.modality_combo.addItem("Current (Primary)")
+        self.modality_combo.addItem("Current (Modality 1)")
         modality_row.addWidget(self.modality_combo)
         modality_row.addStretch(1)
         layout.addLayout(modality_row)
@@ -81,7 +81,7 @@ class SmlmPanel(QtWidgets.QWidget):
         """Update modality combo with available modalities."""
         current_text = self.modality_combo.currentText()
         self.modality_combo.clear()
-        self.modality_combo.addItem("Current (Primary)")
+        self.modality_combo.addItem("Current (Modality 1)")
         
         if modality_manager is not None:
             modalities = modality_manager.get_all_modalities()

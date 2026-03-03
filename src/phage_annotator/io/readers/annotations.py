@@ -84,13 +84,11 @@ def parse_thunderstorm_csv(
         img_col = df.columns[cols_lower.index("image_name")]
     frame_vals = df[frame_col] if frame_col else None
     base = _frame_base(frame_vals) if frame_vals is not None else 0
-    for row in df.itertuples(index=False):
-        x_val = float(getattr(row, x_col))
-        y_val = float(getattr(row, y_col))
-        meta: Dict[str, object] = {
-            col: getattr(row, col) for col in df.columns if hasattr(row, col)
-        }
-        name = str(getattr(row, img_col)) if img_col else image_name
+    for row in df.to_dict(orient="records"):
+        x_val = float(row[x_col])
+        y_val = float(row[y_col])
+        meta: Dict[str, object] = dict(row)
+        name = str(row.get(img_col)) if img_col else image_name
         if x_unit == "nm" or y_unit == "nm":
             if pixel_size_nm:
                 x_px = x_val / pixel_size_nm
@@ -104,12 +102,12 @@ def parse_thunderstorm_csv(
             x_px, y_px = x_val, y_val
         t = -1
         if frame_col:
-            t_val = int(getattr(row, frame_col))
+            t_val = int(row[frame_col])
             t = t_val - base
             meta["frame_base"] = base
         z = -1
         if z_col:
-            z = int(getattr(row, z_col))
+            z = int(row[z_col])
         points.append(
             Keypoint(
                 image_id=-1,

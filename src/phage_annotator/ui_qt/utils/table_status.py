@@ -381,12 +381,8 @@ class TableStatusMixin:
                 pass
 
         pts_view, area_um2 = self._view_density_stats()
-        density_txt = ""
-        if area_um2 > 0:
-            density = pts_view / area_um2 if area_um2 > 0 else 0.0
-            density_txt = f" | View pts: {pts_view} | Area: {area_um2:.2f} um^2 | Density: {density:.3f} /um^2"
+        density = (pts_view / area_um2) if area_um2 > 0 else 0.0
         cache_mb, cache_items = self.proj_cache.stats()
-        cache_txt = f" | Cache: {cache_mb} MB | Items: {cache_items}"
         
         # Collect diagnostic flags
         diag_flags = []
@@ -405,7 +401,6 @@ class TableStatusMixin:
         if getattr(self.primary_image.array, "filename", None) is not None:
             diag_flags.append("Memmap")
         
-        diag_txt = f" | {'; '.join(diag_flags)}" if diag_flags else ""
         assist_state = self._canonical_assist_state()
         jobs_txt = ""
         if getattr(self, "jobs", None) is not None:
@@ -429,7 +424,7 @@ class TableStatusMixin:
             else:
                 autosave_txt = "Autosave: on"
         scope_state = "Stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "Slice"
-        target_map = {"frame": "Frame", "mean": "Mean Projection", "support": "Support"}
+        target_map = {"frame": "Frame", "mean": "Mean Projection", "support": "Modality 2"}
         target_state = target_map.get(str(getattr(self, "annotate_target", "frame")), "Frame")
         qc_warnings = 0
         qc_errors = 0
@@ -453,6 +448,34 @@ class TableStatusMixin:
             self.status_label_lbl.setText(f"Label: {self.current_label}")
         if getattr(self, "status_tz_lbl", None) is not None:
             self.status_tz_lbl.setText(frame_txt)
+        if getattr(self, "status_points_lbl", None) is not None:
+            self.status_points_lbl.setText(f"Points ({target_state}): {current}")
+        if getattr(self, "status_roi_area_lbl", None) is not None:
+            self.status_roi_area_lbl.setText(
+                f"ROI area: {area_um2:.2f} um^2" if area_um2 > 0 else "ROI area: n/a"
+            )
+        if getattr(self, "status_density_lbl", None) is not None:
+            self.status_density_lbl.setText(
+                f"Density: {density:.3f} /um^2" if area_um2 > 0 else "Density: n/a"
+            )
+        if getattr(self, "status_fps_lbl", None) is not None:
+            self.status_fps_lbl.setText(f"FPS: {int(self.speed_slider.value())}")
+        # Keep live metrics contextual: show only while annotation workflow is active.
+        annotate_tool_active = bool(
+            getattr(self, "tool_router", None) is not None
+            and getattr(self.tool_router, "tool", None) == Tool.ANNOTATE_POINT
+        )
+        for attr in ("status_points_lbl", "status_roi_area_lbl", "status_density_lbl", "status_fps_lbl"):
+            widget = getattr(self, attr, None)
+            if widget is not None:
+                # Hide tooltip when hiding widget
+                if not annotate_tool_active:
+                    try:
+                        from matplotlib.backends.qt_compat import QtWidgets
+                        QtWidgets.QToolTip.hideText()
+                    except Exception:
+                        pass
+                widget.setVisible(annotate_tool_active)
         if getattr(self, "status_scope_lbl", None) is not None:
             self.status_scope_lbl.setText(f"Scope: {scope_state}")
             if str(getattr(self, "annotation_scope", "current")) == "all":
@@ -579,15 +602,65 @@ class TableStatusMixin:
                 except Exception:
                     projection_txt = "raw"
             modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
-            target_txt = str(getattr(self, "annotate_target", "frame"))
+            target_key = str(getattr(self, "annotate_target", "frame"))
+            target_txt = {"frame": "Frame", "mean": "Mean Projection", "support": "Modality 2"}.get(
+                target_key, target_key
+            )
             self.evidence_strip_lbl.setText(
                 f"Evidence: modality={modality_txt} | target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
             )
 
-        self._status_base = (
-            f"Label: {self.current_label} | Slice pts: {current} | Total pts: {total} "
-            f"| Speed {self.speed_slider.value()} fps | {autosave_txt}{density_txt}{cache_txt}{diag_txt}{jobs_txt}"
-        )
+        status_details = getattr(self, "status_details_panel", None)
+        if status_details is not None:
+            try:
+                status_details.dataset_lbl.setText(dataset_name)
+                status_details.tz_lbl.setText(frame_txt)
+                status_details.scope_lbl.setText(scope_state)
+                status_details.target_lbl.setText(target_state)
+                status_details.modality_lbl.setText(modality_txt)
+                status_details.label_lbl.setText(str(self.current_label))
+                status_details.assist_lbl.setText(
+                    f"{assist_state_label(assist_state)}"
+                    + (f" (Need {need} more labels)" if assist_state == AssistState.HEURISTIC and need > 0 else "")
+                )
+                status_details.context_lbl.setText(
+                    self._effective_assist_context_line()
+                    if hasattr(self, "_effective_assist_context_line")
+                    else "-"
+                )
+                status_details.suggestions_lbl.setText(
+                    self.status_suggestion_fresh_lbl.text()
+                    if getattr(self, "status_suggestion_fresh_lbl", None) is not None
+                    else "n/a"
+                )
+                status_details.qc_lbl.setText(qc_label)
+                status_details.results_lbl.setText(
+                    self.status_results_lbl.text()
+                    if getattr(self, "status_results_lbl", None) is not None
+                    else "Results: n/a"
+                )
+                status_details.points_lbl.setText(f"Slice {current} | Total {total}")
+                status_details.roi_area_lbl.setText(
+                    f"{area_um2:.2f} um^2" if area_um2 > 0 else "n/a"
+                )
+                status_details.density_lbl.setText(
+                    f"{density:.3f} /um^2" if area_um2 > 0 else "n/a"
+                )
+                status_details.fps_lbl.setText(f"{int(self.speed_slider.value())} fps")
+                status_details.autosave_lbl.setText(autosave_txt.replace("Autosave: ", ""))
+                status_details.cache_lbl.setText(f"{cache_mb} MB | {cache_items} items")
+                status_details.jobs_lbl.setText(jobs_txt.replace(" | Jobs: ", "") if jobs_txt else "idle")
+                status_details.diag_lbl.setText("; ".join(diag_flags) if diag_flags else "none")
+            except Exception:
+                pass
+
+        tool_name = "Annotate"
+        try:
+            if getattr(self, "tool_router", None) is not None:
+                tool_name = self._tool_label(self.tool_router.tool)
+        except Exception:
+            pass
+        self._status_base = "Ready"
         self._render_status()
         self._update_bottom_task_panels()
         if self.tool_label is not None and self.tool_router is not None:

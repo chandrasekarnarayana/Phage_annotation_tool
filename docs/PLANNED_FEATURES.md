@@ -10,8 +10,34 @@ GUI design principles were checked and operationalized in the runtime UI; they a
 
 ## Priority Backlog
 
-### Remaining Cleanup Backlog
-No open cleanup items.
+### Active Gaps (Next Release Candidates)
+
+P0 (release hardening):
+
+1. Public documentation truth alignment:
+   - synchronize README and docs capability claims with current runtime behavior.
+   - keep a canonical capabilities snapshot (`docs/CURRENT_CAPABILITIES.md`).
+2. Deterministic persistence and annotation I/O regression expansion:
+   - strengthen tests for project save/load and mixed-format annotation imports.
+   - include migration and dedup edge-case regression coverage.
+3. CI release hygiene gates:
+   - oversized tracked file guard.
+   - generated artifact guard (`*.egg-info`).
+   - markdown quality guard.
+
+P1 (interoperability and external parity):
+
+4. Native ThunderSTORM bridge backend:
+   - broaden fixture coverage and default macro templates for lab onboarding.
+5. SMLM parity QA harness:
+   - expand fixture corpus and publish baseline deltas in release reports.
+
+P2 (platform maturity):
+
+6. Plugin/backend boundary formalization for external SMLM tooling:
+   - extend beyond Fiji bridge flows into non-Fiji backend plugin adapters.
+7. Reproducibility runbook mode:
+   - add guided replay UI flow from exported runbook bundles.
 
 ### Completed Cleanup and Unification
 
@@ -114,6 +140,67 @@ No open cleanup items.
    - full repository test pass verified in venv.
    - optional disk-cache tests now dependency-aware (skip when `zstandard` is unavailable).
    - release checklist added under `docs/PRODUCTION_READINESS_CHECKLIST.md`.
+34. Release hygiene enforcement completed:
+   - removed tracked demo binary (`phage_annotator_demo.tif`) from source control.
+   - removed tracked generated package metadata under `src/phage_annotator.egg-info/`.
+   - added CI release hygiene guard (`scripts/check_release_hygiene.py`) for oversized files and generated artifacts.
+35. Documentation quality and truth-alignment hardening completed:
+   - added markdown quality guard (`scripts/check_markdown_quality.py`) into CI lint job.
+   - updated `README.md` to reflect current runtime capabilities and production validation commands.
+   - added canonical capability snapshot at `docs/CURRENT_CAPABILITIES.md`.
+36. Annotation I/O correctness hardening completed:
+   - fixed dedup fallback to use `Keypoint.x/y` (not stale `x_px/y_px` fields).
+   - fixed ThunderSTORM CSV parser to support bracketed column names via dict-based row access.
+   - added deterministic regression tests for mixed-format annotation parsing and dedup behavior.
+37. Native ThunderSTORM bridge backend completed (interoperability baseline):
+   - added backend abstraction with selectable `internal`, `fiji_subprocess`, and `fiji_pyimagej` execution paths.
+   - integrated backend selection and bridge configuration fields directly into SMLM panel controls.
+   - normalized bridge outputs back into localization overlays/exports.
+38. SMLM parity harness completed (baseline):
+   - added parity metrics module for internal-vs-bridge comparison (`precision`, `recall`, XY error).
+   - added parity CLI (`phage-annotator-smlm-parity`) for fixture-driven comparisons.
+   - added deterministic unit tests for parity metric behavior.
+39. Reproducibility runbook mode completed (baseline):
+   - added runbook state model with lockable method profiles and provenance event capture.
+   - integrated runbook mode, profile locking, and runbook export controls in SMLM UI.
+   - persisted runbook state and provenance in project save/load settings.
+40. Multi-plugin Fiji bridge capability completed (baseline):
+   - added discovery for multiple external Fiji plugins from `external_plugins/` (JAR + optional JSON manifest metadata).
+   - added plugin selector in SMLM bridge UI with plugin-to-JAR auto-fill.
+   - generalized bridge macro/env contract (`PHAGE_PLUGIN_ID`, `PHAGE_PLUGIN_JAR`, `PHAGE_PLUGIN_NAME`) while preserving ThunderSTORM backward compatibility vars.
+41. Strict plugin manifest SDK + template runner completed:
+   - implemented strict execution contract (`identity`, `invocation`, typed `parameters`, `io_contract`, `execution_mode`).
+   - added typed parameter validation + deterministic arg builder (`ij_kv`, `json`, `template`).
+   - added manifest-generated macro execution path when explicit macro file is absent.
+   - added SDK documentation and baseline ThunderSTORM manifest in `external_plugins/`.
+42. Operational Fiji bridge hardening completed:
+   - added SMLM preflight checks (UI button + CLI) for runtime/plugin/macro/writability readiness.
+   - added plugins.config parsing from plugin JARs for menu-command metadata enrichment.
+   - added tested ThunderSTORM macro template in repository (`external_plugins/thunderstorm_macro.ijm`).
+   - added optional real Fiji end-to-end integration test gate (`FIJI_APP_PATH`-guarded).
+43. Fiji bridge operations tooling completed:
+   - added active preflight probe mode (`--probe`) with deterministic exit codes for runtime diagnostics.
+   - added demo smoke-test runner CLI (`phage-annotator-smlm-run-demo`) with synthetic stack generation and artifact export.
+   - added plugin SDK tooling CLI (`phage-annotator-fiji-plugin-tool`) for command listing, manifest validation, and scaffold generation.
+44. Bridge diagnostics and recovery UX completed:
+   - expanded SMLM execution plan/debug panel with generated macro view and copyable debug report.
+   - enriched debug reports with OS/Python/package/git metadata, plugin JAR hash/size, manifest schema metadata, and artifact listing.
+   - added bridge failure recovery actions (open logs, open error folder, copy report, one-click internal-backend fallback).
+45. Optional Fiji CI lane completed:
+   - added CI job that runs Fiji integration tests when `FIJI_APP_PATH`/`FIJI_EXE_PATH` repository variables are configured.
+   - keeps integration checks skipped by default while enabling scheduled/controlled runtime validation.
+46. Demo reproducibility artifacts completed:
+   - demo runner now emits `run_manifest.json` and `sha256sums.txt` for deterministic output verification.
+   - manifest records backend/plugin context, plugin JAR hash, and schema-version metadata.
+47. Adapter lifecycle contract documented:
+   - added explicit adapter lifecycle in manifest SDK docs (discover → describe → materialize → execute → validate → observe → recover).
+   - added offline install guidance for air-gapped environments in `README.md` and bridge docs.
+48. Guided preflight onboarding UX completed:
+   - added SMLM fix-it card driven by preflight/probe exit codes (`2/3/4/5`) with direct corrective actions.
+   - supports one-click path pickers, plugin command listing, macro/log visibility, and immediate probe rerun.
+49. Second-plugin onboarding proof completed:
+   - added a second manifest-only plugin profile (`thunder_storm_fast`) with no backend code changes.
+   - added test coverage confirming multi-profile discovery from repository assets.
 
 ## Assisted Annotation Terminology
 

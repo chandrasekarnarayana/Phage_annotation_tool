@@ -165,6 +165,9 @@ class SessionState:
     evidence_layer_config: Dict[str, dict] = field(default_factory=dict)
     evidence_layer_presets: Dict[str, dict] = field(default_factory=dict)
     disable_bulk_accept_when_stale: bool = True
+    smlm_runbook_enabled: bool = False
+    smlm_runbook_locked_profiles: Dict[str, dict] = field(default_factory=dict)
+    smlm_runbook_provenance: List[Dict[str, object]] = field(default_factory=list)
     # Collaboration metadata for local workflows.
     current_user: str = "local_user"
     audit_log: List[Dict[str, object]] = field(default_factory=list)

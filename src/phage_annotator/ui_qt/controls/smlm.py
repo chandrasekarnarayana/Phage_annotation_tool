@@ -3,15 +3,36 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import importlib.metadata
 import pathlib
+import platform
+import subprocess
+import sys
+import textwrap
+from datetime import datetime
 from typing import Optional, Tuple
 
 import numpy as np
-from matplotlib.backends.qt_compat import QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.analysis.core import roi_mask_for_shape
 from phage_annotator.deepstorm.infer import DeepStormParams, is_torch_available, run_deepstorm_stream
-from phage_annotator.smlm.thunderstorm import SmlmParams, run_smlm_stream
+from phage_annotator.smlm.backends import (
+    ThunderstormBridgeConfig,
+    discover_bundled_thunderstorm_jar,
+    run_thunderstorm_backend,
+)
+from phage_annotator.smlm.reproducibility import (
+    ReproducibilityRunbookState,
+    append_provenance_event,
+    export_reproducibility_bundle,
+    lock_profile,
+    resolve_profile,
+)
+from phage_annotator.smlm.preflight import report_to_text, run_preflight
+from phage_annotator.smlm.external_plugins import parse_plugins_config_from_jar
+from phage_annotator.smlm.thunderstorm import SmlmParams
 
 
 class SmlmControlsMixin:
@@ -37,6 +58,167 @@ class SmlmControlsMixin:
             render_sigma_nm=values.render_sigma_nm,
         )
 
+    def _smlm_bridge_config_from_ui(self) -> ThunderstormBridgeConfig:
+        if self.smlm_panel is None:
+            return ThunderstormBridgeConfig()
+        values = self.smlm_panel.thunder.values()
+        return ThunderstormBridgeConfig(
+            backend=values.backend,
+            plugin_id=values.plugin_id or "thunder_storm",
+            plugin_jar_path=values.plugin_jar_path,
+            fiji_executable=values.fiji_executable,
+            macro_path=values.fiji_macro_path,
+            thunderstorm_jar_path=values.thunderstorm_jar_path,
+            command_template=values.fiji_command_template,
+            pyimagej_app_path=values.pyimagej_app_path,
+            timeout_sec=int(self._settings.value("smlmBridgeTimeoutSec", 900, type=int)),
+        )
+
+    def _get_runbook_state(self) -> ReproducibilityRunbookState:
+        state = getattr(self, "_smlm_runbook_state", None)
+        if state is None:
+            state = ReproducibilityRunbookState()
+            self._smlm_runbook_state = state
+        return state
+
+    def _run_smlm_preflight(self) -> None:
+        """Run bridge preflight checks and surface actionable diagnostics."""
+        if self.smlm_panel is None:
+            return
+        config = self._smlm_bridge_config_from_ui()
+        do_probe = str(config.backend).strip().lower() == "fiji_subprocess"
+        report = run_preflight(config, probe=do_probe)
+        summary = report_to_text(report)
+        self.smlm_panel.thunder.status_label.setText(
+            "Preflight OK" if report.ok else "Preflight failed (see details)"
+        )
+        if hasattr(self.smlm_panel.thunder, "append_debug_report"):
+            self.smlm_panel.thunder.append_debug_report(summary)
+        if report.ok:
+            if hasattr(self.smlm_panel.thunder, "clear_fixit_card"):
+                self.smlm_panel.thunder.clear_fixit_card()
+            self._set_status("SMLM preflight passed.")
+        else:
+            self._show_smlm_preflight_fixit(report.exit_code, summary)
+            self._set_status("SMLM preflight failed; review checklist.")
+            QtWidgets.QMessageBox.warning(self, "SMLM Preflight", summary)
+
+    def _show_smlm_preflight_fixit(self, exit_code: int, summary: str) -> None:
+        if self.smlm_panel is None or not hasattr(self.smlm_panel.thunder, "set_fixit_card"):
+            return
+        sw = self.smlm_panel.thunder
+        actions = []
+        title = "Preflight failed"
+        detail = summary
+        if int(exit_code) == 2:
+            title = "Fiji not configured"
+            detail = "Set Fiji paths, then run probe again."
+            actions = [
+                ("Set FIJI_APP_PATH", self._pick_smlm_fiji_app_path),
+                ("Set FIJI_EXE_PATH", self._pick_smlm_fiji_executable),
+                ("Re-run Probe", self._run_smlm_preflight),
+                ("Copy Debug Report", sw._copy_debug_report),
+            ]
+        elif int(exit_code) == 3:
+            title = "Plugin not discoverable"
+            detail = "Select plugin JAR and inspect available plugin commands."
+            actions = [
+                ("Select JAR", self._pick_smlm_plugin_jar),
+                ("List Commands", self._list_smlm_plugin_commands),
+                ("Re-run Probe", self._run_smlm_preflight),
+                ("Copy Debug Report", sw._copy_debug_report),
+            ]
+        elif int(exit_code) == 4:
+            title = "Macro execution failed"
+            detail = "Inspect generated macro and logs, then run probe again."
+            actions = [
+                ("Show Macro", self._show_smlm_macro_viewer),
+                ("Open Error Folder", self._open_smlm_error_folder),
+                ("Open Logs", self._open_smlm_logs_panel),
+                ("Re-run Probe", self._run_smlm_preflight),
+            ]
+        elif int(exit_code) == 5:
+            title = "Probe output missing"
+            detail = "Inspect output/logs and rerun probe."
+            actions = [
+                ("Open Output Folder", self._open_smlm_error_folder),
+                ("Open Logs", self._open_smlm_logs_panel),
+                ("Re-run Probe", self._run_smlm_preflight),
+                ("Copy Debug Report", sw._copy_debug_report),
+            ]
+        else:
+            actions = [
+                ("Re-run Probe", self._run_smlm_preflight),
+                ("Copy Debug Report", sw._copy_debug_report),
+            ]
+        sw.set_fixit_card(title=title, detail=detail, actions=actions)
+
+    def _pick_smlm_fiji_app_path(self) -> None:
+        if self.smlm_panel is None:
+            return
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select Fiji.app directory")
+        if path:
+            self.smlm_panel.thunder.pyimagej_app_edit.setText(path)
+            self.smlm_panel.thunder.status_label.setText("Fiji app path updated.")
+
+    def _pick_smlm_fiji_executable(self) -> None:
+        if self.smlm_panel is None:
+            return
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select Fiji executable")
+        if path:
+            self.smlm_panel.thunder.fiji_exec_edit.setText(path)
+            self.smlm_panel.thunder.status_label.setText("Fiji executable updated.")
+
+    def _pick_smlm_plugin_jar(self) -> None:
+        if self.smlm_panel is None:
+            return
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select plugin JAR", "", "JAR Files (*.jar)")
+        if path:
+            self.smlm_panel.thunder.thunderstorm_jar_edit.setText(path)
+            self.smlm_panel.thunder.status_label.setText("Plugin JAR updated.")
+
+    def _list_smlm_plugin_commands(self) -> None:
+        if self.smlm_panel is None:
+            return
+        jar = self.smlm_panel.thunder.thunderstorm_jar_edit.text().strip()
+        if not jar:
+            QtWidgets.QMessageBox.information(self, "Plugin Commands", "No plugin JAR selected.")
+            return
+        menus, commands = parse_plugins_config_from_jar(jar)
+        if not commands:
+            QtWidgets.QMessageBox.information(self, "Plugin Commands", "No commands discovered in plugins.config.")
+            return
+        lines = []
+        for idx, command in enumerate(commands):
+            menu = menus[idx] if idx < len(menus) else "(menu unknown)"
+            lines.append(f"{idx + 1}. {command} [{menu}]")
+        QtWidgets.QMessageBox.information(self, "Plugin Commands", "\n".join(lines))
+
+    def _show_smlm_macro_viewer(self) -> None:
+        if self.smlm_panel is None:
+            return
+        sw = self.smlm_panel.thunder
+        sw.generated_macro_view.setVisible(True)
+        sw.show_macro_btn.setText("Hide Generated Macro")
+
+    def _open_smlm_logs_panel(self) -> None:
+        self.set_panel_visible("logs", True, source="smlm_fixit")
+
+    def _open_smlm_error_folder(self) -> None:
+        path = getattr(self, "_last_smlm_error_report_path", "")
+        if path:
+            folder = pathlib.Path(path).resolve().parent
+        else:
+            folder = pathlib.Path("artifacts") / "smlm_errors"
+            folder.mkdir(parents=True, exist_ok=True)
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
+
+    def _sync_runbook_state_to_session(self) -> None:
+        state = self._get_runbook_state()
+        self.controller.session_state.smlm_runbook_enabled = bool(state.enabled)
+        self.controller.session_state.smlm_runbook_locked_profiles = dict(state.locked_profiles)
+        self.controller.session_state.smlm_runbook_provenance = list(state.provenance_events)
+
     def _run_smlm(self) -> None:
         if self.smlm_panel is None:
             return
@@ -59,6 +241,65 @@ class SmlmControlsMixin:
         params = self._smlm_params_from_ui()
         if params is None:
             return
+        bridge_config = self._smlm_bridge_config_from_ui()
+        runbook_state = self._get_runbook_state()
+        if self.smlm_panel is not None:
+            runbook_state.enabled = bool(self.smlm_panel.thunder.repro_mode_chk.isChecked())
+        self._sync_runbook_state_to_session()
+        proposed_profile = {
+            "backend": bridge_config.backend,
+            "plugin_id": bridge_config.plugin_id,
+            "plugin_jar_path": bridge_config.plugin_jar_path,
+            "params": params.__dict__,
+            "fiji_executable": bridge_config.fiji_executable,
+            "fiji_macro_path": bridge_config.macro_path,
+            "thunderstorm_jar_path": bridge_config.thunderstorm_jar_path,
+            "fiji_command_template": bridge_config.command_template,
+            "pyimagej_app_path": bridge_config.pyimagej_app_path,
+        }
+        effective_profile = resolve_profile(runbook_state, "ThunderSTORM", proposed_profile)
+        params = SmlmParams(**effective_profile.get("params", params.__dict__))
+        bridge_config = ThunderstormBridgeConfig(
+            backend=str(effective_profile.get("backend", bridge_config.backend)),
+            plugin_id=str(effective_profile.get("plugin_id", bridge_config.plugin_id)),
+            plugin_jar_path=str(
+                effective_profile.get("plugin_jar_path", bridge_config.plugin_jar_path)
+            ),
+            fiji_executable=str(effective_profile.get("fiji_executable", bridge_config.fiji_executable)),
+            macro_path=str(effective_profile.get("fiji_macro_path", bridge_config.macro_path)),
+            thunderstorm_jar_path=str(
+                effective_profile.get("thunderstorm_jar_path", bridge_config.thunderstorm_jar_path)
+            ),
+            command_template=str(
+                effective_profile.get("fiji_command_template", bridge_config.command_template)
+            ),
+            pyimagej_app_path=str(
+                effective_profile.get("pyimagej_app_path", bridge_config.pyimagej_app_path)
+            ),
+            timeout_sec=bridge_config.timeout_sec,
+            plugin_parameters=self._build_plugin_parameters(params),
+        )
+        if (
+            bridge_config.backend in {"fiji_subprocess", "fiji_pyimagej"}
+            and not (bridge_config.plugin_jar_path or bridge_config.thunderstorm_jar_path)
+        ):
+            jar = discover_bundled_thunderstorm_jar()
+            if jar is not None:
+                bridge_config = ThunderstormBridgeConfig(
+                    backend=bridge_config.backend,
+                    fiji_executable=bridge_config.fiji_executable,
+                    macro_path=bridge_config.macro_path,
+                    plugin_id=bridge_config.plugin_id,
+                    plugin_jar_path=str(jar),
+                    thunderstorm_jar_path=str(jar),
+                    command_template=bridge_config.command_template,
+                    pyimagej_app_path=bridge_config.pyimagej_app_path,
+                    timeout_sec=bridge_config.timeout_sec,
+                    plugin_parameters=bridge_config.plugin_parameters,
+                )
+                if self.smlm_panel is not None:
+                    self.smlm_panel.thunder.thunderstorm_jar_edit.setText(str(jar))
+
         err, warn = self._validate_smlm_params(params)
         if err:
             thunder.status_label.setText(err)
@@ -96,7 +337,41 @@ class SmlmControlsMixin:
         image_id = self.primary_image.id
         self._smlm_run_id += 1
         run_id = self._smlm_run_id
-        self._record_smlm_run("ThunderSTORM", params.__dict__, roi_rect, self.crop_rect, None)
+        self._record_smlm_run(
+            "ThunderSTORM",
+            params.__dict__,
+            roi_rect,
+            self.crop_rect,
+            None,
+            backend=bridge_config.backend,
+            backend_config={
+                "plugin_id": bridge_config.plugin_id,
+                "plugin_jar_path": bridge_config.plugin_jar_path,
+                "fiji_executable": bridge_config.fiji_executable,
+                "fiji_macro_path": bridge_config.macro_path,
+                "thunderstorm_jar_path": bridge_config.thunderstorm_jar_path,
+                "fiji_command_template": bridge_config.command_template,
+                "pyimagej_app_path": bridge_config.pyimagej_app_path,
+            },
+            runbook_enabled=runbook_state.enabled,
+        )
+        append_provenance_event(
+            runbook_state,
+            event_type="smlm_run_requested",
+            payload={
+                "method": "ThunderSTORM",
+                "backend": bridge_config.backend,
+                "plugin_id": bridge_config.plugin_id,
+                "plugin_jar_path": bridge_config.plugin_jar_path,
+                "image_path": str(self.primary_image.path),
+                "thunderstorm_jar_path": bridge_config.thunderstorm_jar_path,
+                "roi_rect": list(roi_rect),
+                "crop_rect": list(self.crop_rect) if self.crop_rect is not None else None,
+                "params": dict(params.__dict__),
+                "runbook_enabled": bool(runbook_state.enabled),
+            },
+        )
+        self._sync_runbook_state_to_session()
 
         def _job(progress, cancel_token):
             def _frames():
@@ -111,7 +386,7 @@ class SmlmControlsMixin:
             def _progress_cb(val: int, msg: str) -> None:
                 progress(val, msg)
 
-            locs, sr = run_smlm_stream(
+            locs, sr, backend_meta = run_thunderstorm_backend(
                 _frames(),
                 total_frames=t_count,
                 roi_mask=roi_mask,
@@ -119,15 +394,16 @@ class SmlmControlsMixin:
                 crop_offset=crop_offset,
                 params=params,
                 pixel_size_nm=pixel_size_nm,
+                config=bridge_config,
                 progress_cb=_progress_cb,
                 is_cancelled=cancel_token.is_cancelled,
             )
-            return (locs, sr, roi_rect, crop_offset, image_id, job_gen, run_id, t_count)
+            return (locs, sr, backend_meta, roi_rect, crop_offset, image_id, job_gen, run_id, t_count)
 
         def _on_result(result) -> None:
             if result is None:
                 return
-            locs, sr, roi_rect_full, crop_off, img_id, gen, res_run_id, frames = result
+            locs, sr, backend_meta, roi_rect_full, crop_off, img_id, gen, res_run_id, frames = result
             if gen != self._job_generation or img_id != self.primary_image.id or res_run_id != self._smlm_run_id:
                 return
             self._smlm_results = locs
@@ -147,8 +423,25 @@ class SmlmControlsMixin:
             thunder.run_btn.setEnabled(True)
             thunder.cancel_btn.setEnabled(False)
             self._append_log(
-                f"[SMLM] ThunderSTORM job={self._smlm_job_id} frames={frames} detections={len(locs)}"
+                f"[SMLM] ThunderSTORM backend={bridge_config.backend} "
+                f"job={self._smlm_job_id} frames={frames} detections={len(locs)}"
             )
+            if hasattr(thunder, "set_generated_macro"):
+                thunder.set_generated_macro(str((backend_meta or {}).get("executed_macro", "")))
+            if hasattr(thunder, "append_debug_report"):
+                thunder.append_debug_report(self._build_smlm_debug_report(bridge_config, backend_meta=backend_meta))
+            append_provenance_event(
+                runbook_state,
+                event_type="smlm_run_finished",
+                payload={
+                    "method": "ThunderSTORM",
+                    "backend": bridge_config.backend,
+                    "backend_meta": dict(backend_meta or {}),
+                    "detections": int(len(locs)),
+                    "frames": int(frames),
+                },
+            )
+            self._sync_runbook_state_to_session()
             self._refresh_image()
 
         def _on_error(err: str) -> None:
@@ -156,6 +449,19 @@ class SmlmControlsMixin:
             thunder.run_btn.setEnabled(True)
             thunder.cancel_btn.setEnabled(False)
             self._append_log(f"[SMLM] Error\n{err}")
+            report_text = self._build_smlm_debug_report(
+                bridge_config,
+                backend_meta=None,
+                error_text=err,
+            )
+            report_path = self._persist_smlm_error_report(report_text)
+            if hasattr(thunder, "append_debug_report"):
+                thunder.append_debug_report(report_text)
+            self._show_smlm_failure_actions(
+                bridge_config=bridge_config,
+                report_path=report_path,
+                error_text=err,
+            )
 
         def _on_progress(val: int, msg: str) -> None:
             thunder.progress.setValue(val)
@@ -176,7 +482,207 @@ class SmlmControlsMixin:
         thunder.status_label.setText("Running…")
         thunder.run_btn.setEnabled(False)
         thunder.cancel_btn.setEnabled(True)
-        self._append_log(f"[SMLM] ThunderSTORM started job={self._smlm_job_id} frames={t_count}")
+        self._append_log(
+            f"[SMLM] ThunderSTORM backend={bridge_config.backend} "
+            f"started job={self._smlm_job_id} frames={t_count}"
+        )
+
+    def _build_smlm_debug_report(
+        self,
+        bridge_config: ThunderstormBridgeConfig,
+        *,
+        backend_meta: dict | None,
+        error_text: str = "",
+    ) -> str:
+        plugin_jar = bridge_config.plugin_jar_path or bridge_config.thunderstorm_jar_path
+        package_version = "unknown"
+        try:
+            package_version = importlib.metadata.version("phage-annotator")
+        except Exception:
+            pass
+        git_sha = self._resolve_git_sha()
+        plugin_jar_sha = self._sha256_file(plugin_jar) if plugin_jar else ""
+        plugin_jar_size = ""
+        if plugin_jar:
+            try:
+                plugin_jar_size = str(pathlib.Path(plugin_jar).stat().st_size)
+            except Exception:
+                plugin_jar_size = ""
+        fiji_version = self._resolve_fiji_version(bridge_config.fiji_executable)
+        macro_source = "user"
+        if not bridge_config.macro_path:
+            macro_source = "auto"
+        manifest = None
+        try:
+            from phage_annotator.smlm.external_plugins import resolve_plugin_descriptor
+
+            desc = resolve_plugin_descriptor(bridge_config.plugin_id)
+            manifest = desc.manifest if desc is not None else None
+            if not bridge_config.macro_path and desc is not None and desc.macro_path:
+                macro_source = "bundled"
+            elif not bridge_config.macro_path and manifest is not None:
+                macro_source = "generated"
+        except Exception:
+            manifest = None
+        env_lines = [
+            f"PHAGE_SMLM_INPUT=<temp-input.tif>",
+            f"PHAGE_SMLM_OUTPUT=<temp-output.csv>",
+            f"PHAGE_SMLM_PARAMS_JSON=<temp-params.json>",
+            f"PHAGE_PLUGIN_ID={bridge_config.plugin_id}",
+            f"PHAGE_PLUGIN_JAR={plugin_jar}",
+        ]
+        lines = [
+            f"[SMLM DEBUG] timestamp={datetime.now().isoformat(timespec='seconds')}",
+            f"os={platform.platform()}",
+            f"python={sys.version.split()[0]}",
+            f"package_version={package_version}",
+            f"git_sha={git_sha}",
+            f"backend={bridge_config.backend}",
+            f"plugin_id={bridge_config.plugin_id}",
+            f"fiji_executable={bridge_config.fiji_executable}",
+            f"fiji_version={fiji_version}",
+            f"macro_path={bridge_config.macro_path or '<auto>'}",
+            f"macro_source={macro_source}",
+            f"pyimagej_app_path={bridge_config.pyimagej_app_path}",
+            f"command_template={'custom' if bridge_config.command_template else 'default'}",
+            f"timeout_sec={bridge_config.timeout_sec}",
+            f"plugin_jar_path={plugin_jar}",
+            f"plugin_jar_sha256={plugin_jar_sha}",
+            f"plugin_jar_size_bytes={plugin_jar_size}",
+            "env:",
+            *[f"  {line}" for line in env_lines],
+        ]
+        if manifest is not None:
+            lines.extend(
+                [
+                    f"manifest.plugin_version_tested={manifest.plugin_version_tested or 'n/a'}",
+                    f"manifest.csv_schema_version={manifest.csv_schema_version or 'n/a'}",
+                    f"manifest.required_columns={','.join(manifest.required_columns)}",
+                ]
+            )
+        if backend_meta:
+            lines.append("backend_meta:")
+            for key in sorted(backend_meta.keys()):
+                if key == "executed_macro":
+                    continue
+                lines.append(f"  {key}: {backend_meta[key]}")
+            output_csv = str((backend_meta or {}).get("output_csv", "")).strip()
+            if output_csv:
+                lines.append("artifacts:")
+                lines.extend(self._artifact_lines([output_csv]))
+            macro = str(backend_meta.get("executed_macro", "")).strip()
+            if macro:
+                lines.extend(["executed_macro:", textwrap.indent(macro, "  ")])
+        if error_text:
+            lines.extend(["error:", textwrap.indent(error_text.strip(), "  ")])
+        return "\n".join(lines)
+
+    def _artifact_lines(self, paths: list[str]) -> list[str]:
+        lines: list[str] = []
+        for raw in paths:
+            p = pathlib.Path(raw)
+            if p.exists():
+                lines.append(f"  {p}: {p.stat().st_size} bytes")
+            else:
+                lines.append(f"  {p}: <missing>")
+        return lines
+
+    def _sha256_file(self, path: str) -> str:
+        try:
+            p = pathlib.Path(path)
+            if not p.exists():
+                return ""
+            h = hashlib.sha256()
+            with p.open("rb") as fh:
+                for chunk in iter(lambda: fh.read(8192), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+        except Exception:
+            return ""
+
+    def _resolve_git_sha(self) -> str:
+        try:
+            proc = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if proc.returncode == 0:
+                return (proc.stdout or "").strip() or "unknown"
+        except Exception:
+            pass
+        return "unknown"
+
+    def _resolve_fiji_version(self, fiji_executable: str) -> str:
+        exe = str(fiji_executable or "").strip()
+        if not exe:
+            return ""
+        try:
+            proc = subprocess.run(
+                [exe, "--version"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            out = (proc.stdout or proc.stderr or "").strip()
+            return out.splitlines()[0][:180] if out else ""
+        except Exception:
+            return ""
+
+    def _persist_smlm_error_report(self, report_text: str) -> str:
+        out_dir = pathlib.Path("artifacts") / "smlm_errors"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = out_dir / f"smlm_error_{stamp}.log"
+        path.write_text(report_text, encoding="utf-8")
+        self._last_smlm_error_report_path = str(path)
+        return str(path)
+
+    def _show_smlm_failure_actions(
+        self,
+        *,
+        bridge_config: ThunderstormBridgeConfig,
+        report_path: str,
+        error_text: str,
+    ) -> None:
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Warning)
+        msg.setWindowTitle("SMLM Bridge Error")
+        msg.setText("Fiji bridge execution failed.")
+        msg.setInformativeText(
+            "A detailed report was saved.\n"
+            f"{report_path}"
+        )
+        msg.setDetailedText(error_text)
+        fallback_btn = None
+        if (bridge_config.backend or "").strip().lower() != "internal":
+            fallback_btn = msg.addButton("Run Internal Backend", QtWidgets.QMessageBox.AcceptRole)
+        logs_btn = msg.addButton("Open Logs Panel", QtWidgets.QMessageBox.ActionRole)
+        folder_btn = msg.addButton("Open Error Folder", QtWidgets.QMessageBox.ActionRole)
+        copy_btn = msg.addButton("Copy Debug Report", QtWidgets.QMessageBox.ActionRole)
+        msg.addButton(QtWidgets.QMessageBox.Close)
+        msg.exec_()
+        clicked = msg.clickedButton()
+        if clicked is logs_btn:
+            self.set_panel_visible("logs", True, source="smlm_error")
+            return
+        if clicked is folder_btn:
+            folder = pathlib.Path(report_path).resolve().parent
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder)))
+            return
+        if clicked is copy_btn:
+            try:
+                QtWidgets.QApplication.clipboard().setText(pathlib.Path(report_path).read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            return
+        if fallback_btn is not None and clicked is fallback_btn and self.smlm_panel is not None:
+            self.smlm_panel.thunder.backend_combo.setCurrentText("internal")
+            self._set_status("Retrying SMLM with internal backend.")
+            self._run_smlm()
 
     def _cancel_smlm(self) -> None:
         if self._smlm_job_id is None:
@@ -607,6 +1113,10 @@ class SmlmControlsMixin:
         roi_rect: Tuple[float, float, float, float],
         crop_rect: Optional[Tuple[float, float, float, float]],
         model: Optional[dict],
+        *,
+        backend: str = "internal",
+        backend_config: Optional[dict] = None,
+        runbook_enabled: bool = False,
     ) -> None:
         from datetime import datetime
 
@@ -614,6 +1124,9 @@ class SmlmControlsMixin:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "method": method,
             "params": params,
+            "backend": backend,
+            "backend_config": dict(backend_config or {}),
+            "runbook_enabled": bool(runbook_enabled),
             "roi_rect": roi_rect,
             "roi_shape": self.roi_shape,
             "crop_rect": crop_rect,
@@ -676,6 +1189,56 @@ class SmlmControlsMixin:
             deep.agg_combo.setCurrentText(str(params.get("aggregation_mode", deep.agg_combo.currentText())))
             self._run_deepstorm()
 
+    def _lock_current_smlm_profile(self) -> None:
+        if self.smlm_panel is None:
+            return
+        params = self._smlm_params_from_ui()
+        if params is None:
+            return
+        bridge = self._smlm_bridge_config_from_ui()
+        state = self._get_runbook_state()
+        lock_profile(
+            state,
+            "ThunderSTORM",
+            {
+                "backend": bridge.backend,
+                "plugin_id": bridge.plugin_id,
+                "plugin_jar_path": bridge.plugin_jar_path,
+                "params": dict(params.__dict__),
+                "fiji_executable": bridge.fiji_executable,
+                "fiji_macro_path": bridge.macro_path,
+                "thunderstorm_jar_path": bridge.thunderstorm_jar_path,
+                "fiji_command_template": bridge.command_template,
+                "pyimagej_app_path": bridge.pyimagej_app_path,
+            },
+        )
+        self._sync_runbook_state_to_session()
+        self._set_status("Runbook profile locked for ThunderSTORM.")
+        self.smlm_panel.thunder.status_label.setText("Runbook profile locked.")
+
+    def _export_smlm_runbook(self) -> None:
+        state = self._get_runbook_state()
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export Reproducibility Runbook",
+            str(pathlib.Path.cwd() / "smlm_runbook.json"),
+            "JSON Files (*.json)",
+        )
+        if not path:
+            return
+        out = export_reproducibility_bundle(
+            state,
+            out_path=pathlib.Path(path),
+            session_payload={
+                "image_path": str(getattr(self.primary_image, "path", "")),
+                "smlm_runs": list(getattr(self, "_smlm_run_history", [])),
+            },
+        )
+        self._sync_runbook_state_to_session()
+        self._set_status(f"Exported runbook to {out}")
+        if self.smlm_panel is not None:
+            self.smlm_panel.thunder.status_label.setText(f"Runbook exported: {out.name}")
+
     def _toggle_smlm_points(self) -> None:
         if getattr(self, "show_smlm_points_act", None) is not None:
             self.show_smlm_points = self.show_smlm_points_act.isChecked()
@@ -685,3 +1248,34 @@ class SmlmControlsMixin:
         if getattr(self, "show_smlm_sr_act", None) is not None:
             self.show_sr_overlay = self.show_smlm_sr_act.isChecked()
             self._refresh_image()
+
+    def _build_plugin_parameters(self, params: SmlmParams) -> dict:
+        """Map current SMLM parameters into plugin manifest parameter names."""
+        return {
+            "sigma_px": float(params.sigma_px),
+            "fit_radius_px": int(params.fit_radius_px),
+            "filter_type": str(params.filter_type),
+            "dog_sigma1": float(params.dog_sigma1),
+            "dog_sigma2": float(params.dog_sigma2),
+            "detection_thr_sigma": float(params.detection_thr_sigma),
+            "max_candidates_per_frame": int(params.max_candidates_per_frame),
+            "merge_radius_px": float(params.merge_radius_px),
+            "min_photons": float(params.min_photons),
+            "max_uncertainty_nm": float(params.max_uncertainty_nm),
+            "upsample": int(params.upsample),
+            "render_mode": str(params.render_mode),
+            "render_sigma_nm": float(params.render_sigma_nm),
+        }
+
+    def _on_smlm_runbook_toggled(self, checked: bool) -> None:
+        state = self._get_runbook_state()
+        state.enabled = bool(checked)
+        append_provenance_event(
+            state,
+            event_type="runbook_toggled",
+            payload={"enabled": bool(checked)},
+        )
+        self._sync_runbook_state_to_session()
+        self._set_status(
+            "SMLM runbook mode enabled." if checked else "SMLM runbook mode disabled."
+        )

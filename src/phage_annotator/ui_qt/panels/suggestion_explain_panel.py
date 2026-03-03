@@ -11,8 +11,8 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(3)
 
         self.header_lbl = QtWidgets.QLabel("Why Was This Suggested?")
         self.header_lbl.setStyleSheet("font-weight: 600;")
@@ -38,7 +38,7 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
 
         comp_group = QtWidgets.QGroupBox("Score Components")
         comp_layout = QtWidgets.QVBoxLayout(comp_group)
-        comp_layout.setContentsMargins(8, 8, 8, 8)
+        comp_layout.setContentsMargins(4, 4, 4, 4)
         self.components_txt = QtWidgets.QPlainTextEdit()
         self.components_txt.setReadOnly(True)
         self.components_txt.setMaximumBlockCount(200)
@@ -47,7 +47,7 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
 
         patch_group = QtWidgets.QGroupBox("Local Patch Preview")
         patch_layout = QtWidgets.QVBoxLayout(patch_group)
-        patch_layout.setContentsMargins(8, 8, 8, 8)
+        patch_layout.setContentsMargins(4, 4, 4, 4)
         self.patch_lbl = QtWidgets.QLabel("No suggestion selected.")
         self.patch_lbl.setMinimumHeight(140)
         self.patch_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)

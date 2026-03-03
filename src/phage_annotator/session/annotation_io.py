@@ -211,8 +211,8 @@ class SessionAnnotationIOMixin:
                 seen_ids.add(kp.annotation_id)
             else:
                 key = (
-                    int(round(kp.x_px / eps)),
-                    int(round(kp.y_px / eps)),
+                    int(round(kp.x / eps)),
+                    int(round(kp.y / eps)),
                     int(kp.t),
                     int(kp.z),
                     kp.label,

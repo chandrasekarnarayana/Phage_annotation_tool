@@ -76,6 +76,12 @@ jobs:
               )
           print("Test layout guard passed.")
           PY
+      - name: Release hygiene guard
+        run: python scripts/check_release_hygiene.py
+      - name: Markdown quality guard
+        run: python scripts/check_markdown_quality.py
+      - name: Console scripts declaration guard
+        run: python -m pytest -q tests/unit/test_cli_entrypoints.py
 
   test-core:
     name: Core Tests (${{ matrix.os }} / py${{ matrix.python-version }})
@@ -95,7 +101,7 @@ jobs:
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .[dev]
+          python -m pip install .[dev,cache]
       - name: Prepare artifacts dir
         run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
       - name: Diagnostics
@@ -133,7 +139,7 @@ jobs:
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .[dev]
+          python -m pip install .[dev,cache]
       - name: Prepare artifacts dir
         run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
       - name: Install Xvfb
@@ -174,7 +180,7 @@ jobs:
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .[dev]
+          python -m pip install .[dev,cache]
       - name: Prepare artifacts dir
         run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
       - name: Install Xvfb
@@ -194,7 +200,9 @@ jobs:
               open_training_controls_routes_to_preferences or
               layout_preset_action_fires_once or
               overlay_toggle_action_fires_once or
-              reset_layout_action_fires_once"
+              reset_layout_action_fires_once or
+              smlm_preflight_fixit_card_wiring or
+              smlm_plugin_dropdown_hides_internal_profiles"
           --junitxml=artifacts/junit-gui-ux-state.xml
           --log-file=artifacts/pytest-gui-ux-state.log
       - name: Upload GUI UX artifacts
@@ -202,6 +210,67 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gui-ux-state-artifacts-ubuntu-22.04-py3.11
+          path: artifacts
+
+  test-fiji-integration:
+    name: Fiji Integration Tests (optional)
+    if: ${{ vars.FIJI_APP_PATH != '' && vars.FIJI_EXE_PATH != '' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      FIJI_APP_PATH: ${{ vars.FIJI_APP_PATH }}
+      FIJI_EXE_PATH: ${{ vars.FIJI_EXE_PATH }}
+      QT_QPA_PLATFORM: offscreen
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .[dev,cache]
+      - name: Prepare artifacts dir
+        run: python -c "import pathlib; pathlib.Path('artifacts').mkdir(exist_ok=True)"
+      - name: Preflight probe
+        run: >
+          python -m phage_annotator.smlm.preflight_cli
+          --backend fiji_subprocess
+          --plugin-id thunder_storm
+          --fiji-exe "$FIJI_EXE_PATH"
+          --probe
+      - name: Demo runner smoke test
+        run: >
+          python -m phage_annotator.smlm.demo_cli
+          --backend fiji_subprocess
+          --plugin-id thunder_storm
+          --fiji-exe "$FIJI_EXE_PATH"
+          --out-dir artifacts/fiji_demo
+          --probe-first
+      - name: Run optional Fiji integration tests
+        run: >
+          python -m pytest -m integration
+          tests/integration/test_fiji_thunderstorm.py
+          --junitxml=artifacts/junit-fiji-integration.xml
+          --log-file=artifacts/pytest-fiji-integration.log
+      - name: Fiji integration summary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path("artifacts/fiji_demo/run_manifest.json")
+          if manifest.exists():
+              print("Probe OK + Demo OK")
+              print(manifest.read_text(encoding="utf-8"))
+          else:
+              print("Demo manifest missing")
+          PY
+      - name: Upload Fiji integration artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fiji-integration-artifacts-ubuntu-22.04-py3.11
           path: artifacts
 
   build:

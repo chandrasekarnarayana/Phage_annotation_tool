@@ -72,7 +72,12 @@ class DensityControlsMixin:
         
         opts = self._density_infer_options_from_ui()
         cfg = self._density_config_from_ui()
-        panel = self.density_panel.target_combo.currentText().lower()
+        panel = self.density_panel.target_combo.currentText().strip().lower()
+        panel = {
+            "mean projection": "mean",
+            "modality 2": "support",
+            "std projection": "std",
+        }.get(panel, panel)
         self._density_last_panel = panel
         self.controller.density_target_panel = panel
         self._settings.setValue("densityTargetPanel", panel)

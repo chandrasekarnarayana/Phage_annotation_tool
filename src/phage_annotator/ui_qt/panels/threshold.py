@@ -49,11 +49,11 @@ class ThresholdPanel(QtWidgets.QWidget):
 
         # Phase ζ: Modality selector for multi-modality analysis
         self.modality_combo = QtWidgets.QComboBox()
-        self.modality_combo.addItem("Current (Primary)")
+        self.modality_combo.addItem("Current (Modality 1)")
         form.addRow("Run on modality", self.modality_combo)
 
         self.target_combo = QtWidgets.QComboBox()
-        self.target_combo.addItems(["Frame", "Mean", "Support"])
+        self.target_combo.addItems(["Frame", "Mean Projection", "Modality 2"])
         form.addRow("Target", self.target_combo)
 
         self.region_chk = QtWidgets.QCheckBox("ROI only")
@@ -204,7 +204,7 @@ class ThresholdPanel(QtWidgets.QWidget):
         """Update modality combo with available modalities."""
         current_text = self.modality_combo.currentText()
         self.modality_combo.clear()
-        self.modality_combo.addItem("Current (Primary)")
+        self.modality_combo.addItem("Current (Modality 1)")
         
         if modality_manager is not None:
             modalities = modality_manager.get_all_modalities()

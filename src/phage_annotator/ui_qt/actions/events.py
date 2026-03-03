@@ -21,6 +21,13 @@ class EventsMixin(KeyboardEventsMixin):
         self.fov_list.currentRowChanged.connect(self._set_fov)
         self.primary_combo.currentIndexChanged.connect(self._set_primary_combo)
         self.support_combo.currentIndexChanged.connect(self._set_support_combo)
+        if getattr(self, "lazy_modality_table", None) is not None:
+            self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
+        if getattr(self, "lazy_add_raw_btn", None) is not None:
+            self.lazy_add_raw_btn.clicked.connect(lambda: self._add_lazy_modality_view("raw"))
+            self.lazy_add_mean_btn.clicked.connect(lambda: self._add_lazy_modality_view("mean"))
+            self.lazy_add_std_btn.clicked.connect(lambda: self._add_lazy_modality_view("std"))
+            self.lazy_remove_btn.clicked.connect(self._remove_selected_lazy_modality_view)
         self.play_t_btn.clicked.connect(lambda: self._toggle_play("t"))
         self.play_z_btn.clicked.connect(lambda: self._toggle_play("z"))
         self.t_minus_button.clicked.connect(lambda: self._step_slider(self.t_slider, -1))
@@ -74,6 +81,12 @@ class EventsMixin(KeyboardEventsMixin):
             self.sync_zoom_chk.stateChanged.connect(self._on_sync_mode_changed)
         if getattr(self, "sync_contrast_chk", None) is not None:
             self.sync_contrast_chk.stateChanged.connect(self._on_sync_mode_changed)
+        if getattr(self, "sync_scope_combo", None) is not None:
+            self.sync_scope_combo.currentTextChanged.connect(self._on_sync_scope_changed)
+        if getattr(self, "sync_select_all_btn", None) is not None:
+            self.sync_select_all_btn.clicked.connect(self._select_all_sync_views)
+        if getattr(self, "sync_clear_btn", None) is not None:
+            self.sync_clear_btn.clicked.connect(self._clear_sync_view_selection)
         self.label_buttons.buttonClicked.connect(self._on_label_change)
         self.scope_group.buttonClicked.connect(self._on_scope_change)
         self.target_group.buttonClicked.connect(self._on_target_change)
@@ -129,7 +142,7 @@ class EventsMixin(KeyboardEventsMixin):
         self.filter_current_chk.stateChanged.connect(lambda _state: self._refresh_table())
         if hasattr(self, "auto_follow_table_chk"):
             self.auto_follow_table_chk.stateChanged.connect(self._on_auto_follow_table_changed)
-        self.show_ann_master_chk.stateChanged.connect(self._refresh_image)
+        self.show_ann_master_chk.stateChanged.connect(self._on_show_annotations_master_changed)
         self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
         if self.roi_manager_widget is not None:
             widget = self.roi_manager_widget
@@ -153,9 +166,13 @@ class EventsMixin(KeyboardEventsMixin):
             sw = self.smlm_panel.thunder
             sw.run_btn.clicked.connect(self._run_smlm)
             sw.cancel_btn.clicked.connect(self._cancel_smlm)
+            sw.preflight_btn.clicked.connect(self._run_smlm_preflight)
             sw.export_csv_btn.clicked.connect(self._export_smlm_csv)
             sw.export_h5_btn.clicked.connect(self._export_smlm_hdf5)
             sw.add_ann_btn.clicked.connect(self._smlm_to_annotations)
+            sw.lock_profile_btn.clicked.connect(self._lock_current_smlm_profile)
+            sw.export_runbook_btn.clicked.connect(self._export_smlm_runbook)
+            sw.repro_mode_chk.toggled.connect(self._on_smlm_runbook_toggled)
             self.smlm_panel.preset_combo.currentTextChanged.connect(self._apply_smlm_preset)
         if self.smlm_panel is not None:
             dw = self.smlm_panel.deep

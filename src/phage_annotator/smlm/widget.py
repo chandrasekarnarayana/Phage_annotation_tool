@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Optional
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from phage_annotator.smlm.backends import discover_bundled_thunderstorm_jar
+from phage_annotator.smlm.external_plugins import discover_external_fiji_plugins
 
 
 @dataclass
@@ -25,6 +29,15 @@ class SmlmUiValues:
     upsample: int
     render_mode: str
     render_sigma_nm: float
+    backend: str
+    plugin_id: str
+    fiji_executable: str
+    fiji_macro_path: str
+    plugin_jar_path: str
+    thunderstorm_jar_path: str
+    fiji_command_template: str
+    pyimagej_app_path: str
+    reproducibility_mode: bool
 
 
 class SmlmDockWidget(QtWidgets.QWidget):
@@ -43,6 +56,15 @@ class SmlmDockWidget(QtWidgets.QWidget):
         self.filter_combo = QtWidgets.QComboBox()
         self.filter_combo.addItems(["wavelet_bspline", "dog"])
         form.addRow("Filter", self.filter_combo)
+
+        self.backend_combo = QtWidgets.QComboBox()
+        self.backend_combo.addItems(["internal", "fiji_subprocess", "fiji_pyimagej"])
+        self.backend_combo.setToolTip("Select execution backend for ThunderSTORM-style localization.")
+        form.addRow("Backend", self.backend_combo)
+
+        self.plugin_combo = QtWidgets.QComboBox()
+        self.plugin_combo.setToolTip("Select Fiji JAR plugin for bridge backends.")
+        form.addRow("Plugin", self.plugin_combo)
 
         self.sigma_spin = QtWidgets.QDoubleSpinBox()
         self.sigma_spin.setRange(0.4, 6.0)
@@ -111,12 +133,58 @@ class SmlmDockWidget(QtWidgets.QWidget):
         self.render_sigma_spin.setValue(10.0)
         form.addRow("Render sigma (nm)", self.render_sigma_spin)
 
+        self.fiji_exec_edit = QtWidgets.QLineEdit()
+        self.fiji_exec_edit.setPlaceholderText("/path/to/Fiji.app/ImageJ-linux64")
+        form.addRow("Fiji executable", self.fiji_exec_edit)
+
+        self.fiji_macro_edit = QtWidgets.QLineEdit()
+        self.fiji_macro_edit.setPlaceholderText("/path/to/thunderstorm_macro.ijm")
+        form.addRow("Fiji macro/script", self.fiji_macro_edit)
+
+        self.thunderstorm_jar_edit = QtWidgets.QLineEdit()
+        self.thunderstorm_jar_edit.setPlaceholderText("/path/to/Thunder_STORM.jar")
+        form.addRow("Plugin JAR", self.thunderstorm_jar_edit)
+
+        self.fiji_command_template_edit = QtWidgets.QLineEdit()
+        self.fiji_command_template_edit.setPlaceholderText(
+            "{fiji_executable} --headless -macro {macro_path} "
+            "'input=\"{input_tif}\",output=\"{output_csv}\",params=\"{params_json}\"'"
+        )
+        self.fiji_command_template_edit.setToolTip(
+            "Optional override command template. Supports: {fiji_executable}, {macro_path}, "
+            "{input_tif}, {output_csv}, {params_json}."
+        )
+        form.addRow("Fiji command template", self.fiji_command_template_edit)
+
+        self.pyimagej_app_edit = QtWidgets.QLineEdit()
+        self.pyimagej_app_edit.setPlaceholderText("/path/to/Fiji.app")
+        form.addRow("PyImageJ app path", self.pyimagej_app_edit)
+
+        self._plugin_descriptors = {}
+        self._populate_plugin_list()
+        self.plugin_combo.currentIndexChanged.connect(self._on_plugin_changed)
+        self.backend_combo.currentIndexChanged.connect(self._refresh_effective_config)
+        self.fiji_exec_edit.textChanged.connect(self._refresh_effective_config)
+        self.fiji_macro_edit.textChanged.connect(self._refresh_effective_config)
+        self.thunderstorm_jar_edit.textChanged.connect(self._refresh_effective_config)
+        self.fiji_command_template_edit.textChanged.connect(self._refresh_effective_config)
+        self.pyimagej_app_edit.textChanged.connect(self._refresh_effective_config)
+        bundled = discover_bundled_thunderstorm_jar()
+        if bundled is not None:
+            self.thunderstorm_jar_edit.setText(str(Path(bundled)))
+            self.thunderstorm_jar_edit.setToolTip(
+                "Auto-detected bundled ThunderSTORM JAR. "
+                "Available as PHAGE_THUNDERSTORM_JAR in bridge runs."
+            )
+
         btn_row = QtWidgets.QHBoxLayout()
         self.run_btn = QtWidgets.QPushButton("Run SMLM (ROI)")
         self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.preflight_btn = QtWidgets.QPushButton("Preflight")
         self.cancel_btn.setEnabled(False)
         btn_row.addWidget(self.run_btn)
         btn_row.addWidget(self.cancel_btn)
+        btn_row.addWidget(self.preflight_btn)
         layout.addLayout(btn_row)
 
         self.progress = QtWidgets.QProgressBar()
@@ -126,6 +194,56 @@ class SmlmDockWidget(QtWidgets.QWidget):
 
         self.status_label = QtWidgets.QLabel("Idle")
         layout.addWidget(self.status_label)
+
+        self.fixit_group = QtWidgets.QGroupBox("Guided Fix")
+        self.fixit_group.setVisible(False)
+        fixit_layout = QtWidgets.QVBoxLayout(self.fixit_group)
+        self.fixit_title_label = QtWidgets.QLabel("")
+        self.fixit_title_label.setStyleSheet("font-weight: 600;")
+        self.fixit_detail_label = QtWidgets.QLabel("")
+        self.fixit_detail_label.setWordWrap(True)
+        fixit_layout.addWidget(self.fixit_title_label)
+        fixit_layout.addWidget(self.fixit_detail_label)
+        self.fixit_actions_layout = QtWidgets.QHBoxLayout()
+        self.fixit_actions_layout.addStretch(1)
+        fixit_layout.addLayout(self.fixit_actions_layout)
+        layout.addWidget(self.fixit_group)
+
+        self.effective_config_view = QtWidgets.QPlainTextEdit()
+        self.effective_config_view.setReadOnly(True)
+        self.effective_config_view.setMaximumHeight(140)
+        self.effective_config_view.setPlaceholderText("Effective bridge config")
+        self.execution_group = QtWidgets.QGroupBox("Execution Plan / Debug")
+        self.execution_group.setCheckable(True)
+        self.execution_group.setChecked(False)
+        execution_layout = QtWidgets.QVBoxLayout(self.execution_group)
+        execution_layout.addWidget(self.effective_config_view)
+        debug_btn_row = QtWidgets.QHBoxLayout()
+        self.show_macro_btn = QtWidgets.QPushButton("Show Generated Macro")
+        self.copy_debug_btn = QtWidgets.QPushButton("Copy Debug Report")
+        debug_btn_row.addWidget(self.show_macro_btn)
+        debug_btn_row.addWidget(self.copy_debug_btn)
+        debug_btn_row.addStretch(1)
+        execution_layout.addLayout(debug_btn_row)
+        self.generated_macro_view = QtWidgets.QPlainTextEdit()
+        self.generated_macro_view.setReadOnly(True)
+        self.generated_macro_view.setVisible(False)
+        self.generated_macro_view.setPlaceholderText("Generated/Executed macro content")
+        self.generated_macro_view.setMaximumHeight(140)
+        execution_layout.addWidget(self.generated_macro_view)
+        layout.addWidget(self.execution_group)
+        self.show_macro_btn.clicked.connect(self._toggle_generated_macro_view)
+        self.copy_debug_btn.clicked.connect(self._copy_debug_report)
+
+        runbook_row = QtWidgets.QHBoxLayout()
+        self.repro_mode_chk = QtWidgets.QCheckBox("Runbook mode")
+        self.lock_profile_btn = QtWidgets.QPushButton("Lock Profile")
+        self.export_runbook_btn = QtWidgets.QPushButton("Export Runbook")
+        runbook_row.addWidget(self.repro_mode_chk)
+        runbook_row.addWidget(self.lock_profile_btn)
+        runbook_row.addWidget(self.export_runbook_btn)
+        runbook_row.addStretch(1)
+        layout.addLayout(runbook_row)
 
         color_row = QtWidgets.QHBoxLayout()
         color_row.addWidget(QtWidgets.QLabel("Color by"))
@@ -145,6 +263,7 @@ class SmlmDockWidget(QtWidgets.QWidget):
         layout.addLayout(export_row)
 
         layout.addStretch(1)
+        self._refresh_effective_config()
 
     def values(self) -> SmlmUiValues:
         """Return a typed snapshot of the current UI values."""
@@ -162,4 +281,143 @@ class SmlmDockWidget(QtWidgets.QWidget):
             upsample=int(self.upsample_spin.value()),
             render_mode=str(self.render_combo.currentText()),
             render_sigma_nm=float(self.render_sigma_spin.value()),
+            backend=str(self.backend_combo.currentText()),
+            plugin_id=str(self.plugin_combo.currentData() or ""),
+            fiji_executable=str(self.fiji_exec_edit.text()).strip(),
+            fiji_macro_path=str(self.fiji_macro_edit.text()).strip(),
+            plugin_jar_path=str(self.thunderstorm_jar_edit.text()).strip(),
+            thunderstorm_jar_path=str(self.thunderstorm_jar_edit.text()).strip(),
+            fiji_command_template=str(self.fiji_command_template_edit.text()).strip(),
+            pyimagej_app_path=str(self.pyimagej_app_edit.text()).strip(),
+            reproducibility_mode=bool(self.repro_mode_chk.isChecked()),
         )
+
+    def _populate_plugin_list(self) -> None:
+        current_id = str(self.plugin_combo.currentData() or "")
+        self.plugin_combo.blockSignals(True)
+        self.plugin_combo.clear()
+        self._plugin_descriptors = {}
+        discovered = discover_external_fiji_plugins()
+        if not discovered:
+            self.plugin_combo.addItem("None (manual jar path)", "")
+        for plugin in discovered:
+            if not bool(getattr(plugin, "ui_visible", True)):
+                continue
+            label = f"{plugin.name} ({plugin.plugin_id})"
+            self.plugin_combo.addItem(label, plugin.plugin_id)
+            self._plugin_descriptors[plugin.plugin_id] = plugin
+        idx = self.plugin_combo.findData(current_id)
+        if idx >= 0:
+            self.plugin_combo.setCurrentIndex(idx)
+        elif self.plugin_combo.count() > 0:
+            self.plugin_combo.setCurrentIndex(0)
+        self.plugin_combo.blockSignals(False)
+        self._on_plugin_changed(self.plugin_combo.currentIndex())
+
+    def _on_plugin_changed(self, _index: int) -> None:
+        plugin_id = str(self.plugin_combo.currentData() or "")
+        if not plugin_id:
+            return
+        plugin = self._plugin_descriptors.get(plugin_id)
+        if plugin is None:
+            return
+        if plugin.jar_path:
+            self.thunderstorm_jar_edit.setText(plugin.jar_path)
+        if plugin.macro_path and not self.fiji_macro_edit.text().strip():
+            self.fiji_macro_edit.setText(plugin.macro_path)
+        self._refresh_effective_config()
+
+    def _refresh_effective_config(self, *_args) -> None:
+        if not hasattr(self, "effective_config_view"):
+            return
+        plugin_id = str(self.plugin_combo.currentData() or "")
+        plugin_label = self.plugin_combo.currentText() or "(none)"
+        plugin = self._plugin_descriptors.get(plugin_id)
+        macro_text = self.fiji_macro_edit.text().strip()
+        macro_source = "user-supplied"
+        if not macro_text:
+            if plugin is not None and plugin.macro_path:
+                macro_source = "bundled default"
+            elif plugin is not None and plugin.manifest is not None:
+                macro_source = "generated-from-manifest"
+            else:
+                macro_source = "missing"
+        lines = [
+            f"backend={self.backend_combo.currentText()}",
+            f"plugin={plugin_label}",
+            f"plugin_id={plugin_id}",
+            f"fiji_executable={self.fiji_exec_edit.text().strip()}",
+            f"macro_path={macro_text or '<auto-resolved>'}",
+            f"macro_source={macro_source}",
+            f"plugin_jar={self.thunderstorm_jar_edit.text().strip()}",
+            f"pyimagej_app={self.pyimagej_app_edit.text().strip()}",
+            "timeout_sec=900",
+            f"generated_at={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        ]
+        if plugin is not None and plugin.command_names:
+            lines.append(f"plugin_commands={', '.join(plugin.command_names[:2])}")
+        if plugin is not None and plugin.manifest is not None:
+            manifest = plugin.manifest
+            lines.append(f"plugin_version_tested={manifest.plugin_version_tested or 'n/a'}")
+            lines.append(f"csv_schema_version={manifest.csv_schema_version or 'n/a'}")
+            if manifest.required_columns:
+                lines.append(f"required_columns={', '.join(manifest.required_columns)}")
+        template = self.fiji_command_template_edit.text().strip()
+        lines.append("command_template=custom" if template else "command_template=default")
+        self.effective_config_view.setPlainText("\n".join(lines))
+
+    def _toggle_generated_macro_view(self) -> None:
+        visible = not self.generated_macro_view.isVisible()
+        self.generated_macro_view.setVisible(visible)
+        self.show_macro_btn.setText("Hide Generated Macro" if visible else "Show Generated Macro")
+
+    def _copy_debug_report(self) -> None:
+        lines = [self.effective_config_view.toPlainText().strip()]
+        macro = self.generated_macro_view.toPlainText().strip()
+        if macro:
+            lines.append("=== GENERATED_MACRO ===")
+            lines.append(macro)
+        text = "\n\n".join([part for part in lines if part])
+        QtWidgets.QApplication.clipboard().setText(text)
+
+    def append_debug_report(self, text: str) -> None:
+        """Append diagnostics to execution plan panel."""
+        existing = self.effective_config_view.toPlainText().strip()
+        prefix = f"{existing}\n\n" if existing else ""
+        self.effective_config_view.setPlainText(prefix + text.strip())
+
+    def set_generated_macro(self, macro_text: str) -> None:
+        """Set generated/executed macro text in debug panel."""
+        self.generated_macro_view.setPlainText((macro_text or "").strip())
+
+    def clear_fixit_card(self) -> None:
+        """Hide and clear guided fix card."""
+        self._clear_fixit_buttons()
+        self.fixit_title_label.setText("")
+        self.fixit_detail_label.setText("")
+        self.fixit_group.setVisible(False)
+
+    def set_fixit_card(
+        self,
+        *,
+        title: str,
+        detail: str,
+        actions: list[tuple[str, Callable[[], None]]],
+    ) -> None:
+        """Show guided fix card with actionable buttons."""
+        self._clear_fixit_buttons()
+        self.fixit_title_label.setText(title.strip())
+        self.fixit_detail_label.setText(detail.strip())
+        for label, handler in actions:
+            btn = QtWidgets.QPushButton(label)
+            btn.clicked.connect(handler)
+            self.fixit_actions_layout.addWidget(btn)
+        self.fixit_actions_layout.addStretch(1)
+        self.fixit_group.setVisible(True)
+
+    def _clear_fixit_buttons(self) -> None:
+        while self.fixit_actions_layout.count():
+            item = self.fixit_actions_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()

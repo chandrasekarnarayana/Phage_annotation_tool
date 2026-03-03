@@ -272,7 +272,7 @@ class RenderingMixin:
         titles = {
             "frame": f"Frame (T={t_idx}, Z={z_idx})",
             "mean": "Mean Projection",
-            "support": f"Support (T={t_idx}, Z={z_idx})",
+            "support": f"Modality 2 (T={t_idx}, Z={z_idx})",
             "std": "Std Projection",
         }
         extents = {}
@@ -938,7 +938,7 @@ class RenderingMixin:
         if target == "mean":
             target_txt = f"Mean Projection (Z=1-{max(1, z_total)})"
         elif target == "support":
-            target_txt = "Support"
+            target_txt = "Modality 2"
         else:
             target_txt = f"Frame T={int(t_idx) + 1} Z={int(z_idx) + 1}"
 

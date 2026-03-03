@@ -149,10 +149,10 @@ class ThresholdControlsMixin:
             return None
         if target == "Frame":
             return self._slice_data(prim)
-        if target == "Mean":
+        if target in {"Mean", "Mean Projection"}:
             data, _ = self._get_projection(prim, "mean")
             return data
-        if target == "Support":
+        if target in {"Support", "Modality 2"}:
             if self.support_image.array is None:
                 return None
             return self._slice_data(self.support_image)

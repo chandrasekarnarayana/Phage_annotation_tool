@@ -144,13 +144,20 @@ def integrate_b_contrast_features(main_window: KeypointAnnotator) -> None:
         print(f"[B&C Integration] Warning: Failed to install keyboard shortcuts: {e}")
         shortcut_manager = None
     
-    # Install visual indicators in status bar (if status bar exists)
+    # Install visual indicators in status bar only when explicitly enabled.
     try:
-        if main_window.statusBar() is not None:
-            indicator_bar = VisualIndicatorIntegration.install_status_indicators(main_window)
-            print("[B&C Integration] Visual indicators installed successfully")
-        else:
-            print("[B&C Integration] Warning: Status bar not available for indicators")
+        settings = getattr(main_window, "_settings", None)
+        indicators_enabled = bool(
+            settings.value("statusIndicatorBarEnabled", False, type=bool)
+            if settings is not None
+            else False
+        )
+        if indicators_enabled:
+            if main_window.statusBar() is not None:
+                VisualIndicatorIntegration.install_status_indicators(main_window)
+                print("[B&C Integration] Visual indicators installed successfully")
+            else:
+                print("[B&C Integration] Warning: Status bar not available for indicators")
     except Exception as e:
         print(f"[B&C Integration] Warning: Failed to install visual indicators: {e}")
     

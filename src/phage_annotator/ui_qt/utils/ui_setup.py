@@ -12,7 +12,6 @@ from phage_annotator.ui_qt.utils import ui_actions, ui_docks
 from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
-from phage_annotator.ui_qt.panels.right_dock_segment_header import RightDockSegmentHeader
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
 from phage_annotator.rendering.mpl import Renderer
@@ -50,8 +49,9 @@ class UiSetupMixin:
         )
         self.setStyleSheet(
             "QToolBar { spacing: 6px; }"
-            "QDockWidget::title { padding: 4px 6px; }"
-            "QGroupBox { margin-top: 8px; }"
+            "QDockWidget { border: 1px solid #d0d0d0; }"
+            "QDockWidget::title { padding: 4px 6px; background: #f5f5f5; border-bottom: 1px solid #e0e0e0; }"
+            "QGroupBox { margin-top: 8px; border: 1px solid #e8e8e8; border-radius: 4px; }"
             "QPushButton { padding: 4px 8px; }"
             "QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { padding: 2px 6px; }"
         )
@@ -122,12 +122,18 @@ class UiSetupMixin:
 
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
+        central.setStyleSheet(
+            "QWidget { background: #ffffff; }"
+        )
         central_layout = QtWidgets.QVBoxLayout(central)
         central_layout.setContentsMargins(12, 12, 12, 12)
         central_layout.setSpacing(10)
 
         # Explore pane: FOV list + primary/support (sidebar page)
         self.explore_panel = QtWidgets.QWidget()
+        self.explore_panel.setStyleSheet(
+            "QWidget { border: 1px solid #d8d8d8; border-radius: 3px; background: #fafafa; }"
+        )
         explore_layout = QtWidgets.QVBoxLayout(self.explore_panel)
         explore_layout.setContentsMargins(8, 8, 8, 8)
         explore_layout.setSpacing(8)
@@ -141,7 +147,7 @@ class UiSetupMixin:
         explore_layout.addWidget(self.clear_fovs_btn)
 
         primary_box = QtWidgets.QHBoxLayout()
-        primary_box.addWidget(QtWidgets.QLabel("Primary"))
+        primary_box.addWidget(QtWidgets.QLabel("Modality 1"))
         self.primary_combo = QtWidgets.QComboBox()
         self.support_combo = QtWidgets.QComboBox()
         for img in self.images:
@@ -157,12 +163,45 @@ class UiSetupMixin:
         self.support_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
         
         primary_box.addWidget(self.primary_combo)
-        primary_box.addWidget(QtWidgets.QLabel("Support"))
+        primary_box.addWidget(QtWidgets.QLabel("Modality 2"))
         primary_box.addWidget(self.support_combo)
         explore_layout.addLayout(primary_box)
+        modality_group = QtWidgets.QGroupBox("Modalities / Views")
+        modality_layout = QtWidgets.QVBoxLayout(modality_group)
+        modality_layout.setContentsMargins(6, 6, 6, 6)
+        modality_layout.setSpacing(6)
+        self.lazy_modality_table = QtWidgets.QTableWidget(0, 5)
+        self.lazy_modality_table.setHorizontalHeaderLabels(
+            ["Visible", "Name", "Source", "View", "Sync Group"]
+        )
+        self.lazy_modality_table.verticalHeader().setVisible(False)
+        self.lazy_modality_table.horizontalHeader().setStretchLastSection(True)
+        self.lazy_modality_table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.lazy_modality_table.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.DoubleClicked
+            | QtWidgets.QAbstractItemView.EditTrigger.EditKeyPressed
+        )
+        modality_layout.addWidget(self.lazy_modality_table)
+        controls_row = QtWidgets.QHBoxLayout()
+        self.lazy_add_raw_btn = QtWidgets.QPushButton("Add Modality")
+        self.lazy_add_mean_btn = QtWidgets.QPushButton("Add Mean View")
+        self.lazy_add_std_btn = QtWidgets.QPushButton("Add Std View")
+        self.lazy_remove_btn = QtWidgets.QPushButton("Remove")
+        controls_row.addWidget(self.lazy_add_raw_btn)
+        controls_row.addWidget(self.lazy_add_mean_btn)
+        controls_row.addWidget(self.lazy_add_std_btn)
+        controls_row.addWidget(self.lazy_remove_btn)
+        modality_layout.addLayout(controls_row)
+        explore_layout.addWidget(modality_group)
 
         # Annotation table (own dock)
         self.annot_table = QtWidgets.QTableWidget(0, 7)
+        self.annot_table.setStyleSheet(
+            "QTableWidget { border: 1px solid #d0d0d0; alternate-background-color: #f8f8f8; }"
+            "QTableWidget::item { padding: 2px; border-right: 1px solid #e8e8e8; }"
+        )
         self.annot_table.setHorizontalHeaderLabels(["ID", "Scope", "T", "Z", "Y", "X", "Label"])
         self.annot_table.setSelectionBehavior(
             QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
@@ -178,18 +217,14 @@ class UiSetupMixin:
         if self.auto_follow_table_chk.isChecked():
             self.filter_current_chk.setChecked(True)
         self.annotation_table_panel = QtWidgets.QWidget()
-        annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
-        annot_layout.setContentsMargins(8, 8, 8, 8)
-        annot_layout.setSpacing(8)
-        self.annotation_segment_header = RightDockSegmentHeader(self.annotation_table_panel)
-        self.annotation_segment_header.segment_requested.connect(self._activate_right_dock_segment)
-        self.annotation_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
-        annot_layout.addWidget(self.annotation_segment_header)
-        self.review_queue_hint_lbl = QtWidgets.QLabel(
-            "Tip: Review Queue is a tab in this right-side dock."
+        self.annotation_table_panel.setStyleSheet(
+            "QWidget { border: 1px solid #d8d8d8; border-radius: 3px; background: #fafafa; }"
         )
-        self.review_queue_hint_lbl.setStyleSheet("color: #666; font-style: italic;")
-        annot_layout.addWidget(self.review_queue_hint_lbl)
+        annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
+        annot_layout.setContentsMargins(4, 4, 4, 4)
+        annot_layout.setSpacing(4)
+        self.annotation_segment_header = None
+        self.review_queue_hint_lbl = None
         table_filter_row = QtWidgets.QHBoxLayout()
         table_filter_row.addWidget(self.filter_current_chk)
         table_filter_row.addWidget(self.auto_follow_table_chk)
@@ -199,6 +234,9 @@ class UiSetupMixin:
 
         # Figure area
         fig_container = QtWidgets.QWidget()
+        fig_container.setStyleSheet(
+            "QWidget { border: 1px solid #c0c0c0; border-radius: 4px; background: #ffffff; }"
+        )
         fig_layout = QtWidgets.QVBoxLayout(fig_container)
         fig_layout.setContentsMargins(8, 8, 8, 8)
         fig_layout.setSpacing(6)
@@ -232,6 +270,9 @@ class UiSetupMixin:
 
         # Playback bar (compact bottom controls)
         playback_bar = QtWidgets.QWidget()
+        playback_bar.setStyleSheet(
+            "QWidget { border-top: 2px solid #b8b8b8; background: #f9f9f9; border-radius: 3px; }"
+        )
         playback_layout = QtWidgets.QGridLayout(playback_bar)
         playback_layout.setContentsMargins(6, 6, 6, 6)
         playback_layout.setSpacing(6)
@@ -293,13 +334,22 @@ class UiSetupMixin:
         self.playback_target_combo = QtWidgets.QComboBox()
         self.playback_target_combo.addItem("Active")
         self.playback_target_btn = QtWidgets.QPushButton("Play Target")
-        playback_layout.addWidget(QtWidgets.QLabel("Mode"), 3, 0)
-        playback_layout.addWidget(self.playback_mode_combo, 3, 1)
-        playback_layout.addWidget(self.playback_target_combo, 3, 2)
-        playback_layout.addWidget(self.playback_target_btn, 3, 3)
-        self.quick_hist_btn = QtWidgets.QPushButton("Histogram")
-        self.quick_profile_btn = QtWidgets.QPushButton("Profile")
-        self.quick_qc_btn = QtWidgets.QPushButton("QC Issues")
+        # Keep advanced playback routing controls available for programmatic use,
+        # but do not crowd the default bottom control strip.
+        self.playback_mode_combo.setVisible(False)
+        self.playback_target_combo.setVisible(False)
+        self.playback_target_btn.setVisible(False)
+        self.quick_panels_btn = QtWidgets.QToolButton()
+        self.quick_panels_btn.setText("Panels")
+        self.quick_panels_btn.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.quick_panels_menu = QtWidgets.QMenu(self.quick_panels_btn)
+        self.quick_hist_act = self.quick_panels_menu.addAction("Histogram")
+        self.quick_hist_act.setCheckable(True)
+        self.quick_profile_act = self.quick_panels_menu.addAction("Profile")
+        self.quick_profile_act.setCheckable(True)
+        self.quick_qc_act = self.quick_panels_menu.addAction("QC Issues")
+        self.quick_qc_act.setCheckable(True)
+        self.quick_panels_btn.setMenu(self.quick_panels_menu)
         self.quick_layout_btn = QtWidgets.QToolButton()
         self.quick_layout_btn.setText("Layouts")
         self.quick_layout_btn.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -310,14 +360,11 @@ class UiSetupMixin:
         self.quick_layout_menu.addAction("Assist Expert", lambda: self.apply_preset("Assist Expert"))
         self.quick_layout_menu.addAction("Minimal", lambda: self.apply_preset("Minimal"))
         self.quick_layout_btn.setMenu(self.quick_layout_menu)
-        self.quick_hist_btn.setToolTip("Toggle histogram panel")
-        self.quick_profile_btn.setToolTip("Toggle line profile panel")
-        self.quick_qc_btn.setToolTip("Show QC issues panel")
+        self.quick_panels_btn.setToolTip("Quick panel toggles")
         self.quick_layout_btn.setToolTip("Quick layout presets")
-        playback_layout.addWidget(self.quick_hist_btn, 4, 1)
-        playback_layout.addWidget(self.quick_profile_btn, 4, 2)
-        playback_layout.addWidget(self.quick_qc_btn, 4, 3)
-        playback_layout.addWidget(self.quick_layout_btn, 4, 0)
+        # Keep panel/layout quick menus available from menu bar and command palette.
+        self.quick_panels_btn.setVisible(False)
+        self.quick_layout_btn.setVisible(False)
 
         display_group = QtWidgets.QGroupBox("Display")
         display_layout = QtWidgets.QGridLayout(display_group)
@@ -452,6 +499,25 @@ class UiSetupMixin:
         sync_layout.addWidget(self.sync_zoom_chk, 2, 3)
         sync_layout.addWidget(self.sync_contrast_label, 3, 0)
         sync_layout.addWidget(self.sync_contrast_chk, 3, 1)
+        self.sync_scope_combo = QtWidgets.QComboBox()
+        self.sync_scope_combo.addItems(
+            ["Active view only", "Selected linked views", "All linked views"]
+        )
+        self.sync_scope_combo.setCurrentIndex(1)
+        self.sync_select_all_btn = QtWidgets.QPushButton("Select all")
+        self.sync_clear_btn = QtWidgets.QPushButton("Clear")
+        self.sync_scope_hint_lbl = QtWidgets.QLabel(
+            "Contrast edits apply to selected linked views."
+        )
+        self.sync_scope_hint_lbl.setStyleSheet("color: #546e7a;")
+        self.sync_keys_hint_lbl = QtWidgets.QLabel("Sync keys: -")
+        self.sync_keys_hint_lbl.setStyleSheet("color: #455a64; font-style: italic;")
+        sync_layout.addWidget(QtWidgets.QLabel("Contrast scope"), 4, 0)
+        sync_layout.addWidget(self.sync_scope_combo, 4, 1, 1, 2)
+        sync_layout.addWidget(self.sync_select_all_btn, 5, 0)
+        sync_layout.addWidget(self.sync_clear_btn, 5, 1)
+        sync_layout.addWidget(self.sync_scope_hint_lbl, 6, 0, 1, 4)
+        sync_layout.addWidget(self.sync_keys_hint_lbl, 7, 0, 1, 4)
         display_layout.addWidget(sync_group, drow, 0, 1, 3)
         drow += 1
 
@@ -759,16 +825,8 @@ class UiSetupMixin:
         # Re-apply registry shortcuts now that panel-switcher action exists.
         apply_menu_shortcuts(self)
         self._init_panel_policy_controls()
-        self.review_segment_header = RightDockSegmentHeader(self.review_queue_panel)
-        self.review_segment_header.segment_requested.connect(self._activate_right_dock_segment)
-        self.review_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
-        if getattr(self, "review_queue_panel", None) is not None:
-            self.review_queue_panel.layout().insertWidget(0, self.review_segment_header)
-        self.explain_segment_header = RightDockSegmentHeader(self.suggestion_explain_panel)
-        self.explain_segment_header.segment_requested.connect(self._activate_right_dock_segment)
-        self.explain_segment_header.review_pack_toggled.connect(self._toggle_review_context_pack)
-        if getattr(self, "suggestion_explain_panel", None) is not None:
-            self.suggestion_explain_panel.layout().insertWidget(0, self.explain_segment_header)
+        self.review_segment_header = None
+        self.explain_segment_header = None
         self._init_channel_panel_integration()
         self._setup_annotation_toolbar()
 
@@ -1014,10 +1072,12 @@ class UiSetupMixin:
                 self.modality_layers_panel.first_run_hint_lbl.setVisible(show_hint)
                 if show_hint:
                     self._settings.setValue("firstRunHintModalityLayers", False)
-        self.quick_hist_btn.clicked.connect(self._toggle_hist_panel)
-        self.quick_profile_btn.clicked.connect(self._toggle_profile_panel)
-        self.quick_qc_btn.clicked.connect(
-            lambda: self.set_panel_visible("qc_issues", True, source="quick_button:qc")
+        self.quick_hist_act.triggered.connect(lambda _checked=False: self._toggle_hist_panel())
+        self.quick_profile_act.triggered.connect(lambda _checked=False: self._toggle_profile_panel())
+        self.quick_qc_act.triggered.connect(
+            lambda _checked=False: self.set_panel_visible(
+                "qc_issues", True, source="quick_button:qc"
+            )
         )
         for dock_attr in (
             "dock_hist",
@@ -1061,6 +1121,8 @@ class UiSetupMixin:
         self._refresh_panel_policy_controls()
         self._refresh_assist_warmup_panel()
         self._refresh_right_dock_segment_headers()
+        if hasattr(self, "_refresh_lazy_modality_table"):
+            self._refresh_lazy_modality_table()
         if hasattr(self, "advanced_open_explain_btn"):
             self.advanced_open_explain_btn.clicked.connect(
                 lambda: self._set_panel_visibility("suggestion_explain", True)
@@ -1106,15 +1168,16 @@ class UiSetupMixin:
         if bool(self._settings.value("firstRunWelcomeShown", False, type=bool)):
             return
         self._settings.setValue("firstRunWelcomeShown", True)
-        QtWidgets.QMessageBox.information(
-            self,
-            "Welcome",
-            (
-                "• Use A/R/N/P to review suggestions\n"
-                "• Check Status Bar for scope & assist state\n"
-                "• Try Layout Presets from Layout menu"
-            ),
-        )
+        # Non-blocking onboarding: status message instead of modal popup.
+        if hasattr(self, "_set_status"):
+            self._set_status(
+                "Welcome: A/R/N/P review suggestions | Check status bar | Layout menu has presets"
+            )
+        else:
+            self.statusBar().showMessage(
+                "Welcome: A/R/N/P review suggestions | Check status bar | Layout menu has presets",
+                8000,
+            )
 
     def _init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         ui_docks.init_panels(self, dock_menu)
@@ -1350,6 +1413,9 @@ class UiSetupMixin:
 
     def _make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_suggestion_explain_widget(self)
+
+    def _make_status_details_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_status_details_widget(self)
 
     def _make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_advanced_analysis_widget(self)

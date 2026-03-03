@@ -116,25 +116,38 @@ class DockActionsMixin:
                     act.blockSignals(True)
                     act.setChecked(visible)
                     act.blockSignals(False)
-        if getattr(self, "quick_hist_btn", None) is not None and getattr(self, "dock_hist", None) is not None:
-            self.quick_hist_btn.setText(
-                "Histogram (On)" if bool(self.dock_hist.isVisible()) else "Histogram (Off)"
-            )
-        if getattr(self, "quick_profile_btn", None) is not None and getattr(self, "dock_profile", None) is not None:
-            self.quick_profile_btn.setText(
-                "Profile (On)" if bool(self.dock_profile.isVisible()) else "Profile (Off)"
-            )
+        hist_act = getattr(self, "quick_hist_act", None)
+        if hist_act is not None and getattr(self, "dock_hist", None) is not None:
+            hist_act.blockSignals(True)
+            hist_act.setChecked(bool(self.dock_hist.isVisible()))
+            hist_act.setText("Histogram")
+            hist_act.blockSignals(False)
+        profile_act = getattr(self, "quick_profile_act", None)
+        if profile_act is not None and getattr(self, "dock_profile", None) is not None:
+            profile_act.blockSignals(True)
+            profile_act.setChecked(bool(self.dock_profile.isVisible()))
+            profile_act.setText("Profile")
+            profile_act.blockSignals(False)
+        qc_act = getattr(self, "quick_qc_act", None)
+        if qc_act is not None and getattr(self, "dock_qc_issues", None) is not None:
+            qc_act.blockSignals(True)
+            qc_act.setChecked(bool(self.dock_qc_issues.isVisible()))
+            qc_act.blockSignals(False)
 
     def _update_qc_button_highlight(self, issue_count: int) -> None:
         """Highlight QC quick button when active issues exist."""
-        btn = getattr(self, "quick_qc_btn", None)
-        if btn is None:
+        btn = getattr(self, "quick_panels_btn", None)
+        act = getattr(self, "quick_qc_act", None)
+        if btn is None and act is None:
             return
         count = int(max(0, issue_count))
-        btn.setText(f"QC Issues ({count})" if count > 0 else "QC Issues")
+        if act is not None:
+            act.setText(f"QC Issues ({count})" if count > 0 else "QC Issues")
         if count > 0:
-            btn.setStyleSheet(
-                "QPushButton { background-color: #f4c542; color: #1f1f1f; font-weight: 600; }"
-            )
+            if btn is not None:
+                btn.setStyleSheet(
+                    "QToolButton { background-color: #f4c542; color: #1f1f1f; font-weight: 600; }"
+                )
         else:
-            btn.setStyleSheet("")
+            if btn is not None:
+                btn.setStyleSheet("")

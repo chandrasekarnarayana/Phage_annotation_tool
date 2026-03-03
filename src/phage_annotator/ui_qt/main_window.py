@@ -384,6 +384,7 @@ class KeypointAnnotator(
         self._sr_overlay_extent = None
         self._smlm_run_history: List[dict] = []
         self._last_smlm_run: Optional[dict] = None
+        self._smlm_runbook_state = None
         self.show_smlm_points = True
         self.show_sr_overlay = True
         self._threshold_preview_mask = None

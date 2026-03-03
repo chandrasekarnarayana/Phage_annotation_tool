@@ -213,6 +213,18 @@ class JobManager(QtCore.QObject):
         for token in list(self._tokens.values()):
             token.cancel()
 
+    def cancel(self, job_id: str) -> bool:
+        """Cancel a specific running job by id."""
+        token = self._tokens.get(str(job_id))
+        if token is None:
+            return False
+        token.cancel()
+        return True
+
+    def active_job_count(self) -> int:
+        """Return count of currently tracked active jobs."""
+        return int(len(self._tokens))
+
     def _dispatch_result(self, job_id: str, result: Any) -> None:
         callbacks = self._callbacks.get(job_id)
         if callbacks and callbacks[0] is not None:

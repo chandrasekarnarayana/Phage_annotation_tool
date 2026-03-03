@@ -78,6 +78,8 @@ class ExportMixin:
 
     def _save_project(self) -> None:
         """Save a .phageproj plus per-image annotations."""
+        if hasattr(self, "_sync_runbook_state_to_session"):
+            self._sync_runbook_state_to_session()
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
             "Save project",
@@ -179,6 +181,15 @@ class ExportMixin:
             "disable_bulk_accept_when_stale": bool(
                 getattr(self, "_disable_bulk_accept_when_stale", True)
             ),
+            "smlm_runbook_enabled": bool(
+                getattr(self.controller.session_state, "smlm_runbook_enabled", False)
+            ),
+            "smlm_runbook_locked_profiles": dict(
+                getattr(self.controller.session_state, "smlm_runbook_locked_profiles", {})
+            ),
+            "smlm_runbook_provenance": list(
+                getattr(self.controller.session_state, "smlm_runbook_provenance", [])
+            ),
         }
         self.controller.save_project(
             self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
@@ -210,6 +221,8 @@ class ExportMixin:
         self.fov_list.setCurrentRow(self.current_image_idx)
         self.primary_combo.setCurrentIndex(self.current_image_idx)
         self.support_combo.setCurrentIndex(self.support_image_idx)
+        if hasattr(self, "_refresh_lazy_modality_table"):
+            self._refresh_lazy_modality_table()
         self.speed_slider.setValue(int(self.controller.session_state.fps))
         mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
         self.current_cmap_idx = mapping.lut
@@ -226,6 +239,31 @@ class ExportMixin:
             self.roi_manager.rois_by_image = self.controller.rois_by_image
         self._smlm_run_history = list(self.controller.session_state.smlm_runs)
         self._last_smlm_run = self._smlm_run_history[-1] if self._smlm_run_history else None
+        if self.smlm_panel is not None and self._last_smlm_run:
+            backend = str(self._last_smlm_run.get("backend", "internal"))
+            backend_cfg = dict(self._last_smlm_run.get("backend_config", {}) or {})
+            thunder = self.smlm_panel.thunder
+            idx = thunder.backend_combo.findText(backend)
+            if idx >= 0:
+                thunder.backend_combo.setCurrentIndex(idx)
+            plugin_id = str(backend_cfg.get("plugin_id", ""))
+            plugin_idx = thunder.plugin_combo.findData(plugin_id)
+            if plugin_idx >= 0:
+                thunder.plugin_combo.setCurrentIndex(plugin_idx)
+            thunder.fiji_exec_edit.setText(str(backend_cfg.get("fiji_executable", "")))
+            thunder.fiji_macro_edit.setText(str(backend_cfg.get("fiji_macro_path", "")))
+            thunder.thunderstorm_jar_edit.setText(
+                str(
+                    backend_cfg.get(
+                        "plugin_jar_path",
+                        backend_cfg.get("thunderstorm_jar_path", ""),
+                    )
+                )
+            )
+            thunder.fiji_command_template_edit.setText(
+                str(backend_cfg.get("fiji_command_template", ""))
+            )
+            thunder.pyimagej_app_edit.setText(str(backend_cfg.get("pyimagej_app_path", "")))
         self._threshold_settings = dict(self.controller.session_state.threshold_settings)
         if self.threshold_panel is not None and self._threshold_settings:
             self._apply_threshold_settings(self._threshold_settings)
@@ -249,6 +287,23 @@ class ExportMixin:
         self._disable_bulk_accept_when_stale = bool(
             getattr(self.controller.session_state, "disable_bulk_accept_when_stale", True)
         )
+        if getattr(self, "_smlm_runbook_state", None) is None:
+            from phage_annotator.smlm.reproducibility import ReproducibilityRunbookState
+
+            self._smlm_runbook_state = ReproducibilityRunbookState()
+        self._smlm_runbook_state.enabled = bool(
+            getattr(self.controller.session_state, "smlm_runbook_enabled", False)
+        )
+        self._smlm_runbook_state.locked_profiles = dict(
+            getattr(self.controller.session_state, "smlm_runbook_locked_profiles", {}) or {}
+        )
+        self._smlm_runbook_state.provenance_events = list(
+            getattr(self.controller.session_state, "smlm_runbook_provenance", []) or []
+        )
+        if getattr(self, "smlm_panel", None) is not None:
+            self.smlm_panel.thunder.repro_mode_chk.blockSignals(True)
+            self.smlm_panel.thunder.repro_mode_chk.setChecked(self._smlm_runbook_state.enabled)
+            self.smlm_panel.thunder.repro_mode_chk.blockSignals(False)
         if hasattr(self, "annotation_space_combo"):
             self.annotation_space_combo.blockSignals(True)
             self.annotation_space_combo.setCurrentText(
@@ -337,7 +392,7 @@ class ExportMixin:
         layout = QtWidgets.QFormLayout(dlg)
         panel_combo = QtWidgets.QComboBox()
         panel_combo.setObjectName("export_dialog_combo_panel")
-        panel_combo.addItems(["Frame", "Mean", "Support", "Std"])
+        panel_combo.addItems(["Frame", "Mean Projection", "Modality 2", "Std Projection"])
         scope_combo = QtWidgets.QComboBox()
         scope_combo.setObjectName("export_dialog_combo_scope")
         scope_combo.addItems(["Current slice", "T range", "All frames"])
@@ -430,8 +485,14 @@ class ExportMixin:
 
         fmt = fmt_combo.currentText().lower()
         default_name = pathlib.Path(self.primary_image.path).with_suffix(f".export.{fmt}")
+        panel_key = panel_combo.currentText().strip().lower()
+        panel_key = {
+            "mean projection": "mean",
+            "modality 2": "support",
+            "std projection": "std",
+        }.get(panel_key, panel_key)
         opts = ExportOptions(
-            panel=panel_combo.currentText().lower(),
+            panel=panel_key,
             region=region_combo.currentText().lower(),
             include_roi_outline=roi_outline_chk.isChecked(),
             include_roi_fill=roi_fill_chk.isChecked(),
@@ -453,13 +514,13 @@ class ExportMixin:
         t_values = self._export_t_values(scope, t_start.value(), t_end.value())
 
         # P1.5: Export guardrails and preflight validation
-        # 1) Support panel requires a loaded support image
+        # 1) Modality 2 panel requires a loaded secondary image
         if opts.panel == "support":
             if self.support_image is None or self.support_image.array is None:
                 QtWidgets.QMessageBox.warning(
                     self,
                     "Export blocked",
-                    "Support image is not loaded. Choose a different panel or load a support image.",
+                    "Modality 2 image is not loaded. Choose a different panel or load a secondary modality.",
                 )
                 return
         # 2) ROI-based region requires a valid ROI

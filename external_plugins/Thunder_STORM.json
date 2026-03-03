@@ -1,0 +1,58 @@
+{
+  "plugin_id": "thunder_storm",
+  "name": "ThunderSTORM",
+  "jar_path": "Thunder_STORM.jar",
+  "macro_path": "thunderstorm_macro.ijm",
+  "description": "ThunderSTORM SMLM localization plugin (Fiji bridge).",
+  "plugin": {
+    "jar_path": "Thunder_STORM.jar",
+    "macro_path": "thunderstorm_macro.ijm",
+    "identity": {
+      "id": "thunder_storm",
+      "display_name": "ThunderSTORM",
+      "menu_path": "Plugins>ThunderSTORM",
+      "implementation_type": "legacy_plugin"
+    },
+    "invocation": {
+      "run_command": "ThunderSTORM",
+      "arg_builder": "ij_kv",
+      "arg_template": "",
+      "macro_template": "setBatchMode(true);\nrun(\"${PHAGE_PLUGIN_COMMAND}\", \"${PHAGE_PLUGIN_ARG_STRING}\");\nif (\"${PHAGE_SMLM_OUTPUT}\" != \"\") saveAs(\"Results\", \"${PHAGE_SMLM_OUTPUT}\");\n"
+    },
+    "parameters": [
+      {"name": "sigma_px", "type": "float", "default": 1.3, "min": 0.4, "max": 6.0},
+      {"name": "fit_radius_px", "type": "int", "default": 4, "min": 2, "max": 12},
+      {"name": "filter_type", "type": "choice", "default": "wavelet_bspline", "choices": ["wavelet_bspline", "dog"]},
+      {"name": "detection_thr_sigma", "type": "float", "default": 3.0, "min": 0.5, "max": 10.0},
+      {"name": "max_candidates_per_frame", "type": "int", "default": 5000, "min": 100, "max": 20000},
+      {"name": "merge_radius_px", "type": "float", "default": 1.0, "min": 0.0, "max": 5.0},
+      {"name": "min_photons", "type": "float", "default": 50.0, "min": 0.0, "max": 10000.0},
+      {"name": "max_uncertainty_nm", "type": "float", "default": 30.0, "min": 1.0, "max": 200.0},
+      {"name": "upsample", "type": "int", "default": 8, "min": 2, "max": 16}
+    ],
+    "io_contract": {
+      "active_image_required": true,
+      "roi_optional": true,
+      "stack_required": false,
+      "outputs": {
+        "updates_image": false,
+        "creates_overlay": false,
+        "writes_results_table": true,
+        "adds_rois": false,
+        "exports_files": true
+      }
+    },
+    "schema": {
+      "plugin_version_tested": "1.3",
+      "csv_schema_version": "thunderstorm-csv-v1",
+      "required_columns": ["x [px]", "y [px]"],
+      "optional_columns": ["sigma [px]", "intensity [photon]", "offset [photon]", "uncertainty [px]"],
+      "separator": ",",
+      "decimal": "."
+    },
+    "execution_mode": {
+      "ui_dialog": "none",
+      "threading": "worker_thread"
+    }
+  }
+}

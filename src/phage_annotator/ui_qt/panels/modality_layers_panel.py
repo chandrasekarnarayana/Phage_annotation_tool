@@ -16,8 +16,8 @@ class ModalityLayersPanel(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(3)
 
         self.header_lbl = QtWidgets.QLabel("Modality / Evidence Layers")
         self.header_lbl.setStyleSheet("font-weight: 600;")

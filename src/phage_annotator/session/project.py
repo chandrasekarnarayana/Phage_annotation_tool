@@ -313,6 +313,15 @@ class SessionProjectMixin:
         self.session_state.disable_bulk_accept_when_stale = bool(
             settings.get("disable_bulk_accept_when_stale", True)
         )
+        self.session_state.smlm_runbook_enabled = bool(
+            settings.get("smlm_runbook_enabled", False)
+        )
+        runbook_locked = settings.get("smlm_runbook_locked_profiles", {})
+        if isinstance(runbook_locked, dict):
+            self.session_state.smlm_runbook_locked_profiles = dict(runbook_locked)
+        runbook_prov = settings.get("smlm_runbook_provenance", [])
+        if isinstance(runbook_prov, list):
+            self.session_state.smlm_runbook_provenance = list(runbook_prov)
         suggestion_payload = settings.get("suggestions_by_image", {})
         if isinstance(suggestion_payload, dict):
             for image_id, rows in suggestion_payload.items():

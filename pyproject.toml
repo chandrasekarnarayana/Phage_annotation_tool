@@ -24,6 +24,10 @@ dependencies = [
 
 [project.scripts]
 phage-annotator = "phage_annotator.cli:main"
+phage-annotator-smlm-parity = "phage_annotator.smlm.parity_cli:main"
+phage-annotator-smlm-preflight = "phage_annotator.smlm.preflight_cli:main"
+phage-annotator-smlm-run-demo = "phage_annotator.smlm.demo_cli:main"
+phage-annotator-fiji-plugin-tool = "phage_annotator.smlm.external_plugins_cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -36,6 +40,10 @@ dev = [
 cache = [
   "zstandard>=0.22",
 ]
+fiji = [
+  "pyimagej>=1.5",
+  "jpype1>=1.5",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers"
@@ -43,6 +51,7 @@ testpaths = ["tests"]
 markers = [
   "gui: GUI tests that require a Qt backend (run under Xvfb in CI)",
   "benchmark: performance benchmark tests requiring pytest-benchmark",
+  "integration: optional end-to-end integration tests requiring external runtime dependencies",
   "order: execution-order marker used by selected test modules",
 ]
 

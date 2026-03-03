@@ -309,7 +309,7 @@ class DisplayControlsMixin:
             return
         if not self.sync_contrast_chk.isChecked():
             return
-        panel_keys = self._selected_sync_panels(default_to_all=True)
+        panel_keys = self._contrast_target_panels()
         if not panel_keys:
             return
         source = self.controller.display_mapping.mapping_for(
@@ -439,6 +439,8 @@ class DisplayControlsMixin:
             self._sync_channel_panel_for_active_image()
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
+        if hasattr(self, "_refresh_lazy_modality_table"):
+            self._refresh_lazy_modality_table()
         self._refresh_image()
 
     def _set_primary_combo(self, idx: int) -> None:
@@ -481,6 +483,8 @@ class DisplayControlsMixin:
                 self._sync_channel_panel_for_active_image()
             if hasattr(self, "_refresh_annotation_view_controls"):
                 self._refresh_annotation_view_controls()
+            if hasattr(self, "_refresh_lazy_modality_table"):
+                self._refresh_lazy_modality_table()
             self._refresh_image()
             # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
             self._schedule_adjacent_fov_prefetch()
@@ -565,6 +569,8 @@ class DisplayControlsMixin:
             self._maybe_autoload_annotations(self.support_image.id)
             if hasattr(self, "_refresh_annotation_view_controls"):
                 self._refresh_annotation_view_controls()
+            if hasattr(self, "_refresh_lazy_modality_table"):
+                self._refresh_lazy_modality_table()
             self._refresh_image()
 
     def _toggle_play(self, axis: str) -> None:
@@ -833,7 +839,7 @@ class DisplayControlsMixin:
         dlg.setWindowTitle("Copy Display Settings")
         layout = QtWidgets.QFormLayout(dlg)
         target_combo = QtWidgets.QComboBox()
-        target_combo.addItems(["Support image", "All images"])
+        target_combo.addItems(["Modality 2 image", "All images"])
         layout.addRow("Target", target_combo)
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -843,7 +849,7 @@ class DisplayControlsMixin:
 
         def _apply() -> None:
             choice = target_combo.currentText()
-            if choice == "Support image":
+            if choice == "Modality 2 image":
                 self._apply_display_to_image(self.support_image.id, "support", mapping)
             else:
                 for img in self.images:
@@ -901,17 +907,21 @@ class DisplayControlsMixin:
                 new_scope=str(new_scope),
             )
         if new_scope == "all":
+            msg = "Switched to Stack Annotation Mode (All Z)"
             QtWidgets.QToolTip.showText(
                 self.mapToGlobal(QtCore.QPoint(20, 20)),
-                "Switched to Stack Annotation Mode (All Z)",
+                msg,
                 self,
             )
         else:
+            msg = "Switched to Slice Annotation Mode (Current Z)"
             QtWidgets.QToolTip.showText(
                 self.mapToGlobal(QtCore.QPoint(20, 20)),
-                "Switched to Slice Annotation Mode (Current Z)",
+                msg,
                 self,
             )
+        # Auto-hide tooltip after 2 seconds to prevent it from lingering
+        QtCore.QTimer.singleShot(2000, lambda: QtWidgets.QToolTip.hideText())
         self._update_status()
         self._refresh_image()
         if hasattr(self, "_maybe_emit_assist_context_delta"):
@@ -1364,6 +1374,11 @@ class DisplayControlsMixin:
     def _update_sync_list(self, visible: List[str]) -> None:
         if getattr(self, "sync_list", None) is None:
             return
+        if hasattr(self, "_ensure_lazy_sync_group_keys"):
+            try:
+                self._ensure_lazy_sync_group_keys()
+            except Exception:
+                pass
         selected = set(getattr(self, "_sync_selected_panels", set()))
         if not selected:
             selected = set(visible)
@@ -1375,6 +1390,9 @@ class DisplayControlsMixin:
                 modality = getattr(self, "_panel_modality_map", {}).get(key)
                 if modality is not None:
                     label = modality.display_name
+                sync_key = self._sync_key_for_panel(str(key))
+                if sync_key:
+                    label = f"[{sync_key}] {label}"
                 item = QtWidgets.QListWidgetItem(label)
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, key)
                 item.setSelected(key in selected)
@@ -1382,6 +1400,46 @@ class DisplayControlsMixin:
         finally:
             self.sync_list.blockSignals(False)
         self._sync_selected_panels = set(self._selected_sync_panels(default_to_all=True))
+        self._update_sync_keys_hint()
+
+    def _sync_key_for_panel(self, panel_key: str) -> str:
+        """Return sync key for a panel from lazy modality/view group mapping."""
+        groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
+        key = str(panel_key or "").strip()
+        if not key:
+            return ""
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        modality = panel_map.get(key)
+        if modality is not None:
+            text = str(groups.get(int(getattr(modality, "idx", -1)), "")).strip()
+            if text:
+                return text
+        if key == "support":
+            text = str(groups.get("builtin:support", "")).strip()
+            if text:
+                return text
+        if key in {"mean", "std"}:
+            text = str(groups.get(f"builtin:{key}", "")).strip()
+            if text:
+                return text
+        return ""
+
+    def _update_sync_keys_hint(self) -> None:
+        """Show selected sync keys clearly in contrast sync panel."""
+        hint = getattr(self, "sync_keys_hint_lbl", None)
+        if hint is None:
+            return
+        selected = self._selected_sync_panels(default_to_all=False)
+        keys = []
+        for panel_key in selected:
+            sync_key = self._sync_key_for_panel(str(panel_key))
+            if sync_key:
+                keys.append(str(sync_key))
+        if keys:
+            ordered = sorted(set(keys), key=lambda v: int(v) if str(v).isdigit() else 10**9)
+            hint.setText(f"Sync keys (selected): {', '.join(ordered)}")
+        else:
+            hint.setText("Sync keys (selected): none")
 
     def _selected_sync_panels(self, default_to_all: bool = False) -> List[str]:
         if getattr(self, "sync_list", None) is None:
@@ -1397,6 +1455,8 @@ class DisplayControlsMixin:
     def _on_sync_selection_changed(self) -> None:
         self._sync_selected_panels = set(self._selected_sync_panels())
         self._apply_sync_selection()
+        self._update_sync_keys_hint()
+        self._on_sync_scope_changed(str(getattr(self, "sync_scope_combo", None).currentText() if getattr(self, "sync_scope_combo", None) is not None else ""))
         if getattr(self, "sync_contrast_chk", None) is not None:
             if self.sync_contrast_chk.isChecked():
                 self._sync_contrast_from_frame()
@@ -1439,6 +1499,7 @@ class DisplayControlsMixin:
                 self.link_zoom_act.setChecked(self.link_zoom)
         self._apply_sync_selection()
         self._update_sync_indicators()
+        self._on_sync_scope_changed(str(getattr(self, "sync_scope_combo", None).currentText() if getattr(self, "sync_scope_combo", None) is not None else ""))
         if getattr(self, "sync_contrast_chk", None) is not None:
             if self.sync_contrast_chk.isChecked():
                 self._sync_contrast_from_frame()
@@ -1594,6 +1655,77 @@ class DisplayControlsMixin:
 
         if hasattr(self, "_update_analysis_panel_modalities"):
             self._update_analysis_panel_modalities()
+        if hasattr(self, "_refresh_lazy_modality_table"):
+            self._refresh_lazy_modality_table()
         
         # Refresh image to update any modality-related displays
         self._refresh_image()
+    def _contrast_sync_scope(self) -> str:
+        """Return normalized contrast sync scope mode."""
+        combo = getattr(self, "sync_scope_combo", None)
+        if combo is None:
+            return "selected"
+        text = str(combo.currentText() or "").strip().lower()
+        if text.startswith("active"):
+            return "active"
+        if text.startswith("all"):
+            return "all"
+        return "selected"
+
+    def _contrast_target_panels(self) -> List[str]:
+        """Resolve panels affected by contrast edits from scope + sync selection."""
+        scope = self._contrast_sync_scope()
+        if scope == "active":
+            selected = self._selected_sync_panels(default_to_all=False)
+            if len(selected) == 1:
+                return [str(selected[0])]
+            key = str(getattr(self, "annotate_target", "frame")).strip().lower()
+            if key in getattr(self, "_panel_sync_index", {}):
+                return [str(key)]
+            return ["frame"]
+        if scope == "all":
+            keys = list(getattr(self, "_panel_sync_index", {}).keys())
+            return keys if keys else ["frame"]
+        selected = self._selected_sync_panels(default_to_all=True)
+        return selected if selected else ["frame"]
+
+    def _on_sync_scope_changed(self, _text: str) -> None:
+        """Update contrast-scope hint and apply sync when enabled."""
+        hint = getattr(self, "sync_scope_hint_lbl", None)
+        scope = self._contrast_sync_scope()
+        if hint is not None:
+            if scope == "active":
+                hint.setText("Contrast edits affect only the active target view.")
+            elif scope == "all":
+                hint.setText("Contrast edits affect all linked visible views.")
+            else:
+                hint.setText("Contrast edits affect selected linked views.")
+        if getattr(self, "sync_contrast_chk", None) is not None and self.sync_contrast_chk.isChecked():
+            self._sync_contrast_from_frame()
+        self._update_sync_keys_hint()
+
+    def _select_all_sync_views(self) -> None:
+        """Select all linked views for contrast/zoom/playback sync."""
+        sync_list = getattr(self, "sync_list", None)
+        if sync_list is None:
+            return
+        sync_list.blockSignals(True)
+        try:
+            for i in range(sync_list.count()):
+                item = sync_list.item(i)
+                item.setSelected(True)
+        finally:
+            sync_list.blockSignals(False)
+        self._on_sync_selection_changed()
+
+    def _clear_sync_view_selection(self) -> None:
+        """Clear linked-view selection to isolate edits."""
+        sync_list = getattr(self, "sync_list", None)
+        if sync_list is None:
+            return
+        sync_list.blockSignals(True)
+        try:
+            sync_list.clearSelection()
+        finally:
+            sync_list.blockSignals(False)
+        self._on_sync_selection_changed()

@@ -2892,6 +2892,8 @@ class ActionsMixin(
         self.support_combo.addItem(keep_img.name)
         self.current_image_idx = 0
         self.support_image_idx = 0
+        if hasattr(self, "_refresh_lazy_modality_table"):
+            self._refresh_lazy_modality_table()
         self._set_status("Cleared FOV list; kept current image.")
         self.roi_manager.rois_by_image = {0: self.roi_manager.list_rois(keep_idx)}
         self.roi_manager.set_active(self.roi_manager.active_roi_id)

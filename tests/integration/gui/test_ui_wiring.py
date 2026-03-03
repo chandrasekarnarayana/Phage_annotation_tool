@@ -1142,6 +1142,54 @@ def test_smlm_density_job_submission(qtbot, tmp_path):
 
 
 @pytest.mark.gui
+def test_smlm_preflight_fixit_card_wiring(qtbot, tmp_path):
+    """Preflight failure should surface actionable fix-it card in SMLM panel."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_smlm_fixit.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._show_smlm_panel()
+    qtbot.wait(100)
+    assert win.smlm_panel is not None
+    sw = win.smlm_panel.thunder
+    assert not sw.fixit_group.isVisible()
+
+    win._show_smlm_preflight_fixit(2, "Fiji executable missing")
+    qtbot.wait(50)
+    assert sw.fixit_group.isVisible()
+    assert "Fiji not configured" in sw.fixit_title_label.text()
+
+
+@pytest.mark.gui
+def test_smlm_plugin_dropdown_hides_internal_profiles(qtbot, tmp_path):
+    """SMLM plugin dropdown should hide non-UI manifest profiles."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_smlm_plugin_visibility.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    win._show_smlm_panel()
+    qtbot.wait(100)
+    assert win.smlm_panel is not None
+    combo = win.smlm_panel.thunder.plugin_combo
+    labels = [combo.itemText(i) for i in range(combo.count())]
+    joined = " | ".join(labels).lower()
+    assert "thunder_storm_fast" not in joined
+    assert "thunder_storm" in joined
+
+
+@pytest.mark.gui
 def test_annotation_table_controls_wiring(qtbot, tmp_path):
     """Test annotation table controls (add, delete, filter) are wired."""
     pytest.importorskip("PyQt5")

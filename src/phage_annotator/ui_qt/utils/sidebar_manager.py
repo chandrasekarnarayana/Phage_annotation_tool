@@ -8,11 +8,20 @@ from typing import List
 
 @dataclass(frozen=True)
 class SidebarLayoutConfig:
-    """Layout sizing configuration for sidebar and annotations docks."""
+    """Layout sizing configuration for left and right sidebars (dock panels).
+    
+    Both sidebars support expand/collapse toggling:
+    - Left sidebar: 300px expanded, 48px collapsed (icon-only)
+    - Right sidebar (annotations): 320px expanded, 48px collapsed (icon-only)
+    """
 
+    # Left sidebar (tools) sizing
     expanded_width: int = 300
     collapsed_width: int = 48
-    annotations_width: int = 320
+    
+    # Right sidebar (annotations/inspect) sizing
+    annotations_width: int = 320                  # Expanded width
+    annotations_collapsed_width: int = 48         # Collapsed width (icon-only, matching left)
 
 
 class SidebarManager:
@@ -27,13 +36,29 @@ class SidebarManager:
         sidebar_visible: bool,
         annotations_visible: bool,
         collapsed: bool,
+        annotations_collapsed: bool = False,
     ) -> List[int]:
-        """Return dock sizes in sidebar->annotations order."""
+        """Return dock sizes in sidebar->annotations order.
+        
+        Parameters
+        ----------
+        sidebar_visible : bool
+            Whether left sidebar is visible.
+        annotations_visible : bool
+            Whether right sidebar is visible.
+        collapsed : bool
+            Whether left sidebar is in collapsed (icon-only) state.
+        annotations_collapsed : bool, optional
+            Whether right sidebar is in collapsed (icon-only) state. Default False.
+        """
         sizes: List[int] = []
         if sidebar_visible:
             sizes.append(self.config.collapsed_width if collapsed else self.config.expanded_width)
         if annotations_visible:
-            sizes.append(self.config.annotations_width)
+            sizes.append(
+                self.config.annotations_collapsed_width if annotations_collapsed 
+                else self.config.annotations_width
+            )
         return sizes
 
     def dock_order(self, sidebar_visible: bool, annotations_visible: bool) -> List[str]:
