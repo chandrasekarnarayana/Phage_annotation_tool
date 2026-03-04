@@ -291,6 +291,202 @@ class LocalPeakSuggestionModel:
                 break
         return out
 
+    def _extract_stack_features(
+        self,
+        stack: np.ndarray,
+        y: float,
+        x: float,
+    ) -> tuple[float, float, float, float]:
+        """Extract enhanced features using full stack at a given (y, x) location.
+        
+        Computes SNR and other statistics by looking at intensity across all frames
+        at a single xy position, providing more robust feature estimation.
+        
+        Parameters
+        ----------
+        stack : np.ndarray
+            3D array of shape (T, H, W) or (Z, H, W)
+        y : float
+            Y coordinate
+        x : float
+            X coordinate
+            
+        Returns
+        -------
+        amplitude : float
+            Mean peak value across frames
+        snr : float
+            Signal-to-noise ratio from stack statistics
+        stack_contrast : float
+            Contrast relative to background across stack
+        stack_std : float
+            Standard deviation of peak values across frames
+        """
+        y_int, x_int = int(round(y)), int(round(x))
+        h, w = stack.shape[1], stack.shape[2]
+        
+        # Clamp to valid range
+        if y_int < 0 or y_int >= h or x_int < 0 or x_int >= w:
+            return 0.0, 0.0, 0.0, 0.0
+        
+        # Extract values at (y, x) across all frames
+        values = stack[:, y_int, x_int].astype(np.float64)
+        
+        if not np.isfinite(values).any():
+            return 0.0, 0.0, 0.0, 0.0
+        
+        # Compute statistics
+        peak_mean = float(np.nanmean(values))
+        peak_std = float(np.nanstd(values))
+        
+        # Estimate background from local neighborhood median (across stack mean)
+        stack_mean = np.nanmean(stack.astype(np.float64), axis=0)
+        r = 5
+        y0, y1 = max(0, y_int - r), min(h, y_int + r + 1)
+        x0, x1 = max(0, x_int - r), min(w, x_int + r + 1)
+        
+        patch = stack_mean[y0:y1, x0:x1]
+        if patch.size > 0:
+            baseline = float(np.nanmedian(patch))
+        else:
+            baseline = float(np.nanmedian(stack_mean))
+        
+        baseline_std = float(np.nanstd(stack_mean[stack_mean != baseline]))
+        if baseline_std < 1e-8:
+            baseline_std = 1e-8
+        
+        # SNR: (signal - baseline) / noise
+        snr = (peak_mean - baseline) / baseline_std if baseline_std > 0 else 0.0
+        snr = float(max(0.0, snr))
+        
+        # Contrast: relative height above background
+        contrast = (peak_mean - baseline) / (abs(baseline) + 1e-8)
+        contrast = float(max(0.0, contrast))
+        
+        return peak_mean, snr, contrast, peak_std
+
+    def predict_from_stack(
+        self,
+        image_stack: np.ndarray,
+        *,
+        image_id: int,
+        image_name: str,
+        label: str,
+        z_frame: int = 0,
+        strategy: str = "raw",
+        threshold_min_score: float = 0.0,
+        roi_id: str | None = None,
+        roi_shape: str = "none",
+        roi_rect: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+        refine_from_stack: bool = True,
+    ) -> List[PointSuggestion]:
+        """Detect candidates on mean projection, refine using full stack.
+        
+        Strategy:
+        1. Compute mean projection across time dimension (or z if no time)
+        2. Detect local maxima on clean mean image (reduced noise)
+        3. For each candidate, extract features from full stack (better SNR)
+        4. Return enhanced suggestions with stack-computed properties
+        
+        Parameters
+        ----------
+        image_stack : np.ndarray
+            3D array of shape (T, H, W) or (Z, H, W)
+        image_id : int
+            Image identifier
+        image_name : str
+            Image name for metadata
+        label : str
+            Point label/class
+        z_frame : int
+            Z slice to use (if 3D is Z, H, W instead of T, H, W)
+        strategy : str
+            Detection strategy ("raw", "corrected", "consensus")
+        threshold_min_score : float
+            Minimum score threshold
+        roi_id : str | None
+            ROI identifier
+        roi_shape : str
+            ROI shape type
+        roi_rect : tuple
+            ROI rectangle coordinates
+        refine_from_stack : bool
+            Whether to refine features using stack (True) or single frame (False)
+            
+        Returns
+        -------
+        List[PointSuggestion]
+            Scored suggestions sorted by score (descending)
+        """
+        stack = np.asarray(image_stack)
+        if stack.ndim != 3 or stack.size == 0:
+            return []
+        
+        # Compute mean projection (average across time or z)
+        mean_projection = np.nanmean(stack.astype(np.float64), axis=0)
+        
+        if mean_projection.size == 0:
+            return []
+        
+        # Detect candidates on the cleaner mean image
+        # Use slightly lower threshold since noise is reduced by averaging
+        lower_quantile = max(0.99, self.threshold_quantile - 0.005)
+        
+        raw_candidates = self._collect_candidates(
+            mean_projection,
+            threshold_quantile=lower_quantile,
+            source_modality="mean_stack",
+            image_id=image_id,
+            image_name=image_name,
+            t=0,
+            z=z_frame,
+            label=label,
+            roi_id=roi_id,
+            roi_shape=roi_shape,
+            roi_rect=roi_rect,
+        )
+        
+        if not raw_candidates or not refine_from_stack:
+            return raw_candidates
+        
+        # Refine features using full stack
+        refined_candidates = []
+        for suggestion in raw_candidates:
+            # Extract enhanced features from stack at this location
+            stack_amp, stack_snr, stack_contrast, stack_std = self._extract_stack_features(
+                stack,
+                float(suggestion.y),
+                float(suggestion.x),
+            )
+            
+            if stack_snr < 1.0:
+                # Low SNR from stack, skip this candidate
+                continue
+            
+            # Update suggestion with stack-based properties
+            suggestion.score_components["stack_snr"] = float(stack_snr)
+            suggestion.score_components["stack_contrast"] = float(stack_contrast)
+            suggestion.score_components["stack_std"] = float(stack_std)
+            suggestion.score_components["stack_amplitude"] = float(stack_amp)
+            
+            # Boost score for high stack SNR (more confident detection)
+            base_score = float(suggestion.score)
+            snr_boost = min(0.2, float(stack_snr) / 20.0)  # Up to +0.2 boost
+            new_score = min(1.0, base_score + snr_boost)
+            suggestion.score = new_score
+            suggestion.source_modality = "mean_stack_refined"
+            
+            refined_candidates.append(suggestion)
+        
+        # Sort by refined score
+        ranked = sorted(
+            [s for s in refined_candidates if float(s.score) >= float(threshold_min_score)],
+            key=lambda s: float(s.score),
+            reverse=True,
+        )
+        
+        return ranked[: int(self.max_points)]
+
     def predict(
         self,
         image_slice: np.ndarray,

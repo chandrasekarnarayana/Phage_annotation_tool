@@ -439,6 +439,8 @@ class ActionsMixin(
             stack_t = np.asarray(image.array[t_idx, :, :, :], dtype=np.float32)
             out["mean_projection"] = np.nanmean(stack_t, axis=0)
             out["max_projection"] = np.nanmax(stack_t, axis=0)
+            # Store full stack for stack-aware suggestion methods
+            out["_full_stack_t"] = stack_t
         config = dict(getattr(self, "_evidence_layer_config", {}) or {})
         filtered: dict[str, np.ndarray] = {}
         for modality_id, frame in out.items():
@@ -690,6 +692,34 @@ class ActionsMixin(
                 row.meta.setdefault("features", {})
                 row.meta["features"][modality_id] = dict(row.score_components)
             return rows
+
+        # Stack-aware detection: uses full temporal/z stack for enhanced SNR
+        if strategy_key in ("stack_aware", "stack-aware"):
+            full_stack = frames.get("_full_stack_t")
+            if full_stack is not None and hasattr(model, "predict_from_stack"):
+                try:
+                    rows = model.predict_from_stack(
+                        full_stack,
+                        image_id=image.id,
+                        image_name=image.name,
+                        label=label,
+                        z_frame=z_idx,
+                        strategy="raw",
+                        roi_id=roi_id,
+                        roi_shape=roi_shape,
+                        roi_rect=roi_rect,
+                        refine_from_stack=True,
+                    )
+                    for row in rows:
+                        row.source_modality = "stack_aware"
+                        row.meta.setdefault("features", {})
+                        row.meta["features"]["stack_aware"] = dict(row.score_components)
+                    return rows
+                except Exception as exc:
+                    import sys
+                    print(f"Warning: stack-aware prediction failed: {exc}", file=sys.stderr)
+            # Fall back to raw if stack unavailable
+            return _predict_one("raw", frames["raw"])
 
         if strategy_key in frames:
             return _predict_one(strategy_key, frames[strategy_key])

@@ -26,7 +26,7 @@ except ImportError:
 # Temporary feature gates.
 DISABLE_QC = True
 DISABLE_DIAGNOSTICS = True
-DISABLE_SHORTCUTS = True
+DISABLE_SHORTCUTS = False
 
 
 class UiSetupMixin:
@@ -190,22 +190,22 @@ class UiSetupMixin:
         modality_layout = QtWidgets.QVBoxLayout(modality_group)
         modality_layout.setContentsMargins(6, 6, 6, 6)
         modality_layout.setSpacing(6)
-        self.lazy_modality_table = QtWidgets.QTableWidget(0, 10)
+        self.lazy_modality_table = QtWidgets.QTableWidget(0, 9)
         self.lazy_modality_table.setHorizontalHeaderLabels(
-            ["No", "Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
+            ["Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
         )
         model = self.lazy_modality_table.model()
         model.setHeaderData(
-            2, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
+            1, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            7, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            6, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            8, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            7, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            9, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            8, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         self.lazy_modality_table.verticalHeader().setVisible(False)
         self.lazy_modality_table.horizontalHeader().setStretchLastSection(True)
@@ -221,9 +221,6 @@ class UiSetupMixin:
         self.lazy_add_raw_btn = QtWidgets.QPushButton("Add Modality")
         self.lazy_add_mean_btn = QtWidgets.QPushButton("Add Mean View")
         self.lazy_add_std_btn = QtWidgets.QPushButton("Add Std View")
-        self.lazy_add_median_btn = QtWidgets.QPushButton("Add Median View")
-        self.lazy_add_min_btn = QtWidgets.QPushButton("Add Min View")
-        self.lazy_add_max_btn = QtWidgets.QPushButton("Add Max View")
         self.lazy_remove_btn = QtWidgets.QPushButton("Remove")
         self.lazy_auto_update_chk = QtWidgets.QCheckBox("Auto Update")
         # Default to immediate canvas reflection; user can toggle off for batch editing.
@@ -233,9 +230,6 @@ class UiSetupMixin:
         controls_row.addWidget(self.lazy_add_raw_btn)
         controls_row.addWidget(self.lazy_add_mean_btn)
         controls_row.addWidget(self.lazy_add_std_btn)
-        controls_row.addWidget(self.lazy_add_median_btn)
-        controls_row.addWidget(self.lazy_add_min_btn)
-        controls_row.addWidget(self.lazy_add_max_btn)
         controls_row.addWidget(self.lazy_remove_btn)
         controls_row.addStretch(1)
         controls_row.addWidget(self.lazy_auto_update_chk)
@@ -547,8 +541,7 @@ class UiSetupMixin:
         self.auto_scope_combo = QtWidgets.QComboBox()
         self.auto_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
         self.auto_target_combo = QtWidgets.QComboBox()
-        self.auto_target_combo.addItem("Bottom Sync Target")
-        self.auto_target_combo.setEnabled(False)
+        self.auto_target_combo.addItems(["Current panel", "All visible panels"])
         self.auto_roi_chk = QtWidgets.QCheckBox("Use ROI only")
         auto_group = QtWidgets.QGroupBox("Auto Contrast")
         auto_layout = QtWidgets.QGridLayout(auto_group)
@@ -568,9 +561,7 @@ class UiSetupMixin:
         auto_layout.addWidget(QtWidgets.QLabel("ROI"), 3, 0)
         auto_layout.addWidget(self.auto_roi_chk, 3, 1, 1, 2)
         self.auto_scope_combo.setToolTip("Data extent used to compute automatic contrast.")
-        self.auto_target_combo.setToolTip(
-            "Auto-contrast target is controlled by the bottom Sync Target group."
-        )
+        self.auto_target_combo.setToolTip("Where computed contrast mapping is applied.")
         self.auto_roi_chk.setToolTip("Restrict auto-contrast statistics to current ROI.")
         display_layout.addWidget(auto_group, drow, 0, 1, 3)
         drow += 1
@@ -784,19 +775,6 @@ class UiSetupMixin:
         self.pyramid_levels_spin.setValue(self.pyramid_max_levels)
         adv_layout.addWidget(QtWidgets.QLabel("Pyramid levels"), r, 0)
         adv_layout.addWidget(self.pyramid_levels_spin, r, 1)
-        r += 1
-
-        self.canvas_layout_rows_spin = QtWidgets.QSpinBox()
-        self.canvas_layout_rows_spin.setRange(0, 6)
-        self.canvas_layout_rows_spin.setValue(int(self._settings.value("canvasLayoutRows", 0, type=int)))
-        self.canvas_layout_cols_spin = QtWidgets.QSpinBox()
-        self.canvas_layout_cols_spin.setRange(0, 12)
-        self.canvas_layout_cols_spin.setValue(int(self._settings.value("canvasLayoutCols", 0, type=int)))
-        adv_layout.addWidget(QtWidgets.QLabel("Canvas rows (0=auto)"), r, 0)
-        adv_layout.addWidget(self.canvas_layout_rows_spin, r, 1)
-        r += 1
-        adv_layout.addWidget(QtWidgets.QLabel("Canvas cols (0=auto)"), r, 0)
-        adv_layout.addWidget(self.canvas_layout_cols_spin, r, 1)
         r += 1
 
         self.apply_display_btn = QtWidgets.QPushButton("Apply display mapping to pixels…")
@@ -1155,10 +1133,6 @@ class UiSetupMixin:
         self.assist_min_positive_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_negative_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_context_spin.valueChanged.connect(self._on_assist_minima_changed)
-        if getattr(self, "canvas_layout_rows_spin", None) is not None:
-            self.canvas_layout_rows_spin.valueChanged.connect(self._on_canvas_grid_rows_changed)
-        if getattr(self, "canvas_layout_cols_spin", None) is not None:
-            self.canvas_layout_cols_spin.valueChanged.connect(self._on_canvas_grid_cols_changed)
         if not DISABLE_QC:
             self.qc_auto_show_chk.toggled.connect(self._on_qc_auto_show_changed)
         else:
