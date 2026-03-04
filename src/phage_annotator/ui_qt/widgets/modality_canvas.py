@@ -64,19 +64,25 @@ class ModalityCanvasView:
         self._setup_axes()
     
     def _setup_axes(self) -> None:
-        """Configure axes appearance for clean presentation."""
+        """Configure axes appearance with visible coordinate ticks."""
         self.ax.set_aspect('equal')
         self.ax.set_title(self.modality_name, fontsize=10, pad=5)
         self.ax.tick_params(
             axis='both',
             which='both',
-            bottom=False,
+            bottom=True,
             top=False,
-            left=False,
+            left=True,
             right=False,
-            labelbottom=False,
-            labelleft=False
+            labelbottom=True,
+            labelleft=True,
+            length=3,
+            width=0.8,
+            labelsize=8
         )
+        # Keep location context visible for annotation/navigation.
+        self.ax.set_xlabel("X", fontsize=8, labelpad=2)
+        self.ax.set_ylabel("Y", fontsize=8, labelpad=2)
     
     def set_active(self, active: bool) -> None:
         """Highlight this view as the active modality.

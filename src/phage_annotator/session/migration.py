@@ -19,13 +19,10 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     """Upgrade old primary/support session to use modalities.
     
     This function converts a session using the old active_primary_id/active_support_id
-    system to the new ModalityManager-based system. It maintains complete backward
-    compatibility by:
-    
-    1. Creating Modality 1 from primary image
-    2. Creating Modality 2 from support image (if exists)
-    3. Preserving all display settings
-    4. Setting migration_version=1
+    system to the new ModalityManager-based system.
+
+    Legacy bootstrap creation of fixed modalities was removed so new/dynamic
+    workflows can start empty and add modalities explicitly from the UI.
     
     After this operation, code can use either:
     - Old API: session_state.active_primary_id (still works)
@@ -52,14 +49,8 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     # Import here to avoid circular dependency
     from phage_annotator.session.modality import ModalityManager
     
-    # Create new modality manager
-    support_id = int(getattr(session_state, "active_support_id", session_state.active_primary_id))
-    if support_id < 0:
-        support_id = int(session_state.active_primary_id)
-    manager = ModalityManager.create_from_primary_support(
-        primary_img_id=int(session_state.active_primary_id),
-        support_img_id=support_id,
-    )
+    # Create an empty modality manager (no forced base modalities).
+    manager = ModalityManager()
     
     session_state.modality_manager = manager
     session_state.migration_version = 1
@@ -119,34 +110,6 @@ def ensure_modality_system(session_state: SessionState) -> ModalityManager:
     manager = session_state.modality_manager
     if manager is None:
         raise RuntimeError("Failed to initialize modality manager")
-
-    # Backfill legacy sessions: ensure base indices 0/1 always exist.
-    modalities = list(manager.get_all_modalities())
-    has_idx0 = any(int(getattr(mod, "idx", -1)) == 0 for mod in modalities)
-    has_idx1 = any(int(getattr(mod, "idx", -1)) == 1 for mod in modalities)
-
-    if not has_idx0:
-        from phage_annotator.session.modality import ModalitySpec
-
-        primary_id = int(getattr(session_state, "active_primary_id", 0))
-        manager.modalities.append(
-            ModalitySpec(idx=0, image_id=primary_id, display_name="Modality 1")
-        )
-
-    if not has_idx1:
-        from phage_annotator.session.modality import ModalitySpec
-
-        primary_id = int(getattr(session_state, "active_primary_id", 0))
-        support_id = int(getattr(session_state, "active_support_id", primary_id))
-        if support_id < 0:
-            support_id = primary_id
-        manager.modalities.append(
-            ModalitySpec(idx=1, image_id=support_id, display_name="Modality 2")
-        )
-
-    manager.modalities.sort(key=lambda m: int(getattr(m, "idx", 0)))
-    if manager.modalities:
-        manager._next_idx = max(int(getattr(m, "idx", 0)) for m in manager.modalities) + 1
     return manager
 
 

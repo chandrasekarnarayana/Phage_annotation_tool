@@ -1488,6 +1488,7 @@ class UiExtrasMixin:
         self._ensure_lazy_sync_group_keys()
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
+        self._normalize_visible_auto_modality_names(manager)
         for panel_key in ("modality_0", "modality_1"):
             if panel_key in hidden_base:
                 self._panel_visibility[str(panel_key)] = False
@@ -1517,8 +1518,15 @@ class UiExtrasMixin:
                 next_order += 1
                 panel_order[panel_key] = int(order_no)
             modality_rows.append((int(order_no), int(modality.idx), panel_key, modality))
+        # Normalize displayed rows to contiguous 1..N so the first visible row always starts at 1.
+        normalized_rows = sorted(modality_rows, key=lambda x: (int(x[0]), int(x[1])))
+        panel_order = {
+            str(panel_key): int(i + 1)
+            for i, (_old_order, _idx, panel_key, _modality) in enumerate(normalized_rows)
+        }
         self._lazy_panel_order = panel_order
-        for order_no, _idx, panel_key, modality in sorted(modality_rows, key=lambda x: (int(x[0]), int(x[1]))):
+        for order_no, _idx, panel_key, modality in normalized_rows:
+            order_no = int(panel_order.get(str(panel_key), int(order_no)))
             row = table.rowCount()
             table.insertRow(row)
             if panel_key == "modality_1":
@@ -1602,6 +1610,48 @@ class UiExtrasMixin:
     def _panel_key_for_modality_idx(self, modality_idx: int) -> str:
         """Map modality index to panel key used by renderer/sync list."""
         return f"modality_{int(modality_idx)}"
+
+    def _next_visible_auto_modality_name(self, manager) -> str:
+        """Return next available default visible name: Modality 1, Modality 2, ..."""
+        hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
+        used = set()
+        for modality in manager.get_all_modalities():
+            panel_key = self._panel_key_for_modality_idx(int(getattr(modality, "idx", -1)))
+            if panel_key in hidden_base:
+                continue
+            name = str(getattr(modality, "display_name", "") or "").strip()
+            if name.startswith("Modality "):
+                suffix = name.split("Modality ", 1)[1].strip()
+                if suffix.isdigit():
+                    used.add(int(suffix))
+        n = 1
+        while n in used:
+            n += 1
+        return f"Modality {n}"
+
+    def _normalize_visible_auto_modality_names(self, manager) -> None:
+        """Renumber legacy auto names (Modality idx+1) to visible sequence Modality 1..N."""
+        hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
+        panel_order = dict(getattr(self, "_lazy_panel_order", {}) or {})
+        rows = []
+        for modality in manager.get_all_modalities():
+            panel_key = self._panel_key_for_modality_idx(int(getattr(modality, "idx", -1)))
+            if panel_key in hidden_base:
+                continue
+            order_no = panel_order.get(panel_key)
+            if not str(order_no).isdigit():
+                order_no = 10**6 + int(getattr(modality, "idx", 0))
+            rows.append((int(order_no), int(getattr(modality, "idx", 0)), modality))
+        rows.sort(key=lambda x: (x[0], x[1]))
+        for display_idx, (_order, _mid, modality) in enumerate(rows, start=1):
+            current = str(getattr(modality, "display_name", "") or "").strip()
+            legacy_auto = f"Modality {int(getattr(modality, 'idx', 0)) + 1}"
+            target = f"Modality {int(display_idx)}"
+            if current == legacy_auto and current != target:
+                try:
+                    manager.rename_modality(int(getattr(modality, "idx", -1)), target)
+                except Exception:
+                    continue
 
     def _panel_key_from_role_data(self, role_data) -> str:
         """Resolve lazy-table role payload (int or builtin:*) to panel key."""
@@ -1922,9 +1972,11 @@ class UiExtrasMixin:
             "min": ProjectionType.MIN,
             "max": ProjectionType.MAX,
         }.get(proj_key, ProjectionType.RAW)
+        custom_name = self._next_visible_auto_modality_name(manager)
         try:
             modality = manager.add_modality(
                 image_id=int(getattr(getattr(self, "primary_image", None), "id", 0)),
+                custom_name=str(custom_name),
                 projection_type=proj,
             )
         except Exception as exc:

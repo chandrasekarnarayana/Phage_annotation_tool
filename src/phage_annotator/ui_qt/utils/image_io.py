@@ -72,7 +72,7 @@ def read_metadata(path: Path) -> LazyImage:
         page = tf.series[0]
         shape = page.shape
         dtype = str(page.dtype)
-        ome_axes = page.axes if tf.ome_metadata else None
+        ome_axes = page.axes  # Read axes from tifffile (works with metadata dict or OME-XML)
     interpret = "auto"
     if ome_axes and len(ome_axes) == len(shape):
         axes = ome_axes.upper()

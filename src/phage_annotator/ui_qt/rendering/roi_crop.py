@@ -536,11 +536,23 @@ class RoiCropMixin:
             cols = max(1, cols_override)
             rows = int(np.ceil(float(n) / float(cols)))
             return max(1, rows), cols
-        # Default auto layout:
-        # <=2 views: 1 row, >2 and <=8: 2 rows, >8: 3 rows.
-        rows = 1 if n <= 2 else 2 if n <= 8 else 3
-        cols = int(np.ceil(float(n) / float(rows)))
-        return rows, max(1, cols)
+        # Default auto layout: choose an adaptive near-square grid for any N.
+        # Scoring priorities:
+        # 1) Minimize empty cells
+        # 2) Keep grid balanced (cols close to rows)
+        # 3) Prefer fewer rows on ties (wider canvas-friendly layout)
+        best_rows, best_cols = 1, n
+        best_score = None
+        for rows in range(1, n + 1):
+            cols = int(np.ceil(float(n) / float(rows)))
+            empty = int(rows * cols - n)
+            balance = abs(cols - rows)
+            score = (empty * 10) + balance
+            candidate = (score, rows)
+            if best_score is None or candidate < best_score:
+                best_score = candidate
+                best_rows, best_cols = rows, cols
+        return max(1, int(best_rows)), max(1, int(best_cols))
 
     def _rebuild_figure_layout(self, layout_spec: Optional[dict] = None) -> None:
         if layout_spec is None:
