@@ -1,0 +1,16 @@
+{
+  "checks": [
+    {
+      "match": "test_standardize_axes_perf",
+      "max_mean_ms": 750.0
+    },
+    {
+      "match": "test_display_mapping_creation",
+      "max_mean_ms": 50.0
+    },
+    {
+      "match": "test_display_mapping_update",
+      "max_mean_ms": 50.0
+    }
+  ]
+}

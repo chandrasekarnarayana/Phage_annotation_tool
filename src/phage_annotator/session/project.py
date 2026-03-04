@@ -24,12 +24,194 @@ from phage_annotator.roi.manager import Roi, roi_from_dict
 class SessionProjectMixin:
     """Mixin for project persistence and recovery helpers."""
 
+    @staticmethod
+    def _resolve_project_image_path(
+        entry: Dict[str, object], project_dir: pathlib.Path
+    ) -> pathlib.Path:
+        """Resolve moved/relocated image path from project entry."""
+        raw = pathlib.Path(str(entry.get("path", "")))
+        if raw.exists():
+            return raw
+        rel = entry.get("path_relative")
+        if isinstance(rel, str) and rel.strip():
+            candidate = (project_dir / rel).resolve()
+            if candidate.exists():
+                return candidate
+        image_name = str(entry.get("image_name", raw.name)).strip()
+        if image_name:
+            direct = (project_dir / image_name).resolve()
+            if direct.exists():
+                return direct
+            # Best-effort recursive search under project dir for renamed/moved roots.
+            matches = list(project_dir.rglob(image_name))
+            for candidate in matches:
+                if candidate.is_file():
+                    return candidate.resolve()
+        return raw
+
+    @staticmethod
+    def _prompt_relink_missing_images(
+        parent: QtWidgets.QWidget,
+        missing_entries: List[tuple[int, Dict[str, object], pathlib.Path]],
+        *,
+        mode: str = "ask",
+    ) -> Dict[int, pathlib.Path]:
+        """Prompt user to relink missing images (folder scan or per-file selection)."""
+        if not missing_entries:
+            return {}
+        names = []
+        for _, entry, fallback in missing_entries:
+            image_name = str(entry.get("image_name", fallback.name)).strip()
+            if image_name:
+                names.append(image_name)
+        if not names:
+            return {}
+        relinked: Dict[int, pathlib.Path] = {}
+        if mode not in {"ask", "auto", "manual"}:
+            mode = "ask"
+        resp = QtWidgets.QMessageBox.StandardButton.Yes
+        if mode == "ask":
+            resp = QtWidgets.QMessageBox.question(
+                parent,
+                "Missing images",
+                (
+                    f"{len(missing_entries)} project image(s) were not found.\n"
+                    "Yes = select one folder for auto-relink\n"
+                    "No = select each missing file manually"
+                ),
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+                | QtWidgets.QMessageBox.StandardButton.Cancel,
+                QtWidgets.QMessageBox.StandardButton.Yes,
+            )
+        elif mode == "manual":
+            resp = QtWidgets.QMessageBox.StandardButton.No
+        else:
+            resp = QtWidgets.QMessageBox.StandardButton.Yes
+        if resp == QtWidgets.QMessageBox.StandardButton.Cancel:
+            return relinked
+        if resp == QtWidgets.QMessageBox.StandardButton.Yes:
+            folder = QtWidgets.QFileDialog.getExistingDirectory(
+                parent,
+                "Select folder containing relocated images",
+                str(pathlib.Path.cwd()),
+            )
+            if not folder:
+                return relinked
+            folder_path = pathlib.Path(folder)
+            for idx, entry, fallback in missing_entries:
+                image_name = str(entry.get("image_name", fallback.name)).strip()
+                if not image_name:
+                    continue
+                direct = (folder_path / image_name).resolve()
+                if direct.exists() and direct.is_file():
+                    relinked[idx] = direct
+                    continue
+                matches = [p for p in folder_path.rglob(image_name) if p.is_file()]
+                if matches:
+                    relinked[idx] = matches[0].resolve()
+            return relinked
+        for idx, entry, fallback in missing_entries:
+            image_name = str(entry.get("image_name", fallback.name)).strip()
+            start_dir = str(pathlib.Path.cwd())
+            if image_name:
+                start_dir = str(pathlib.Path.cwd() / image_name)
+            selected, _ = QtWidgets.QFileDialog.getOpenFileName(
+                parent,
+                f"Locate image: {image_name or fallback.name}",
+                start_dir,
+                "Image files (*.tif *.tiff *.ome.tif *.ome.tiff);;All files (*)",
+            )
+            if selected:
+                selected_path = pathlib.Path(selected).resolve()
+                if selected_path.exists() and selected_path.is_file():
+                    relinked[idx] = selected_path
+        return relinked
+
+    def _annotation_export_timestamp(self) -> str:
+        return datetime.now().isoformat(timespec="seconds")
+
+    def _current_annotation_target(self) -> str:
+        target = str(getattr(self, "annotate_target", "frame")).strip()
+        return target or "frame"
+
+    def _image_export_context(self, image_id: int) -> Dict[str, object]:
+        image = next(
+            (
+                img
+                for img in self.session_state.images
+                if int(getattr(img, "id", -1)) == int(image_id)
+            ),
+            None,
+        )
+        if image is None:
+            return {"image_id": int(image_id)}
+        shape = list(getattr(image, "shape", ()) or ())
+        return {
+            "image_id": int(getattr(image, "id", image_id)),
+            "image_name": str(getattr(image, "name", "")),
+            "image_path": str(pathlib.Path(str(getattr(image, "path", ""))).resolve()),
+            "shape": shape,
+            "dtype": str(getattr(image, "dtype", "")),
+            "has_time": bool(getattr(image, "has_time", False)),
+            "has_z": bool(getattr(image, "has_z", False)),
+            "ome_axes": str(getattr(image, "ome_axes", "") or ""),
+            "interpret_3d_as": str(getattr(image, "interpret_3d_as", "auto")),
+        }
+
+    def build_annotation_export_metadata(
+        self,
+        image_id: int,
+        *,
+        export_format: str,
+        export_path: Optional[pathlib.Path] = None,
+    ) -> Dict[str, object]:
+        """Build rich export metadata for CSV/JSON annotations."""
+        image_ctx = self._image_export_context(image_id)
+        base = self.build_annotation_metadata(image_id)
+        display_by_panel: Dict[str, object] = {}
+        for panel, mapping in self.display_mapping.per_image.get(image_id, {}).items():
+            display_by_panel[str(panel)] = {
+                "min": float(mapping.min_val),
+                "max": float(mapping.max_val),
+                "gamma": float(mapping.gamma),
+                "lut": int(mapping.lut),
+                "invert": bool(mapping.invert),
+            }
+        annotation_count = len(self.session_state.annotations.get(image_id, []))
+        payload: Dict[str, object] = {
+            "tool": "PhageAnnotator",
+            "schema": "annotation_export.v1",
+            "exported_at": self._annotation_export_timestamp(),
+            "export_format": str(export_format),
+            "annotation_count": int(annotation_count),
+            "linked_image": image_ctx,
+            "annotation_context": {
+                "scope": str(getattr(self.view_state, "annotation_scope", "current")),
+                "target": self._current_annotation_target(),
+                "annotation_space": str(
+                    getattr(self.session_state, "annotation_space", "stack")
+                ),
+                "t": int(getattr(self.view_state, "t", 0)),
+                "z": int(getattr(self.view_state, "z", 0)),
+            },
+            "capture": {
+                "roi": base.get("roi"),
+                "crop": base.get("crop"),
+                "display_frame": base.get("display"),
+                "display_by_panel": display_by_panel,
+            },
+        }
+        if export_path is not None:
+            payload["export_path"] = str(pathlib.Path(export_path).resolve())
+        return payload
+
     def build_annotation_metadata(self, image_id: int) -> Dict[str, object]:
         """Build metadata dict from current ROI, crop, and display settings."""
         meta: Dict[str, object] = {}
-        
+
         # Add ROI if set
-        roi = self.view_state.roi
+        roi = self.view_state.roi_spec
         if roi and roi.shape != "none":
             meta["roi"] = {
                 "shape": roi.shape,
@@ -42,24 +224,24 @@ class SessionProjectMixin:
                 radius = roi.w / 2
                 meta["roi"]["center"] = (center_x, center_y)
                 meta["roi"]["radius"] = radius
-        
+
         # Add crop if set
         crop = self.view_state.crop_rect
         if crop and crop != (0, 0, 0, 0):
             meta["crop"] = crop
-        
+
         # Add display settings for the current image
-        if image_id in self.session_state.images:
-            mapping = self.display_mapping.get_for_panel("frame")  # Use frame panel as default
+        if any(int(getattr(img, "id", -1)) == int(image_id) for img in self.session_state.images):
+            mapping = self.display_mapping.mapping_for(int(image_id), "frame")
             meta["display"] = {
                 "win": {
-                    "min": mapping.vmin,
-                    "max": mapping.vmax,
+                    "min": mapping.min_val,
+                    "max": mapping.max_val,
                 },
                 "gamma": mapping.gamma,
-                "lut": mapping.lut_name,
+                "lut": mapping.lut,
             }
-        
+
         return meta
 
     def save_csv(self, parent: QtWidgets.QWidget, path: pathlib.Path) -> None:
@@ -67,7 +249,12 @@ class SessionProjectMixin:
         image_id = self.session_state.active_primary_id
         points = self.session_state.annotations.get(image_id, [])
         try:
-            save_keypoints_csv(points, path)
+            meta = self.build_annotation_export_metadata(
+                image_id,
+                export_format="csv",
+                export_path=path,
+            )
+            save_keypoints_csv(points, path, meta=meta)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Save CSV failed", str(exc))
             return
@@ -78,7 +265,12 @@ class SessionProjectMixin:
         image_id = self.session_state.active_primary_id
         points = self.session_state.annotations.get(image_id, [])
         try:
-            save_keypoints_json(points, path)
+            meta = self.build_annotation_export_metadata(
+                image_id,
+                export_format="json",
+                export_path=path,
+            )
+            save_keypoints_json(points, path, meta=meta)
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Save JSON failed", str(exc))
             return
@@ -127,13 +319,13 @@ class SessionProjectMixin:
         display_mappings: Dict[int, Dict[str, dict]] = {}
         for image_id, panels in self.display_mapping.per_image.items():
             display_mappings[image_id] = {panel: mapping_to_dict(mapping) for panel, mapping in panels.items()}
-        
+
         # Phase ι: Pass modality_manager for persistence
         modality_manager = getattr(self.session_state, "modality_manager", None)
         channel_display_settings = getattr(
             self.session_state, "channel_display_settings", None
         )
-        
+
         save_project(
             path,
             self.session_state.images,
@@ -151,7 +343,14 @@ class SessionProjectMixin:
         self.session_state.project_save_time = path.stat().st_mtime if path.exists() else None
         self.set_dirty(False)
 
-    def load_project(self, parent: QtWidgets.QWidget, path: pathlib.Path, read_metadata) -> bool:
+    def load_project(
+        self,
+        parent: QtWidgets.QWidget,
+        path: pathlib.Path,
+        read_metadata,
+        *,
+        relink_mode: str = "ask",
+    ) -> bool:
         try:
             (
                 image_entries,
@@ -185,14 +384,36 @@ class SessionProjectMixin:
         display_per_image: Dict[int, Dict[str, DisplayMapping]] = {}
         rois_by_image: Dict[int, List[Roi]] = {}
         missing_images = []
+        relinked_images: List[str] = []
         
+        resolved_paths: Dict[int, pathlib.Path] = {}
+        missing_entries: List[tuple[int, Dict[str, object], pathlib.Path]] = []
         for idx, entry in enumerate(image_entries):
-            img_path = pathlib.Path(entry["path"])
-            # Check if image exists before trying to load
-            if not img_path.exists():
-                missing_images.append(str(img_path))
+            img_path = self._resolve_project_image_path(entry, path.parent)
+            if img_path.exists():
+                resolved_paths[idx] = img_path
+                original_path = pathlib.Path(str(entry.get("path", "")))
+                if original_path and original_path != img_path:
+                    relinked_images.append(f"{original_path} -> {img_path}")
+            else:
+                missing_entries.append((idx, entry, img_path))
+        if missing_entries:
+            manual = self._prompt_relink_missing_images(
+                parent,
+                missing_entries,
+                mode=relink_mode,
+            )
+            for idx, relinked in manual.items():
+                resolved_paths[idx] = relinked
+                original_path = pathlib.Path(str(image_entries[idx].get("path", "")))
+                if original_path and original_path != relinked:
+                    relinked_images.append(f"{original_path} -> {relinked}")
+        for idx, entry in enumerate(image_entries):
+            img_path = resolved_paths.get(idx)
+            if img_path is None:
+                fallback = self._resolve_project_image_path(entry, path.parent)
+                missing_images.append(str(fallback))
                 continue
-                
             try:
                 meta = read_metadata(img_path)
             except Exception as e:
@@ -222,10 +443,34 @@ class SessionProjectMixin:
             msg += "\n".join(missing_images[:10])  # Show first 10
             if len(missing_images) > 10:
                 msg += f"\n... and {len(missing_images) - 10} more"
+            if relinked_images:
+                msg += "\n\nRelinked images:\n"
+                msg += "\n".join(relinked_images[:5])
+                if len(relinked_images) > 5:
+                    msg += f"\n... and {len(relinked_images) - 5} more"
             QtWidgets.QMessageBox.warning(parent, "Some images not found", msg)
         
         # If no images loaded at all, fail
         if not images:
+            unresolved_rows = []
+            for idx, entry in enumerate(image_entries):
+                if idx not in resolved_paths:
+                    fallback = self._resolve_project_image_path(entry, path.parent)
+                    unresolved_rows.append(
+                        {
+                            "index": int(idx),
+                            "image_name": str(entry.get("image_name", fallback.name)),
+                            "original_path": str(entry.get("path", fallback)),
+                            "resolved_attempt": str(fallback),
+                        }
+                    )
+            self.session_state.project_relink_report = {
+                "project_path": str(path),
+                "loaded_count": 0,
+                "relinked": list(relinked_images),
+                "missing": list(missing_images),
+                "unresolved": unresolved_rows,
+            }
             QtWidgets.QMessageBox.critical(parent, "Load failed", "No images could be loaded from the project.")
             return False
             
@@ -233,13 +478,23 @@ class SessionProjectMixin:
             # Map entry idx to actual image id by matching paths
             if idx < len(image_entries):
                 actual_id = None
+                entry_path = pathlib.Path(str(image_entries[idx].get("path", "")))
+                entry_name = str(image_entries[idx].get("image_name", entry_path.name))
                 for img in images:
-                    if pathlib.Path(img.path) == pathlib.Path(image_entries[idx]["path"]):
+                    img_path = pathlib.Path(str(getattr(img, "path", "")))
+                    if img_path == entry_path or img_path.name == entry_name:
                         actual_id = img.id
                         break
                 if actual_id is not None and ann_path and ann_path.exists():
                     try:
-                        annotations[actual_id] = keypoints_from_json(ann_path)
+                        loaded_points = keypoints_from_json(ann_path)
+                        for kp in loaded_points:
+                            kp.image_id = actual_id
+                            if not kp.image_name:
+                                kp.image_name = images[actual_id].name
+                            if not kp.image_key:
+                                kp.image_key = kp.image_name
+                        annotations[actual_id] = loaded_points
                     except Exception:
                         annotations[actual_id] = []
         self.session_state.images = images
@@ -265,8 +520,12 @@ class SessionProjectMixin:
 
         self.session_state.project_path = path
         self.session_state.project_save_time = path.stat().st_mtime if path.exists() else None
-        self.session_state.active_primary_id = int(settings.get("last_fov_index", 0))
-        self.session_state.active_support_id = int(settings.get("last_support_index", min(1, len(images) - 1)))
+        default_support = min(1, len(images) - 1)
+        requested_primary = int(settings.get("last_fov_index", 0))
+        requested_support = int(settings.get("last_support_index", default_support))
+        max_id = max(0, len(images) - 1)
+        self.session_state.active_primary_id = min(max(0, requested_primary), max_id)
+        self.session_state.active_support_id = min(max(0, requested_support), max_id)
         self.session_state.smlm_runs = list(settings.get("smlm_runs", []))
         self.session_state.threshold_settings = dict(settings.get("threshold_settings", {}))
         self.session_state.threshold_configs_by_image = dict(settings.get("threshold_configs_by_image", {}))
@@ -445,6 +704,25 @@ class SessionProjectMixin:
                 self.set_lut(0)
 
         self.set_dirty(False)
+        unresolved_rows = []
+        for idx, entry in enumerate(image_entries):
+            if idx not in resolved_paths:
+                fallback = self._resolve_project_image_path(entry, path.parent)
+                unresolved_rows.append(
+                    {
+                        "index": int(idx),
+                        "image_name": str(entry.get("image_name", fallback.name)),
+                        "original_path": str(entry.get("path", fallback)),
+                        "resolved_attempt": str(fallback),
+                    }
+                )
+        self.session_state.project_relink_report = {
+            "project_path": str(path),
+            "loaded_count": int(len(images)),
+            "relinked": list(relinked_images),
+            "missing": list(missing_images),
+            "unresolved": unresolved_rows,
+        }
         self.state_changed.emit()
         self.annotations_changed.emit()
         return True

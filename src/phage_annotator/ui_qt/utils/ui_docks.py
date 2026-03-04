@@ -16,6 +16,7 @@ from phage_annotator.ui_qt.panels.density import DensityPanel
 from phage_annotator.ui_qt.panels.modality_layers_panel import ModalityLayersPanel
 from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
 from phage_annotator.ui_qt.panels.review_queue_panel import ReviewQueuePanel
+from phage_annotator.ui_qt.panels.project_relink_panel import ProjectRelinkPanel
 from phage_annotator.ui_qt.panels.status_details_panel import StatusDetailsPanel
 from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
 from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
@@ -74,7 +75,7 @@ def _is_user_intent_reason(reason: str) -> bool:
     text = str(reason or "").strip().lower()
     if text in {"user", "command_palette", "panel_switcher"}:
         return True
-    return text.startswith(("menu:", "quick_button:", "right_dock_segment"))
+    return text.startswith(("menu:", "quick_button:"))
 
 
 def _show_status_message(self, text: str, timeout_ms: int = 3500) -> None:
@@ -113,6 +114,12 @@ def _hide_auto_open_toast(self) -> None:
 
 def _show_auto_open_toast(self, panel_id: str, panel_title: str, *, timeout_ms: int = 7000) -> None:
     """Show interactive toast for auto-open events with Pin/Disable actions."""
+    if bool(
+        getattr(self, "_settings", None).value("statusBarMinimalMode", True, type=bool)
+        if getattr(self, "_settings", None) is not None
+        else True
+    ):
+        return
     if not bool(getattr(self, "_settings", None).value("panelAutoOpenToastsEnabled", False, type=bool) if getattr(self, "_settings", None) is not None else False):
         return
     _hide_auto_open_toast(self)
@@ -200,7 +207,7 @@ def _merge_system_docks(self) -> None:
 
     tabs = QtWidgets.QTabWidget(self)
     tabs.setObjectName("system_tabs")
-    tabs.addTab(logs_w, "Diagnostics")
+    tabs.addTab(logs_w, "Logs / Diagnostics")
     tabs.addTab(perf_w, "Performance")
     tabs.addTab(rec_w, "Recorder")
 
@@ -583,7 +590,14 @@ def _apply_panel_constraints(self, dock: QtWidgets.QDockWidget, spec: PanelSpec)
     constraints = spec.constraints if isinstance(spec.constraints, PanelConstraints) else PanelConstraints()
     features = QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
     # Exclude close button from sidebar panels (left and right) that have collapse/expand controls
-    right_sidebar_panels = {"annotations", "review_queue", "suggestion_explain", "advanced_analysis", "modality_layers"}
+    right_sidebar_panels = {
+        "annotations",
+        "review_queue",
+        "suggestion_explain",
+        "advanced_analysis",
+        "modality_layers",
+        "status_details",
+    }
     if spec.id not in {"sidebar"} | right_sidebar_panels:
         features |= QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
     if constraints.floatable:
@@ -596,6 +610,12 @@ def _apply_panel_constraints(self, dock: QtWidgets.QDockWidget, spec: PanelSpec)
         dock.setAllowedAreas(allowed)
     else:
         dock.setAllowedAreas(QtCore.Qt.DockWidgetArea.AllDockWidgetAreas)
+    if spec.id in right_sidebar_panels:
+        dock.setMinimumWidth(360)
+        dock.setStyleSheet(
+            "QDockWidget { margin: 0px; padding: 0px; }"
+            "QDockWidget::title { padding: 6px 8px; font-weight: 600; }"
+        )
 
 
 def _canonical_area_for_panel(self, spec: PanelSpec) -> QtCore.Qt.DockWidgetArea:
@@ -817,7 +837,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_annotations_widget,
             toggle_action_text="Annotation Table",
             bucket="inspect",
-            tab_group="inspect_main",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -832,7 +851,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_review_queue_widget,
             toggle_action_text="Review Queue",
             bucket="inspect",
-            tab_group="inspect_main",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -847,7 +865,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_suggestion_explain_widget,
             toggle_action_text="Why This Suggestion?",
             bucket="inspect",
-            tab_group="inspect_main",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -862,8 +879,22 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_status_details_widget,
             toggle_action_text="Status Details",
             bucket="inspect",
-            tab_group="inspect_main",
             search_aliases=("status details", "run context", "session status"),
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
+        ),
+        PanelSpec(
+            id="project_relink",
+            title="Project Relink",
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=False,
+            widget_factory=self._make_project_relink_widget,
+            toggle_action_text="Project Relink",
+            bucket="inspect",
+            search_aliases=("relink", "missing images", "project relink"),
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -878,7 +909,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_advanced_analysis_widget,
             toggle_action_text="Advanced Analysis",
             bucket="inspect",
-            tab_group="inspect_main",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -999,7 +1029,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_modality_layers_widget,
             toggle_action_text="Modality Layers",
             bucket="inspect",
-            tab_group="inspect_main",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -1017,11 +1046,11 @@ def build_panel_registry(self) -> List[PanelSpec]:
         ),
         PanelSpec(
             id="logs",
-            title="Diagnostics",
+            title="Logs / Diagnostics",
             default_area=QtCore.Qt.BottomDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_logs_widget,
-            toggle_action_text="Diagnostics",
+            toggle_action_text="Logs / Diagnostics",
             bucket="plots",
             tab_group="system",
             search_aliases=("logs", "system logs"),
@@ -1150,6 +1179,12 @@ def make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
 def make_status_details_widget(self) -> QtWidgets.QWidget:
     widget = StatusDetailsPanel(parent=self)
     self.status_details_panel = widget
+    return widget
+
+
+def make_project_relink_widget(self) -> QtWidgets.QWidget:
+    widget = ProjectRelinkPanel(parent=self)
+    self.project_relink_panel = widget
     return widget
 
 
@@ -1498,6 +1533,15 @@ def setup_status_bar(self) -> None:
     """Initialize status-bar widgets (progress, buffer stats, and tool status)."""
     status_bar = self.statusBar()
     status_bar.setSizeGripEnabled(True)
+    indicator = getattr(self, "_status_indicator_bar", None)
+    if indicator is not None:
+        try:
+            status_bar.removeWidget(indicator)
+            indicator.setParent(None)
+            indicator.deleteLater()
+        except Exception:
+            pass
+        self._status_indicator_bar = None
     # Add soft border and background styling to the status bar
     status_bar.setStyleSheet(
         "QStatusBar { border-top: 2px solid #b8b8b8; background: #f5f5f5; padding: 2px; }"
@@ -1507,6 +1551,9 @@ def setup_status_bar(self) -> None:
     self.status = QtWidgets.QLabel("")
     self.status.setMinimumWidth(180)
     status_bar.addWidget(self.status, stretch=0)
+    self.status_runtime_lbl = QtWidgets.QLabel("Points: 0 | ROI: n/a | Density: n/a | FPS: 30")
+    self.status_runtime_lbl.setVisible(False)
+    status_bar.addPermanentWidget(self.status_runtime_lbl)
 
     # Permanent operational state widgets (single source of truth).
     self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -")
@@ -1536,6 +1583,8 @@ def setup_status_bar(self) -> None:
     # Secondary state stays available for logic/tooltips but is hidden from the
     # default status bar strip to reduce visual crowding.
     for widget in (
+        self.status_dataset_lbl,
+        self.status_tz_lbl,
         self.status_label_lbl,
         self.status_scope_lbl,
         self.status_target_lbl,

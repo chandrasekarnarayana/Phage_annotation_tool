@@ -95,6 +95,8 @@ class ThunderstormBridgeConfig:
     command_template: str = ""
     pyimagej_app_path: str = ""
     timeout_sec: int = 900
+    retry_count: int = 1
+    retry_delay_sec: float = 0.75
 
 
 def discover_bundled_thunderstorm_jar(start_dir: Optional[Path] = None) -> Optional[Path]:
@@ -274,25 +276,60 @@ def _run_fiji_subprocess(
 
         if progress_cb is not None:
             progress_cb(20, "Running Fiji/ThunderSTORM…")
-        try:
-            proc = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=max(30, int(config.timeout_sec)),
-                env=env,
-            )
-        except subprocess.TimeoutExpired as exc:
+        attempts = max(1, int(getattr(config, "retry_count", 1)) + 1)
+        retry_delay = max(0.0, float(getattr(config, "retry_delay_sec", 0.75)))
+        proc = None
+        timeout_error = None
+        import time as _time
+        for attempt in range(1, attempts + 1):
+            try:
+                proc = subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=max(30, int(config.timeout_sec)),
+                    env=env,
+                )
+                timeout_error = None
+            except subprocess.TimeoutExpired as exc:
+                proc = None
+                timeout_error = exc
+                if attempt < attempts:
+                    if progress_cb is not None:
+                        progress_cb(
+                            20,
+                            f"Fiji attempt {attempt}/{attempts} timed out; retrying…",
+                        )
+                    _time.sleep(retry_delay)
+                    continue
+                raise FijiTimeoutError(
+                    "Fiji run timed out after retry attempts. "
+                    "Increase timeout or reduce ROI/stack size."
+                ) from exc
+
+            if proc is not None and proc.returncode == 0:
+                break
+            if attempt < attempts:
+                if progress_cb is not None:
+                    progress_cb(
+                        20,
+                        f"Fiji attempt {attempt}/{attempts} failed; retrying…",
+                    )
+                _time.sleep(retry_delay)
+        if timeout_error is not None:
             raise FijiTimeoutError(
-                "Fiji run timed out. Increase timeout or reduce ROI/stack size."
-            ) from exc
+                "Fiji run timed out after retry attempts. "
+                "Increase timeout or reduce ROI/stack size."
+            ) from timeout_error
+        if proc is None:
+            raise MacroExecutionError("Fiji bridge failed before subprocess execution.")
         if proc.returncode != 0:
             stderr = (proc.stderr or "").strip()
             stdout = (proc.stdout or "").strip()
             detail = stderr or stdout or f"exit={proc.returncode}"
             raise MacroExecutionError(
-                "Fiji bridge failed. Check macro/plugin compatibility. "
+                "Fiji bridge failed after retry attempts. Check macro/plugin compatibility. "
                 f"Details: {detail}"
             )
         if not output_csv.exists():
@@ -328,6 +365,7 @@ def _run_fiji_subprocess(
             "macro_path": str(macro_path),
             "executed_macro": executed_macro_text,
             "plugin_params": plugin_params,
+            "retry_count": int(getattr(config, "retry_count", 1)),
         }
 
 

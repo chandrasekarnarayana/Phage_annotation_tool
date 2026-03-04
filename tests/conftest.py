@@ -113,7 +113,11 @@ def pytest_collection_modifyitems(
     run_gui = _is_gui_requested(config)
     skip_gui = pytest.mark.skip(reason="Use --run-gui (or -m gui) to run GUI tests.")
     skip_missing_pyqt = pytest.mark.skip(reason="PyQt5 is not installed in this environment.")
+    skip_unsupported_runtime = pytest.mark.skip(
+        reason="GUI tests are disabled on this Python runtime; use the CI-supported GUI runtime (py3.11)."
+    )
     has_pyqt = find_spec("PyQt5") is not None
+    unsupported_gui_runtime = sys.version_info >= (3, 13)
 
     for item in items:
         item_path = _to_path(getattr(item, "path", getattr(item, "fspath", "")))
@@ -124,6 +128,8 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_gui)
         if run_gui and "gui" in item.keywords and not has_pyqt:
             item.add_marker(skip_missing_pyqt)
+        if run_gui and "gui" in item.keywords and unsupported_gui_runtime:
+            item.add_marker(skip_unsupported_runtime)
 
 
 # Ensure a safe backend/environment for GUI tests under CI/headless.

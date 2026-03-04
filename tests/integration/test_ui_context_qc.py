@@ -196,3 +196,71 @@ def test_qc_panel_export_buttons_emit_format(qapp):
     panel.export_html_btn.click()
 
     assert observed == ["csv", "json", "html"]
+
+
+@pytest.mark.gui
+@pytest.mark.skipif(not _HAS_QT, reason="PyQt5 runtime unavailable")
+def test_qc_panel_resolve_hides_issue_and_emits_status(qapp):
+    """Resolve action should mark issue resolved and remove it from open list."""
+    qc_state = QCState()
+    issue = QCIssue(
+        issue_id="dup-2",
+        severity=IssueSeverity.ERROR,
+        issue_type="duplicate",
+        message="duplicate annotation",
+        image_id=1,
+        affected_annotation_ids=["a", "b"],
+        location_x=10.0,
+        location_y=20.0,
+        location_z=0,
+        location_t=0,
+    )
+    qc_state.add_issue(issue)
+    panel = QCIssuesPanel(qc_state=qc_state)
+    panel.refresh()
+
+    observed: list[tuple[str, str]] = []
+    panel.issue_status_changed.connect(lambda issue_id, status: observed.append((issue_id, status)))
+
+    resolve_buttons = [
+        btn
+        for btn in panel.findChildren(QtWidgets.QPushButton)
+        if btn.text() == "Resolve"
+    ]
+    assert resolve_buttons
+    resolve_buttons[0].click()
+
+    assert qc_state.get_issue_status("dup-2") == qc_state.STATUS_RESOLVED
+    assert panel.get_visible_issue_count() == 0
+    assert observed == [("dup-2", qc_state.STATUS_RESOLVED)]
+
+
+@pytest.mark.gui
+@pytest.mark.skipif(not _HAS_QT, reason="PyQt5 runtime unavailable")
+def test_qc_panel_show_resolved_filter_restores_visibility(qapp):
+    """Resolved issues are hidden by default and shown when filter is enabled."""
+    qc_state = QCState()
+    issue = QCIssue(
+        issue_id="dup-3",
+        severity=IssueSeverity.ERROR,
+        issue_type="duplicate",
+        message="duplicate annotation",
+        image_id=1,
+        affected_annotation_ids=["a", "b"],
+        location_x=11.0,
+        location_y=21.0,
+        location_z=0,
+        location_t=0,
+    )
+    qc_state.add_issue(issue)
+    panel = QCIssuesPanel(qc_state=qc_state)
+    panel.refresh()
+
+    # Resolve issue via state and refresh panel.
+    assert qc_state.resolve_issue("dup-3") is True
+    panel.refresh()
+    assert panel.get_visible_issue_count() == 0
+
+    # Enable "Show Resolved" and verify issue becomes visible again.
+    panel.show_resolved_checkbox.setChecked(True)
+    assert panel.get_visible_issue_count() == 1

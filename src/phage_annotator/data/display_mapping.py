@@ -49,6 +49,29 @@ class DisplayMapping:
     per_panel: Dict[str, "DisplayMapping"] = field(default_factory=dict)
     per_image: Dict[int, Dict[str, "DisplayMapping"]] = field(default_factory=dict)
 
+    @property
+    def vmin(self) -> float:
+        """Backward-compatible alias for legacy display consumers."""
+        return float(self.min_val)
+
+    @vmin.setter
+    def vmin(self, value: float) -> None:
+        self.min_val = float(value)
+
+    @property
+    def vmax(self) -> float:
+        """Backward-compatible alias for legacy display consumers."""
+        return float(self.max_val)
+
+    @vmax.setter
+    def vmax(self, value: float) -> None:
+        self.max_val = float(value)
+
+    @property
+    def lut_name(self) -> str:
+        """Human-readable LUT token for legacy project metadata export."""
+        return str(int(self.lut))
+
     def set_window(self, min_val: float, max_val: float) -> None:
         """Set the display window bounds."""
         self.min_val = float(min_val)
@@ -234,8 +257,18 @@ def mapping_from_dict(data: dict, fallback: Optional[DisplayMapping] = None) -> 
     if fallback is None:
         fallback = DisplayMapping(0.0, 1.0)
     mapping = DisplayMapping(
-        float(data.get("min_val", fallback.min_val)),
-        float(data.get("max_val", fallback.max_val)),
+        float(
+            data.get(
+                "min_val",
+                data.get("vmin", data.get("min", fallback.min_val)),
+            )
+        ),
+        float(
+            data.get(
+                "max_val",
+                data.get("vmax", data.get("max", fallback.max_val)),
+            )
+        ),
         float(data.get("gamma", fallback.gamma)),
         data.get("mode", fallback.mode),
         int(data.get("lut", fallback.lut)),

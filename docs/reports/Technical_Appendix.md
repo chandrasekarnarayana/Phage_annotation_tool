@@ -86,8 +86,8 @@ Status: Complete
 |---|---|
 | Execution model | `QThreadPool` + `QRunnable` with signal-based callbacks. |
 | Cancellation model | Cooperative cancellation through `CancelToken`. |
-| Current public methods | `submit(...)`, `cancel_all()`. |
-| Known mismatch | UI paths call `jobs.cancel(job_id)` and `jobs.active_job_count()` but these methods are not present in current `JobManager` implementation. |
+| Current public methods | `submit(...)`, `cancel(job_id)`, `cancel_all()`, `active_job_count()`. |
+| Status | Cancel/status API mismatch is resolved in current `JobManager` implementation. |
 
 ## 3. State Transition Tables
 Status: Complete
@@ -215,8 +215,8 @@ Status: Complete
 |---|---|---|---|
 | Missing image files in project load | Existence checks and load warnings | Partial load + warning dialog | Session may restore incompletely |
 | Qt runtime not available | Import-time failure during test collection/runtime startup | Documented prerequisites; marker-gated GUI tests | GUI validation blocked in some environments |
-| Job cancellation calls missing API | Runtime exception on cancel/status paths | Pending code fix (TD-001) | User-visible failure in cancel workflow |
-| Legacy field-name drift in compatibility paths | Runtime exception when those paths execute | Pending normalization + tests (TD-002) | Hidden until specific settings/workflows trigger |
+| Job cancellation calls missing API | Previously caused runtime exception on cancel/status paths | Resolved (TD-001) | Keep direct job API regression coverage in CI |
+| Legacy field-name drift in compatibility paths | Reduced via compatibility aliases and tested canonical fallbacks | Keep alias regressions in CI and incrementally remove obsolete aliases | Residual risk limited to untested third-party/custom extensions |
 | Missing benchmark plugin | Benchmark tests skipped | Install dev extras and rerun | No quantitative performance baseline |
 
 ## 9. ADR Index (Architecture Decision Records)

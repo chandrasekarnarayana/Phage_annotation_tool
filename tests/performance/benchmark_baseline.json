@@ -1,0 +1,19 @@
+{
+  "baselines": [
+    {
+      "match": "test_standardize_axes_perf",
+      "mean_ms": 30.0,
+      "max_regression_pct": 300.0
+    },
+    {
+      "match": "test_display_mapping_creation",
+      "mean_ms": 5.0,
+      "max_regression_pct": 600.0
+    },
+    {
+      "match": "test_display_mapping_update",
+      "mean_ms": 5.0,
+      "max_regression_pct": 600.0
+    }
+  ]
+}

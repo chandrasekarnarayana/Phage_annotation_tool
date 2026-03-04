@@ -92,7 +92,6 @@ class KeypointAnnotator(
     stacks. Annotation coordinates are stored in full-resolution image space
     (crop and downsample only affect display).
     """
-    
     def _get_setting(self, key: str, default, type_):
         """Get a setting via unified settings proxy."""
         return self._settings.value(key, default, type=type_)
@@ -173,6 +172,7 @@ class KeypointAnnotator(
         self._adaptive_tile_size = 256
         self._lod_mode_active: Dict[int, bool] = {}
         self._panel_modality_map: Dict[str, object] = {}
+        self._annotation_panel_visibility: Dict[str, bool] = {}
         self._status_base = ""
         self._status_extra = ""
         self._annotation_write_context_pending = False
@@ -213,6 +213,23 @@ class KeypointAnnotator(
         ] = {}
         cache_max_mb = self._settings.value("cacheMaxMB", 1024, type=int)
         self.proj_cache = ProjectionCache(max_mb=cache_max_mb)
+        def _handle_projection_cache_warning(message: str) -> None:
+            text = f"Memory warning: {message}"
+            try:
+                self._set_status(text)
+            except Exception:
+                pass
+            try:
+                self._append_log(f"[CACHE] {text}")
+            except Exception:
+                pass
+
+        self._handle_projection_cache_warning = _handle_projection_cache_warning
+        self.proj_cache.set_warning_callback(
+            lambda msg: QtCore.QTimer.singleShot(
+                0, lambda m=str(msg): self._handle_projection_cache_warning(m)
+            )
+        )
         self._diag_hist_source = None
         self.jobs = JobManager(self)
         self._active_job_id: Optional[str] = None

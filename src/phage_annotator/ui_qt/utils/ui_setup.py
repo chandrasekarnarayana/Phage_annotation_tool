@@ -170,9 +170,22 @@ class UiSetupMixin:
         modality_layout = QtWidgets.QVBoxLayout(modality_group)
         modality_layout.setContentsMargins(6, 6, 6, 6)
         modality_layout.setSpacing(6)
-        self.lazy_modality_table = QtWidgets.QTableWidget(0, 5)
+        self.lazy_modality_table = QtWidgets.QTableWidget(0, 9)
         self.lazy_modality_table.setHorizontalHeaderLabels(
-            ["Visible", "Name", "Source", "View", "Sync Group"]
+            ["Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
+        )
+        model = self.lazy_modality_table.model()
+        model.setHeaderData(
+            1, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
+        )
+        model.setHeaderData(
+            6, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+        )
+        model.setHeaderData(
+            7, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+        )
+        model.setHeaderData(
+            8, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         self.lazy_modality_table.verticalHeader().setVisible(False)
         self.lazy_modality_table.horizontalHeader().setStretchLastSection(True)
@@ -221,9 +234,8 @@ class UiSetupMixin:
             "QWidget { border: 1px solid #d8d8d8; border-radius: 3px; background: #fafafa; }"
         )
         annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
-        annot_layout.setContentsMargins(4, 4, 4, 4)
-        annot_layout.setSpacing(4)
-        self.annotation_segment_header = None
+        annot_layout.setContentsMargins(8, 8, 8, 8)
+        annot_layout.setSpacing(8)
         self.review_queue_hint_lbl = None
         table_filter_row = QtWidgets.QHBoxLayout()
         table_filter_row.addWidget(self.filter_current_chk)
@@ -328,6 +340,21 @@ class UiSetupMixin:
         playback_layout.addWidget(self.loop_chk, 2, 3)
         self.fps_label = QtWidgets.QLabel(f"FPS: {self.speed_slider.value()}")
         playback_layout.addWidget(self.fps_label, 2, 1)
+        self.sync_target_live_lbl = QtWidgets.QLabel("Sync target: Manual group")
+        self.sync_target_live_lbl.setStyleSheet("color: #455a64; font-style: italic;")
+        playback_layout.addWidget(self.sync_target_live_lbl, 3, 0, 1, 4)
+        self.sync_target_mode_combo = QtWidgets.QComboBox()
+        self.sync_target_mode_combo.addItem("Manual group", "manual")
+        self.sync_target_mode_combo.addItem("Active canvas group", "active")
+        self.sync_target_mode_combo.setCurrentIndex(0)
+        self.sync_target_mode_combo.setToolTip("Choose how sync target group is selected.")
+        self.sync_key_combo = QtWidgets.QComboBox()
+        self.sync_key_combo.addItem("Group 1", "1")
+        self.sync_key_combo.setEnabled(True)
+        self.sync_key_combo.setToolTip("Select numeric Sync Group key from Lazy Loading.")
+        playback_layout.addWidget(QtWidgets.QLabel("Sync Target"), 4, 0)
+        playback_layout.addWidget(self.sync_target_mode_combo, 4, 1)
+        playback_layout.addWidget(self.sync_key_combo, 4, 2, 1, 2)
 
         self.playback_mode_combo = QtWidgets.QComboBox()
         self.playback_mode_combo.addItems(["Synchronized", "Independent", "Sequential"])
@@ -366,8 +393,22 @@ class UiSetupMixin:
         self.quick_panels_btn.setVisible(False)
         self.quick_layout_btn.setVisible(False)
 
-        display_group = QtWidgets.QGroupBox("Display")
+        display_group = QtWidgets.QGroupBox("Contrast & Projection")
+        display_group.setObjectName("contrast_projection_group")
+        display_group.setStyleSheet(
+            "#contrast_projection_group QGroupBox {"
+            " margin-top: 10px; border: 1px solid #e4e7eb; border-radius: 5px; padding-top: 4px; }"
+            "#contrast_projection_group QGroupBox::title {"
+            " subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #263238; font-weight: 600; }"
+            "#contrast_projection_group QComboBox, #contrast_projection_group QLineEdit, "
+            "#contrast_projection_group QDoubleSpinBox, #contrast_projection_group QSpinBox { min-height: 24px; }"
+            "#contrast_projection_group QPushButton { min-height: 24px; }"
+        )
         display_layout = QtWidgets.QGridLayout(display_group)
+        display_layout.setContentsMargins(10, 10, 10, 10)
+        display_layout.setHorizontalSpacing(10)
+        display_layout.setVerticalSpacing(8)
+        display_layout.setColumnStretch(2, 1)
         drow = 0
 
         self.vmin_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
@@ -409,39 +450,6 @@ class UiSetupMixin:
         vmax_slider_box.addWidget(self.vmax_plus_button)
         self.vmin_label = QtWidgets.QLabel("vmin: -")
         self.vmax_label = QtWidgets.QLabel("vmax: -")
-        display_layout.addWidget(QtWidgets.QLabel("Vmin"), drow, 0)
-        display_layout.addWidget(self.vmin_label, drow, 1)
-        display_layout.addLayout(vmin_slider_box, drow, 2)
-        drow += 1
-        display_layout.addWidget(QtWidgets.QLabel("Vmax"), drow, 0)
-        display_layout.addWidget(self.vmax_label, drow, 1)
-        display_layout.addLayout(vmax_slider_box, drow, 2)
-        drow += 1
-        # Percentile sliders are applied when data is available in _on_vminmax_change.
-
-        auto_row = QtWidgets.QHBoxLayout()
-        self.auto_btn = QtWidgets.QPushButton("Auto")
-        self.auto_set_btn = QtWidgets.QPushButton("Set…")
-        self.auto_pct_label = QtWidgets.QLabel("0.35% / 99.65%")
-        auto_row.addWidget(self.auto_btn)
-        auto_row.addWidget(self.auto_set_btn)
-        auto_row.addWidget(self.auto_pct_label)
-        display_layout.addWidget(QtWidgets.QLabel("Auto"), drow, 0)
-        display_layout.addLayout(auto_row, drow, 2)
-        drow += 1
-
-        self.auto_scope_combo = QtWidgets.QComboBox()
-        self.auto_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
-        self.auto_target_combo = QtWidgets.QComboBox()
-        self.auto_target_combo.addItems(["Current panel", "All visible panels"])
-        self.auto_roi_chk = QtWidgets.QCheckBox("Use ROI only")
-        auto_opt_row = QtWidgets.QHBoxLayout()
-        auto_opt_row.addWidget(self.auto_scope_combo)
-        auto_opt_row.addWidget(self.auto_target_combo)
-        auto_opt_row.addWidget(self.auto_roi_chk)
-        display_layout.addWidget(QtWidgets.QLabel("Auto options"), drow, 0)
-        display_layout.addLayout(auto_opt_row, drow, 2)
-        drow += 1
 
         self.lut_combo = QtWidgets.QComboBox()
         self.lut_combo.addItems(lut_names())
@@ -449,9 +457,6 @@ class UiSetupMixin:
         lut_box = QtWidgets.QHBoxLayout()
         lut_box.addWidget(self.lut_combo)
         lut_box.addWidget(self.lut_invert_chk)
-        display_layout.addWidget(QtWidgets.QLabel("LUT"), drow, 0)
-        display_layout.addLayout(lut_box, drow, 2)
-        drow += 1
 
         self.gamma_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.gamma_slider.setRange(2, 50)
@@ -460,64 +465,104 @@ class UiSetupMixin:
         gamma_row = QtWidgets.QHBoxLayout()
         gamma_row.addWidget(self.gamma_slider, stretch=1)
         gamma_row.addWidget(self.gamma_label)
-        display_layout.addWidget(QtWidgets.QLabel("Gamma"), drow, 0)
-        display_layout.addLayout(gamma_row, drow, 2)
+        self.log_chk = QtWidgets.QCheckBox("Log display")
+
+        contrast_group = QtWidgets.QGroupBox("Contrast")
+        contrast_layout = QtWidgets.QGridLayout(contrast_group)
+        contrast_layout.setContentsMargins(10, 8, 10, 8)
+        contrast_layout.setHorizontalSpacing(10)
+        contrast_layout.setVerticalSpacing(8)
+        contrast_layout.addWidget(QtWidgets.QLabel("Vmin"), 0, 0)
+        contrast_layout.addWidget(self.vmin_label, 0, 1)
+        contrast_layout.addLayout(vmin_slider_box, 0, 2)
+        contrast_layout.addWidget(QtWidgets.QLabel("Vmax"), 1, 0)
+        contrast_layout.addWidget(self.vmax_label, 1, 1)
+        contrast_layout.addLayout(vmax_slider_box, 1, 2)
+        contrast_layout.addWidget(QtWidgets.QLabel("LUT"), 2, 0)
+        contrast_layout.addLayout(lut_box, 2, 2)
+        contrast_layout.addWidget(QtWidgets.QLabel("Gamma"), 3, 0)
+        contrast_layout.addLayout(gamma_row, 3, 2)
+        contrast_layout.addWidget(self.log_chk, 4, 0, 1, 3)
+        display_layout.addWidget(contrast_group, drow, 0, 1, 3)
         drow += 1
 
-        self.log_chk = QtWidgets.QCheckBox("Log display")
-        display_layout.addWidget(self.log_chk, drow, 0, 1, 2)
+        self.auto_btn = QtWidgets.QPushButton("Auto")
+        self.auto_set_btn = QtWidgets.QPushButton("Set…")
+        self.auto_pct_label = QtWidgets.QLabel("0.35% / 99.65%")
+        self.auto_scope_combo = QtWidgets.QComboBox()
+        self.auto_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
+        self.auto_target_combo = QtWidgets.QComboBox()
+        self.auto_target_combo.addItems(["Current panel", "All visible panels"])
+        self.auto_roi_chk = QtWidgets.QCheckBox("Use ROI only")
+        auto_group = QtWidgets.QGroupBox("Auto Contrast")
+        auto_layout = QtWidgets.QGridLayout(auto_group)
+        auto_layout.setContentsMargins(10, 8, 10, 8)
+        auto_layout.setHorizontalSpacing(10)
+        auto_layout.setVerticalSpacing(8)
+        auto_controls = QtWidgets.QHBoxLayout()
+        auto_controls.addWidget(self.auto_btn)
+        auto_controls.addWidget(self.auto_set_btn)
+        auto_controls.addWidget(self.auto_pct_label)
+        auto_layout.addWidget(QtWidgets.QLabel("Action"), 0, 0)
+        auto_layout.addLayout(auto_controls, 0, 1, 1, 2)
+        auto_layout.addWidget(QtWidgets.QLabel("Scope"), 1, 0)
+        auto_layout.addWidget(self.auto_scope_combo, 1, 1, 1, 2)
+        auto_layout.addWidget(QtWidgets.QLabel("Target"), 2, 0)
+        auto_layout.addWidget(self.auto_target_combo, 2, 1, 1, 2)
+        auto_layout.addWidget(QtWidgets.QLabel("ROI"), 3, 0)
+        auto_layout.addWidget(self.auto_roi_chk, 3, 1, 1, 2)
+        self.auto_scope_combo.setToolTip("Data extent used to compute automatic contrast.")
+        self.auto_target_combo.setToolTip("Where computed contrast mapping is applied.")
+        self.auto_roi_chk.setToolTip("Restrict auto-contrast statistics to current ROI.")
+        display_layout.addWidget(auto_group, drow, 0, 1, 3)
         drow += 1
 
         # Replace projection_axis_combo with full ProjectionSelectorWidget
         from phage_annotator.ui_qt.widgets.projection_selector import ProjectionSelectorWidget
         self.projection_selector = ProjectionSelectorWidget(self)
-        display_layout.addWidget(QtWidgets.QLabel("Projection"), drow, 0)
-        display_layout.addWidget(self.projection_selector, drow, 2)
+        projection_group = QtWidgets.QGroupBox("Projection")
+        projection_layout = QtWidgets.QGridLayout(projection_group)
+        projection_layout.setContentsMargins(10, 8, 10, 8)
+        projection_layout.setHorizontalSpacing(10)
+        projection_layout.setVerticalSpacing(8)
+        projection_layout.addWidget(QtWidgets.QLabel("Mode"), 0, 0)
+        projection_layout.addWidget(self.projection_selector, 0, 1)
         # Keep projection_axis_combo as alias for backward compatibility
         self.projection_axis_combo = self.projection_selector.axis_combo
+        display_layout.addWidget(projection_group, drow, 0, 1, 3)
         drow += 1
 
-        sync_group = QtWidgets.QGroupBox("Sync")
+        sync_group = QtWidgets.QGroupBox("Sync Target")
         sync_layout = QtWidgets.QGridLayout(sync_group)
-        self.sync_list = QtWidgets.QListWidget()
-        self.sync_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.sync_playback_chk = QtWidgets.QCheckBox("Playback")
-        self.sync_zoom_chk = QtWidgets.QCheckBox("Zoom/Pan")
-        self.sync_contrast_chk = QtWidgets.QCheckBox("Contrast")
-        # Visual indicators for sync state
-        self.sync_playback_label = QtWidgets.QLabel("🔲")  # Empty box when off, will be updated
-        self.sync_playback_label.setToolTip("Playback sync is OFF")
-        self.sync_zoom_label = QtWidgets.QLabel("🔲")
-        self.sync_zoom_label.setToolTip("Zoom/Pan sync is OFF")
-        self.sync_contrast_label = QtWidgets.QLabel("🔲")
-        self.sync_contrast_label.setToolTip("Contrast sync is OFF")
-        sync_layout.addWidget(QtWidgets.QLabel("Linked views"), 0, 0, 1, 2)
-        sync_layout.addWidget(self.sync_list, 1, 0, 1, 2)
-        sync_layout.addWidget(self.sync_playback_label, 2, 0)
-        sync_layout.addWidget(self.sync_playback_chk, 2, 1)
-        sync_layout.addWidget(self.sync_zoom_label, 2, 2)
-        sync_layout.addWidget(self.sync_zoom_chk, 2, 3)
-        sync_layout.addWidget(self.sync_contrast_label, 3, 0)
-        sync_layout.addWidget(self.sync_contrast_chk, 3, 1)
-        self.sync_scope_combo = QtWidgets.QComboBox()
-        self.sync_scope_combo.addItems(
-            ["Active view only", "Selected linked views", "All linked views"]
+        sync_layout.setContentsMargins(10, 8, 10, 8)
+        sync_layout.setHorizontalSpacing(10)
+        sync_layout.setVerticalSpacing(8)
+        self.sync_intro_lbl = QtWidgets.QLabel(
+            "Use one shared Sync Group target for contrast, zoom/pan, and playback."
         )
-        self.sync_scope_combo.setCurrentIndex(1)
-        self.sync_select_all_btn = QtWidgets.QPushButton("Select all")
-        self.sync_clear_btn = QtWidgets.QPushButton("Clear")
+        self.sync_intro_lbl.setWordWrap(True)
+        self.sync_intro_lbl.setStyleSheet("color: #455a64;")
         self.sync_scope_hint_lbl = QtWidgets.QLabel(
-            "Contrast edits apply to selected linked views."
+            "Sync source: active view group."
         )
         self.sync_scope_hint_lbl.setStyleSheet("color: #546e7a;")
-        self.sync_keys_hint_lbl = QtWidgets.QLabel("Sync keys: -")
+        self.sync_keys_hint_lbl = QtWidgets.QLabel("Groups available: -")
         self.sync_keys_hint_lbl.setStyleSheet("color: #455a64; font-style: italic;")
-        sync_layout.addWidget(QtWidgets.QLabel("Contrast scope"), 4, 0)
-        sync_layout.addWidget(self.sync_scope_combo, 4, 1, 1, 2)
-        sync_layout.addWidget(self.sync_select_all_btn, 5, 0)
-        sync_layout.addWidget(self.sync_clear_btn, 5, 1)
-        sync_layout.addWidget(self.sync_scope_hint_lbl, 6, 0, 1, 4)
-        sync_layout.addWidget(self.sync_keys_hint_lbl, 7, 0, 1, 4)
+        self.sync_source_hint_lbl = QtWidgets.QLabel(
+            "Per-row checkboxes in Lazy Loading decide what syncs (contrast/zoom/playback)."
+        )
+        self.sync_source_hint_lbl.setStyleSheet("color: #546e7a;")
+        sync_layout.addWidget(self.sync_intro_lbl, 0, 0, 1, 4)
+        sync_layout.addWidget(
+            QtWidgets.QLabel("Sync target controls are always visible in the bottom playback bar."),
+            1,
+            0,
+            1,
+            4,
+        )
+        sync_layout.addWidget(self.sync_scope_hint_lbl, 2, 0, 1, 4)
+        sync_layout.addWidget(self.sync_keys_hint_lbl, 3, 0, 1, 4)
+        sync_layout.addWidget(self.sync_source_hint_lbl, 4, 0, 1, 4)
         display_layout.addWidget(sync_group, drow, 0, 1, 3)
         drow += 1
 
@@ -541,27 +586,22 @@ class UiSetupMixin:
         self.scalebar_background_chk.setChecked(self.scale_bar_background_box)
         self.scalebar_export_chk = QtWidgets.QCheckBox("Include in export")
         self.scalebar_export_chk.setChecked(self.scale_bar_include_in_export)
-        scalebar_row = QtWidgets.QHBoxLayout()
-        scalebar_row.addWidget(self.scalebar_chk)
-        scalebar_row.addWidget(QtWidgets.QLabel("Length (um)"))
-        scalebar_row.addWidget(self.scalebar_length_spin)
-        display_layout.addWidget(QtWidgets.QLabel("Scale bar"), drow, 0)
-        display_layout.addLayout(scalebar_row, drow, 2)
-        drow += 1
-        scalebar_opts = QtWidgets.QHBoxLayout()
-        scalebar_opts.addWidget(QtWidgets.QLabel("Thickness"))
-        scalebar_opts.addWidget(self.scalebar_thickness_spin)
-        scalebar_opts.addWidget(QtWidgets.QLabel("Location"))
-        scalebar_opts.addWidget(self.scalebar_location_combo)
-        display_layout.addWidget(QtWidgets.QLabel("Scale options"), drow, 0)
-        display_layout.addLayout(scalebar_opts, drow, 2)
-        drow += 1
-        scalebar_flags = QtWidgets.QHBoxLayout()
-        scalebar_flags.addWidget(self.scalebar_text_chk)
-        scalebar_flags.addWidget(self.scalebar_background_chk)
-        scalebar_flags.addWidget(self.scalebar_export_chk)
-        display_layout.addWidget(QtWidgets.QLabel("Scale flags"), drow, 0)
-        display_layout.addLayout(scalebar_flags, drow, 2)
+        scalebar_group = QtWidgets.QGroupBox("Scale Bar")
+        scalebar_layout = QtWidgets.QGridLayout(scalebar_group)
+        scalebar_layout.setContentsMargins(8, 8, 8, 8)
+        scalebar_layout.setHorizontalSpacing(8)
+        scalebar_layout.setVerticalSpacing(6)
+        scalebar_layout.addWidget(self.scalebar_chk, 0, 0, 1, 2)
+        scalebar_layout.addWidget(QtWidgets.QLabel("Length (um)"), 1, 0)
+        scalebar_layout.addWidget(self.scalebar_length_spin, 1, 1)
+        scalebar_layout.addWidget(QtWidgets.QLabel("Thickness"), 2, 0)
+        scalebar_layout.addWidget(self.scalebar_thickness_spin, 2, 1)
+        scalebar_layout.addWidget(QtWidgets.QLabel("Location"), 3, 0)
+        scalebar_layout.addWidget(self.scalebar_location_combo, 3, 1)
+        scalebar_layout.addWidget(self.scalebar_text_chk, 4, 0)
+        scalebar_layout.addWidget(self.scalebar_background_chk, 4, 1)
+        scalebar_layout.addWidget(self.scalebar_export_chk, 5, 0, 1, 2)
+        display_layout.addWidget(scalebar_group, drow, 0, 1, 3)
         drow += 1
 
         self.annotate_panel = self._build_annotate_panel()
@@ -809,8 +849,7 @@ class UiSetupMixin:
         self.profile_canvas = FigureCanvasQTAgg(self.profile_fig)
         self.ax_line = self.profile_fig.add_subplot(111)
 
-        # Panels/docks + sidebar (status bar must be set up first for logs widget)
-        self._setup_status_bar()
+        # Panels/docks + sidebar (status bar already initialized earlier)
         self._init_panels(dock_panels_menu)
         self.open_panel_switcher_act = QtWidgets.QAction("Panels: Open Panel…", self)
         self.open_panel_switcher_act.setObjectName("open_panel_switcher")
@@ -825,8 +864,6 @@ class UiSetupMixin:
         # Re-apply registry shortcuts now that panel-switcher action exists.
         apply_menu_shortcuts(self)
         self._init_panel_policy_controls()
-        self.review_segment_header = None
-        self.explain_segment_header = None
         self._init_channel_panel_integration()
         self._setup_annotation_toolbar()
 
@@ -870,15 +907,18 @@ class UiSetupMixin:
         select_suggestion_strategy_act.triggered.connect(self._select_suggestion_strategy_dialog)
         if getattr(self, "status_strategy_combo", None) is not None:
             self._sync_status_strategy_selector()
-            self.status_strategy_combo.currentTextChanged.connect(
-                lambda text: self._set_suggestion_strategy(text, source="status_bar")
+            self.status_strategy_combo.currentIndexChanged.connect(
+                lambda _idx: self._set_suggestion_strategy(
+                    str(self.status_strategy_combo.currentData() or self.status_strategy_combo.currentText()),
+                    source="status_bar",
+                )
             )
             self.status_strategy_combo.setToolTip(
                 "Suggestion strategy:\n"
-                "- raw: peaks in raw signal\n"
-                "- corrected: peaks after correction\n"
-                "- evidence_consensus: strong across modalities\n"
-                "- evidence_contradiction: enforce positive/negative evidence rules"
+                "- Source Frame: peaks in unprocessed source signal\n"
+                "- Corrected: peaks after correction\n"
+                "- Evidence Consensus: strong across modalities\n"
+                "- Evidence Contradiction: enforce positive/negative evidence rules"
             )
         if getattr(self, "status_modality_combo", None) is not None:
             self.status_modality_combo.currentIndexChanged.connect(
@@ -1055,6 +1095,12 @@ class UiSetupMixin:
             self.review_queue_panel.apply_offset_requested.connect(
                 self._apply_review_queue_offset
             )
+            self.review_queue_panel.suggestion_row_selected.connect(
+                self._on_review_queue_row_selected
+            )
+            self.review_queue_panel.decision_requested.connect(
+                self._set_selected_suggestion_decision
+            )
         if getattr(self, "modality_layers_panel", None) is not None:
             self.modality_layers_panel.layer_changed.connect(self._on_modality_layer_changed)
             self.modality_layers_panel.save_preset_requested.connect(
@@ -1113,6 +1159,7 @@ class UiSetupMixin:
             self.qc_issues_panel.jump_to_location.connect(self._jump_to_qc_issue)
             self.qc_issues_panel.validation_requested.connect(self._trigger_qc_validation)
             self.qc_issues_panel.export_requested.connect(self._export_qc_report)
+            self.qc_issues_panel.issue_status_changed.connect(self._on_qc_issue_status_changed)
         if hasattr(self, "annotation_meta_apply_btn"):
             self.annotation_meta_apply_btn.clicked.connect(self._apply_annotation_metadata)
             self.annotation_meta_close_btn.clicked.connect(self._dismiss_annotation_meta_banner)
@@ -1120,7 +1167,6 @@ class UiSetupMixin:
         self._update_qc_button_highlight(0)
         self._refresh_panel_policy_controls()
         self._refresh_assist_warmup_panel()
-        self._refresh_right_dock_segment_headers()
         if hasattr(self, "_refresh_lazy_modality_table"):
             self._refresh_lazy_modality_table()
         if hasattr(self, "advanced_open_explain_btn"):
@@ -1137,6 +1183,13 @@ class UiSetupMixin:
             self.advanced_open_calib_btn.clicked.connect(self._show_calibration_visualizer)
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
+        if hasattr(self, "project_relink_panel"):
+            self.project_relink_panel.retry_auto_requested.connect(
+                lambda: self._retry_project_relink("auto")
+            )
+            self.project_relink_panel.retry_manual_requested.connect(
+                lambda: self._retry_project_relink("manual")
+            )
         self.controller.annotations_changed.connect(
             lambda: self._schedule_qc_validation(self.controller.session_state.active_primary_id)
         )
@@ -1181,27 +1234,6 @@ class UiSetupMixin:
 
     def _init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
         ui_docks.init_panels(self, dock_menu)
-
-    def _activate_right_dock_segment(self, segment: str) -> None:
-        """Raise one of the tabbed right-dock panels via segmented headers."""
-        seg = str(segment).strip().lower()
-        target_attr = {
-            "table": "dock_annotations",
-            "queue": "dock_review_queue",
-            "why": "dock_suggestion_explain",
-        }.get(seg, "dock_annotations")
-        target = getattr(self, target_attr, None)
-        if target is None:
-            return
-        panel_id = {
-            "dock_annotations": "annotations",
-            "dock_review_queue": "review_queue",
-            "dock_suggestion_explain": "suggestion_explain",
-        }.get(target_attr, "annotations")
-        self.set_panel_visible(panel_id, True, source="right_dock_segment")
-        target.raise_()
-        if hasattr(self, "_refresh_right_dock_segment_headers"):
-            self._refresh_right_dock_segment_headers()
 
     def _init_channel_panel_integration(self) -> None:
         """Wire channel panel signals to session state integration."""
@@ -1416,6 +1448,9 @@ class UiSetupMixin:
 
     def _make_status_details_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_status_details_widget(self)
+
+    def _make_project_relink_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_project_relink_widget(self)
 
     def _make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_advanced_analysis_widget(self)

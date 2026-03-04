@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from matplotlib.backends.qt_compat import QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 
 class StatusDetailsPanel(QtWidgets.QWidget):
@@ -10,9 +10,15 @@ class StatusDetailsPanel(QtWidgets.QWidget):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("status_details_panel")
+        self.setStyleSheet(
+            "#status_details_panel QGroupBox { margin-top: 8px; }"
+            "#status_details_panel QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+            "#status_details_panel QLabel { padding: 1px 0; }"
+        )
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(8)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(10)
 
         title = QtWidgets.QLabel("Status Details")
         title.setStyleSheet("font-weight: 600;")
@@ -21,6 +27,11 @@ class StatusDetailsPanel(QtWidgets.QWidget):
         context_group = QtWidgets.QGroupBox("Annotation Context")
         context_form = QtWidgets.QFormLayout(context_group)
         context_form.setContentsMargins(8, 8, 8, 8)
+        context_form.setHorizontalSpacing(10)
+        context_form.setVerticalSpacing(6)
+        context_form.setLabelAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
         self.dataset_lbl = QtWidgets.QLabel("-")
         self.tz_lbl = QtWidgets.QLabel("-")
         self.scope_lbl = QtWidgets.QLabel("-")
@@ -38,6 +49,11 @@ class StatusDetailsPanel(QtWidgets.QWidget):
         assist_group = QtWidgets.QGroupBox("Assist and QC")
         assist_form = QtWidgets.QFormLayout(assist_group)
         assist_form.setContentsMargins(8, 8, 8, 8)
+        assist_form.setHorizontalSpacing(10)
+        assist_form.setVerticalSpacing(6)
+        assist_form.setLabelAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
         self.assist_lbl = QtWidgets.QLabel("-")
         self.context_lbl = QtWidgets.QLabel("-")
         self.context_lbl.setWordWrap(True)
@@ -54,6 +70,11 @@ class StatusDetailsPanel(QtWidgets.QWidget):
         system_group = QtWidgets.QGroupBox("System")
         system_form = QtWidgets.QFormLayout(system_group)
         system_form.setContentsMargins(8, 8, 8, 8)
+        system_form.setHorizontalSpacing(10)
+        system_form.setVerticalSpacing(6)
+        system_form.setLabelAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
         self.points_lbl = QtWidgets.QLabel("-")
         self.roi_area_lbl = QtWidgets.QLabel("-")
         self.density_lbl = QtWidgets.QLabel("-")

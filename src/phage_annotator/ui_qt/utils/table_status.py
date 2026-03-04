@@ -34,7 +34,6 @@ class TableStatusMixin:
         """Refresh table rows and keep selection focused for current T/Z when enabled."""
         self._populate_table()
         self._focus_table_current_slice_row()
-        self._refresh_right_dock_segment_headers()
         if hasattr(self, "_refresh_review_queue_panel"):
             self._refresh_review_queue_panel()
 
@@ -98,34 +97,6 @@ class TableStatusMixin:
             "font-weight: 600; "
             f"color: {assist_state_color(state)};"
         )
-
-    def _refresh_right_dock_segment_headers(self) -> None:
-        """Sync segmented right-dock headers with counts and active tab state."""
-        table_count = int(self.annot_table.rowCount()) if getattr(self, "annot_table", None) is not None else 0
-        queue_count = 0
-        if hasattr(self, "_visible_suggestions_uncertain_first"):
-            try:
-                queue_count = int(len(self._visible_suggestions_uncertain_first()))
-            except Exception:
-                queue_count = 0
-
-        active = "table"
-        dock_annotations = getattr(self, "dock_annotations", None)
-        dock_review_queue = getattr(self, "dock_review_queue", None)
-        dock_suggestion_explain = getattr(self, "dock_suggestion_explain", None)
-        if dock_review_queue is not None and bool(dock_review_queue.isVisible()):
-            active = "queue"
-        elif dock_suggestion_explain is not None and bool(dock_suggestion_explain.isVisible()):
-            active = "why"
-        elif dock_annotations is not None and bool(dock_annotations.isVisible()):
-            active = "table"
-
-        for attr in ("annotation_segment_header", "review_segment_header", "explain_segment_header"):
-            header = getattr(self, attr, None)
-            if header is None:
-                continue
-            header.set_counts(table_count=table_count, queue_count=queue_count)
-            header.set_active(active)
 
     def _bottom_task_counts(self) -> tuple[int, int, int]:
         """Return counts for task-specific bottom tabs: (qc_issues, results_rows, log_alerts)."""
@@ -424,8 +395,9 @@ class TableStatusMixin:
             else:
                 autosave_txt = "Autosave: on"
         scope_state = "Stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "Slice"
-        target_map = {"frame": "Frame", "mean": "Mean Projection", "support": "Modality 2"}
-        target_state = target_map.get(str(getattr(self, "annotate_target", "frame")), "Frame")
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        target_key = str(getattr(self, "annotate_target", "frame"))
+        target_state = str(getattr(panel_map.get(target_key), "display_name", target_key.title()))
         qc_warnings = 0
         qc_errors = 0
         qc_state = getattr(self, "qc_state", None)
@@ -460,6 +432,13 @@ class TableStatusMixin:
             )
         if getattr(self, "status_fps_lbl", None) is not None:
             self.status_fps_lbl.setText(f"FPS: {int(self.speed_slider.value())}")
+        status_runtime_lbl = getattr(self, "status_runtime_lbl", None)
+        if status_runtime_lbl is not None:
+            roi_txt = f"{area_um2:.2f} um^2" if area_um2 > 0 else "n/a"
+            density_txt = f"{density:.3f} /um^2" if area_um2 > 0 else "n/a"
+            status_runtime_lbl.setText(
+                f"Points: {current} | ROI: {roi_txt} | Density: {density_txt} | FPS: {int(self.speed_slider.value())}"
+            )
         # Keep live metrics contextual: show only while annotation workflow is active.
         annotate_tool_active = bool(
             getattr(self, "tool_router", None) is not None
@@ -476,6 +455,14 @@ class TableStatusMixin:
                     except Exception:
                         pass
                 widget.setVisible(annotate_tool_active)
+        if status_runtime_lbl is not None:
+            if not annotate_tool_active:
+                try:
+                    from matplotlib.backends.qt_compat import QtWidgets
+                    QtWidgets.QToolTip.hideText()
+                except Exception:
+                    pass
+            status_runtime_lbl.setVisible(annotate_tool_active)
         if getattr(self, "status_scope_lbl", None) is not None:
             self.status_scope_lbl.setText(f"Scope: {scope_state}")
             if str(getattr(self, "annotation_scope", "current")) == "all":
@@ -598,14 +585,14 @@ class TableStatusMixin:
             if getattr(self, "projection_selector", None) is not None:
                 try:
                     projection_txt, axis_txt = self.projection_selector.current_selection()
+                    if str(projection_txt).strip().lower() == "raw":
+                        projection_txt = "source frame"
                     projection_txt = f"{projection_txt} ({axis_txt})"
                 except Exception:
-                    projection_txt = "raw"
+                    projection_txt = "source frame"
             modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
             target_key = str(getattr(self, "annotate_target", "frame"))
-            target_txt = {"frame": "Frame", "mean": "Mean Projection", "support": "Modality 2"}.get(
-                target_key, target_key
-            )
+            target_txt = str(getattr(panel_map.get(target_key), "display_name", target_key))
             self.evidence_strip_lbl.setText(
                 f"Evidence: modality={modality_txt} | target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
             )

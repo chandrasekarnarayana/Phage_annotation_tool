@@ -20,6 +20,7 @@ Example
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -98,12 +99,39 @@ def save_project(
         payload["modality_manager"] = modality_manager.to_dict()
     
     for img in images:
-        ann_path = Path(img.path).with_suffix(".annotations.json")
-        save_keypoints_json(annotations.get(img.id, []), ann_path)
+        image_path = Path(img.path)
+        ann_path = image_path.with_suffix(".annotations.json")
+        ann_meta = {
+            "tool": "PhageAnnotator",
+            "schema": "annotation_export.v1",
+            "export_format": "json",
+            "exported_at": datetime.now().isoformat(timespec="seconds"),
+            "annotation_count": int(len(annotations.get(img.id, []))),
+            "linked_image": {
+                "image_id": int(getattr(img, "id", -1)),
+                "image_name": str(image_path.name),
+                "image_path": str(image_path.resolve()),
+                "shape": list(getattr(img, "shape", ()) or ()),
+                "dtype": str(getattr(img, "dtype", "")),
+                "has_time": bool(getattr(img, "has_time", False)),
+                "has_z": bool(getattr(img, "has_z", False)),
+                "ome_axes": str(getattr(img, "ome_axes", "") or ""),
+                "interpret_3d_as": str(getattr(img, "interpret_3d_as", "auto")),
+            },
+            "project_context": {"source": "project_save"},
+        }
+        save_keypoints_json(annotations.get(img.id, []), ann_path, meta=ann_meta)
         images_payload.append(
             {
-                "path": str(Path(img.path).resolve()),
+                "path": str(image_path.resolve()),
+                "path_relative": str(image_path.relative_to(path.parent.resolve()))
+                if image_path.resolve().is_relative_to(path.parent.resolve())
+                else None,
+                "image_name": str(image_path.name),
                 "annotations": str(ann_path.resolve()),
+                "annotations_relative": str(ann_path.relative_to(path.parent.resolve()))
+                if ann_path.resolve().is_relative_to(path.parent.resolve())
+                else None,
                 "interpret_3d_as": getattr(img, "interpret_3d_as", "auto"),
                 "display_mapping": (display_mappings.get(img.id, {}) if display_mappings else {}),
                 "rois": (
@@ -189,11 +217,11 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, 
     # Load modality manager if present
     modality_manager_data = data.get("modality_manager", None)
     
-    ann_map = {
-        idx: Path(entry.get("annotations"))
-        for idx, entry in enumerate(images)
-        if entry.get("annotations")
-    }
+    ann_map: Dict[int, Path] = {}
+    for idx, entry in enumerate(images):
+        resolved = _resolve_annotation_path(path.parent, entry)
+        if resolved is not None:
+            ann_map[idx] = resolved
     roi_map = {
         idx: entry.get("rois", [])
         for idx, entry in enumerate(images)
@@ -215,3 +243,29 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, 
         if entry.get("annotation_imports")
     }
     return images, settings, ann_map, roi_map, thr_map, part_map, import_map, modality_manager_data, channel_display_settings
+
+
+def _resolve_annotation_path(project_dir: Path, entry: dict) -> Optional[Path]:
+    raw = entry.get("annotations")
+    if raw:
+        raw_path = Path(str(raw))
+        if raw_path.exists():
+            return raw_path
+    rel = entry.get("annotations_relative")
+    if rel:
+        rel_path = (project_dir / str(rel)).resolve()
+        if rel_path.exists():
+            return rel_path
+    image_path = entry.get("path")
+    if image_path:
+        image_p = Path(str(image_path))
+        sidecar = image_p.with_suffix(".annotations.json")
+        if sidecar.exists():
+            return sidecar
+        stem = image_p.stem
+        folder = image_p.parent
+        if folder.exists():
+            matches = sorted(folder.glob(f"{stem}.annotations*.json"))
+            if matches:
+                return matches[-1]
+    return Path(str(raw)) if raw else None

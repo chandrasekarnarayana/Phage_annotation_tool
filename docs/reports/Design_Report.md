@@ -115,7 +115,7 @@ Status: Complete
 | FR-003 | `src/phage_annotator/session/modality.py` | `tests/unit/session/test_modality_system.py` | Covers add/remove/rename/serialize |
 | FR-004 | `src/phage_annotator/data/display_mapping.py` | `tests/unit/data/test_sync_rules.py` | Covers sync flags and roundtrip |
 | FR-005 | `src/phage_annotator/io/projects/base.py`, `src/phage_annotator/session/project.py` | `tests/unit/test_modality_persistence.py`, `tests/unit/session/test_state_persistence.py` | Partial coverage: modality persistence tests pass; Qt-dependent state persistence remains blocked |
-| FR-007 | `src/phage_annotator/ui_qt/services/jobs.py` | No direct unit test found | See technical debt item TD-001 |
+| FR-007 | `src/phage_annotator/ui_qt/services/jobs.py` | `tests/unit/ui_qt/services/test_jobs.py` | `cancel()`/`active_job_count()` API now implemented and covered |
 | FR-009 | `src/phage_annotator/cache/projection_cache.py` | `tests/unit/cache/test_projection_cache_modality.py` | LRU/budget behavior covered |
 | FR-010 | `scripts/check_*.py` | `tests/unit/structure/test_structure_integrity.py` | Verifies structure and non-Qt import policy |
 
@@ -240,7 +240,7 @@ Status: Partial
 ### 9.3 Background Jobs and Responsiveness
 - Job execution is based on `QThreadPool` with cooperative cancellation tokens.
 - Projection and analysis jobs include stale-generation guards before applying results.
-- Known gap: GUI code calls `jobs.cancel(job_id)` and `jobs.active_job_count()` but these methods are not present on current `ui_qt/services/jobs.py::JobManager`.
+- `JobManager` now exposes `cancel(job_id)` and `active_job_count()`; cancel/status API mismatch is resolved.
 
 ### 9.4 Benchmark Summary
 | Scenario | Metric | Baseline | Current | Notes |
@@ -347,8 +347,8 @@ Status: Complete
 ### 14.3 Technical Debt Register
 | ID | Debt Item | Impact | Mitigation Plan |
 |---|---|---|---|
-| TD-001 | `JobManager` API mismatch (`cancel`, `active_job_count` called but not implemented) | Runtime errors in cancel/status paths | Add missing API methods and unit tests for cancellation/status behavior |
-| TD-002 | Legacy attribute drift in metadata/dedup paths (`view_state.roi`, `mapping.vmin`, `kp.x_px`) | Potential runtime failures on specific feature toggles/import paths | Normalize to canonical fields (`roi_spec`, `min_val/max_val`, `x/y`) and add regression tests |
+| TD-001 | `JobManager` API mismatch (`cancel`, `active_job_count` called but not implemented) | Resolved | API methods implemented; keep direct cancel/status regression coverage in CI |
+| TD-002 | Legacy attribute drift in compatibility paths (`view_state.roi`, `mapping.vmin`, `kp.x_px`) | Reduced | Canonical fields are now primary (`roi_spec`, `min_val/max_val`, `x/y`) with compatibility aliases and regression tests (`tests/unit/session/test_session_components.py`, `tests/unit/session/test_annotation_io_regression.py`) |
 | TD-003 | Qt imports in session modules block collection in non-Qt env | Reduced portability and CI flexibility | Introduce Qt abstraction or guard imports for headless testability |
 | TD-004 | Performance evidence is mostly structural, not benchmarked | Harder to assess scalability claims | Add reproducible benchmark suite with thresholds in CI |
 | TD-005 | License/citation state not aligned with common JOSS expectations | External review/release risk | Add explicit citation metadata and align licensing policy with target publication venue requirements |
@@ -374,13 +374,13 @@ Status: Complete
 - Performance tests exist but were not executed to produce stable baseline numbers here.
 
 ### 16.2 Near-Term Roadmap
-1. Resolve TD-001/TD-002 compatibility drift issues and add direct tests.
+1. Continue pruning compatibility aliases now that TD-002 critical paths are regression-tested.
 2. Stand up a Qt-enabled validation environment and execute GUI-marked suites.
 3. Produce reproducible benchmark baselines for projection, cache, and UI-latency paths.
 4. Finalize citation metadata and publication-oriented documentation artifacts.
 
 ## 17. Conclusion
-The codebase shows a substantial, modular implementation with strong evidence for core non-Qt logic and structure integrity. The primary readiness blockers for external software review are environment-complete GUI validation, a small but important set of compatibility drift issues, and missing benchmark/citation maturity for publication-grade reproducibility narratives.
+The codebase shows a substantial, modular implementation with strong evidence for core non-Qt logic and structure integrity. The primary readiness blockers for external software review are environment-complete GUI validation plus benchmark/citation maturity for publication-grade reproducibility narratives.
 
 ## Appendix A. Figures and Tables Index
 - No figures embedded in this draft.
@@ -394,4 +394,4 @@ The codebase shows a substantial, modular implementation with strong evidence fo
 | C-003 | Modality annotation utilities validated | `tests/unit/annotation/test_multi_modality_annotations.py` |
 | C-004 | Qt validation blocked in current runtime | `pytest --collect-only -q` (Qt import errors) |
 | C-005 | Projection cache modality behavior validated | `tests/unit/cache/test_projection_cache_modality.py` |
-| C-006 | Job API mismatch exists | `src/phage_annotator/ui_qt/utils/jobs.py`, `src/phage_annotator/ui_qt/services/jobs.py` |
+| C-006 | Job cancellation/status API compatibility preserved | `src/phage_annotator/ui_qt/services/jobs.py`, `tests/unit/ui_qt/services/test_jobs.py` |

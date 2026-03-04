@@ -28,6 +28,22 @@ class RoiSpec:
     rect: Tuple[float, float, float, float]
     shape: str = "circle"
 
+    @property
+    def x(self) -> float:
+        return float(self.rect[0])
+
+    @property
+    def y(self) -> float:
+        return float(self.rect[1])
+
+    @property
+    def w(self) -> float:
+        return float(self.rect[2])
+
+    @property
+    def h(self) -> float:
+        return float(self.rect[3])
+
 
 @dataclass
 class ViewState:
@@ -57,6 +73,33 @@ class ViewState:
     hist_region: str = "roi"
     play_mode: Optional[str] = None
     loop_playback: bool = False
+
+    @property
+    def roi(self) -> RoiSpec:
+        """Backward-compatible alias for legacy code paths."""
+        return self.roi_spec
+
+    @roi.setter
+    def roi(self, value: RoiSpec) -> None:
+        self.roi_spec = value
+
+    @property
+    def roi_rect(self) -> Tuple[float, float, float, float]:
+        """Backward-compatible alias for command/event helpers."""
+        return tuple(self.roi_spec.rect)
+
+    @roi_rect.setter
+    def roi_rect(self, value: Tuple[float, float, float, float]) -> None:
+        self.roi_spec = RoiSpec(rect=tuple(value), shape=self.roi_spec.shape)
+
+    @property
+    def roi_shape(self) -> str:
+        """Backward-compatible alias for command/event helpers."""
+        return str(self.roi_spec.shape)
+
+    @roi_shape.setter
+    def roi_shape(self, value: str) -> None:
+        self.roi_spec = RoiSpec(rect=self.roi_spec.rect, shape=str(value))
 
 
 @dataclass

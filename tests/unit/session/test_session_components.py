@@ -10,7 +10,7 @@ from typing import Optional
 import numpy as np
 
 from phage_annotator.core.session_state import RoiSpec, SessionState, ViewState
-from phage_annotator.data.display_mapping import DisplayMapping
+from phage_annotator.data.display_mapping import DisplayMapping, mapping_from_dict
 from phage_annotator.session.commands import SetCropCommand, SetThresholdCommand, command_from_dict
 from phage_annotator.session.images import SessionImageMixin
 import phage_annotator.session.state as session_state_module
@@ -155,6 +155,42 @@ def test_session_state_facade_exports_core_dataclasses() -> None:
     state = session_state_module.ViewState()
     assert isinstance(state.roi_spec, RoiSpec)
     assert state.roi_spec.shape == "circle"
+
+
+def test_view_state_legacy_roi_aliases_roundtrip() -> None:
+    """Legacy view-state ROI aliases should stay mapped to roi_spec."""
+    state = ViewState()
+    state.roi_rect = (11.0, 22.0, 33.0, 44.0)
+    state.roi_shape = "box"
+    assert state.roi_spec.rect == (11.0, 22.0, 33.0, 44.0)
+    assert state.roi_spec.shape == "box"
+    # Legacy accessor used by project/session adapters.
+    assert state.roi.x == 11.0
+    assert state.roi.y == 22.0
+    assert state.roi.w == 33.0
+    assert state.roi.h == 44.0
+
+
+def test_display_mapping_legacy_aliases_roundtrip() -> None:
+    """Legacy mapping aliases (vmin/vmax/lut_name) should remain stable."""
+    mapping = DisplayMapping(0.1, 0.9, lut=3)
+    mapping.vmin = 0.2
+    mapping.vmax = 0.8
+    assert mapping.min_val == 0.2
+    assert mapping.max_val == 0.8
+    assert mapping.vmin == 0.2
+    assert mapping.vmax == 0.8
+    assert mapping.lut_name == "3"
+
+
+def test_mapping_from_dict_accepts_legacy_minmax_keys() -> None:
+    """Deserializer should accept old vmin/vmax and min/max keys."""
+    m1 = mapping_from_dict({"vmin": 5.0, "vmax": 7.0}, DisplayMapping(0.0, 1.0))
+    assert m1.min_val == 5.0
+    assert m1.max_val == 7.0
+    m2 = mapping_from_dict({"min": 2.5, "max": 9.5}, DisplayMapping(0.0, 1.0))
+    assert m2.min_val == 2.5
+    assert m2.max_val == 9.5
 
 
 def test_session_view_mixin_basic_state_mutations() -> None:

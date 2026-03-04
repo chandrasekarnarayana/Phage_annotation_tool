@@ -479,3 +479,82 @@ class TestQCStateEdgeCases:
         
         affected = state.get_affected_annotation_ids()
         assert len(affected) == 50
+
+
+@pytest.mark.order(2)
+class TestQCStateIssueStatus:
+    """Test issue status transitions (active/resolved/ignored)."""
+
+    def test_resolve_issue_hides_from_visible(self, sample_issues):
+        state = QCState()
+        for issue in sample_issues:
+            state.add_issue(issue)
+
+        assert state.resolve_issue("dup_001") is True
+        assert state.get_issue_status("dup_001") == state.STATUS_RESOLVED
+
+        visible = state.get_visible_issues()
+        assert len(visible) == 2
+        assert all(issue.issue_id != "dup_001" for issue in visible)
+
+    def test_ignore_issue_hides_from_visible(self, sample_issues):
+        state = QCState()
+        for issue in sample_issues:
+            state.add_issue(issue)
+
+        assert state.ignore_issue("bound_001") is True
+        assert state.get_issue_status("bound_001") == state.STATUS_IGNORED
+
+        visible = state.get_visible_issues()
+        assert len(visible) == 2
+        assert all(issue.issue_id != "bound_001" for issue in visible)
+
+    def test_include_resolved_and_ignored_options(self, sample_issues):
+        state = QCState()
+        for issue in sample_issues:
+            state.add_issue(issue)
+
+        state.resolve_issue("dup_001")
+        state.ignore_issue("bound_001")
+
+        default_visible = state.get_visible_issues()
+        assert len(default_visible) == 1
+
+        include_all = state.get_visible_issues(include_resolved=True, include_ignored=True)
+        assert len(include_all) == 3
+
+    def test_order_by_severity(self):
+        state = QCState()
+        state.add_issue(
+            QCIssue(
+                issue_id="i_info",
+                severity=IssueSeverity.INFO,
+                issue_type="density_cluster",
+                message="info",
+                image_id="img_001",
+                affected_annotation_ids=["ann_1"],
+            )
+        )
+        state.add_issue(
+            QCIssue(
+                issue_id="i_error",
+                severity=IssueSeverity.ERROR,
+                issue_type="duplicate",
+                message="error",
+                image_id="img_001",
+                affected_annotation_ids=["ann_2"],
+            )
+        )
+        state.add_issue(
+            QCIssue(
+                issue_id="i_warning",
+                severity=IssueSeverity.WARNING,
+                issue_type="missing_label",
+                message="warning",
+                image_id="img_001",
+                affected_annotation_ids=["ann_3"],
+            )
+        )
+
+        ordered = state.get_visible_issues(order_by_severity=True)
+        assert [issue.issue_id for issue in ordered] == ["i_error", "i_warning", "i_info"]

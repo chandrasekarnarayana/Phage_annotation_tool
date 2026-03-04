@@ -103,7 +103,7 @@ class UiExtrasMixin:
         availability: dict[str, bool] = {}
         if table is not None and table.rowCount() > 0:
             for row in range(table.rowCount()):
-                name_item = table.item(row, 1)
+                name_item = table.item(row, 2)
                 if name_item is None:
                     continue
                 role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -136,6 +136,70 @@ class UiExtrasMixin:
                 availability[k] = bool(visible)
         return availability
 
+    def _set_lazy_row_visible_state(self, panel_key: str, checked: bool) -> None:
+        """Mirror panel visibility changes back into lazy modality table checkboxes."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        panel_key = str(panel_key)
+        for row in range(table.rowCount()):
+            name_item = table.item(row, 2)
+            if name_item is None:
+                continue
+            role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
+            row_key = ""
+            if isinstance(role_data, str):
+                role_text = str(role_data)
+                if role_text.startswith("builtin:"):
+                    row_key = role_text.split(":", 1)[1]
+                elif role_text.startswith("modality_"):
+                    row_key = role_text
+            else:
+                try:
+                    row_key = self._panel_key_for_modality_idx(int(role_data))
+                except Exception:
+                    row_key = ""
+            if row_key != panel_key:
+                continue
+            chk = table.cellWidget(row, 0)
+            if isinstance(chk, QtWidgets.QCheckBox) and chk.isChecked() != bool(checked):
+                chk.blockSignals(True)
+                chk.setChecked(bool(checked))
+                chk.blockSignals(False)
+            break
+
+    def _set_lazy_row_points_state(self, panel_key: str, checked: bool) -> None:
+        """Mirror annotation point visibility changes into lazy-table Pts checkboxes."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        panel_key = str(panel_key)
+        for row in range(table.rowCount()):
+            name_item = table.item(row, 2)
+            if name_item is None:
+                continue
+            role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
+            row_key = ""
+            if isinstance(role_data, str):
+                role_text = str(role_data)
+                if role_text.startswith("builtin:"):
+                    row_key = role_text.split(":", 1)[1]
+                elif role_text.startswith("modality_"):
+                    row_key = role_text
+            else:
+                try:
+                    row_key = self._panel_key_for_modality_idx(int(role_data))
+                except Exception:
+                    row_key = ""
+            if row_key != panel_key:
+                continue
+            chk = table.cellWidget(row, 1)
+            if isinstance(chk, QtWidgets.QCheckBox) and chk.isChecked() != bool(checked):
+                chk.blockSignals(True)
+                chk.setChecked(bool(checked))
+                chk.blockSignals(False)
+            break
+
     def _lazy_annotation_rows(self) -> list[tuple[str, str]]:
         """Return (panel_key, display_name) rows from lazy table in exact visible order."""
         table = getattr(self, "lazy_modality_table", None)
@@ -143,7 +207,7 @@ class UiExtrasMixin:
         if table is None:
             return rows
         for row in range(table.rowCount()):
-            name_item = table.item(row, 1)
+            name_item = table.item(row, 2)
             if name_item is None:
                 continue
             role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -188,24 +252,22 @@ class UiExtrasMixin:
                 if k in availability
             ]
         for key, label in ordered_rows:
+            if not bool(availability.get(str(key), False)):
+                continue
             chk = QtWidgets.QCheckBox(str(label))
-            chk.toggled.connect(lambda checked, k=str(key): self._on_panel_toggle(k, bool(checked)))
+            chk.toggled.connect(
+                lambda checked, k=str(key): self._on_annotation_panel_toggle(k, bool(checked))
+            )
             layout.addWidget(chk)
             checkboxes[str(key)] = chk
         self._annotation_view_checkboxes = checkboxes
-        panel_actions = dict(getattr(self, "panel_actions", {}) or {})
+        point_vis = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
         for key, chk in checkboxes.items():
-            available = str(key) in availability
-            chk.setVisible(available)
-            action = panel_actions.get(str(key))
-            if action is not None:
-                chk.blockSignals(True)
-                chk.setChecked(bool(action.isChecked()))
-                chk.blockSignals(False)
-            else:
-                chk.blockSignals(True)
-                chk.setChecked(bool(availability.get(str(key), False)))
-                chk.blockSignals(False)
+            available = bool(availability.get(str(key), False))
+            chk.setVisible(bool(available))
+            chk.blockSignals(True)
+            chk.setChecked(bool(point_vis.get(str(key), True)))
+            chk.blockSignals(False)
         self.show_frame_chk = self._annotation_view_checkboxes.get("frame")
         self.show_mean_chk = self._annotation_view_checkboxes.get("mean")
         self.show_support_chk = self._annotation_view_checkboxes.get("support")
@@ -251,36 +313,62 @@ class UiExtrasMixin:
         return labels
 
     def _refresh_annotation_target_constraints(self) -> None:
-        """Enable/disable target choices based on currently available views."""
+        """Enable target choices based on currently available visible views."""
         availability = self._available_annotation_views()
-        targets = dict(getattr(self, "_target_buttons", {}) or {})
-        unavailable = []
+        combo = getattr(self, "annotate_target_combo", None)
         labels = self._annotation_view_labels()
-        for key in ("frame", "mean", "support"):
-            btn = targets.get(key)
-            if btn is None:
+        if combo is None:
+            return
+        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        combo.blockSignals(True)
+        combo.clear()
+        for key, label in self._lazy_annotation_rows():
+            if not bool(availability.get(str(key), False)):
                 continue
-            btn.setText(labels.get(key, btn.text()))
-            available = bool(availability.get(key, False))
-            btn.setEnabled(available)
-            if available:
-                btn.setToolTip("")
-            else:
-                unavailable.append(btn.text())
-                btn.setToolTip("Unavailable for current modality/view context")
+            combo.addItem(labels.get(str(key), str(label)), str(key))
+        combo.blockSignals(False)
+        if combo.count() <= 0:
+            hint = getattr(self, "target_unavailable_hint_lbl", None)
+            if hint is not None:
+                hint.setText("No visible target view. Enable at least one view in Lazy Loading.")
+                hint.setVisible(True)
+            return
+        idx = combo.findData(current_target)
+        if idx < 0:
+            idx = 0
+            self.annotate_target = str(combo.itemData(0))
+        combo.blockSignals(True)
+        combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+        badge = getattr(self, "target_state_badge_lbl", None)
+        if badge is not None:
+            badge.setText(f"Write target: {combo.currentText()}")
         hint = getattr(self, "target_unavailable_hint_lbl", None)
         if hint is not None:
-            if unavailable:
-                hint.setText("Other targets unavailable for this modality.")
-                hint.setVisible(True)
-            else:
-                hint.setVisible(False)
+            hint.setVisible(False)
+
+    def _on_annotation_panel_toggle(self, panel_key: str, checked: bool) -> None:
+        """Toggle whether annotations are rendered on a specific visible panel."""
+        key = str(panel_key or "").strip()
+        if not key:
+            return
         current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
-        if not bool(availability.get(current_target, False)):
-            frame_btn = targets.get("frame")
-            if frame_btn is not None:
-                frame_btn.setChecked(True)
-            self.annotate_target = "frame"
+        if key == current_target and not bool(checked):
+            chk = dict(getattr(self, "_annotation_view_checkboxes", {}) or {}).get(key)
+            if chk is not None:
+                chk.blockSignals(True)
+                chk.setChecked(True)
+                chk.blockSignals(False)
+            self._set_status("Target view must show points while annotating.")
+            return
+        point_vis = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
+        point_vis[key] = bool(checked)
+        self._annotation_panel_visibility = point_vis
+        if hasattr(self, "_set_lazy_row_points_state"):
+            self._set_lazy_row_points_state(key, bool(checked))
+        if hasattr(self, "_refresh_annotation_view_controls"):
+            self._refresh_annotation_view_controls()
+        self._refresh_image()
 
     def _build_sidebar_stack(self) -> QtWidgets.QWidget:
         """Create the 10-panel stacked sidebar with activity bar and toggle behavior.
@@ -302,7 +390,7 @@ class UiExtrasMixin:
         self._right_sidebar_last_width = None
         
         left_default = int(self._settings.value("leftSidebarDefaultWidth", 300, type=int))
-        right_default = int(self._settings.value("rightSidebarDefaultWidth", 320, type=int))
+        right_default = int(self._settings.value("rightSidebarDefaultWidth", 420, type=int))
         self.sidebar_manager = SidebarManager(
             SidebarLayoutConfig(
                 expanded_width=max(220, left_default),
@@ -468,7 +556,14 @@ class UiExtrasMixin:
         bar.setOrientation(QtCore.Qt.Orientation.Vertical)
         bar.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         bar.setMovable(False)
-        bar.setIconSize(QtCore.QSize(16, 16))
+        bar.setIconSize(QtCore.QSize(20, 20))
+        bar.setFixedWidth(getattr(self, "_sidebar_bar_width", 38))
+        bar.setStyleSheet(
+            "QToolBar#right_sidebar_toolbar {"
+            " spacing: 3px; padding-top: 4px; border-left: 1px solid #d0d0d0; background: #f9fafb; }"
+            "QToolBar#right_sidebar_toolbar QToolButton {"
+            " margin: 1px; padding: 4px; min-width: 30px; min-height: 30px; border-radius: 4px; }"
+        )
         bar.setFloatable(False)
         bar.setAllowedAreas(QtCore.Qt.ToolBarArea.RightToolBarArea)
 
@@ -542,6 +637,34 @@ class UiExtrasMixin:
         )
         bar.addAction(advanced_act)
 
+        status_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation),
+            "Status Details",
+            self,
+        )
+        status_act.setObjectName("right_sidebar_status_toggle")
+        status_act.setCheckable(True)
+        status_act.setChecked(False)
+        status_act.setToolTip("Status Details")
+        status_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("status_details")
+        )
+        bar.addAction(status_act)
+
+        relink_act = QtWidgets.QAction(
+            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirOpenIcon),
+            "Project Relink",
+            self,
+        )
+        relink_act.setObjectName("right_sidebar_relink_toggle")
+        relink_act.setCheckable(True)
+        relink_act.setChecked(False)
+        relink_act.setToolTip("Project Relink")
+        relink_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("project_relink")
+        )
+        bar.addAction(relink_act)
+
         # Add separator and collapse/expand toggle
         bar.addSeparator()
         collapse_act = QtWidgets.QAction(
@@ -563,6 +686,8 @@ class UiExtrasMixin:
             "suggestion_explain": explain_act,
             "modality_layers": layers_act,
             "advanced_analysis": advanced_act,
+            "status_details": status_act,
+            "project_relink": relink_act,
         }
 
         self.addToolBar(QtCore.Qt.RightToolBarArea, bar)
@@ -573,11 +698,14 @@ class UiExtrasMixin:
             "suggestion_explain",
             "modality_layers",
             "advanced_analysis",
+            "status_details",
+            "project_relink",
         ):
             dock = getattr(self, f"dock_{panel_id}", None)
             if dock is not None:
                 dock.visibilityChanged.connect(self._sync_annotation_toolbar)
                 dock.visibilityChanged.connect(lambda _v: self._capture_right_sidebar_width())
+        self._ensure_right_sidebar_panels_not_tabified()
         self._sync_annotation_toolbar(True)
 
     def _capture_right_sidebar_width(self) -> None:
@@ -588,6 +716,8 @@ class UiExtrasMixin:
             "suggestion_explain",
             "modality_layers",
             "advanced_analysis",
+            "status_details",
+            "project_relink",
         ):
             dock = getattr(self, f"dock_{panel_id}", None)
             if dock is None or not dock.isVisible():
@@ -620,6 +750,46 @@ class UiExtrasMixin:
             action.blockSignals(True)
             action.setChecked(checked)
             action.blockSignals(False)
+        if not any(
+            bool(getattr(self, f"dock_{panel_id}", None) and getattr(self, f"dock_{panel_id}").isVisible())
+            for panel_id in (
+                "annotations",
+                "review_queue",
+                "suggestion_explain",
+                "modality_layers",
+                "advanced_analysis",
+                "status_details",
+                "project_relink",
+            )
+        ):
+            if getattr(self, "dock_annotations", None) is not None and not getattr(
+                self, "_right_sidebar_collapsed", False
+            ):
+                self.set_panel_visible("annotations", True, source="right_sidebar:auto_default")
+
+    def _ensure_right_sidebar_panels_not_tabified(self) -> None:
+        """Keep right inspect panels as standalone docks (never tab peers)."""
+        panel_ids = (
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "modality_layers",
+            "advanced_analysis",
+            "status_details",
+            "project_relink",
+        )
+        for panel_id in panel_ids:
+            dock = getattr(self, f"dock_{panel_id}", None)
+            if dock is None:
+                continue
+            peers = list(self.tabifiedDockWidgets(dock) or [])
+            if not peers:
+                continue
+            try:
+                self.removeDockWidget(dock)
+                self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+            except Exception:
+                continue
 
     def _toggle_right_sidebar_panel(self, panel_id: str) -> None:
         """VSCode-like right rail behavior: select one panel or collapse current."""
@@ -630,6 +800,8 @@ class UiExtrasMixin:
             "suggestion_explain",
             "modality_layers",
             "advanced_analysis",
+            "status_details",
+            "project_relink",
         ]
         target_dock = getattr(self, f"dock_{panel_id}", None)
         if target_dock is None:
@@ -662,10 +834,10 @@ class UiExtrasMixin:
         # Enforce a practical open width (avoid ultra-thin right pane).
         preferred_right = int(
             getattr(self, "_right_sidebar_last_width", 0)
-            or self._settings.value("rightSidebarDefaultWidth", 320, type=int)
+            or self._settings.value("rightSidebarDefaultWidth", 420, type=int)
         )
-        preferred_right = max(280, preferred_right)
-        target_dock.setMinimumWidth(260)
+        preferred_right = max(420, preferred_right)
+        target_dock.setMinimumWidth(360)
         left = getattr(self, "dock_sidebar", None)
         try:
             if left is not None and left.isVisible():
@@ -676,6 +848,7 @@ class UiExtrasMixin:
         except Exception:
             pass
         self._capture_right_sidebar_width()
+        self._ensure_right_sidebar_panels_not_tabified()
         self._sync_annotation_toolbar(True)
     
     def _collapse_sidebar(self) -> None:
@@ -712,6 +885,49 @@ class UiExtrasMixin:
         self._right_sidebar_collapsed = False
         self._right_sidebar_expanded = True
         self._settings.setValue("rightSidebarCollapsed", False)
+        preferred_right = int(
+            getattr(self, "_right_sidebar_last_width", 0)
+            or self._settings.value("rightSidebarDefaultWidth", 420, type=int)
+        )
+        preferred_right = max(420, preferred_right)
+        for panel_id in (
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "modality_layers",
+            "advanced_analysis",
+            "status_details",
+        ):
+            dock = getattr(self, f"dock_{panel_id}", None)
+            if dock is not None:
+                dock.setMinimumWidth(360)
+        active_right = next(
+            (
+                getattr(self, f"dock_{pid}", None)
+                for pid in (
+                    "annotations",
+                    "review_queue",
+                    "suggestion_explain",
+                    "modality_layers",
+                    "advanced_analysis",
+                    "status_details",
+                )
+                if getattr(self, f"dock_{pid}", None) is not None
+                and getattr(self, f"dock_{pid}").isVisible()
+            ),
+            None,
+        )
+        if active_right is not None:
+            left = getattr(self, "dock_sidebar", None)
+            try:
+                if left is not None and left.isVisible():
+                    left_w = max(220, int(left.width()))
+                    self.resizeDocks([left, active_right], [left_w, preferred_right], QtCore.Qt.Orientation.Horizontal)
+                else:
+                    self.resizeDocks([active_right], [preferred_right], QtCore.Qt.Orientation.Horizontal)
+            except Exception:
+                pass
+        self._ensure_right_sidebar_panels_not_tabified()
         self._apply_canvas_priority_layout()
 
     def _toggle_right_sidebar_collapse(self) -> None:
@@ -723,11 +939,22 @@ class UiExtrasMixin:
 
     def _build_annotate_panel(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
+        panel.setObjectName("annotate_sidebar_panel")
+        panel.setStyleSheet(
+            "#annotate_sidebar_panel QGroupBox {"
+            " margin-top: 10px; border: 1px solid #e4e7eb; border-radius: 5px; padding-top: 4px; }"
+            "#annotate_sidebar_panel QGroupBox::title {"
+            " subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #263238; font-weight: 600; }"
+            "#annotate_sidebar_panel QComboBox, #annotate_sidebar_panel QLineEdit { min-height: 24px; }"
+            "#annotate_sidebar_panel QCheckBox, #annotate_sidebar_panel QRadioButton { min-height: 22px; }"
+        )
         layout = QtWidgets.QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
         vis_group = QtWidgets.QGroupBox("Visible views")
         vis_layout = QtWidgets.QVBoxLayout(vis_group)
+        vis_layout.setContentsMargins(8, 8, 8, 8)
+        vis_layout.setSpacing(6)
         self.show_ann_master_chk = QtWidgets.QCheckBox("Show annotations")
         self.show_ann_master_chk.setChecked(True)
         row = QtWidgets.QVBoxLayout()
@@ -756,6 +983,8 @@ class UiExtrasMixin:
         layout.addWidget(vis_group)
         label_group = QtWidgets.QGroupBox("Labels")
         label_layout = QtWidgets.QVBoxLayout(label_group)
+        label_layout.setContentsMargins(8, 8, 8, 8)
+        label_layout.setSpacing(6)
         self.label_buttons = QtWidgets.QButtonGroup()
         # P3.5: Guard against empty label lists
         labels_to_display = self.labels if self.labels else ["Point", "Region"]
@@ -769,6 +998,8 @@ class UiExtrasMixin:
 
         scope_group = QtWidgets.QGroupBox("Annotation scope")
         scope_layout = QtWidgets.QVBoxLayout(scope_group)
+        scope_layout.setContentsMargins(8, 8, 8, 8)
+        scope_layout.setSpacing(6)
         self.scope_group = QtWidgets.QButtonGroup()
         for label in ["Current slice", "All slices"]:
             btn = QtWidgets.QRadioButton(label)
@@ -784,17 +1015,20 @@ class UiExtrasMixin:
             )
         layout.addWidget(scope_group)
 
-        target_group = QtWidgets.QGroupBox("Target panel")
+        target_group = QtWidgets.QGroupBox("Annotation target")
         target_layout = QtWidgets.QVBoxLayout(target_group)
-        self.target_group = QtWidgets.QButtonGroup()
-        self._target_buttons = {}
-        for key, label in [("frame", "Frame"), ("mean", "Mean Projection"), ("support", "Modality 2")]:
-            btn = QtWidgets.QRadioButton(label)
-            if key == "mean":
-                btn.setChecked(True)
-            self.target_group.addButton(btn)
-            target_layout.addWidget(btn)
-            self._target_buttons[key] = btn
+        target_layout.setContentsMargins(8, 8, 8, 8)
+        target_layout.setSpacing(6)
+        self.annotate_target_combo = QtWidgets.QComboBox(target_group)
+        self.annotate_target_combo.setToolTip(
+            "Choose the visible canvas view/modality where new points will be written."
+        )
+        target_layout.addWidget(self.annotate_target_combo)
+        self.target_state_badge_lbl = QtWidgets.QLabel("Write target: -")
+        self.target_state_badge_lbl.setStyleSheet(
+            "background:#e8f0fe; color:#1d4e89; padding:3px 6px; border-radius:4px; font-weight:600;"
+        )
+        target_layout.addWidget(self.target_state_badge_lbl)
         self.target_unavailable_hint_lbl = _LogicalVisibilityLabel("")
         self.target_unavailable_hint_lbl.setWordWrap(True)
         self.target_unavailable_hint_lbl.setStyleSheet("color: #546e7a; font-style: italic;")
@@ -804,6 +1038,8 @@ class UiExtrasMixin:
 
         tool_group = QtWidgets.QGroupBox("Tools")
         tool_layout = QtWidgets.QVBoxLayout(tool_group)
+        tool_layout.setContentsMargins(8, 8, 8, 8)
+        tool_layout.setSpacing(6)
         self.tool_label = QtWidgets.QLabel("Tool: Annotate")
         tool_layout.addWidget(self.tool_label)
         
@@ -825,11 +1061,11 @@ class UiExtrasMixin:
         return panel
 
     def _on_show_annotations_master_changed(self, state: int) -> None:
-        """Toggle all visible annotation panels from the master checkbox."""
+        """Toggle annotation overlays globally and keep per-panel point flags in sync."""
         enabled = bool(int(state))
         checkboxes = dict(getattr(self, "_annotation_view_checkboxes", {}) or {})
-        panel_actions = dict(getattr(self, "panel_actions", {}) or {})
-        changed = False
+        changed_keys: list[str] = []
+        point_vis = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
         for key, chk in checkboxes.items():
             if not chk.isVisible():
                 continue
@@ -837,16 +1073,21 @@ class UiExtrasMixin:
                 chk.blockSignals(True)
                 chk.setChecked(enabled)
                 chk.blockSignals(False)
-            act = panel_actions.get(str(key))
-            if act is not None and act.isChecked() != enabled:
-                act.blockSignals(True)
-                act.setChecked(enabled)
-                act.blockSignals(False)
-            if bool(self._panel_visibility.get(str(key), True)) != enabled:
-                self._panel_visibility[str(key)] = enabled
-                changed = True
-        if changed:
-            self._rebuild_figure_layout()
+            if point_vis.get(str(key), True) != enabled:
+                point_vis[str(key)] = enabled
+                changed_keys.append(str(key))
+        self._annotation_panel_visibility = point_vis
+        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        if not enabled:
+            # Keep current target visible to avoid accidental hidden-write confusion.
+            self._annotation_panel_visibility[current_target] = True
+            target_chk = checkboxes.get(current_target)
+            if target_chk is not None:
+                target_chk.blockSignals(True)
+                target_chk.setChecked(True)
+                target_chk.blockSignals(False)
+        if changed_keys:
+            self._refresh_lazy_modality_table()
         self._refresh_image()
 
     def _cycle_label(self, delta: int) -> None:
@@ -877,6 +1118,8 @@ class UiExtrasMixin:
             "suggestion_explain",
             "advanced_analysis",
             "modality_layers",
+            "status_details",
+            "project_relink",
         ]
         bottom_ids = [
             "qc_issues",
@@ -1122,20 +1365,35 @@ class UiExtrasMixin:
     def _set_right_dock_mode(self, mode: str) -> None:
         """Mode-aware right dock behavior: annotate/review/inspect."""
         target = str(mode or "").strip().lower()
-        right_ids = ("annotations", "review_queue", "suggestion_explain")
+        right_ids = (
+            "annotations",
+            "review_queue",
+            "suggestion_explain",
+            "status_details",
+            "project_relink",
+        )
         if target == "annotate":
             # Annotation-first default: keep table visible and focused.
+            self._set_right_handle_compact(False)
             self.set_panel_visible("annotations", True, source="mode_right_dock")
-            self.set_panel_visible("review_queue", False, source="mode_right_dock")
-            self.set_panel_visible("suggestion_explain", False, source="mode_right_dock")
+            for panel_id in right_ids:
+                if panel_id != "annotations":
+                    self.set_panel_visible(panel_id, False, source="mode_right_dock")
             dock = getattr(self, "dock_annotations", None)
             if dock is not None:
+                dock.setMinimumWidth(360)
                 dock.raise_()
-            self._set_right_handle_compact(True)
+            if getattr(self, "_right_sidebar_collapsed", False):
+                self._expand_right_sidebar()
+            else:
+                self._apply_canvas_priority_layout()
             return
         if target == "review":
             self._set_right_handle_compact(False)
             self.set_panel_visible("review_queue", True, source="mode_right_dock")
+            for panel_id in right_ids:
+                if panel_id != "review_queue":
+                    self.set_panel_visible(panel_id, False, source="mode_right_dock")
             dock = getattr(self, "dock_review_queue", None)
             if dock is not None:
                 dock.raise_()
@@ -1143,6 +1401,9 @@ class UiExtrasMixin:
         if target == "inspect":
             self._set_right_handle_compact(False)
             self.set_panel_visible("suggestion_explain", True, source="mode_right_dock")
+            for panel_id in right_ids:
+                if panel_id != "suggestion_explain":
+                    self.set_panel_visible(panel_id, False, source="mode_right_dock")
             dock = getattr(self, "dock_suggestion_explain", None)
             if dock is not None:
                 dock.raise_()
@@ -1197,12 +1458,14 @@ class UiExtrasMixin:
 
     def _get_target_axis(self):
         axes = self.renderer.axes if getattr(self, "renderer", None) is not None else {}
-        target_map = {
-            "frame": axes.get("frame"),
-            "mean": axes.get("mean"),
-            "support": axes.get("support"),
-        }
-        return target_map.get(self.annotate_target, axes.get("frame"))
+        target_key = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        ax = axes.get(target_key)
+        if ax is not None:
+            return ax
+        if "frame" in axes:
+            return axes.get("frame")
+        # Fallback to first available axis to keep annotation workflow operable.
+        return next(iter(axes.values()), None)
 
     def _get_image_axes(self) -> Set[object]:
         if getattr(self, "renderer", None) is None:
@@ -1250,6 +1513,9 @@ class UiExtrasMixin:
         self._ensure_lazy_sync_group_keys()
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
+        for panel_key in ("frame", "support"):
+            if panel_key in hidden_base:
+                self._panel_visibility[str(panel_key)] = False
         if not bool(getattr(self, "_lazy_builtin_seeded", False)) and not builtin:
             builtin["mean"] = {
                 "name": "Mean Projection",
@@ -1263,12 +1529,17 @@ class UiExtrasMixin:
             }
             self._lazy_builtin_seeded = True
         self._lazy_builtin_views = builtin
+        projection_labels = {
+            "raw": "Source Frame",
+            "mean": "Mean",
+            "std": "Std",
+            "min": "Min",
+            "max": "Max",
+        }
         table.blockSignals(True)
         table.setRowCount(0)
         saw_support = False
         for modality in manager.get_all_modalities():
-            row = table.rowCount()
-            table.insertRow(row)
             panel_key = (
                 "frame"
                 if int(modality.idx) == 0
@@ -1278,6 +1549,8 @@ class UiExtrasMixin:
             )
             if panel_key in hidden_base and int(modality.idx) <= 1:
                 continue
+            row = table.rowCount()
+            table.insertRow(row)
             if panel_key == "support":
                 saw_support = True
             visible_chk = QtWidgets.QCheckBox(table)
@@ -1286,10 +1559,18 @@ class UiExtrasMixin:
                 lambda checked, k=panel_key: self._on_panel_toggle(str(k), bool(checked))
             )
             table.setCellWidget(row, 0, visible_chk)
+            pts_chk = QtWidgets.QCheckBox(table)
+            pts_chk.setChecked(
+                bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get(panel_key, True))
+            )
+            pts_chk.toggled.connect(
+                lambda checked, k=panel_key: self._on_annotation_panel_toggle(str(k), bool(checked))
+            )
+            table.setCellWidget(row, 1, pts_chk)
 
             name_item = QtWidgets.QTableWidgetItem(str(modality.display_name))
             name_item.setData(QtCore.Qt.ItemDataRole.UserRole, int(modality.idx))
-            table.setItem(row, 1, name_item)
+            table.setItem(row, 2, name_item)
 
             source_combo = QtWidgets.QComboBox(table)
             for img in getattr(self, "images", []) or []:
@@ -1301,11 +1582,11 @@ class UiExtrasMixin:
                     mid, int(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 2, source_combo)
+            table.setCellWidget(row, 3, source_combo)
 
             view_combo = QtWidgets.QComboBox(table)
             for projection in ("raw", "mean", "std", "min", "max"):
-                view_combo.addItem(projection.title(), projection)
+                view_combo.addItem(str(projection_labels.get(projection, projection.title())), projection)
             proj_idx = max(0, view_combo.findData(str(modality.projection_type.value)))
             view_combo.setCurrentIndex(proj_idx)
             view_combo.currentIndexChanged.connect(
@@ -1313,12 +1594,26 @@ class UiExtrasMixin:
                     mid, str(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 3, view_combo)
+            table.setCellWidget(row, 4, view_combo)
             group_item = QtWidgets.QTableWidgetItem(
                 str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get(int(modality.idx), ""))
             )
             group_item.setData(QtCore.Qt.ItemDataRole.UserRole, int(modality.idx))
-            table.setItem(row, 4, group_item)
+            table.setItem(row, 5, group_item)
+            table.setCellWidget(row, 6, self._sync_mode_toolbutton(table, int(modality.idx), "contrast"))
+            table.setCellWidget(row, 7, self._sync_mode_toolbutton(table, int(modality.idx), "zoom"))
+            table.setCellWidget(row, 8, self._sync_mode_toolbutton(table, int(modality.idx), "playback"))
+
+        # Remove stale dynamic panel visibility keys no longer represented by modalities.
+        valid_dynamic_keys = {
+            self._panel_key_for_modality_idx(int(modality.idx))
+            for modality in manager.get_all_modalities()
+            if int(modality.idx) >= 2
+        }
+        for key in list(dict(getattr(self, "_panel_visibility", {}) or {}).keys()):
+            k = str(key)
+            if k.startswith("modality_") and k not in valid_dynamic_keys:
+                self._panel_visibility.pop(k, None)
 
         # Keep lazy rows aligned with canvas panels: always expose support panel row.
         if not saw_support and "support" not in hidden_base:
@@ -1330,6 +1625,14 @@ class UiExtrasMixin:
                 lambda checked, k="support": self._on_panel_toggle(str(k), bool(checked))
             )
             table.setCellWidget(row, 0, visible_chk)
+            pts_chk = QtWidgets.QCheckBox(table)
+            pts_chk.setChecked(
+                bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get("support", True))
+            )
+            pts_chk.toggled.connect(
+                lambda checked, k="support": self._on_annotation_panel_toggle(str(k), bool(checked))
+            )
+            table.setCellWidget(row, 1, pts_chk)
             support_name = "Modality 2"
             support_combo = getattr(self, "support_combo", None)
             if support_combo is not None and support_combo.count() > 0:
@@ -1338,7 +1641,7 @@ class UiExtrasMixin:
                     support_name = f"Modality 2 ({support_combo.itemText(idx)})"
             name_item = QtWidgets.QTableWidgetItem(support_name)
             name_item.setData(QtCore.Qt.ItemDataRole.UserRole, "builtin:support")
-            table.setItem(row, 1, name_item)
+            table.setItem(row, 2, name_item)
             source_combo = QtWidgets.QComboBox(table)
             for img in getattr(self, "images", []) or []:
                 source_combo.addItem(str(getattr(img, "name", f"Image {img.id}")), int(img.id))
@@ -1349,17 +1652,20 @@ class UiExtrasMixin:
                     int(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 2, source_combo)
+            table.setCellWidget(row, 3, source_combo)
             view_combo = QtWidgets.QComboBox(table)
-            view_combo.addItem("Raw", "raw")
+            view_combo.addItem("Source Frame", "raw")
             view_combo.setCurrentIndex(0)
             view_combo.setEnabled(False)
-            table.setCellWidget(row, 3, view_combo)
+            table.setCellWidget(row, 4, view_combo)
             group_item = QtWidgets.QTableWidgetItem(
                 str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get("builtin:support", ""))
             )
             group_item.setData(QtCore.Qt.ItemDataRole.UserRole, "builtin:support")
-            table.setItem(row, 4, group_item)
+            table.setItem(row, 5, group_item)
+            table.setCellWidget(row, 6, self._sync_mode_toolbutton(table, "builtin:support", "contrast"))
+            table.setCellWidget(row, 7, self._sync_mode_toolbutton(table, "builtin:support", "zoom"))
+            table.setCellWidget(row, 8, self._sync_mode_toolbutton(table, "builtin:support", "playback"))
 
         for panel_key in ("mean", "std"):
             cfg = dict(self._lazy_builtin_views.get(panel_key, {}) or {})
@@ -1371,9 +1677,17 @@ class UiExtrasMixin:
                 lambda checked, k=panel_key: self._on_panel_toggle(str(k), bool(checked))
             )
             table.setCellWidget(row, 0, visible_chk)
+            pts_chk = QtWidgets.QCheckBox(table)
+            pts_chk.setChecked(
+                bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get(panel_key, True))
+            )
+            pts_chk.toggled.connect(
+                lambda checked, k=panel_key: self._on_annotation_panel_toggle(str(k), bool(checked))
+            )
+            table.setCellWidget(row, 1, pts_chk)
             name_item = QtWidgets.QTableWidgetItem(str(cfg.get("name", panel_key.title())))
             name_item.setData(QtCore.Qt.ItemDataRole.UserRole, f"builtin:{panel_key}")
-            table.setItem(row, 1, name_item)
+            table.setItem(row, 2, name_item)
             source_combo = QtWidgets.QComboBox(table)
             for img in getattr(self, "images", []) or []:
                 source_combo.addItem(str(getattr(img, "name", f"Image {img.id}")), int(img.id))
@@ -1384,10 +1698,10 @@ class UiExtrasMixin:
                     str(k), int(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 2, source_combo)
+            table.setCellWidget(row, 3, source_combo)
             view_combo = QtWidgets.QComboBox(table)
             for projection in ("raw", "mean", "std", "min", "max"):
-                view_combo.addItem(projection.title(), projection)
+                view_combo.addItem(str(projection_labels.get(projection, projection.title())), projection)
             proj_idx = max(0, view_combo.findData(str(cfg.get("projection", panel_key))))
             view_combo.setCurrentIndex(proj_idx)
             view_combo.currentIndexChanged.connect(
@@ -1395,14 +1709,31 @@ class UiExtrasMixin:
                     str(k), str(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 3, view_combo)
+            table.setCellWidget(row, 4, view_combo)
             group_item = QtWidgets.QTableWidgetItem(
                 str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get(f"builtin:{panel_key}", ""))
             )
             group_item.setData(QtCore.Qt.ItemDataRole.UserRole, f"builtin:{panel_key}")
-            table.setItem(row, 4, group_item)
+            table.setItem(row, 5, group_item)
+            table.setCellWidget(
+                row, 6, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "contrast")
+            )
+            table.setCellWidget(
+                row, 7, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "zoom")
+            )
+            table.setCellWidget(
+                row, 8, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "playback")
+            )
         table.blockSignals(False)
         table.resizeColumnsToContents()
+        table.setColumnWidth(0, 48)
+        table.setColumnWidth(1, 36)
+        if table.columnCount() >= 9:
+            table.setColumnWidth(6, 28)
+            table.setColumnWidth(7, 28)
+            table.setColumnWidth(8, 28)
+        if hasattr(self, "_refresh_annotation_view_controls"):
+            self._refresh_annotation_view_controls()
 
     def _panel_key_for_modality_idx(self, modality_idx: int) -> str:
         """Map modality index to panel key used by renderer/sync list."""
@@ -1424,6 +1755,144 @@ class UiExtrasMixin:
         while key in used:
             key += 1
         return str(key)
+
+    def _sync_modes_for_role(self, role_key) -> dict[str, bool]:
+        """Return sync mode flags for a modality/view role key."""
+        modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
+        current = dict(modes.get(role_key, {}) or {})
+        normalized = {
+            "contrast": bool(current.get("contrast", True)),
+            "zoom": bool(current.get("zoom", True)),
+            "playback": bool(current.get("playback", True)),
+        }
+        modes[role_key] = normalized
+        self._lazy_sync_modes = modes
+        return normalized
+
+    def _set_sync_mode_for_role(self, role_key, mode_key: str, enabled: bool) -> None:
+        """Update one sync mode flag for all rows in the same sync group."""
+        key = str(mode_key).strip().lower()
+        if key not in {"contrast", "zoom", "playback"}:
+            return
+        groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
+        group_key = str(groups.get(role_key, "")).strip()
+        target_roles = {role_key}
+        if group_key.isdigit():
+            target_roles = {rk for rk, gk in groups.items() if str(gk).strip() == group_key}
+        modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
+        for target_role in target_roles:
+            row_modes = dict(modes.get(target_role, {}) or {})
+            row_modes[key] = bool(enabled)
+            modes[target_role] = {
+                "contrast": bool(row_modes.get("contrast", True)),
+                "zoom": bool(row_modes.get("zoom", True)),
+                "playback": bool(row_modes.get("playback", True)),
+            }
+        self._lazy_sync_modes = modes
+        self._sync_mode_widgets_for_roles(target_roles, key)
+        if hasattr(self, "_on_sync_mode_changed"):
+            self._on_sync_mode_changed()
+
+    def _ensure_lazy_sync_modes(self) -> None:
+        """Ensure each lazy row has explicit sync mode flags."""
+        modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
+        groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
+        if getattr(self, "controller", None) is not None:
+            from phage_annotator.session.migration import ensure_modality_system
+
+            manager = ensure_modality_system(self.controller.session_state)
+            for modality in manager.get_all_modalities():
+                role_key = int(modality.idx)
+                current = dict(modes.get(role_key, {}) or {})
+                modes[role_key] = {
+                    "contrast": bool(current.get("contrast", True)),
+                    "zoom": bool(current.get("zoom", True)),
+                    "playback": bool(current.get("playback", True)),
+                }
+        for builtin_key in ("builtin:support", "builtin:mean", "builtin:std"):
+            if builtin_key not in groups:
+                continue
+            current = dict(modes.get(builtin_key, {}) or {})
+            modes[builtin_key] = {
+                "contrast": bool(current.get("contrast", True)),
+                "zoom": bool(current.get("zoom", True)),
+                "playback": bool(current.get("playback", True)),
+            }
+        self._lazy_sync_modes = modes
+
+    def _sync_mode_toolbutton(self, table, role_key, mode_key: str):
+        """Create compact lazy-table sync mode toggle button (C/Z/P)."""
+        mk = str(mode_key).strip().lower()
+        label = {"contrast": "C", "zoom": "Z", "playback": "P"}.get(mk, "?")
+        tooltip = {
+            "contrast": "Sync contrast for this row's Sync Group",
+            "zoom": "Sync zoom/pan for this row's Sync Group",
+            "playback": "Sync playback for this row's Sync Group",
+        }.get(mk, "Sync mode")
+        btn = QtWidgets.QToolButton(table)
+        btn.setText(label)
+        btn.setCheckable(True)
+        btn.setAutoRaise(False)
+        btn.setFixedWidth(24)
+        btn.setToolTip(tooltip)
+        btn.setProperty("syncMode", mk)
+        btn.setProperty("roleKey", role_key)
+        btn.setChecked(bool(self._sync_modes_for_role(role_key).get(mk, True)))
+        btn.toggled.connect(
+            lambda checked, rk=role_key, mode=mk: self._set_sync_mode_for_role(
+                rk, mode, bool(checked)
+            )
+        )
+        return btn
+
+    def _role_key_for_lazy_row(self, row: int):
+        """Return role key (int or builtin:*) for a lazy-table row."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None or row < 0 or row >= table.rowCount():
+            return None
+        item = table.item(row, 2)
+        if item is None:
+            return None
+        role_data = item.data(QtCore.Qt.ItemDataRole.UserRole)
+        if isinstance(role_data, str):
+            role_text = str(role_data)
+            if role_text.startswith("builtin:"):
+                return role_text
+            if role_text.startswith("modality_"):
+                try:
+                    return int(role_text.split("_", 1)[1])
+                except Exception:
+                    return None
+            return role_text
+        try:
+            return int(role_data)
+        except Exception:
+            return None
+
+    def _sync_mode_widgets_for_roles(self, role_keys: set, mode_key: str) -> None:
+        """Apply mode-check state to all visible lazy-table rows for given role keys."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        mk = str(mode_key).strip().lower()
+        if mk not in {"contrast", "zoom", "playback"}:
+            return
+        col = {"contrast": 6, "zoom": 7, "playback": 8}[mk]
+        role_set = set(role_keys or set())
+        for row in range(table.rowCount()):
+            rk = self._role_key_for_lazy_row(row)
+            if rk not in role_set:
+                continue
+            widget = table.cellWidget(row, col)
+            if widget is None:
+                continue
+            target_checked = bool(self._sync_modes_for_role(rk).get(mk, True))
+            widget.blockSignals(True)
+            try:
+                if hasattr(widget, "setChecked"):
+                    widget.setChecked(target_checked)
+            finally:
+                widget.blockSignals(False)
 
     def _ensure_lazy_sync_group_keys(self) -> None:
         """Ensure every lazy modality/view row has a numeric sync key."""
@@ -1448,6 +1917,7 @@ class UiExtrasMixin:
             if not key.isdigit():
                 groups[role_key] = self._next_numeric_sync_key(groups)
         self._lazy_modality_groups = groups
+        self._ensure_lazy_sync_modes()
 
     def _add_lazy_modality_view(self, projection_key: str) -> None:
         """Add a new modality/view row and reflect it immediately on canvas."""
@@ -1506,7 +1976,7 @@ class UiExtrasMixin:
         row = int(table.currentRow())
         if row < 0:
             return
-        item = table.item(row, 1)
+        item = table.item(row, 2)
         if item is None:
             return
         role_data = item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -1521,6 +1991,9 @@ class UiExtrasMixin:
                     builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
                     builtin.pop(key, None)
                     self._lazy_builtin_views = builtin
+                modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
+                modes.pop(f"builtin:{key}", None)
+                self._lazy_sync_modes = modes
                 self._on_panel_toggle(str(key), False)
                 self._refresh_lazy_modality_table()
                 self._refresh_annotation_view_controls()
@@ -1541,6 +2014,9 @@ class UiExtrasMixin:
             return
         if manager.remove_modality(modality_idx):
             self._panel_visibility.pop(f"modality_{modality_idx}", None)
+            modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
+            modes.pop(int(modality_idx), None)
+            self._lazy_sync_modes = modes
             self._refresh_lazy_modality_table()
             self._refresh_annotation_view_controls()
             self._refresh_image()
@@ -1550,7 +2026,7 @@ class UiExtrasMixin:
         if item is None or getattr(self, "controller", None) is None:
             return
         col = int(item.column())
-        if col not in (1, 4):
+        if col not in (2, 5):
             return
         from phage_annotator.session.migration import ensure_modality_system
 
@@ -1558,7 +2034,7 @@ class UiExtrasMixin:
         role_text = str(role_data)
         if role_text.startswith("builtin:"):
             panel_key = role_text.split(":", 1)[1]
-            if col == 4:
+            if col == 5:
                 groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
                 new_key = str(item.text()).strip()
                 if not new_key.isdigit():
@@ -1579,7 +2055,7 @@ class UiExtrasMixin:
             return
 
         modality_idx = int(role_data)
-        if col == 4:
+        if col == 5:
             groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
             new_key = str(item.text()).strip()
             if not new_key.isdigit():
@@ -1603,38 +2079,26 @@ class UiExtrasMixin:
         self._refresh_image()
 
     def _apply_lazy_group_sync_selection(self, group_key: str) -> None:
-        """Select panels in sync list by shared lazy-table group key."""
+        """Set manual sync target to a shared lazy-table group key."""
         group = str(group_key or "").strip()
-        sync_list = getattr(self, "sync_list", None)
-        if not group or sync_list is None:
+        combo = getattr(self, "sync_key_combo", None)
+        if not group or combo is None:
             return
-        groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
-        selected_panel_keys = {
-            self._panel_key_for_modality_idx(mod_idx)
-            for mod_idx, key in groups.items()
-            if isinstance(mod_idx, int) and str(key).strip() == group
-        }
-        for mod_key, key in groups.items():
-            if isinstance(mod_key, str) and mod_key.startswith("builtin:") and str(key).strip() == group:
-                selected_panel_keys.add(mod_key.split(":", 1)[1])
-        if not selected_panel_keys:
+        idx = combo.findData(group)
+        if idx < 0:
             return
-        sync_list.blockSignals(True)
-        try:
-            for i in range(sync_list.count()):
-                item = sync_list.item(i)
-                panel_key = str(item.data(QtCore.Qt.ItemDataRole.UserRole) or "")
-                item.setSelected(panel_key in selected_panel_keys)
-        finally:
-            sync_list.blockSignals(False)
-        if getattr(self, "sync_zoom_chk", None) is not None:
-            self.sync_zoom_chk.setChecked(True)
-        if getattr(self, "sync_playback_chk", None) is not None:
-            self.sync_playback_chk.setChecked(True)
-        if getattr(self, "sync_contrast_chk", None) is not None:
-            self.sync_contrast_chk.setChecked(True)
-        if hasattr(self, "_on_sync_selection_changed"):
-            self._on_sync_selection_changed()
+        mode_combo = getattr(self, "sync_target_mode_combo", None)
+        if mode_combo is not None:
+            mode_combo.blockSignals(True)
+            mode_combo.setCurrentIndex(max(0, mode_combo.findData("manual")))
+            mode_combo.blockSignals(False)
+        if getattr(self, "sync_follow_active_chk", None) is not None:
+            self.sync_follow_active_chk.setChecked(False)
+        combo.blockSignals(True)
+        combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+        if hasattr(self, "_on_sync_mode_changed"):
+            self._on_sync_mode_changed()
 
     def _on_lazy_modality_source_changed(self, modality_idx: int, image_id: int) -> None:
         if getattr(self, "controller", None) is None:
@@ -1715,6 +2179,7 @@ class UiExtrasMixin:
                 "suggestion_explain",
                 "advanced_analysis",
                 "modality_layers",
+                "status_details",
             },
             "analyze": {"roi", "roi_manager", "results", "orthoview", "metadata"},
             "display": {"hist", "profile"},
@@ -1733,6 +2198,7 @@ class UiExtrasMixin:
             "suggestion_explain",
             "advanced_analysis",
             "modality_layers",
+            "status_details",
             "roi",
             "roi_manager",
             "results",
@@ -1847,6 +2313,25 @@ class UiExtrasMixin:
             self._collapse_right_sidebar()
         else:
             self._expand_right_sidebar()
+            # Keep right side usable by default: if nothing is visible, show Annotation Table.
+            any_right_visible = any(
+                bool(getattr(self, attr, None) is not None and getattr(self, attr).isVisible())
+                for attr in (
+                    "dock_annotations",
+                    "dock_review_queue",
+                    "dock_suggestion_explain",
+                    "dock_modality_layers",
+                    "dock_advanced_analysis",
+                    "dock_status_details",
+                )
+            )
+            if not any_right_visible and getattr(self, "dock_annotations", None) is not None:
+                self.set_panel_visible("annotations", True, source="restore_defaults")
+                try:
+                    self.dock_annotations.raise_()
+                except Exception:
+                    pass
+                self._apply_canvas_priority_layout()
 
     def _apply_canvas_priority_layout(self) -> None:
         """Resize docks so the canvas remains the primary focus."""
@@ -1861,6 +2346,7 @@ class UiExtrasMixin:
             "dock_suggestion_explain",
             "dock_advanced_analysis",
             "dock_modality_layers",
+            "dock_status_details",
         ):
             candidate = getattr(self, attr, None)
             if candidate is not None and candidate.isVisible():
@@ -1871,6 +2357,12 @@ class UiExtrasMixin:
             width = int(right_dock.width())
             if width > 80:
                 self._right_sidebar_last_width = width
+            if not bool(getattr(self, "_right_sidebar_collapsed", False)):
+                try:
+                    right_dock.setMinimumWidth(360)
+                    right_dock.setMaximumWidth(16777215)
+                except Exception:
+                    pass
 
         for key in self.sidebar_manager.dock_order(sidebar_visible, annotations_visible):
             if key == "sidebar":
@@ -1899,7 +2391,7 @@ class UiExtrasMixin:
                 if getattr(self, "_right_sidebar_collapsed", False):
                     sizes[-1] = self.sidebar_manager.config.annotations_collapsed_width
                 else:
-                    sizes[-1] = max(220, preferred_right)
+                    sizes[-1] = max(360, preferred_right)
             self.resizeDocks(docks, sizes, QtCore.Qt.Orientation.Horizontal)
 
     def _set_sidebar_expanded(self, expanded: bool) -> None:
@@ -2149,6 +2641,7 @@ class UiExtrasMixin:
         if pack_on:
             for key in keys:
                 self.set_panel_visible(key, True, source="review_context_pack")
+            self.set_panel_visible("status_details", False, source="review_context_pack")
             if getattr(self, "dock_review_queue", None) is not None:
                 self.dock_review_queue.raise_()
             self._set_status("Review Context Pack enabled.")
@@ -2157,6 +2650,7 @@ class UiExtrasMixin:
             self.set_panel_visible("review_queue", False, source="review_context_pack")
             self.set_panel_visible("suggestion_explain", False, source="review_context_pack")
             self.set_panel_visible("modality_layers", False, source="review_context_pack")
+            self.set_panel_visible("status_details", False, source="review_context_pack")
             self._set_status("Review Context Pack collapsed to table.")
 
     def _apply_default_layout(self) -> None:
@@ -2386,7 +2880,7 @@ class UiExtrasMixin:
             for key in ("annotations", "suggestion_explain", "advanced_analysis", "modality_layers"):
                 self.set_panel_visible(key, False, source="preset:default_canvas_home")
             self.set_panel_visible("review_queue", True, source="preset:default_canvas_home")
-            self._set_right_handle_compact(True)
+            self._set_right_handle_compact(False)
             self._set_bottom_docks_compact(True)
         else:
             self._set_right_handle_compact(False)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
+import numpy as np
 import pytest
 
 from phage_annotator.analysis.qc_validators import (
@@ -12,6 +13,8 @@ from phage_annotator.analysis.qc_validators import (
     OutOfBoundsValidator,
     MissingLabelValidator,
     DensityClusterValidator,
+    ImageArtifactValidator,
+    PoissonConsistencyValidator,
     QCValidator,
     IssueSeverity,
     QCIssue,
@@ -530,3 +533,51 @@ class TestQCValidatorIntegration:
         
         # Should have detected some issues
         assert len(issue_dict) > 0
+
+
+@pytest.mark.order(2)
+class TestImageArtifactValidator:
+    """Test image/stack artifact detection heuristics."""
+
+    def test_detects_uneven_illumination(self):
+        h, w = 128, 128
+        yy, xx = np.mgrid[:h, :w]
+        r = np.sqrt((xx - (w / 2.0)) ** 2 + (yy - (h / 2.0)) ** 2)
+        frame = (300.0 - (3.5 * r)).astype(np.float32)
+        frame = np.clip(frame, 5.0, None)
+        stack = np.stack([frame, frame, frame], axis=0)
+        issues = ImageArtifactValidator.find_artifacts(stack, image_id="img_illum")
+        assert any(i.issue_type == "uneven_illumination" for i in issues)
+
+    def test_detects_photobleaching(self):
+        frames = []
+        for k in range(8):
+            level = 200.0 - (k * 20.0)
+            frames.append(np.full((64, 64), level, dtype=np.float32))
+        stack = np.stack(frames, axis=0)
+        issues = ImageArtifactValidator.find_artifacts(stack, image_id="img_bleach")
+        assert any(i.issue_type == "photobleaching" for i in issues)
+
+
+@pytest.mark.order(2)
+class TestPoissonConsistencyValidator:
+    """Test Poisson/Fano stochasticity checks."""
+
+    def test_detects_image_stochasticity_deviation(self):
+        rng = np.random.default_rng(0)
+        base = rng.normal(20.0, 3.0, size=(4, 64, 64)).astype(np.float32)
+        base[:, :8, :8] += 120.0
+        issues = PoissonConsistencyValidator.find_image_signal_stochasticity(base, image_id="img_stoch")
+        assert any(i.issue_type == "image_stochasticity" for i in issues)
+
+    def test_detects_annotation_stochasticity_clustered(self):
+        annotations = [
+            create_mock_keypoint(10 + (i % 4), 10 + (i // 4), annotation_id=f"ann_{i}")
+            for i in range(24)
+        ]
+        issues = PoissonConsistencyValidator.find_annotation_stochasticity(
+            annotations=annotations,
+            image_id="img_ann",
+            image_shape=(512, 512),
+        )
+        assert any(i.issue_type == "annotation_stochasticity" for i in issues)

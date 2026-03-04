@@ -5,11 +5,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from phage_annotator.algorithms.smlm_thunderstorm import Localization
+import subprocess
+from types import SimpleNamespace
+
+import numpy as np
+
+from phage_annotator.algorithms.smlm_thunderstorm import Localization, SmlmParams
 from phage_annotator.smlm.backends import (
     ThunderstormBridgeConfig,
     _build_fiji_command,
     discover_bundled_thunderstorm_jar,
+    run_thunderstorm_backend,
 )
 from phage_annotator.smlm.external_plugins import (
     build_manifest_macro,
@@ -237,3 +243,43 @@ def test_second_plugin_profile_discovered_from_repository_assets() -> None:
     ids = {p.plugin_id for p in discovered}
     assert "thunder_storm" in ids
     assert "thunder_storm_fast" in ids
+
+
+def test_fiji_subprocess_retries_then_succeeds(tmp_path: Path, monkeypatch) -> None:
+    macro = tmp_path / "macro.ijm"
+    macro.write_text("run(\"Anything\");\n", encoding="utf-8")
+    calls = {"n": 0}
+
+    def _fake_run(*_args, **kwargs):
+        calls["n"] += 1
+        output_path = Path(str(kwargs["env"]["PHAGE_SMLM_OUTPUT"]))
+        if calls["n"] == 1:
+            return SimpleNamespace(returncode=1, stderr="transient error", stdout="")
+        output_path.write_text("x [px],y [px],frame\n12.0,14.0,0\n", encoding="utf-8")
+        return SimpleNamespace(returncode=0, stderr="", stdout="ok")
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    frames = [(0, np.zeros((16, 16), dtype=np.float32))]
+    locs, _sr, meta = run_thunderstorm_backend(
+        frames,
+        total_frames=1,
+        roi_mask=np.ones((16, 16), dtype=bool),
+        roi_rect=(0.0, 0.0, 16.0, 16.0),
+        crop_offset=(0, 0),
+        params=SmlmParams(),
+        pixel_size_nm=100.0,
+        config=ThunderstormBridgeConfig(
+            backend="fiji_subprocess",
+            fiji_executable="/bin/echo",
+            macro_path=str(macro),
+            plugin_id="thunder_storm",
+            plugin_jar_path=str(tmp_path / "plugin.jar"),
+            retry_count=1,
+            retry_delay_sec=0.0,
+        ),
+        progress_cb=None,
+        is_cancelled=None,
+    )
+    assert calls["n"] == 2
+    assert len(locs) == 1
+    assert int(meta.get("retry_count", -1)) == 1

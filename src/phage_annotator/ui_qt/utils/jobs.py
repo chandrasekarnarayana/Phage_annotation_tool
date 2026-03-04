@@ -126,7 +126,12 @@ class JobsMixin:
             LOGGER.error("Uncaught exception\n%s", msg, extra={"job_id": "gui"})
             self._append_log(f"[EXCEPTION] {exc_type.__name__}: {exc}\n{msg}")
             self._set_status("Unexpected error. See Logs.")
-            if self.dock_logs is not None:
+            auto_open_logs = bool(
+                getattr(self, "_settings", None).value("autoOpenLogsOnError", False, type=bool)
+                if getattr(self, "_settings", None) is not None
+                else False
+            )
+            if auto_open_logs and self.dock_logs is not None:
                 self.set_panel_visible("logs", True, source="exception_hook")
 
         sys.excepthook = _hook
@@ -153,7 +158,12 @@ class JobsMixin:
         self._append_log(f"[JOB] Error: {name} ({job_id})\n{traceback_text}")
         LOGGER.error("Job error: %s\n%s", name, traceback_text, extra={"job_id": job_id})
         self._set_status(f"Job error: {name}")
-        if self.dock_logs is not None:
+        auto_open_logs = bool(
+            getattr(self, "_settings", None).value("autoOpenLogsOnError", False, type=bool)
+            if getattr(self, "_settings", None) is not None
+            else False
+        )
+        if auto_open_logs and self.dock_logs is not None:
             self.set_panel_visible("logs", True, source="job_error")
 
     def _on_job_cancelled(self, name: str, job_id: str) -> None:

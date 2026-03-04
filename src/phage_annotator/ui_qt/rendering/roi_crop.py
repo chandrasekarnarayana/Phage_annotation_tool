@@ -22,6 +22,7 @@ class RoiCropMixin:
     def _current_layout_spec(self) -> dict:
         order = ["frame", "mean", "support", "std"]
         panel_visibility = dict(self._panel_visibility)
+        hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
         self._panel_modality_map = {}
         manager = getattr(self.controller.session_state, "modality_manager", None)
         if not self.images:
@@ -107,6 +108,14 @@ class RoiCropMixin:
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         mean_cfg = dict(builtin.get("mean", {}) or {})
         std_cfg = dict(builtin.get("std", {}) or {})
+        if "mean" not in builtin:
+            panel_visibility["mean"] = False
+        if "std" not in builtin:
+            panel_visibility["std"] = False
+        if "frame" in hidden_base:
+            panel_visibility["frame"] = False
+        if "support" in hidden_base:
+            panel_visibility["support"] = False
         for key, cfg, default_projection in (
             ("mean", mean_cfg, ProjectionType.MEAN),
             ("std", std_cfg, ProjectionType.STD),
@@ -140,6 +149,10 @@ class RoiCropMixin:
                 order.append(key)
                 panel_visibility[key] = bool(panel_visibility.get(key, True))
                 self._panel_modality_map[key] = modality
+        valid_order_keys = set(order)
+        for key in list(panel_visibility.keys()):
+            if str(key).startswith("modality_") and str(key) not in valid_order_keys:
+                panel_visibility[str(key)] = False
         return {
             "order": order,
             "panel_visibility": panel_visibility,
@@ -517,6 +530,9 @@ class RoiCropMixin:
         return self._apply_crop_rect(data, self.crop_rect, (data.shape[0], data.shape[1]))
 
     def _on_panel_toggle(self, key: str, checked: bool) -> None:
+        key = str(key)
+        if key not in self._panel_visibility:
+            self._panel_visibility[key] = bool(checked)
         if not checked and sum(self._panel_visibility.values()) <= 1:
             if key in self.panel_actions:
                 self.panel_actions[key].setChecked(True)
@@ -538,6 +554,8 @@ class RoiCropMixin:
                 chk.blockSignals(True)
                 chk.setChecked(checked)
                 chk.blockSignals(False)
+        if hasattr(self, "_set_lazy_row_visible_state"):
+            self._set_lazy_row_visible_state(str(key), bool(checked))
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
         self._rebuild_figure_layout()

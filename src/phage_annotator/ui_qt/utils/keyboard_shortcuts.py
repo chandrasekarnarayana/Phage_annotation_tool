@@ -136,6 +136,71 @@ class KeyboardShortcutManager:
             self._open_particles
         )
 
+        # ROI Manager shortcuts
+        self.register_action(
+            "roi_add",
+            "T",
+            "Add ROI from current selection",
+            self._roi_add
+        )
+        
+        self.register_action(
+            "roi_delete",
+            "Delete",
+            "Delete selected ROI(s)",
+            self._roi_delete
+        )
+        
+        self.register_action(
+            "roi_duplicate",
+            "Ctrl+D",
+            "Duplicate selected ROI",
+            self._roi_duplicate
+        )
+        
+        self.register_action(
+            "roi_rename",
+            "F2",
+            "Rename selected ROI",
+            self._roi_rename
+        )
+        
+        self.register_action(
+            "roi_deselect",
+            "Ctrl+Shift+D",
+            "Deselect ROI without deleting",
+            self._roi_deselect
+        )
+        
+        self.register_action(
+            "roi_update",
+            "U",
+            "Update ROI geometry from current selection",
+            self._roi_update
+        )
+        
+        self.register_action(
+            "roi_bind_to_slice",
+            "Ctrl+B",
+            "Bind selected ROI(s) to current slice",
+            self._roi_bind_to_slice
+        )
+        
+        # ROI undo/redo shortcuts
+        self.register_action(
+            "roi_undo",
+            "Ctrl+Z",
+            "Undo last ROI operation",
+            self._roi_undo
+        )
+        
+        self.register_action(
+            "roi_redo",
+            "Ctrl+Shift+Z",
+            "Redo last undone ROI operation",
+            self._roi_redo
+        )
+
     def register_action(
         self,
         action_id: str,
@@ -273,6 +338,52 @@ class KeyboardShortcutManager:
         """Open particle analysis panel."""
         if hasattr(self.main_window, '_open_particles'):
             self.main_window._open_particles()
+
+    # ROI Manager action handlers
+    def _roi_add(self) -> None:
+        """Add ROI from current selection."""
+        if hasattr(self.main_window, '_roi_mgr_add'):
+            self.main_window._roi_mgr_add()
+
+    def _roi_delete(self) -> None:
+        """Delete selected ROI(s)."""
+        if hasattr(self.main_window, '_roi_mgr_delete'):
+            self.main_window._roi_mgr_delete()
+
+    def _roi_duplicate(self) -> None:
+        """Duplicate selected ROI."""
+        if hasattr(self.main_window, '_roi_mgr_duplicate'):
+            self.main_window._roi_mgr_duplicate()
+
+    def _roi_rename(self) -> None:
+        """Rename selected ROI."""
+        if hasattr(self.main_window, '_roi_mgr_rename'):
+            self.main_window._roi_mgr_rename()
+
+    def _roi_deselect(self) -> None:
+        """Deselect ROI without deleting."""
+        if hasattr(self.main_window, '_roi_mgr_deselect'):
+            self.main_window._roi_mgr_deselect()
+
+    def _roi_update(self) -> None:
+        """Update ROI geometry from current selection."""
+        if hasattr(self.main_window, '_roi_mgr_update'):
+            self.main_window._roi_mgr_update()
+
+    def _roi_bind_to_slice(self) -> None:
+        """Bind selected ROI(s) to current slice."""
+        if hasattr(self.main_window, '_roi_mgr_batch_bind_to_slice'):
+            self.main_window._roi_mgr_batch_bind_to_slice()
+
+    def _roi_undo(self) -> None:
+        """Undo last ROI operation."""
+        if hasattr(self.main_window, '_roi_mgr_undo'):
+            self.main_window._roi_mgr_undo()
+
+    def _roi_redo(self) -> None:
+        """Redo last undone ROI operation."""
+        if hasattr(self.main_window, '_roi_mgr_redo'):
+            self.main_window._roi_mgr_redo()
 
     def show_shortcuts_help(self) -> None:
         """Display all available shortcuts in a help dialog."""

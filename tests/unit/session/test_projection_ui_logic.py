@@ -17,7 +17,7 @@ class TestProjectionSelectorLogic:
     def test_projection_type_to_display_name_mapping(self):
         """Verify projection type maps to display names correctly."""
         mappings = {
-            "raw": "Raw",
+            "raw": "Source Frame",
             "mean": "Mean",
             "std": "Std Dev",
             "min": "Min",

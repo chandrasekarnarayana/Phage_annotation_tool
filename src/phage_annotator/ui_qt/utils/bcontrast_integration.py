@@ -145,14 +145,27 @@ def integrate_b_contrast_features(main_window: KeypointAnnotator) -> None:
         shortcut_manager = None
     
     # Install visual indicators in status bar only when explicitly enabled.
+    # Default behavior keeps status bar transient/minimal to avoid crowding.
     try:
         settings = getattr(main_window, "_settings", None)
+        status_minimal_mode = bool(
+            settings.value("statusBarMinimalMode", True, type=bool)
+            if settings is not None
+            else True
+        )
         indicators_enabled = bool(
             settings.value("statusIndicatorBarEnabled", False, type=bool)
             if settings is not None
             else False
         )
-        if indicators_enabled:
+        # Keep the main status bar uncluttered by default.
+        # Require an explicit second opt-in for embedding visual chips there.
+        embed_in_status = bool(
+            settings.value("statusIndicatorBarInStatusBar", False, type=bool)
+            if settings is not None
+            else False
+        )
+        if (not status_minimal_mode) and indicators_enabled and embed_in_status:
             if main_window.statusBar() is not None:
                 VisualIndicatorIntegration.install_status_indicators(main_window)
                 print("[B&C Integration] Visual indicators installed successfully")

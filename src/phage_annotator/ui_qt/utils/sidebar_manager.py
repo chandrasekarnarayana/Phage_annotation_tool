@@ -12,7 +12,7 @@ class SidebarLayoutConfig:
     
     Both sidebars support expand/collapse toggling:
     - Left sidebar: 300px expanded, 48px collapsed (icon-only)
-    - Right sidebar (annotations): 320px expanded, 48px collapsed (icon-only)
+    - Right sidebar (annotations): 360px expanded, 48px collapsed (icon-only)
     """
 
     # Left sidebar (tools) sizing
@@ -20,7 +20,7 @@ class SidebarLayoutConfig:
     collapsed_width: int = 48
     
     # Right sidebar (annotations/inspect) sizing
-    annotations_width: int = 320                  # Expanded width
+    annotations_width: int = 420                  # Expanded width
     annotations_collapsed_width: int = 48         # Collapsed width (icon-only, matching left)
 
 

@@ -2,19 +2,37 @@
 
 Phage Annotator is a Qt + Matplotlib microscopy annotation IDE for 2D/3D/time TIFF workflows, with assistive suggestion review, reproducible project persistence, and dock-based expert UX.
 
-## Quick Start
+## Clone
+
+```bash
+git clone https://github.com/<your-org-or-user>/phage-annotator.git
+cd phage-annotator
+```
+
+## Local Install
+
+### Linux / macOS
 
 ```bash
 python -m venv .venv-phage
 source .venv-phage/bin/activate
-pip install -e .[dev,cache]
-phage-annotator --demo
+python -m pip install --upgrade pip
+python -m pip install -e .[dev,cache]
 ```
 
-For Fiji bridge backends, install optional dependencies:
+### Windows (PowerShell)
+
+```powershell
+python -m venv .venv-phage
+.venv-phage\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .[dev,cache]
+```
+
+### Optional Fiji bridge dependencies
 
 ```bash
-pip install -e .[fiji]
+python -m pip install -e .[fiji]
 ```
 
 ### Offline / Air-gapped Install
@@ -24,6 +42,25 @@ If your environment cannot reach package indexes:
 ```bash
 python -m pip install -U pip setuptools wheel
 python -m pip install -e . --no-build-isolation
+```
+
+## Run
+
+```bash
+phage-annotator
+```
+
+If the entrypoint command is not found:
+
+```bash
+python -m phage_annotator.cli
+```
+
+## Verify Install
+
+```bash
+phage-annotator --help
+python -m pytest -q --maxfail=1
 ```
 
 ## Current Capabilities
@@ -42,7 +79,7 @@ python -m pip install -e . --no-build-isolation
 - SMLM demo-run CLI (`phage-annotator-smlm-run-demo`) for deterministic smoke tests.
 - Fiji plugin toolkit CLI (`phage-annotator-fiji-plugin-tool`) for manifest onboarding.
 
-See [Current Capabilities](/home/cs/Desktop/Phage_annotation_tool/docs/CURRENT_CAPABILITIES.md) for detailed, versioned feature status.
+See [Current Capabilities](docs/CURRENT_CAPABILITIES.md) for detailed, versioned feature status.
 
 ## Production Validation Commands
 
@@ -51,16 +88,16 @@ See [Current Capabilities](/home/cs/Desktop/Phage_annotation_tool/docs/CURRENT_C
 QT_QPA_PLATFORM=offscreen .venv-phage/bin/python -m pytest -m gui --run-gui
 ```
 
-See [Production Readiness Checklist](/home/cs/Desktop/Phage_annotation_tool/docs/PRODUCTION_READINESS_CHECKLIST.md).
+See [Production Readiness Checklist](docs/PRODUCTION_READINESS_CHECKLIST.md).
 
 ## Documentation
 
-- [Current Capabilities](/home/cs/Desktop/Phage_annotation_tool/docs/CURRENT_CAPABILITIES.md)
-- [Planned Features](/home/cs/Desktop/Phage_annotation_tool/docs/PLANNED_FEATURES.md)
-- [Fiji ThunderSTORM Bridge](/home/cs/Desktop/Phage_annotation_tool/docs/FIJI_THUNDERSTORM_BRIDGE.md)
-- [SMLM Reproducibility Runbook](/home/cs/Desktop/Phage_annotation_tool/docs/SMLM_REPRODUCIBILITY_RUNBOOK.md)
-- [Panel Architecture Reference](/home/cs/Desktop/Phage_annotation_tool/docs/PANEL_ARCHITECTURE_REFERENCE.md)
-- [Reports Index](/home/cs/Desktop/Phage_annotation_tool/docs/reports/README.md)
+- [Current Capabilities](docs/CURRENT_CAPABILITIES.md)
+- [Planned Features](docs/PLANNED_FEATURES.md)
+- [Fiji ThunderSTORM Bridge](docs/FIJI_THUNDERSTORM_BRIDGE.md)
+- [SMLM Reproducibility Runbook](docs/SMLM_REPRODUCIBILITY_RUNBOOK.md)
+- [Panel Architecture Reference](docs/PANEL_ARCHITECTURE_REFERENCE.md)
+- [Reports Index](docs/reports/README.md)
 
 ## Notes
 

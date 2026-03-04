@@ -25,6 +25,9 @@ Benefits
 - Testable rendering (inject mocks)
 - Swappable data backends
 - Clear dependency flow (renderer depends on data interface, not implementation)
+
+These are interface contracts only. ``NotImplementedError`` occurrences in this
+module are intentional abstract-method placeholders, not runtime TODO stubs.
 """
 
 from __future__ import annotations

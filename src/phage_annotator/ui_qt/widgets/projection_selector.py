@@ -1,7 +1,7 @@
 """Projection selector widget for choosing projection type and axis.
 
 Allows users to select:
-- Projection type (Raw, Mean, Std, Min, Max)
+- Projection type (Source Frame, Mean, Std, Min, Max)
 - Projection axis (T for time, Z for depth)
 """
 
@@ -45,7 +45,7 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("Projection:"), 0, 0)
         self.projection_combo = QtWidgets.QComboBox()
         self.projection_combo.addItems([
-            "Raw",
+            "Source Frame",
             "Mean",
             "Std Dev",
             "Min",
@@ -87,15 +87,14 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
         self.axis_combo.blockSignals(True)
         
         # Set projection type
-        projection_name = modality.projection_type.value.replace("raw", "Raw").title()
         projection_names = {
-            "raw": "Raw",
+            "raw": "Source Frame",
             "mean": "Mean",
             "std": "Std Dev",
             "min": "Min",
             "max": "Max",
         }
-        display_name = projection_names.get(modality.projection_type.value, "Raw")
+        display_name = projection_names.get(modality.projection_type.value, "Source Frame")
         idx = self.projection_combo.findText(display_name)
         if idx >= 0:
             self.projection_combo.setCurrentIndex(idx)
@@ -112,7 +111,7 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
     def _on_projection_changed(self, text: str) -> None:
         """Handle projection type change."""
         projection_map = {
-            "Raw": "raw",
+            "Source Frame": "raw",
             "Mean": "mean",
             "Std Dev": "std",
             "Min": "min",
@@ -132,7 +131,7 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
         
         # Get current projection type
         projection_map = {
-            "Raw": "raw",
+            "Source Frame": "raw",
             "Mean": "mean",
             "Std Dev": "std",
             "Min": "min",
@@ -152,7 +151,7 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
             (projection_type, projection_axis) e.g., ("mean", "t")
         """
         projection_map = {
-            "Raw": "raw",
+            "Source Frame": "raw",
             "Mean": "mean",
             "Std Dev": "std",
             "Min": "min",
@@ -162,3 +161,7 @@ class ProjectionSelectorWidget(QtWidgets.QWidget):
         axis_text = self.axis_combo.currentText()
         projection_axis = "t" if "Time" in axis_text else "z"
         return (projection_type, projection_axis)
+
+    def current_selection(self) -> tuple[str, str]:
+        """Backwards-compatible alias used by existing status/evidence renderers."""
+        return self.get_selection()

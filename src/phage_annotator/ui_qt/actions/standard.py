@@ -18,7 +18,7 @@ from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 from phage_annotator.analysis.core import compute_roi_mean_for_path, fit_bleach_curve
 from phage_annotator.analysis.suggestion_rules import load_suggestion_rule_config
 from phage_annotator.config import SUPPORTED_SUFFIXES
-from phage_annotator.core.annotation import PointSuggestion
+from phage_annotator.core.annotation import Keypoint, PointSuggestion
 from phage_annotator.ui_qt.assist_state import assist_state_label
 from phage_annotator.session.suggestion_commands import (
     AcceptSuggestionCommand,
@@ -308,10 +308,8 @@ class ActionsMixin(
         if not self.link_zoom:
             # reset last linked to avoid forcing 0-1 ranges
             self._last_zoom_linked = None
-        if getattr(self, "sync_zoom_chk", None) is not None:
-            self.sync_zoom_chk.blockSignals(True)
-            self.sync_zoom_chk.setChecked(self.link_zoom)
-            self.sync_zoom_chk.blockSignals(False)
+        if hasattr(self, "_on_sync_mode_changed"):
+            self._on_sync_mode_changed()
         if getattr(self, "view_sync", None) is not None:
             self._apply_view_sync_selection()
         self._refresh_image()
@@ -355,7 +353,7 @@ class ActionsMixin(
                 f"- Review queue visible suggestions: {queue_count}\n"
                 "- A/R: accept/reject current suggestion (when suggestions are visible)\n"
                 "- N/P: next/previous uncertain suggestion\n"
-                "- Use right-dock tabs: Annotation Table, Review Queue, Why This Suggestion?\n"
+                "- Use right-dock panels: Annotation Table, Review Queue, Why This Suggestion.\n"
                 "- Use Layouts button near playback for quick presets."
             ),
         )
@@ -372,6 +370,30 @@ class ActionsMixin(
             if int(s.t) in (t_idx, -1) and int(s.z) in (z_idx, -1)
             and float(getattr(s, "score", getattr(s, "confidence", 0.0))) >= min_score
         ]
+
+    def _suggestions_for_current_tz(self) -> list[PointSuggestion]:
+        """Return all suggestions for active image and current T/Z, including decided history rows."""
+        image_id = int(self.primary_image.id)
+        t_idx = int(self.t_slider.value())
+        z_idx = int(self.z_slider.value())
+        pending = [
+            s
+            for s in self.suggestions.get(image_id, [])
+            if int(getattr(s, "t", -2)) in (t_idx, -1) and int(getattr(s, "z", -2)) in (z_idx, -1)
+        ]
+        history_rows = [
+            s
+            for s in list(getattr(self.controller.session_state, "suggestion_history", {}).get(image_id, []))
+            if int(getattr(s, "t", -2)) in (t_idx, -1) and int(getattr(s, "z", -2)) in (z_idx, -1)
+        ]
+        seen = {str(getattr(s, "suggestion_id", "")) for s in pending}
+        merged = list(pending)
+        for row in history_rows:
+            sid = str(getattr(row, "suggestion_id", ""))
+            if sid and sid in seen:
+                continue
+            merged.append(row)
+        return merged
 
     def _candidate_suggestion_strategies(self) -> list[str]:
         """Return available suggestion strategies for the current context."""
@@ -920,9 +942,11 @@ class ActionsMixin(
         if getattr(self, "projection_selector", None) is not None:
             try:
                 p_name, p_axis = self.projection_selector.current_selection()
+                if str(p_name).strip().lower() == "raw":
+                    p_name = "source frame"
                 projection_txt = f"{p_name} ({p_axis})"
             except Exception:
-                projection_txt = "raw"
+                projection_txt = "source frame"
         scope = "stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "slice"
         target = str(getattr(self, "annotate_target", "frame"))
         strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
@@ -988,21 +1012,49 @@ class ActionsMixin(
         combo.blockSignals(True)
         combo.clear()
         for opt in options:
-            combo.addItem(opt)
-        idx = combo.findText(current)
+            combo.addItem(self._strategy_display_label(opt), opt)
+        idx = combo.findData(current)
         combo.setCurrentIndex(idx if idx >= 0 else 0)
         combo.blockSignals(False)
 
+    def _strategy_display_label(self, strategy: str) -> str:
+        """Return user-facing label for strategy keys while preserving stable internal ids."""
+        key = str(strategy or "").strip()
+        labels = {
+            "raw": "Source Frame",
+            "current_view": "Current View",
+            "corrected": "Corrected",
+            "mean_projection": "Mean Projection",
+            "evidence_consensus": "Evidence Consensus",
+            "evidence_contradiction": "Evidence Contradiction",
+        }
+        return str(labels.get(key, key.replace("_", " ").title()))
+
+    def _strategy_from_display_label(self, strategy: str) -> str:
+        """Map display labels back to canonical strategy keys."""
+        text = str(strategy or "").strip()
+        if not text:
+            return "current_view"
+        options = self._candidate_suggestion_strategies()
+        if text in options:
+            return text
+        for option in options:
+            if self._strategy_display_label(option).lower() == text.lower():
+                return option
+        return text
+
     def _set_suggestion_strategy(self, strategy: str, *, source: str = "ui") -> None:
         """Set suggestion strategy from any UI surface."""
-        selected = str(strategy or "current_view")
+        selected = self._strategy_from_display_label(str(strategy or "current_view"))
         strategies = self._candidate_suggestion_strategies()
         if selected not in strategies:
             selected = strategies[0] if strategies else "current_view"
         self._suggestion_strategy = selected
         self.controller.session_state.suggestion_strategy = self._suggestion_strategy
         self._sync_status_strategy_selector()
-        self._set_status(f"Suggestion strategy ({source}): {self._suggestion_strategy}.")
+        self._set_status(
+            f"Suggestion strategy ({source}): {self._strategy_display_label(self._suggestion_strategy)}."
+        )
         self._append_assist_change_log(
             "strategy_changed", source=str(source), strategy=self._suggestion_strategy
         )
@@ -1733,19 +1785,76 @@ class ActionsMixin(
             panel.skip_btn.setEnabled(False)
             panel.next_uncertain_btn.setEnabled(False)
             panel.accept_green_btn.setEnabled(False)
+            if hasattr(panel, "set_suggestions"):
+                panel.set_suggestions([], 0)
             if hasattr(panel, "offset_count_spin"):
                 panel.offset_count_spin.setRange(1, 1)
                 panel.offset_count_spin.setValue(1)
             if hasattr(panel, "apply_offset_btn"):
                 panel.apply_offset_btn.setEnabled(False)
             self._refresh_suggestion_explain_panel(None)
-            self._refresh_right_dock_segment_headers()
             return
 
         self._suggestion_cursor = int(
             max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
         )
         current = ranked[self._suggestion_cursor]
+        all_rows = self._suggestions_for_current_tz()
+        state_rank = {"proposed": 0, "accepted": 1, "rejected": 2}
+        all_rows = sorted(
+            all_rows,
+            key=lambda item: (
+                state_rank.get(str(getattr(item, "status", "proposed")).lower(), 3),
+                float(
+                    dict(getattr(item, "meta", {}) or {}).get(
+                        "p_accept", getattr(item, "score", getattr(item, "confidence", 0.0))
+                    )
+                ),
+            ),
+        )
+        current_sid = str(getattr(current, "suggestion_id", ""))
+        selected_row = 0
+        table_rows: list[dict[str, str]] = []
+        for ridx, item in enumerate(all_rows):
+            meta = dict(getattr(item, "meta", {}) or {})
+            p_accept = meta.get("p_accept")
+            status_key = str(getattr(item, "status", "proposed")).lower()
+            if p_accept is None:
+                acceptance_txt = f"heuristic {float(getattr(item, 'score', 0.0)):.2f}"
+                state_txt = "heuristic"
+            else:
+                p_val = float(p_accept)
+                acceptance_txt = f"{p_val:.2f}"
+                if p_val >= 0.75:
+                    state_txt = "high"
+                elif p_val >= 0.5:
+                    state_txt = "medium"
+                else:
+                    state_txt = "low"
+            if status_key == "accepted":
+                state_txt = f"{state_txt}, accepted"
+            elif status_key == "rejected":
+                state_txt = f"{state_txt}, rejected"
+            else:
+                state_txt = f"{state_txt}, proposed"
+            sid = str(getattr(item, "suggestion_id", ""))
+            if sid and sid == current_sid:
+                selected_row = ridx
+            table_rows.append(
+                {
+                    "index": str(ridx + 1),
+                    "x": str(int(round(float(item.x)))),
+                    "y": str(int(round(float(item.y)))),
+                    "t": str(int(item.t) + 1),
+                    "z": str(int(item.z) + 1),
+                    "acceptance": acceptance_txt,
+                    "state": state_txt,
+                    "status": status_key if status_key in {"accepted", "rejected"} else "proposed",
+                    "suggestion_id": sid,
+                }
+            )
+        if hasattr(panel, "set_suggestions"):
+            panel.set_suggestions(table_rows, int(selected_row))
         p_accept = dict(getattr(current, "meta", {}) or {}).get("p_accept")
         generated_ts = dict(getattr(current, "meta", {}) or {}).get("generated_at_ts")
         panel.coords_lbl.setText(f"(x={int(round(float(current.x)))}, y={int(round(float(current.y)))})")
@@ -1810,7 +1919,176 @@ class ActionsMixin(
             f"Accept All Green ({green_count})" if green_count > 0 else "Accept All Green"
         )
         self._refresh_suggestion_explain_panel(current)
-        self._refresh_right_dock_segment_headers()
+
+    def _on_review_queue_row_selected(self, row: int) -> None:
+        """Handle row selection from suggested-points table."""
+        all_rows = self._suggestions_for_current_tz()
+        if not all_rows:
+            return
+        idx = int(max(0, min(int(row), len(all_rows) - 1)))
+        selected = all_rows[idx]
+        proposed_ranked = self._visible_suggestions_uncertain_first()
+        if proposed_ranked:
+            sid = str(getattr(selected, "suggestion_id", ""))
+            for ridx, item in enumerate(proposed_ranked):
+                if str(getattr(item, "suggestion_id", "")) == sid:
+                    self._suggestion_cursor = ridx
+                    break
+        self._focus_suggestion(selected)
+        self._refresh_review_queue_panel()
+
+    def _annotation_exists_for_suggestion(self, image_id: int, suggestion_id: str) -> bool:
+        """Return True if an annotation linked to suggestion_id already exists."""
+        sid = str(suggestion_id)
+        rows = list(getattr(self.controller.session_state, "annotations", {}).get(int(image_id), []))
+        for ann in rows:
+            meta = dict(getattr(ann, "meta", {}) or {})
+            if str(meta.get("suggestion_id", "")) == sid:
+                return True
+        return False
+
+    def _remove_annotation_for_suggestion(self, image_id: int, suggestion_id: str) -> int:
+        """Remove annotations linked to suggestion_id and return count removed."""
+        sid = str(suggestion_id)
+        rows = list(getattr(self.controller.session_state, "annotations", {}).get(int(image_id), []))
+        kept = []
+        removed = 0
+        for ann in rows:
+            meta = dict(getattr(ann, "meta", {}) or {})
+            if str(meta.get("suggestion_id", "")) == sid:
+                removed += 1
+                continue
+            kept.append(ann)
+        self.controller.session_state.annotations[int(image_id)] = kept
+        return removed
+
+    def _append_annotation_from_suggestion(self, suggestion: PointSuggestion) -> None:
+        """Create a committed annotation from suggestion if it does not already exist."""
+        if self._annotation_exists_for_suggestion(int(suggestion.image_id), str(suggestion.suggestion_id)):
+            return
+        kp = Keypoint(
+            image_id=int(suggestion.image_id),
+            image_name=str(suggestion.image_name),
+            t=int(suggestion.t),
+            z=int(suggestion.z),
+            y=float(suggestion.y),
+            x=float(suggestion.x),
+            label=str(suggestion.label),
+            source=f"suggested:{str(getattr(suggestion, 'source_model', 'model'))}",
+            meta={
+                "proposal_score": float(getattr(suggestion, "score", 0.0)),
+                "score": float(getattr(suggestion, "score", 0.0)),
+                "suggestion_id": str(suggestion.suggestion_id),
+            },
+        )
+        self.controller.session_state.annotations.setdefault(int(suggestion.image_id), []).append(kp)
+
+    def _set_selected_suggestion_decision(self, suggestion_id: str, status: str) -> None:
+        """Set selected suggestion decision any time: accepted/rejected/proposed."""
+        image_id = int(self.primary_image.id)
+        sid = str(suggestion_id or "").strip()
+        target_status = str(status or "").strip().lower()
+        if not sid or target_status not in {"accepted", "rejected", "proposed"}:
+            return
+        if target_status == "accepted" and not self._ensure_annotation_write_context_confirmed(
+            "Change suggestion decision to accepted"
+        ):
+            return
+
+        pending = self.suggestions.setdefault(image_id, [])
+        history = self.controller.session_state.suggestion_history.setdefault(image_id, [])
+        pending_idx = next((i for i, s in enumerate(pending) if str(getattr(s, "suggestion_id", "")) == sid), None)
+        hist_idx = next((i for i, s in enumerate(history) if str(getattr(s, "suggestion_id", "")) == sid), None)
+        pending_item = pending[pending_idx] if pending_idx is not None else None
+        hist_item = history[hist_idx] if hist_idx is not None else None
+        suggestion = pending_item if pending_item is not None else hist_item
+        if suggestion is None:
+            self._set_status("Suggestion not found for decision update.")
+            return
+        current_status = str(getattr(suggestion, "status", "proposed")).strip().lower()
+        if current_status == target_status:
+            self._set_status(f"Suggestion already {target_status}.")
+            return
+        if (
+            current_status == "accepted"
+            and target_status in {"rejected", "proposed"}
+            and not self._confirm_suggestion_redecision(target_status)
+        ):
+            self._set_status("Decision change cancelled.")
+            return
+
+        if pending_item is not None and target_status == "accepted":
+            cmd = AcceptSuggestionCommand(self.controller, image_id, sid)
+            if not self.controller.execute_view_command(cmd):
+                self._set_status("Could not set accepted for selected suggestion.")
+                return
+        elif pending_item is not None and target_status == "rejected":
+            cmd = RejectSuggestionCommand(self.controller, image_id, sid)
+            if not self.controller.execute_view_command(cmd):
+                self._set_status("Could not set rejected for selected suggestion.")
+                return
+        else:
+            # History/in-place recategorization
+            if target_status == "accepted":
+                if pending_idx is not None:
+                    pending.pop(pending_idx)
+                if hist_idx is None:
+                    history.append(suggestion)
+                    hist_idx = len(history) - 1
+                history[hist_idx].status = "accepted"
+                self._append_annotation_from_suggestion(history[hist_idx])
+            elif target_status == "rejected":
+                if pending_idx is not None:
+                    pending.pop(pending_idx)
+                if hist_idx is None:
+                    history.append(suggestion)
+                    hist_idx = len(history) - 1
+                history[hist_idx].status = "rejected"
+                self._remove_annotation_for_suggestion(image_id, sid)
+            elif target_status == "proposed":
+                self._remove_annotation_for_suggestion(image_id, sid)
+                if hist_idx is not None:
+                    proposal = history.pop(hist_idx)
+                else:
+                    proposal = suggestion
+                    if pending_idx is not None:
+                        pending.pop(pending_idx)
+                proposal.status = "proposed"
+                if all(str(getattr(s, "suggestion_id", "")) != sid for s in pending):
+                    pending.append(proposal)
+
+            self.controller.session_state.dirty = True
+            self.controller.annotations_changed.emit()
+            if hasattr(self.controller, "append_audit_event"):
+                self.controller.append_audit_event(
+                    "suggestion_decision_changed",
+                    image_id=int(image_id),
+                    suggestion_id=sid,
+                    status=target_status,
+                )
+
+        self.undo_act.setEnabled(self.controller.can_undo())
+        self.redo_act.setEnabled(self.controller.can_redo())
+        self._note_annotation_edit(image_id)
+        self._refresh_table()
+        self._refresh_image()
+        self._schedule_qc_validation(image_id)
+        self._refresh_assist_warmup_panel()
+        self._set_status(f"Suggestion decision set to {target_status}.")
+
+    def _confirm_suggestion_redecision(self, target_status: str) -> bool:
+        """Confirm destructive re-decision from accepted to non-accepted state."""
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg.setWindowTitle("Confirm Decision Change")
+        msg.setText("This suggestion is already accepted.")
+        msg.setInformativeText(
+            "Changing it will remove the linked committed annotation.\n"
+            f"Continue and set status to {str(target_status)}?"
+        )
+        msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.Cancel)
+        msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Cancel)
+        return msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes
 
     def _refresh_suggestion_explain_panel(self, suggestion: PointSuggestion | None) -> None:
         """Refresh 'Why was this suggested?' panel for the current suggestion."""
@@ -2992,6 +3270,14 @@ class ActionsMixin(
             return
         if self.controller.annotations_are_loaded(image_id):
             return
+        if not self.controller.annotation_entries_for_image(image_id):
+            # Attempt sidecar scan in the image folder (CSV/JSON) if index is empty.
+            img = next((m for m in getattr(self, "images", []) if int(getattr(m, "id", -1)) == int(image_id)), None)
+            if img is not None:
+                try:
+                    self.controller.build_annotation_index(pathlib.Path(str(getattr(img, "path", ""))).parent)
+                except Exception:
+                    pass
         if not self.controller.annotation_entries_for_image(image_id):
             return
         cal = self._get_calibration_state(image_id)

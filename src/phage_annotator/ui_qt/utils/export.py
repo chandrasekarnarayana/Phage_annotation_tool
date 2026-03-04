@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pathlib
+import re
+from datetime import datetime
 from typing import Tuple
 
 import numpy as np
@@ -22,6 +24,42 @@ from phage_annotator.rendering.scalebar import ScaleBarSpec
 
 class ExportMixin:
     """Mixin for saving/loading annotations and projects."""
+
+    @staticmethod
+    def _tokenize_filename_value(value: object) -> str:
+        text = str(value).strip().lower()
+        text = re.sub(r"[^a-z0-9._-]+", "-", text)
+        return text.strip("-") or "na"
+
+    def _annotation_filename_context_tokens(self) -> str:
+        image_id = int(getattr(self.primary_image, "id", -1))
+        base_meta = self.controller.build_annotation_metadata(image_id)
+        scope = self._tokenize_filename_value(
+            getattr(self, "annotation_scope", "current")
+        )
+        target = self._tokenize_filename_value(getattr(self, "annotate_target", "frame"))
+        space = self._tokenize_filename_value(
+            getattr(self.controller.session_state, "annotation_space", "stack")
+        )
+        t_val = int(getattr(self.controller.view_state, "t", 0))
+        z_val = int(getattr(self.controller.view_state, "z", 0))
+        roi = base_meta.get("roi")
+        roi_token = "none"
+        if isinstance(roi, dict):
+            roi_token = self._tokenize_filename_value(roi.get("shape", "set"))
+        crop = base_meta.get("crop")
+        crop_token = "0"
+        if isinstance(crop, (list, tuple)) and len(crop) == 4:
+            crop_token = "1"
+        return (
+            f"__scope={scope}"
+            f"__target={target}"
+            f"__space={space}"
+            f"__t={t_val}"
+            f"__z={z_val}"
+            f"__roi={roi_token}"
+            f"__crop={crop_token}"
+        )
 
     @staticmethod
     def _serialize_suggestion(suggestion) -> dict:
@@ -68,6 +106,18 @@ class ExportMixin:
         first = self.primary_image.path
         csv_path = pathlib.Path(first).with_suffix(".annotations.csv")
         json_path = pathlib.Path(first).with_suffix(".annotations.json")
+        export_meta = self.controller.build_annotation_export_metadata(
+            self.primary_image.id,
+            export_format="bundle",
+        )
+        ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+        img_name = pathlib.Path(str(getattr(self.primary_image, "name", "image"))).stem
+        core_tokens = (
+            f"__ann__img={self._tokenize_filename_value(img_name)}"
+            f"__ts={ts}{self._annotation_filename_context_tokens()}"
+        )
+        csv_path = csv_path.with_name(f"{csv_path.stem}{core_tokens}{csv_path.suffix}")
+        json_path = json_path.with_name(f"{json_path.stem}{core_tokens}{json_path.suffix}")
         if self._settings.value("encodeAnnotationMetaFilename", False, type=bool):
             meta = self.controller.build_annotation_metadata(self.primary_image.id)
             tokens = format_tokens(meta)
@@ -204,10 +254,27 @@ class ExportMixin:
         )
         if not path:
             return
+        self._last_loaded_project_path = pathlib.Path(path)
+        self._load_project_path(self._last_loaded_project_path, relink_mode="ask")
+
+    def _load_project_path(self, project_path: pathlib.Path, *, relink_mode: str = "ask") -> bool:
+        """Load project from a concrete path and refresh UI state."""
+        self._last_loaded_project_path = pathlib.Path(project_path)
         self._cancel_all_jobs()
         self._bump_job_generation()
-        if not self.controller.load_project(self, pathlib.Path(path), read_metadata):
-            return
+        if not self.controller.load_project(
+            self,
+            pathlib.Path(project_path),
+            read_metadata,
+            relink_mode=relink_mode,
+        ):
+            return False
+        self._apply_loaded_project_to_ui()
+        self._show_project_relink_summary_panel(pathlib.Path(project_path))
+        return True
+
+    def _apply_loaded_project_to_ui(self) -> None:
+        """Apply controller-loaded project state to UI widgets/docks."""
         self.stop_playback_t()
         self.fov_list.clear()
         self.primary_combo.clear()
@@ -382,6 +449,47 @@ class ExportMixin:
         self._refresh_image()
         self._mark_dirty(False)
         self._check_recovery()
+
+    def _show_project_relink_summary_panel(self, project_path: pathlib.Path) -> None:
+        """Update/open persistent Project Relink panel after load."""
+        report = dict(getattr(self.controller.session_state, "project_relink_report", {}) or {})
+        if not report:
+            return
+        relinked = list(report.get("relinked", []) or [])
+        unresolved = list(report.get("unresolved", []) or [])
+        if not relinked and not unresolved:
+            return
+        panel = getattr(self, "project_relink_panel", None)
+        if panel is not None:
+            panel.set_report(report)
+            self.open_panel("project_relink", reason="project_relink:load")
+            self._set_status(
+                f"Project relink summary: {len(relinked)} relinked, {len(unresolved)} unresolved."
+            )
+            return
+        # Safety fallback if panel is unavailable.
+        QtWidgets.QMessageBox.information(
+            self,
+            "Project Relink Summary",
+            f"Loaded {int(report.get('loaded_count', 0))} image(s).\n"
+            f"Relinked: {len(relinked)}\nUnresolved: {len(unresolved)}",
+        )
+
+    def _retry_project_relink(self, mode: str) -> None:
+        """Retry project load with explicit relink mode."""
+        path = getattr(self, "_last_loaded_project_path", None)
+        if path is None:
+            self._set_status("No loaded project to relink.")
+            return
+        mode_value = str(mode or "ask").strip().lower()
+        if mode_value not in {"ask", "auto", "manual"}:
+            mode_value = "ask"
+        ok = self._load_project_path(pathlib.Path(path), relink_mode=mode_value)
+        if ok:
+            self._set_status(
+                "Project reloaded after "
+                + ("manual relink." if mode_value == "manual" else "auto relink retry.")
+            )
 
     def _export_view_dialog(self) -> None:
         if self.primary_image.array is None:

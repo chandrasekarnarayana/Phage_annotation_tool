@@ -83,3 +83,14 @@ def test_invalidate_image_updates_modality_usage() -> None:
     cache.invalidate_image(0)
     bytes_used, _ = cache.get_modality_usage(0)
     assert bytes_used == data.nbytes
+
+
+def test_warning_callback_emits_once_at_ninety_percent_budget() -> None:
+    cache = ProjectionCache(max_mb=1)
+    warned: list[str] = []
+    cache.set_warning_callback(warned.append)
+    data = np.ones((512, 512), dtype=np.float32)  # ~1.0 MB, pushes over 90% in one put
+    cache.put(_key(0, "mean", 0), data)
+    cache.put(_key(1, "mean", 0), data)
+    assert len(warned) == 1
+    assert "Cache at" in warned[0]

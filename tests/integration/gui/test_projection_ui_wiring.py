@@ -45,7 +45,7 @@ class TestProjectionSelectorWidget:
         widget = ProjectionSelectorWidget()
         qtbot.addWidget(widget)
         items = [widget.projection_combo.itemText(i) for i in range(widget.projection_combo.count())]
-        assert items == ["Raw", "Mean", "Std Dev", "Min", "Max"]
+        assert items == ["Source Frame", "Mean", "Std Dev", "Min", "Max"]
 
     def test_axis_combo_items(self, qtbot):
         """Test axis combo has correct items."""
@@ -77,9 +77,9 @@ class TestProjectionSelectorWidget:
         assert args[0] == "mean"
 
     def test_get_selection_raw_t(self):
-        """Test get_selection returns correct values for Raw + T."""
+        """Test get_selection returns correct values for Source Frame + T."""
         widget = ProjectionSelectorWidget()
-        widget.projection_combo.setCurrentText("Raw")
+        widget.projection_combo.setCurrentText("Source Frame")
         widget.axis_combo.setCurrentText("T (Time)")
         proj_type, axis = widget.get_selection()
         assert proj_type == "raw"
@@ -115,7 +115,7 @@ class TestProjectionSelectorWidget:
         )
         widget.set_modality(modality)
         
-        assert widget.projection_combo.currentText() == "Raw"
+        assert widget.projection_combo.currentText() == "Source Frame"
         assert widget.axis_combo.currentText() == "T (Time)"
 
     def test_set_modality_mean_z(self):

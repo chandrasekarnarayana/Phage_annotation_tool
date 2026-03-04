@@ -1,6 +1,6 @@
 # Current Capabilities
 
-Last updated: March 2, 2026
+Last updated: March 4, 2026
 
 ## GUI and Workflow
 
@@ -50,6 +50,8 @@ Last updated: March 2, 2026
 
 - Core unit/integration tests (`pytest -q`) in CI.
 - GUI integration tests in headless CI lane (`-m gui --run-gui`).
+- GUI JUnit execution gates fail CI if GUI suites are fully skipped.
+- Performance/SLO gate job runs benchmark + SLO checks with threshold validation.
 - Release hygiene guards:
   - oversized tracked file guard
   - generated artifact guard

@@ -15,9 +15,14 @@ class ModalityLayersPanel(QtWidgets.QWidget):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("modality_layers_panel")
+        self.setStyleSheet(
+            "#modality_layers_panel QGroupBox { margin-top: 8px; }"
+            "#modality_layers_panel QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
         self.header_lbl = QtWidgets.QLabel("Modality / Evidence Layers")
         self.header_lbl.setStyleSheet("font-weight: 600;")
@@ -35,6 +40,12 @@ class ModalityLayersPanel(QtWidgets.QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.setStyleSheet(
+            "QTableWidget { gridline-color: #e5e7eb; }"
+            "QHeaderView::section { padding: 4px 6px; }"
+        )
         layout.addWidget(self.table, stretch=1)
 
         preset_row = QtWidgets.QHBoxLayout()
@@ -43,6 +54,8 @@ class ModalityLayersPanel(QtWidgets.QWidget):
         self.preset_name_edit.setPlaceholderText("experiment_default")
         self.save_btn = QtWidgets.QPushButton("Save", self)
         self.load_btn = QtWidgets.QPushButton("Load", self)
+        self.save_btn.setMinimumHeight(30)
+        self.load_btn.setMinimumHeight(30)
         preset_row.addWidget(self.preset_name_edit, stretch=1)
         preset_row.addWidget(self.save_btn)
         preset_row.addWidget(self.load_btn)
@@ -63,6 +76,7 @@ class ModalityLayersPanel(QtWidgets.QWidget):
         self.compare_b_edit.setPlaceholderText("preset_b")
         compare_layout.addWidget(self.compare_b_edit, 1, 1)
         self.compare_btn = QtWidgets.QPushButton("Compare A/B", self)
+        self.compare_btn.setMinimumHeight(30)
         compare_layout.addWidget(self.compare_btn, 2, 0, 1, 2)
         layout.addWidget(compare_group)
         self.compare_btn.clicked.connect(self._emit_compare)

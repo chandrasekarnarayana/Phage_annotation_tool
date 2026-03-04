@@ -63,7 +63,7 @@ class EventsMixin(KeyboardEventsMixin):
         self.lut_invert_chk.stateChanged.connect(self._on_lut_invert)
         self.gamma_slider.valueChanged.connect(self._on_gamma_change)
         self.log_chk.stateChanged.connect(self._on_log_toggle)
-        # Wire up projection selector widget (Phase γ)
+        # Wire up projection selector widget
         if getattr(self, "projection_selector", None) is not None:
             self.projection_selector.projection_changed.connect(
                 self._on_projection_changed
@@ -73,23 +73,18 @@ class EventsMixin(KeyboardEventsMixin):
             self.projection_axis_combo.currentTextChanged.connect(
                 self._on_projection_axis_change
             )
-        if getattr(self, "sync_list", None) is not None:
-            self.sync_list.itemSelectionChanged.connect(self._on_sync_selection_changed)
-        if getattr(self, "sync_playback_chk", None) is not None:
-            self.sync_playback_chk.stateChanged.connect(self._on_sync_mode_changed)
-        if getattr(self, "sync_zoom_chk", None) is not None:
-            self.sync_zoom_chk.stateChanged.connect(self._on_sync_mode_changed)
-        if getattr(self, "sync_contrast_chk", None) is not None:
-            self.sync_contrast_chk.stateChanged.connect(self._on_sync_mode_changed)
-        if getattr(self, "sync_scope_combo", None) is not None:
-            self.sync_scope_combo.currentTextChanged.connect(self._on_sync_scope_changed)
-        if getattr(self, "sync_select_all_btn", None) is not None:
-            self.sync_select_all_btn.clicked.connect(self._select_all_sync_views)
-        if getattr(self, "sync_clear_btn", None) is not None:
-            self.sync_clear_btn.clicked.connect(self._clear_sync_view_selection)
+        if getattr(self, "sync_key_combo", None) is not None:
+            self.sync_key_combo.currentIndexChanged.connect(self._on_sync_key_changed)
+        if getattr(self, "sync_target_mode_combo", None) is not None:
+            self.sync_target_mode_combo.currentIndexChanged.connect(self._on_sync_mode_changed)
+        if getattr(self, "sync_follow_active_chk", None) is not None:
+            self.sync_follow_active_chk.toggled.connect(self._on_sync_mode_changed)
         self.label_buttons.buttonClicked.connect(self._on_label_change)
         self.scope_group.buttonClicked.connect(self._on_scope_change)
-        self.target_group.buttonClicked.connect(self._on_target_change)
+        if getattr(self, "annotate_target_combo", None) is not None:
+            self.annotate_target_combo.currentIndexChanged.connect(self._on_target_change)
+        elif getattr(self, "target_group", None) is not None:
+            self.target_group.buttonClicked.connect(self._on_target_change)
         self.marker_size_spin.valueChanged.connect(self._on_marker_size_change)
         self.click_radius_spin.valueChanged.connect(self._on_click_radius_change)
         self.show_profile_chk.stateChanged.connect(self._on_profile_chk_changed)
@@ -148,11 +143,17 @@ class EventsMixin(KeyboardEventsMixin):
             widget = self.roi_manager_widget
             widget.add_btn.clicked.connect(self._roi_mgr_add)
             widget.del_btn.clicked.connect(self._roi_mgr_delete)
+            widget.deselect_btn.clicked.connect(self._roi_mgr_deselect)
+            widget.update_btn.clicked.connect(self._roi_mgr_update)
             widget.rename_btn.clicked.connect(self._roi_mgr_rename)
             widget.dup_btn.clicked.connect(self._roi_mgr_duplicate)
             widget.save_btn.clicked.connect(self._roi_mgr_save)
             widget.load_btn.clicked.connect(self._roi_mgr_load)
+            widget.show_all_btn.toggled.connect(self._roi_mgr_show_all_toggled)
+            widget.show_current_slice_only_btn.toggled.connect(self._roi_mgr_show_current_slice_only_toggled)
             widget.measure_btn.clicked.connect(self._roi_mgr_measure)
+            widget.manage_tags_btn.clicked.connect(self._roi_mgr_manage_tags)
+            widget.filter_by_tag_btn.clicked.connect(self._roi_mgr_filter_by_tag)
             widget.table.itemSelectionChanged.connect(self._roi_mgr_selection_changed)
             widget.table.itemChanged.connect(self._roi_mgr_item_changed)
         if self.results_widget is not None:

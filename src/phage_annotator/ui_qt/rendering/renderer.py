@@ -692,19 +692,14 @@ class RenderingMixin:
     def _build_panel_annotations(
         self,
     ) -> Dict[str, List[Tuple[float, float, str, bool]]]:
-        # Phase ι: Filter annotations by active modality
-        active_modality_idx = getattr(self, "_active_modality_idx", None)
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        show_all_annotations = bool(
+            getattr(getattr(self, "show_ann_master_chk", None), "isChecked", lambda: True)()
+        )
+        points_visible_by_panel = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
         
         points = []
         for kp in self._current_keypoints():
-            # Filter: show annotation if:
-            # - No modality system active (backward compat)
-            # - Annotation has no modality_idx (visible on all modalities)
-            # - Annotation matches active modality
-            if active_modality_idx is not None and kp.modality_idx is not None:
-                if kp.modality_idx != active_modality_idx:
-                    continue  # Skip annotations from other modalities
-            
             color = self._label_color(kp.label, faded=kp.image_id != self.primary_image.id)
             selected_ids = getattr(self, "_selected_annotation_ids", set()) or set()
             selected = str(kp.annotation_id) in selected_ids
@@ -726,18 +721,12 @@ class RenderingMixin:
                 color, _state = self._suggestion_overlay_style(suggestion)
                 points.append((float(suggestion.x), float(suggestion.y), color, False))
 
-        def _filter(panel: str) -> List[Tuple[float, float, str, bool]]:
-            if panel == "frame":
-                return points if self.show_ann_frame else []
-            if panel == "mean":
-                return points if self.show_ann_mean else []
-            if panel == "support":
-                return points
-            return []
-
         panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]] = {}
-        for panel in ["frame", "mean", "support"]:
-            pts = _filter(panel)
+        for panel in panel_map.keys():
+            if not show_all_annotations:
+                pts = []
+            else:
+                pts = points if bool(points_visible_by_panel.get(str(panel), True)) else []
             if not pts:
                 panel_annotations[panel] = []
                 continue
@@ -784,7 +773,24 @@ class RenderingMixin:
         overlays: Dict[str, List[Tuple[str, object, str]]] = {
             panel: [] for panel in ["frame", "mean", "support"]
         }
-        for roi in self.roi_manager.list_rois(self.primary_image.id):
+        
+        # Phase 2: Check if position filtering is enabled
+        show_current_slice_only = getattr(self, '_roi_show_current_slice_only', False)
+        
+        if show_current_slice_only:
+            # Get current slice indices from view_state
+            current_z = getattr(self.controller.view_state, 'z', 0)
+            current_t = getattr(self.controller.view_state, 't', 0)
+            current_c = getattr(self.controller.view_state, 'c', 0)
+            # Use filter_rois_by_position for position-aware filtering
+            rois = self.roi_manager.filter_rois_by_position(
+                self.primary_image.id, z=current_z, t=current_t, c=current_c
+            )
+        else:
+            # Use all ROIs (default behavior)
+            rois = self.roi_manager.list_rois(self.primary_image.id)
+        
+        for roi in rois:
             if not roi.visible:
                 continue
             for panel in overlays:
@@ -935,12 +941,14 @@ class RenderingMixin:
         target = str(getattr(self, "annotate_target", "frame"))
         scope = str(getattr(self, "annotation_scope", "current"))
 
-        if target == "mean":
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        spec = panel_map.get(target)
+        if spec is not None:
+            target_txt = str(getattr(spec, "display_name", target))
+        elif target == "mean":
             target_txt = f"Mean Projection (Z=1-{max(1, z_total)})"
-        elif target == "support":
-            target_txt = "Modality 2"
         else:
-            target_txt = f"Frame T={int(t_idx) + 1} Z={int(z_idx) + 1}"
+            target_txt = f"{str(target).title()} T={int(t_idx) + 1} Z={int(z_idx) + 1}"
 
         if scope == "all":
             scope_txt = "Stack Annotation (All Z)"
@@ -970,9 +978,11 @@ class RenderingMixin:
         if getattr(self, "projection_selector", None) is not None:
             try:
                 p_name, p_axis = self.projection_selector.current_selection()
+                if str(p_name).strip().lower() == "raw":
+                    p_name = "source frame"
                 projection_txt = f"{p_name} ({p_axis})"
             except Exception:
-                projection_txt = "raw"
+                projection_txt = "source frame"
         return (
             f"{base_text} | Modality: {modality_txt} ({projection_txt}) | "
             f"Strategy: {strategy} | Label: {active_label}"

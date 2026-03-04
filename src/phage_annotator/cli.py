@@ -20,16 +20,14 @@ from phage_annotator.demo import generate_dummy_image
     type=click.Path(path_type=pathlib.Path, exists=True, readable=True),
     multiple=True,
     required=False,
-    help="One or more TIFF/OME-TIFF image paths.",
+    help="One or more TIFF/OME-TIFF image paths. If not provided, launches with a demo image.",
 )
-@click.option(
-    "--demo",
-    is_flag=True,
-    default=False,
-    help="Launch a short demo with a generated dummy TIFF instead of real inputs.",
-)
-def main(inputs: List[pathlib.Path], demo: bool) -> None:
-    """Launch the Matplotlib+Qt keypoint annotation GUI for microscopy stacks."""
+def main(inputs: List[pathlib.Path]) -> None:
+    """Launch the Matplotlib+Qt keypoint annotation GUI for microscopy stacks.
+    
+    If no input files are specified, a demo image is automatically generated
+    for exploration and testing.
+    """
     # Initialize application context (services) before GUI
     from phage_annotator.framework import ApplicationContext
     
@@ -39,13 +37,12 @@ def main(inputs: List[pathlib.Path], demo: bool) -> None:
     # Import GUI lazily to avoid initializing Qt during module import or non-GUI tests.
     from phage_annotator.ui_qt.main_window import run_gui
 
-    if demo:
+    if not inputs:
+        # Auto-generate a demo image if no inputs provided
         dummy = generate_dummy_image(pathlib.Path.cwd() / "phage_annotator_demo.tif", mode="t")
         run_gui([dummy])
         return
 
-    if not inputs:
-        raise click.UsageError("Please provide at least one TIFF/OME-TIFF file (or use --demo).")
     run_gui(list(inputs))
 
 

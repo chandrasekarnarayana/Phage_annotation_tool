@@ -457,8 +457,8 @@ class Renderer:
                 continue
             xs = [p[0] for p in points]
             ys = [p[1] for p in points]
-            colors = [p[2] for p in points]
             selected = [p[3] for p in points]
+            colors = ["#ff2d95" if sel else p[2] for p, sel in zip(points, selected)]
             sizes = [ctx.marker_size * (1.3 if sel else 1.0) for sel in selected]
             ax.scatter(xs, ys, c=colors, s=sizes, marker="o", edgecolors="k")
         for panel, labels in ctx.suggestion_staleness_labels.items():

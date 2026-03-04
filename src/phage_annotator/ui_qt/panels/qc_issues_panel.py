@@ -24,6 +24,7 @@ class QCIssuesPanel(QtWidgets.QWidget):
     # Signals
     jump_to_location = QtCore.Signal(float, float, int, int, int)  # x, y, z, t, image_id
     issue_clicked = QtCore.Signal(str)  # issue_id
+    issue_status_changed = QtCore.Signal(str, str)  # issue_id, status
     validation_requested = QtCore.Signal()  # Request re-validation
     export_requested = QtCore.Signal(str)  # Export format: "csv", "json", "html"
     
@@ -45,6 +46,9 @@ class QCIssuesPanel(QtWidgets.QWidget):
         
         self.qc_state = qc_state or QCState()
         self.issue_widgets: List[QtWidgets.QWidget] = []
+        self.show_resolved = False
+        self.show_ignored = False
+        self._monitor = None
         
         self._setup_ui()
         self._update_issue_list()
@@ -60,6 +64,12 @@ class QCIssuesPanel(QtWidgets.QWidget):
         self.summary_label.setStyleSheet("font-weight: bold; padding: 5px;")
         summary_layout.addWidget(self.summary_label)
         summary_layout.addStretch()
+        
+        # Monitor status widget (initially hidden)
+        from phage_annotator.ui_qt.workers.qc_background_monitor import QCMonitorStatusWidget
+        self.monitor_status = QCMonitorStatusWidget()
+        self.monitor_status.hide()
+        summary_layout.addWidget(self.monitor_status)
         
         # Validate button
         self.validate_btn = QtWidgets.QPushButton("Validate")
@@ -90,6 +100,18 @@ class QCIssuesPanel(QtWidgets.QWidget):
         self.info_checkbox.setStyleSheet("QCheckBox { color: #0277bd; }")
         self.info_checkbox.stateChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.info_checkbox)
+
+        self.show_resolved_checkbox = QtWidgets.QCheckBox("Show Resolved")
+        self.show_resolved_checkbox.setChecked(self.show_resolved)
+        self.show_resolved_checkbox.setToolTip("Include issues marked as resolved")
+        self.show_resolved_checkbox.stateChanged.connect(self._on_filter_changed)
+        filter_layout.addWidget(self.show_resolved_checkbox)
+
+        self.show_ignored_checkbox = QtWidgets.QCheckBox("Show Ignored")
+        self.show_ignored_checkbox.setChecked(self.show_ignored)
+        self.show_ignored_checkbox.setToolTip("Include issues marked as ignored")
+        self.show_ignored_checkbox.stateChanged.connect(self._on_filter_changed)
+        filter_layout.addWidget(self.show_ignored_checkbox)
         
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
@@ -167,6 +189,8 @@ class QCIssuesPanel(QtWidgets.QWidget):
         self.qc_state.set_filter("error", self.error_checkbox.isChecked())
         self.qc_state.set_filter("warning", self.warning_checkbox.isChecked())
         self.qc_state.set_filter("info", self.info_checkbox.isChecked())
+        self.show_resolved = bool(self.show_resolved_checkbox.isChecked())
+        self.show_ignored = bool(self.show_ignored_checkbox.isChecked())
         self._update_issue_list()
     
     def _update_issue_list(self) -> None:
@@ -180,17 +204,39 @@ class QCIssuesPanel(QtWidgets.QWidget):
         self.issue_widgets.clear()
         
         # Get visible issues
-        visible_issues = self.qc_state.get_visible_issues()
+        visible_issues = self.qc_state.get_visible_issues(
+            respect_filters=True,
+            include_resolved=bool(self.show_resolved),
+            include_ignored=bool(self.show_ignored),
+            order_by_severity=True,
+        )
         
         # Update summary
         total_issues = len(self.qc_state.issues)
         visible_count = len(visible_issues)
+        resolved_count = len(
+            [
+                issue
+                for issue in self.qc_state.issues
+                if self.qc_state.get_issue_status(str(issue.issue_id)) == self.qc_state.STATUS_RESOLVED
+            ]
+        )
+        ignored_count = len(
+            [
+                issue
+                for issue in self.qc_state.issues
+                if self.qc_state.get_issue_status(str(issue.issue_id)) == self.qc_state.STATUS_IGNORED
+            ]
+        )
         
         if total_issues == 0:
             self.summary_label.setText("No issues detected")
             self.summary_label.setStyleSheet("font-weight: bold; padding: 5px; color: #4caf50;")
         else:
-            self.summary_label.setText(f"{visible_count} of {total_issues} issues")
+            self.summary_label.setText(
+                f"Open: {visible_count} / Total: {total_issues} "
+                f"(Resolved: {resolved_count}, Ignored: {ignored_count})"
+            )
             self.summary_label.setStyleSheet("font-weight: bold; padding: 5px;")
         
         # Create issue widgets
@@ -283,6 +329,29 @@ class QCIssuesPanel(QtWidgets.QWidget):
             details_layout.addWidget(affected_label)
         
         layout.addLayout(details_layout)
+
+        actions_layout = QtWidgets.QHBoxLayout()
+        actions_layout.addStretch()
+
+        resolve_btn = QtWidgets.QPushButton("Resolve")
+        resolve_btn.setToolTip("Mark this issue as resolved")
+        resolve_btn.clicked.connect(
+            lambda _checked=False, issue_id=str(issue.issue_id): self._set_issue_status(
+                issue_id, self.qc_state.STATUS_RESOLVED
+            )
+        )
+        actions_layout.addWidget(resolve_btn)
+
+        ignore_btn = QtWidgets.QPushButton("Ignore")
+        ignore_btn.setToolTip("Ignore this issue for now")
+        ignore_btn.clicked.connect(
+            lambda _checked=False, issue_id=str(issue.issue_id): self._set_issue_status(
+                issue_id, self.qc_state.STATUS_IGNORED
+            )
+        )
+        actions_layout.addWidget(ignore_btn)
+
+        layout.addLayout(actions_layout)
         
         # Make entire widget clickable
         def click_handler(event):
@@ -299,6 +368,13 @@ class QCIssuesPanel(QtWidgets.QWidget):
         widget.mousePressEvent = click_handler
         
         return widget
+
+    def _set_issue_status(self, issue_id: str, status: str) -> None:
+        """Update issue status and refresh list."""
+        if not self.qc_state.set_issue_status(str(issue_id), str(status)):
+            return
+        self.issue_status_changed.emit(str(issue_id), str(status))
+        self._update_issue_list()
     
     def refresh(self) -> None:
         """Refresh issue display (call after QC state changes)."""
@@ -323,3 +399,36 @@ class QCIssuesPanel(QtWidgets.QWidget):
             Visible issue count.
         """
         return len(self.qc_state.get_visible_issues())
+    def set_monitor(self, monitor) -> None:
+        """Set the background QC monitor.
+        
+        Parameters
+        ----------
+        monitor : QCBackgroundMonitor
+            Background monitor instance.
+        """
+        self._monitor = monitor
+        if monitor is not None:
+            monitor.monitoring_started.connect(self._on_monitor_started)
+            monitor.monitoring_stopped.connect(self._on_monitor_stopped)
+    
+    def set_monitor_status(self, message: str) -> None:
+        """Update monitor status display.
+        
+        Parameters
+        ----------
+        message : str
+            Status message to display.
+        """
+        if self.monitor_status is not None:
+            self.monitor_status.set_status(message)
+    
+    def _on_monitor_started(self) -> None:
+        """Called when background monitor starts."""
+        if self.monitor_status is not None:
+            self.monitor_status.set_monitoring_active(True)
+    
+    def _on_monitor_stopped(self) -> None:
+        """Called when background monitor stops."""
+        if self.monitor_status is not None:
+            self.monitor_status.set_monitoring_active(False)

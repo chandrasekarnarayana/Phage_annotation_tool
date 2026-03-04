@@ -24,9 +24,27 @@ class QCActionsMixin:
             self._qc_validation_timer.setSingleShot(True)
             self._qc_validation_timer.setInterval(250)
             self._qc_validation_timer.timeout.connect(self._execute_scheduled_qc_validation)
+        if getattr(self, "_qc_background_monitor", None) is None:
+            from phage_annotator.ui_qt.workers.qc_background_monitor import QCBackgroundMonitor
+            
+            self._qc_background_monitor = QCBackgroundMonitor()
+            self._qc_background_monitor.set_validation_callback(
+                lambda: self._trigger_qc_validation()
+            )
+            self._qc_background_monitor.status_changed.connect(self._on_qc_monitor_status_changed)
+            self._qc_background_monitor.set_enabled(self.qc_state.auto_monitor_enabled)
+            self._qc_background_monitor.start()
         if getattr(self, "qc_issues_panel", None) is not None:
             if self.qc_issues_panel.qc_state is not self.qc_state:
                 self.qc_issues_panel.set_qc_state(self.qc_state)
+            if getattr(self, "_qc_background_monitor", None) is not None:
+                self.qc_issues_panel.set_monitor(self._qc_background_monitor)
+        
+        # Wire monitor to annotation changes
+        if getattr(self, "controller", None) is not None:
+            if not getattr(self, "_qc_annotations_changed_wired", False):
+                self.controller.annotations_changed.connect(self._on_qc_annotations_changed)
+                self._qc_annotations_changed_wired = True
 
     def _schedule_qc_validation(self, image_id: Optional[int] = None) -> None:
         """Schedule debounced QC validation."""
@@ -68,6 +86,7 @@ class QCActionsMixin:
             self.qc_state.issues = [
                 issue for issue in self.qc_state.issues if int(issue.image_id) != int(image_id)
             ]
+            self.qc_state.prune_issue_statuses()
 
         allowed_labels = list(self.labels) if self.labels else None
 
@@ -90,6 +109,7 @@ class QCActionsMixin:
                 annotations,
                 image_id=target_id,
                 image_shape=image_shape,
+                image_array=array,
                 allowed_labels=allowed_labels,
             )
             for issue in issues:
@@ -103,11 +123,21 @@ class QCActionsMixin:
             self.qc_issues_panel.set_qc_state(self.qc_state)
             self.qc_issues_panel.refresh()
         issue_count = int(len(self.qc_state.issues))
-        self._update_qc_button_highlight(issue_count)
+        open_count = int(
+            len(
+                self.qc_state.get_visible_issues(
+                    respect_filters=False,
+                    ignore_filters=True,
+                    include_resolved=False,
+                    include_ignored=False,
+                )
+            )
+        )
+        self._update_qc_button_highlight(open_count)
         dock_qc = getattr(self, "dock_qc_issues", None)
         if dock_qc is not None:
-            dock_qc.setWindowTitle(f"QC Issues ({issue_count})" if issue_count > 0 else "QC Issues")
-            if issue_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", True, type=bool)):
+            dock_qc.setWindowTitle(f"QC Issues ({open_count})" if open_count > 0 else "QC Issues")
+            if open_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", True, type=bool)):
                 self.set_panel_visible("qc_issues", True, source="qc_validation")
                 dock_qc.raise_()
         issue_counts_by_type: dict[str, int] = {}
@@ -123,6 +153,44 @@ class QCActionsMixin:
 
         self._set_status(f"QC validation complete: {len(self.qc_state.issues)} issue(s).")
         self._update_status()
+
+    def _on_qc_issue_status_changed(self, issue_id: str, status: str) -> None:
+        """Handle resolve/ignore actions from QC panel."""
+        self._ensure_qc_runtime()
+        open_count = int(
+            len(
+                self.qc_state.get_visible_issues(
+                    respect_filters=False,
+                    ignore_filters=True,
+                    include_resolved=False,
+                    include_ignored=False,
+                )
+            )
+        )
+        self._update_qc_button_highlight(open_count)
+        dock_qc = getattr(self, "dock_qc_issues", None)
+        if dock_qc is not None:
+            dock_qc.setWindowTitle(f"QC Issues ({open_count})" if open_count > 0 else "QC Issues")
+        self._set_status(f"QC issue {issue_id} marked {status}.")
+        self._update_status()
+
+    def _on_qc_monitor_status_changed(self, message: str) -> None:
+        """Handle status updates from background monitor."""
+        qc_panel = getattr(self, "qc_issues_panel", None)
+        if qc_panel is not None:
+            qc_panel.set_monitor_status(message)
+
+    def _on_qc_annotations_changed(self) -> None:
+        """Handle annotation changes: trigger monitor."""
+        self._ensure_qc_runtime()
+        if getattr(self, "_qc_background_monitor", None) is not None:
+            self._qc_background_monitor.on_annotation_changed()
+
+    def _on_qc_image_changed(self) -> None:
+        """Handle image change: trigger QC monitor to scan new image."""
+        self._ensure_qc_runtime()
+        if getattr(self, "_qc_background_monitor", None) is not None:
+            self._qc_background_monitor.on_image_loaded()
 
     def _jump_to_next_qc_issue(self) -> None:
         """Jump to the next visible QC issue in round-robin order."""
@@ -149,8 +217,13 @@ class QCActionsMixin:
 
     def _jump_to_qc_issue(self, x: float, y: float, z: int, t: int, image_id: int) -> None:
         """Navigate to an issue location from the QC issues panel."""
-        if image_id >= 0 and image_id < len(self.images) and image_id != self.current_image_idx:
-            self._set_fov(int(image_id))
+        if image_id != self.current_image_idx:
+            target_row = next(
+                (idx for idx, img in enumerate(self.images) if int(getattr(img, "id", -1)) == int(image_id)),
+                None,
+            )
+            if target_row is not None:
+                self._set_fov(int(target_row))
 
         if hasattr(self, "t_slider"):
             clamped_t = max(self.t_slider.minimum(), min(int(t), self.t_slider.maximum()))

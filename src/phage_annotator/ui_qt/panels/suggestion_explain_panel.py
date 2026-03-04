@@ -10,9 +10,14 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("suggestion_explain_panel")
+        self.setStyleSheet(
+            "#suggestion_explain_panel QGroupBox { margin-top: 8px; }"
+            "#suggestion_explain_panel QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(3)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
         self.header_lbl = QtWidgets.QLabel("Why Was This Suggested?")
         self.header_lbl.setStyleSheet("font-weight: 600;")
@@ -30,6 +35,11 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
         )
         self.nn_lbl = QtWidgets.QLabel("nearest accepted distance: n/a")
         self.stale_lbl = QtWidgets.QLabel("staleness: n/a")
+        self.coords_lbl.setWordWrap(True)
+        self.score_lbl.setWordWrap(True)
+        self.calib_lbl.setWordWrap(True)
+        self.nn_lbl.setWordWrap(True)
+        self.stale_lbl.setWordWrap(True)
         layout.addWidget(self.coords_lbl)
         layout.addWidget(self.score_lbl)
         layout.addWidget(self.calib_lbl)
@@ -38,16 +48,17 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
 
         comp_group = QtWidgets.QGroupBox("Score Components")
         comp_layout = QtWidgets.QVBoxLayout(comp_group)
-        comp_layout.setContentsMargins(4, 4, 4, 4)
+        comp_layout.setContentsMargins(8, 8, 8, 8)
         self.components_txt = QtWidgets.QPlainTextEdit()
         self.components_txt.setReadOnly(True)
         self.components_txt.setMaximumBlockCount(200)
+        self.components_txt.setMinimumHeight(110)
         comp_layout.addWidget(self.components_txt)
         layout.addWidget(comp_group)
 
         patch_group = QtWidgets.QGroupBox("Local Patch Preview")
         patch_layout = QtWidgets.QVBoxLayout(patch_group)
-        patch_layout.setContentsMargins(4, 4, 4, 4)
+        patch_layout.setContentsMargins(8, 8, 8, 8)
         self.patch_lbl = QtWidgets.QLabel("No suggestion selected.")
         self.patch_lbl.setMinimumHeight(140)
         self.patch_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)

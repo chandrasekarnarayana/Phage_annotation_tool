@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -68,3 +69,43 @@ def test_parse_annotations_mixed_legacy_and_thunderstorm(tmp_path: Path) -> None
     assert all(p.image_name == "img_a.tif" for p in points)
     assert len(imports) == 2
 
+
+def test_parse_annotations_force_image_id_and_image_key_normalization(tmp_path: Path) -> None:
+    """force_image_id should remap all points and normalize empty image_key."""
+    h = _Harness()
+    payload = {
+        "unknown_image.tif": [
+            {"t": 1, "z": 2, "x": 11.0, "y": 22.0, "label": "phage", "image_key": ""}
+        ]
+    }
+    json_path = tmp_path / "points.json"
+    json_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    points, imports = h._parse_annotations_from_paths(
+        [json_path],
+        image_id=0,
+        pixel_size_nm=None,
+        force_image_id=1,
+    )
+    assert len(points) == 1
+    kp = points[0]
+    assert kp.image_id == 1
+    assert kp.image_name == "img_b.tif"
+    assert kp.image_key == "img_b.tif"
+    assert kp.meta.get("import_file", "").endswith("points.json")
+    assert len(imports) == 1
+    assert imports[0][0] == 1
+    assert imports[0][1]["format"] == "json"
+
+
+def test_latest_annotation_meta_returns_last_non_empty_meta() -> None:
+    """latest_annotation_meta should return latest import metadata dict."""
+    h = _Harness()
+    h._record_annotation_imports(
+        [
+            (0, {"format": "legacy", "meta": {"pixel_size_nm": 100.0}}),
+            (0, {"format": "thunderstorm", "meta": {"channel": "A"}}),
+        ]
+    )
+    latest = h.latest_annotation_meta(0)
+    assert latest == {"channel": "A"}

@@ -345,7 +345,7 @@ class SessionDataSource(ComprehensiveDataSource):
         downsample: int = 1,
     ) -> List[Tuple[str, object, str]]:
         """Get ROI overlays in display coordinates."""
-        roi = self._session.view_state.roi
+        roi = self._session.view_state.roi_spec
         if roi is None or roi.shape == "none":
             return []
         
