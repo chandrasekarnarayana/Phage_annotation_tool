@@ -43,7 +43,7 @@ def compute_projections(
     arr : np.ndarray
         Image array in (T, Z, Y, X) order.
     kinds : Iterable[str]
-        Projection kinds: "mean", "std", "min", "max".
+        Projection kinds: "mean", "median", "std", "min", "max".
     axis : str
         Projection axis: "tz" (default), "t", or "z".
 
@@ -66,6 +66,8 @@ def compute_projections(
         kind_l = kind.lower()
         if kind_l == "mean":
             proj = arr.mean(axis=reduce_axes)
+        elif kind_l == "median":
+            proj = np.median(arr, axis=reduce_axes)
         elif kind_l == "std":
             proj = arr.std(axis=reduce_axes)
         elif kind_l == "min":

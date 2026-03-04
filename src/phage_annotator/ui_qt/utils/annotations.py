@@ -12,6 +12,8 @@ class AnnotationsMixin:
     """Mixin for annotation add/remove and profile line edits."""
 
     def _on_click(self, event) -> None:
+        # Annotation clicks follow the selected Annotation target panel directly,
+        # independent of matplotlib toolbar mode.
         if event.inaxes == self.ax_frame and event.xdata is not None and event.ydata is not None:
             fx, fy = self._to_full_coords(self.ax_frame, event.xdata, event.ydata)
             self._set_cursor_xy(fx, fy, refresh=False)

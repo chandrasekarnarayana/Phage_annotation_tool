@@ -88,13 +88,10 @@ class KeyboardHandlersMixin:
         Plays or pauses the current playback session.
         """
         try:
-            if hasattr(self, "play_timer") and self.play_timer:
-                if self.play_timer.isActive():
-                    self.play_timer.stop()
-                    print("Playback paused")
-                else:
-                    self.play_timer.start()
-                    print("Playback started")
+            # Route through the main playback control path.
+            # Avoid starting legacy raw timers directly (can spin hot if misconfigured).
+            if hasattr(self, "_toggle_play"):
+                self._toggle_play("t")
         except Exception as e:
             print(f"Error toggling playback: {e}")
 

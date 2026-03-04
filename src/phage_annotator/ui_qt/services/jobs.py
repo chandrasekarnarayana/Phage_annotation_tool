@@ -248,10 +248,14 @@ def _call_job(
 ) -> Any:
     sig = inspect.signature(fn)
     params = sig.parameters
-    if "progress" in params and "cancel_token" in params:
-        return fn(progress=progress, cancel_token=cancel_token)
+    # Check for both 'cancel_token' and 'cancel' parameter names
+    has_cancel = "cancel_token" in params or "cancel" in params
+    cancel_param_name = "cancel_token" if "cancel_token" in params else "cancel"
+    
+    if "progress" in params and has_cancel:
+        return fn(progress=progress, **{cancel_param_name: cancel_token})
     if "progress" in params:
         return fn(progress=progress)
-    if "cancel_token" in params:
-        return fn(cancel_token=cancel_token)
+    if has_cancel:
+        return fn(**{cancel_param_name: cancel_token})
     return fn()

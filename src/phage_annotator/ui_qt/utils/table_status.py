@@ -125,25 +125,27 @@ class TableStatusMixin:
         has_results = results_rows > 0
         has_logs = log_alerts > 0
         if hasattr(self, "set_panel_visible"):
-            self.set_panel_visible("qc_issues", has_qc, source="bottom_task_auto")
             self.set_panel_visible("results", has_results, source="bottom_task_auto")
-            self.set_panel_visible("logs", has_logs, source="bottom_task_auto")
-        # Keep Results/QC/Diagnostics tabbed together when active.
+            # Keep QC/Diagnostics opt-in to avoid surprise panel popups.
+            if has_qc and getattr(self, "dock_qc_issues", None) is not None and self.dock_qc_issues.isVisible():
+                self.set_panel_visible("qc_issues", True, source="bottom_task_auto")
+            if has_logs and getattr(self, "dock_logs", None) is not None and self.dock_logs.isVisible():
+                self.set_panel_visible("logs", True, source="bottom_task_auto")
+        # Keep task-specific auto-layout restricted to bottom task docks only.
+        # QC/Diagnostics are managed as right-sidebar panels and should not be
+        # re-tabified from status updates.
         dock_results = getattr(self, "dock_results", None)
         dock_qc = getattr(self, "dock_qc_issues", None)
         dock_logs = getattr(self, "dock_logs", None)
-        if dock_results is not None and dock_qc is not None:
-            try:
-                self.tabifyDockWidget(dock_results, dock_qc)
-            except Exception:
-                pass
-        if dock_qc is not None and dock_logs is not None:
-            try:
-                self.tabifyDockWidget(dock_qc, dock_logs)
-            except Exception:
-                pass
         # Collapse bottom to slim footprint when empty; expand modestly when active.
-        bottom_docks = [d for d in (dock_results, dock_qc, dock_logs) if d is not None and d.isVisible()]
+        # Only resize docks that are actually in the bottom area.
+        bottom_docks = [
+            d
+            for d in (dock_results, dock_qc, dock_logs)
+            if d is not None
+            and d.isVisible()
+            and self.dockWidgetArea(d) == QtCore.Qt.DockWidgetArea.BottomDockWidgetArea
+        ]
         if bottom_docks:
             try:
                 target = max(64, int(max(1, self.height()) * 0.12))
@@ -351,8 +353,14 @@ class TableStatusMixin:
             except Exception:
                 pass
 
-        pts_view, area_um2 = self._view_density_stats()
-        density = (pts_view / area_um2) if area_um2 > 0 else 0.0
+        # Calculate view density (visible area inside ROI)
+        pts_view, view_area_um2 = self._view_density_stats()
+        view_density = (pts_view / view_area_um2) if view_area_um2 > 0 else 0.0
+        
+        # Calculate total ROI statistics
+        pts_roi_total, roi_total_area_um2 = self._roi_total_stats()
+        roi_total_density = (pts_roi_total / roi_total_area_um2) if roi_total_area_um2 > 0 else 0.0
+        
         cache_mb, cache_items = self.proj_cache.stats()
         
         # Collect diagnostic flags
@@ -396,7 +404,10 @@ class TableStatusMixin:
                 autosave_txt = "Autosave: on"
         scope_state = "Stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "Slice"
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        target_key = str(getattr(self, "annotate_target", "frame"))
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        target_key = str(getattr(self, "annotate_target", default_target))
         target_state = str(getattr(panel_map.get(target_key), "display_name", target_key.title()))
         qc_warnings = 0
         qc_errors = 0
@@ -422,28 +433,57 @@ class TableStatusMixin:
             self.status_tz_lbl.setText(frame_txt)
         if getattr(self, "status_points_lbl", None) is not None:
             self.status_points_lbl.setText(f"Points ({target_state}): {current}")
+        
+        # Update ROI and density labels with comprehensive statistics
+        roi_active = self.roi_shape != "none" and self.roi_rect[2] > 0 and self.roi_rect[3] > 0
+        
         if getattr(self, "status_roi_area_lbl", None) is not None:
-            self.status_roi_area_lbl.setText(
-                f"ROI area: {area_um2:.2f} um^2" if area_um2 > 0 else "ROI area: n/a"
-            )
+            if roi_active and roi_total_area_um2 > 0:
+                # Show both view area (inside ROI) and total ROI area
+                self.status_roi_area_lbl.setText(
+                    f"View∩ROI: {view_area_um2:.2f} μm² | Total ROI: {roi_total_area_um2:.2f} μm²"
+                )
+            elif view_area_um2 > 0:
+                self.status_roi_area_lbl.setText(f"View area: {view_area_um2:.2f} μm²")
+            else:
+                self.status_roi_area_lbl.setText("ROI area: n/a")
+        
         if getattr(self, "status_density_lbl", None) is not None:
-            self.status_density_lbl.setText(
-                f"Density: {density:.3f} /um^2" if area_um2 > 0 else "Density: n/a"
-            )
+            if roi_active and roi_total_area_um2 > 0:
+                # Show both view density and total ROI density
+                self.status_density_lbl.setText(
+                    f"View: {pts_view} pts ({view_density:.3f}/μm²) | ROI: {pts_roi_total} pts ({roi_total_density:.3f}/μm²)"
+                )
+            elif view_area_um2 > 0:
+                self.status_density_lbl.setText(f"Density: {view_density:.3f}/μm² ({pts_view} pts)")
+            else:
+                self.status_density_lbl.setText("Density: n/a")
+        
         if getattr(self, "status_fps_lbl", None) is not None:
             self.status_fps_lbl.setText(f"FPS: {int(self.speed_slider.value())}")
+        
         status_runtime_lbl = getattr(self, "status_runtime_lbl", None)
         if status_runtime_lbl is not None:
-            roi_txt = f"{area_um2:.2f} um^2" if area_um2 > 0 else "n/a"
-            density_txt = f"{density:.3f} /um^2" if area_um2 > 0 else "n/a"
-            status_runtime_lbl.setText(
-                f"Points: {current} | ROI: {roi_txt} | Density: {density_txt} | FPS: {int(self.speed_slider.value())}"
-            )
-        # Keep live metrics contextual: show only while annotation workflow is active.
-        annotate_tool_active = bool(
-            getattr(self, "tool_router", None) is not None
-            and getattr(self.tool_router, "tool", None) == Tool.ANNOTATE_POINT
-        )
+            if roi_active and roi_total_area_um2 > 0:
+                # Show comprehensive ROI statistics
+                status_runtime_lbl.setText(
+                    f"View: {pts_view} pts, {view_area_um2:.2f} μm², {view_density:.3f}/μm² | "
+                    f"ROI Total: {pts_roi_total} pts, {roi_total_area_um2:.2f} μm², {roi_total_density:.3f}/μm² | "
+                    f"FPS: {int(self.speed_slider.value())}"
+                )
+            elif view_area_um2 > 0:
+                status_runtime_lbl.setText(
+                    f"View: {pts_view} pts, {view_area_um2:.2f} μm², {view_density:.3f}/μm² | "
+                    f"FPS: {int(self.speed_slider.value())}"
+                )
+            else:
+                status_runtime_lbl.setText(
+                    f"Points: {current} | FPS: {int(self.speed_slider.value())}"
+                )
+        
+        # Keep these legacy metric labels hidden; detailed metrics are rendered
+        # via status-runtime text and status-details panel, not floating labels.
+        annotate_tool_active = False
         for attr in ("status_points_lbl", "status_roi_area_lbl", "status_density_lbl", "status_fps_lbl"):
             widget = getattr(self, attr, None)
             if widget is not None:
@@ -591,7 +631,7 @@ class TableStatusMixin:
                 except Exception:
                     projection_txt = "source frame"
             modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
-            target_key = str(getattr(self, "annotate_target", "frame"))
+            target_key = str(getattr(self, "annotate_target", default_target))
             target_txt = str(getattr(panel_map.get(target_key), "display_name", target_key))
             self.evidence_strip_lbl.setText(
                 f"Evidence: modality={modality_txt} | target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
@@ -692,6 +732,17 @@ class TableStatusMixin:
         return color
 
     def _view_density_stats(self) -> Tuple[int, float]:
+        """Calculate view+ROI density statistics.
+        
+        Returns
+        -------
+        pts_view : int
+            Points in visible view intersected with ROI.
+        area_um2 : float
+            Area of visible view intersected with ROI in μm².
+        
+        Note: Use _roi_total_stats() for total ROI statistics.
+        """
         axes = []
         if getattr(self, "renderer", None) is not None:
             axes = [ax for ax in self.renderer.axes.values() if ax is not None]
@@ -725,12 +776,91 @@ class TableStatusMixin:
                     if not (rx <= kp.x <= rx + rw and ry <= kp.y <= ry + rh):
                         continue
             pts_view += 1
-        width = abs(xlim[1] - xlim[0])
-        height = abs(ylim[1] - ylim[0])
+        
+        # Calculate area of intersection between view and ROI
         cal = self._get_calibration_state(self.primary_image.id)
         px_um = cal.pixel_size_um_per_px
-        area_um2 = (width * height) * (px_um**2) if px_um else 0.0
+        
+        if roi_active:
+            # Calculate intersection of view bounds and ROI
+            rx, ry, rw, rh = self.roi_rect
+            if circle_mode and circle_center and circle_r is not None:
+                # For circle ROI, approximate as bounding box intersection
+                # (true circle-rect intersection is complex, this is good enough for density)
+                roi_left, roi_right = rx, rx + rw
+                roi_bottom, roi_top = ry + rh, ry
+            else:
+                roi_left, roi_right = rx, rx + rw
+                roi_bottom, roi_top = ry + rh, ry
+            
+            # View bounds (note: ylim is inverted in matplotlib image coordinates)
+            view_left, view_right = xlim[0], xlim[1]
+            view_bottom, view_top = max(ylim), min(ylim)
+            
+            # Intersection bounds
+            intersect_left = max(roi_left, view_left)
+            intersect_right = min(roi_right, view_right)
+            intersect_bottom = max(roi_bottom, view_bottom)
+            intersect_top = min(roi_top, view_top)
+            
+            # Calculate intersection area
+            if intersect_right > intersect_left and intersect_bottom > intersect_top:
+                width = intersect_right - intersect_left
+                height = intersect_bottom - intersect_top
+                area_um2 = (width * height) * (px_um**2) if px_um else 0.0
+            else:
+                area_um2 = 0.0  # No intersection
+        else:
+            # No ROI active, use full view area
+            width = abs(xlim[1] - xlim[0])
+            height = abs(ylim[1] - ylim[0])
+            area_um2 = (width * height) * (px_um**2) if px_um else 0.0
+        
         return pts_view, area_um2
+    
+    def _roi_total_stats(self) -> Tuple[int, float]:
+        """Calculate total ROI statistics (entire ROI, not just visible view).
+        
+        Returns
+        -------
+        pts_roi : int
+            Total points in entire ROI.
+        roi_area_um2 : float
+            Total area of entire ROI in μm².
+        """
+        roi_active = self.roi_shape != "none" and self.roi_rect[2] > 0 and self.roi_rect[3] > 0
+        if not roi_active:
+            return 0, 0.0
+        
+        circle_mode = self.roi_shape == "circle"
+        rx, ry, rw, rh = self.roi_rect
+        
+        # Calculate total ROI area
+        cal = self._get_calibration_state(self.primary_image.id)
+        px_um = cal.pixel_size_um_per_px
+        
+        if circle_mode:
+            circle_r = min(rw, rh) / 2
+            roi_area_um2 = (np.pi * circle_r**2) * (px_um**2) if px_um else 0.0
+        else:
+            roi_area_um2 = (rw * rh) * (px_um**2) if px_um else 0.0
+        
+        # Count total points in ROI
+        pts = self._current_keypoints()
+        pts_roi = 0
+        
+        if circle_mode:
+            circle_center = (rx + rw / 2, ry + rh / 2)
+            circle_r = min(rw, rh) / 2
+            for kp in pts:
+                if (kp.x - circle_center[0]) ** 2 + (kp.y - circle_center[1]) ** 2 <= circle_r**2:
+                    pts_roi += 1
+        else:
+            for kp in pts:
+                if rx <= kp.x <= rx + rw and ry <= kp.y <= ry + rh:
+                    pts_roi += 1
+        
+        return pts_roi, roi_area_um2
 
     def _point_in_roi(self, x: float, y: float) -> bool:
         if self.roi_shape == "none":

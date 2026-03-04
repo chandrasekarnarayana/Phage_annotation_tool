@@ -17,6 +17,27 @@ from phage_annotator.ui_qt.rendering.lut_manager import LUTS, lut_names
 class DisplayControlsMixin:
     """Mixin for display, playback, and general control handlers."""
 
+    def _display_source_panel_key(self) -> str:
+        """Return panel key used as source for display controls."""
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        target = str(getattr(self, "annotate_target", "")).strip()
+        if target and target in panel_map:
+            return target
+        if panel_map:
+            return next(iter(panel_map.keys()))
+        return "modality_0"
+
+    def _display_source_image(self):
+        """Return image object for current display source panel."""
+        panel_key = self._display_source_panel_key()
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        modality = panel_map.get(panel_key)
+        if modality is not None:
+            img = self._image_obj_from_id(int(getattr(modality, "image_id", -1)))
+            if img is not None:
+                return img
+        return self.primary_image
+
     def _bc_value_from_slider(self, value: int) -> float:
         scale = float(getattr(self, "_bc_slider_scale", 1.0))
         if scale <= 0:
@@ -64,7 +85,8 @@ class DisplayControlsMixin:
             self._bc_updating_controls = False
 
     def _bc_apply_minmax(self, min_val: float, max_val: float) -> None:
-        prim = self.primary_image
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
         if prim.array is None:
             return
         data_min = getattr(self, "_bc_data_min", None)
@@ -91,12 +113,12 @@ class DisplayControlsMixin:
             max_val += shift
         if max_val - min_val < step:
             max_val = min_val + step
-        mapping = self._get_display_mapping(prim.id, "frame", prim.array)
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
         mapping.set_window(min_val, max_val)
-        self._sync_modality_display_settings("frame", mapping)
+        self._sync_modality_display_settings(panel_key, mapping)
         
         # Propagate to synced modalities
-        self._propagate_sync_to_modalities(prim.id, "frame", min_val, max_val)
+        self._propagate_sync_to_modalities(prim.id, panel_key, min_val, max_val)
         
         if self.vmin_label is not None:
             self.vmin_label.setText(f"vmin: {min_val:.3f}")
@@ -304,23 +326,36 @@ class DisplayControlsMixin:
         settings.lut = int(mapping.lut)
         settings.gamma = float(mapping.gamma)
 
+    def _image_obj_from_id(self, image_id: int):
+        """Resolve image object by ID with index fallback."""
+        target = int(image_id)
+        for img in self.images:
+            if int(getattr(img, "id", -1)) == target:
+                return img
+        if 0 <= target < len(self.images):
+            return self.images[target]
+        return None
+
     def _sync_contrast_from_frame(self) -> None:
         panel_keys = self._contrast_target_panels()
         if not panel_keys:
             return
-        source = self.controller.display_mapping.mapping_for(
-            self.primary_image.id, "frame"
-        )
+        source_panel = self._display_source_panel_key()
         panel_map = getattr(self, "_panel_modality_map", {})
+        source_modality = panel_map.get(source_panel)
+        source_image_id = int(getattr(source_modality, "image_id", self.primary_image.id))
+        source = self.controller.display_mapping.mapping_for(source_image_id, source_panel)
         for key in panel_keys:
             modality = panel_map.get(key)
             if modality is None:
                 continue
             image_id = modality.image_id
-            img = self.images[image_id]
+            img = self._image_obj_from_id(image_id)
+            if img is None:
+                continue
             data = img.array if img.array is not None else img
             mapping = self._get_display_mapping(image_id, key, data)
-            if key == "frame" and image_id == self.primary_image.id:
+            if key == source_panel and image_id == source_image_id:
                 continue
             mapping.min_val = source.min_val
             mapping.max_val = source.max_val
@@ -341,9 +376,13 @@ class DisplayControlsMixin:
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         modality = panel_map.get(key)
         if modality is not None:
-            role = int(getattr(modality, "idx", -1))
-        elif key in {"support", "mean", "std"}:
-            role = f"builtin:{key}"
+            idx = int(getattr(modality, "idx", -1))
+            role = idx if idx >= 0 else None
+        if role is None and key.startswith("modality_"):
+            try:
+                role = int(key.split("_", 1)[1])
+            except Exception:
+                role = None
         if role is None:
             return True
         modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
@@ -360,7 +399,10 @@ class DisplayControlsMixin:
 
     def _sync_key_active_group(self) -> str:
         """Return the sync group key derived from current active view/target."""
-        active_key = str(getattr(self, "annotate_target", "frame")).strip().lower() or "frame"
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        active_key = str(getattr(self, "annotate_target", default_target)).strip().lower() or default_target
         return str(self._sync_key_for_panel(active_key) or "").strip()
 
     def _set_sync_key_combo_data(self, group_key: str) -> None:
@@ -445,6 +487,21 @@ class DisplayControlsMixin:
             import sys
             print(f"Error propagating sync to modalities: {e}", file=sys.stderr)
 
+    def _sync_base_modality_sources(self) -> None:
+        """Keep modality-manager base sources aligned with UI primary/support selection."""
+        manager = getattr(self.controller.session_state, "modality_manager", None)
+        if manager is None or not self.images:
+            return
+        try:
+            primary_mod = manager.get_modality(0)
+            if primary_mod is not None:
+                primary_mod.image_id = int(self.primary_image.id)
+            support_mod = manager.get_modality(1)
+            if support_mod is not None:
+                support_mod.image_id = int(self.support_image.id)
+        except Exception:
+            return
+
     def _set_fov(self, idx: int) -> None:
         if idx < 0 or idx >= len(self.images):
             return
@@ -478,6 +535,7 @@ class DisplayControlsMixin:
             cfg = self.controller.session_state.threshold_configs_by_image.get(idx)
             if cfg:
                 self._apply_threshold_settings(cfg)
+        self._sync_base_modality_sources()
         self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
         self._refresh_roi_manager()
         self._refresh_metadata_dock(self.primary_image.id)
@@ -494,7 +552,13 @@ class DisplayControlsMixin:
         if hasattr(self, "_on_qc_image_changed"):
             self._on_qc_image_changed()
 
-    def _set_primary_combo(self, idx: int) -> None:
+    def _set_primary_combo(
+        self,
+        idx: int,
+        *,
+        refresh_lazy_table: bool = True,
+        schedule_prefetch: bool = True,
+    ) -> None:
         if 0 <= idx < len(self.images):
             self.stop_playback_t()
             self._smlm_overlay = None
@@ -526,6 +590,7 @@ class DisplayControlsMixin:
                 cfg = self.controller.session_state.threshold_configs_by_image.get(idx)
                 if cfg:
                     self._apply_threshold_settings(cfg)
+            self._sync_base_modality_sources()
             self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
             self._refresh_roi_manager()
             self._refresh_metadata_dock(self.primary_image.id)
@@ -534,11 +599,12 @@ class DisplayControlsMixin:
                 self._sync_channel_panel_for_active_image()
             if hasattr(self, "_refresh_annotation_view_controls"):
                 self._refresh_annotation_view_controls()
-            if hasattr(self, "_refresh_lazy_modality_table"):
+            if refresh_lazy_table and hasattr(self, "_refresh_lazy_modality_table"):
                 self._refresh_lazy_modality_table()
             self._refresh_image()
             # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
-            self._schedule_adjacent_fov_prefetch()
+            if schedule_prefetch:
+                self._schedule_adjacent_fov_prefetch()
 
     def _schedule_adjacent_fov_prefetch(self) -> None:
         """Schedule low-priority prefetch of adjacent FOVs (P7c).
@@ -612,15 +678,16 @@ class DisplayControlsMixin:
             logger = __import__('logging').getLogger(__name__)
             logger.debug(f"FOV prefetch scheduling failed: {e}")
 
-    def _set_support_combo(self, idx: int) -> None:
+    def _set_support_combo(self, idx: int, *, refresh_lazy_table: bool = True) -> None:
         if 0 <= idx < len(self.images):
             self.stop_playback_t()
             self.support_image_idx = idx
             self.support_combo.setCurrentIndex(idx)
+            self._sync_base_modality_sources()
             self._maybe_autoload_annotations(self.support_image.id)
             if hasattr(self, "_refresh_annotation_view_controls"):
                 self._refresh_annotation_view_controls()
-            if hasattr(self, "_refresh_lazy_modality_table"):
+            if refresh_lazy_table and hasattr(self, "_refresh_lazy_modality_table"):
                 self._refresh_lazy_modality_table()
             self._refresh_image()
 
@@ -649,7 +716,14 @@ class DisplayControlsMixin:
         manager = facade.get_manager()
         for modality in manager.get_all_modalities():
             img = self.images[modality.image_id]
-            frame_count = int(img.shape[0]) if hasattr(img, "shape") else 1
+            # For projections (mean/std/etc), frame_count should be 1 regardless of image shape
+            # Only RAW modalities with 3D+ stacks (T, H, W) have multiple frames
+            if hasattr(img, "shape") and hasattr(img, "ndim"):
+                # 3D or higher: shape[0] is time/frame dimension
+                # 2D: single frame projection
+                frame_count = int(img.shape[0]) if img.ndim >= 3 else 1
+            else:
+                frame_count = 1
             self.modality_playback.register_modality(
                 modality.idx, modality.display_name, frame_count=frame_count
             )
@@ -684,6 +758,11 @@ class DisplayControlsMixin:
     def _on_speed_change(self, value: int) -> None:
         if getattr(self, "fps_label", None) is not None:
             self.fps_label.setText(f"FPS: {value}")
+        # Keep legacy timer path bounded if it gets toggled by old shortcuts.
+        timer = getattr(self, "play_timer", None)
+        if timer is not None:
+            fps = max(1, int(value))
+            timer.setInterval(max(16, int(1000 / fps)))
 
     def _on_axis_mode_change(self, mode: str) -> None:
         self.stop_playback_t()
@@ -755,34 +834,40 @@ class DisplayControlsMixin:
     def _on_vminmax_change(self) -> None:
         if self.vmin_slider.value() > self.vmax_slider.value():
             self.vmax_slider.setValue(self.vmin_slider.value())
-            prim = self.primary_image
-            if prim.array is not None:
-                data = prim.array
-                if self._interactive:
-                    stride = max(1, self.downsample_factor)
-                    data = data[::stride, ::stride, ::stride, ::stride]
-                    vmin = float(np.percentile(data, self.vmin_slider.value()))
-                    vmax = float(np.percentile(data, self.vmax_slider.value()))
-                    mapping = self._get_display_mapping(prim.id, "frame", prim.array)
-                    mapping.set_window(vmin, vmax)
-                    self._sync_modality_display_settings("frame", mapping)
-                    if self._interactive:
-                        self._contrast_drag_active = True
-                        self.recorder.record(
-                            "set_minmax",
-                            {
-                                "vmin": f"{self._last_vmin:.4f}",
-                                "vmax": f"{self._last_vmax:.4f}",
-                            },
-                        )
-                        self._schedule_refresh()
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
+        if prim.array is None:
+            return
+        data = prim.array
+        if self._interactive:
+            stride = max(1, self.downsample_factor)
+            data = data[::stride, ::stride, ::stride, ::stride]
+        vmin = float(np.percentile(data, self.vmin_slider.value()))
+        vmax = float(np.percentile(data, self.vmax_slider.value()))
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
+        mapping.set_window(vmin, vmax)
+        self._sync_modality_display_settings(panel_key, mapping)
+        self._sync_contrast_from_frame()
+        if self._interactive:
+            self._contrast_drag_active = True
+            self.recorder.record(
+                "set_minmax",
+                {
+                    "vmin": f"{self._last_vmin:.4f}",
+                    "vmax": f"{self._last_vmax:.4f}",
+                },
+            )
+            self._schedule_refresh()
+        else:
+            self._refresh_image()
 
     def _apply_display_mapping(self) -> None:
         """Destructively apply the current display mapping to pixel data."""
-        prim = self.primary_image
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
         if prim.array is None:
             return
-        mapping = self._get_display_mapping(prim.id, "frame", prim.array)
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
         # P1.4: Confirmation with "Don't show again" toggle stored in settings
         if self._settings.value("confirmApplyDisplayMapping", True, type=bool):
             mbox = QtWidgets.QMessageBox(
@@ -812,19 +897,20 @@ class DisplayControlsMixin:
         data = np.clip(data, 0.0, 1.0)
         prim.array = data
         mapping.reset_to_full_range(float(data.min()), float(data.max()))
-        self._sync_modality_display_settings("frame", mapping)
+        self._sync_modality_display_settings(panel_key, mapping)
         self._refresh_image()
 
     def _current_vmin_vmax(self) -> Tuple[float, float]:
-        prim = self.primary_image
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
         if prim.array is None:
             return 0.0, 1.0
-        mapping = self._get_display_mapping(prim.id, "frame", prim.array)
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
         vmin, vmax = mapping.min_val, mapping.max_val
         if vmin > vmax:
             vmin, vmax = vmax, vmin
             mapping.set_window(vmin, vmax)
-            self._sync_modality_display_settings("frame", mapping)
+            self._sync_modality_display_settings(panel_key, mapping)
             self.vmin_label.setText(f"vmin: {vmin:.3f}")
             self.vmax_label.setText(f"vmax: {vmax:.3f}")
         # PHASE 2D FIX: Always return vmin, vmax (was missing return statement)
@@ -838,8 +924,10 @@ class DisplayControlsMixin:
             "set_lut",
             {"index": idx, "name": lut_names()[idx] if idx < len(lut_names()) else idx},
         )
-        mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
-        self._sync_modality_display_settings("frame", mapping)
+        panel_key = self._display_source_panel_key()
+        source_img = self._display_source_image()
+        mapping = self.controller.display_mapping.mapping_for(source_img.id, panel_key)
+        self._sync_modality_display_settings(panel_key, mapping)
         self._sync_contrast_from_frame()
         if self.lut_invert_chk is not None:
             invert_supported = True
@@ -860,11 +948,11 @@ class DisplayControlsMixin:
 
     def _on_gamma_change(self, value: int) -> None:
         gamma = max(0.2, min(5.0, value / 10.0))
-        mapping = self.controller.display_mapping.mapping_for(
-            self.primary_image.id, "frame"
-        )
+        panel_key = self._display_source_panel_key()
+        source_img = self._display_source_image()
+        mapping = self.controller.display_mapping.mapping_for(source_img.id, panel_key)
         mapping.gamma = gamma
-        self._sync_modality_display_settings("frame", mapping)
+        self._sync_modality_display_settings(panel_key, mapping)
         if self.gamma_label is not None:
             self.gamma_label.setText(f"{gamma:.2f}")
             self.recorder.record("set_gamma", {"gamma": f"{gamma:.2f}"})
@@ -873,9 +961,9 @@ class DisplayControlsMixin:
             self._refresh_image()
 
     def _on_log_toggle(self) -> None:
-        mapping = self.controller.display_mapping.mapping_for(
-            self.primary_image.id, "frame"
-        )
+        panel_key = self._display_source_panel_key()
+        source_img = self._display_source_image()
+        mapping = self.controller.display_mapping.mapping_for(source_img.id, panel_key)
         mapping.mode = "log" if self.log_chk.isChecked() else "linear"
         self.recorder.record("set_log", {"enabled": self.log_chk.isChecked()})
         self.controller.display_changed.emit()
@@ -883,9 +971,9 @@ class DisplayControlsMixin:
 
     def _copy_display_settings(self) -> None:
         """Copy LUT/min/max/gamma from primary to another target."""
-        mapping = self.controller.display_mapping.mapping_for(
-            self.primary_image.id, "frame"
-        )
+        panel_key = self._display_source_panel_key()
+        source_img = self._display_source_image()
+        mapping = self.controller.display_mapping.mapping_for(source_img.id, panel_key)
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("Copy Display Settings")
         layout = QtWidgets.QFormLayout(dlg)
@@ -900,11 +988,16 @@ class DisplayControlsMixin:
 
         def _apply() -> None:
             choice = target_combo.currentText()
+            panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
             if choice == "Modality 2 image":
-                self._apply_display_to_image(self.support_image.id, "support", mapping)
+                modality1 = panel_map.get("modality_1")
+                if modality1 is not None:
+                    self._apply_display_to_image(int(modality1.image_id), "modality_1", mapping)
             else:
                 for img in self.images:
-                    self._apply_display_to_image(img.id, "frame", mapping)
+                    for key, modality in panel_map.items():
+                        if int(getattr(modality, "image_id", -1)) == int(getattr(img, "id", -2)):
+                            self._apply_display_to_image(img.id, str(key), mapping)
             self._refresh_image()
             dlg.accept()
 
@@ -979,7 +1072,10 @@ class DisplayControlsMixin:
             self._maybe_emit_assist_context_delta("scope")
 
     def _on_target_change(self) -> None:
-        old_target = str(getattr(self, "annotate_target", "frame"))
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        old_target = str(getattr(self, "annotate_target", default_target))
         combo = getattr(self, "annotate_target_combo", None)
         if combo is not None and combo.count() > 0:
             selected = str(combo.currentData() or combo.currentText() or "").strip().lower()
@@ -989,39 +1085,36 @@ class DisplayControlsMixin:
             target_buttons = dict(getattr(self, "_target_buttons", {}) or {})
             if target_buttons:
                 selected = None
-                for key in ("frame", "mean", "support"):
-                    btn = target_buttons.get(key)
+                for key, btn in target_buttons.items():
                     if btn is not None and btn.isChecked():
                         selected = key
                         break
-                self.annotate_target = str(selected or "frame")
+                self.annotate_target = str(selected or default_target)
             else:
                 buttons = self.target_group.buttons()
                 if buttons and buttons[0].isChecked():
-                    self.annotate_target = "frame"
-                elif len(buttons) > 1 and buttons[1].isChecked():
-                    self.annotate_target = "mean"
+                    self.annotate_target = default_target
                 else:
-                    self.annotate_target = "support"
+                    self.annotate_target = default_target
         point_vis = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
-        point_vis[str(getattr(self, "annotate_target", "frame"))] = True
+        point_vis[str(getattr(self, "annotate_target", default_target))] = True
         self._annotation_panel_visibility = point_vis
         chk = dict(getattr(self, "_annotation_view_checkboxes", {}) or {}).get(
-            str(getattr(self, "annotate_target", "frame"))
+            str(getattr(self, "annotate_target", default_target))
         )
         if chk is not None and not chk.isChecked():
             chk.blockSignals(True)
             chk.setChecked(True)
             chk.blockSignals(False)
         if hasattr(self, "_set_lazy_row_points_state"):
-            self._set_lazy_row_points_state(str(getattr(self, "annotate_target", "frame")), True)
+            self._set_lazy_row_points_state(str(getattr(self, "annotate_target", default_target)), True)
         badge = getattr(self, "target_state_badge_lbl", None)
         combo = getattr(self, "annotate_target_combo", None)
         if badge is not None:
             if combo is not None and combo.count() > 0:
                 badge.setText(f"Write target: {combo.currentText()}")
             else:
-                badge.setText(f"Write target: {str(getattr(self, 'annotate_target', 'frame'))}")
+                badge.setText(f"Write target: {str(getattr(self, 'annotate_target', default_target))}")
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
         if old_target != str(self.annotate_target) and hasattr(
@@ -1097,14 +1190,15 @@ class DisplayControlsMixin:
         if not self._contrast_drag_active:
             return
         self._contrast_drag_active = False
-        prim = self.primary_image
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
         if prim.array is None:
             return
         vmin = float(np.percentile(prim.array, self.vmin_slider.value()))
         vmax = float(np.percentile(prim.array, self.vmax_slider.value()))
-        mapping = self._get_display_mapping(prim.id, "frame", prim.array)
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
         mapping.set_window(vmin, vmax)
-        self._sync_modality_display_settings("frame", mapping)
+        self._sync_modality_display_settings(panel_key, mapping)
         self._sync_contrast_from_frame()
         if hasattr(self, "_schedule_refresh"):
             self._schedule_refresh()
@@ -1150,17 +1244,18 @@ class DisplayControlsMixin:
         dlg.exec()
 
     def _open_contrast_dialog(self) -> None:
-        prim = self.primary_image
+        panel_key = self._display_source_panel_key()
+        prim = self._display_source_image()
         if prim.array is None:
             return
         from phage_annotator.ui_qt.widgets.contrast_dialog import ContrastDialog
 
         data = self._slice_data(prim)
-        mapping = self._get_display_mapping(prim.id, "frame", prim.array)
+        mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
 
         def _apply(vmin: float, vmax: float) -> None:
             mapping.set_window(vmin, vmax)
-            self._sync_modality_display_settings("frame", mapping)
+            self._sync_modality_display_settings(panel_key, mapping)
             if self.vmin_label is not None:
                 self.vmin_label.setText(f"vmin: {vmin:.3f}")
             if self.vmax_label is not None:
@@ -1182,17 +1277,25 @@ class DisplayControlsMixin:
         low_pct = float(self._settings.value("autoLowPct", 0.35))
         high_pct = float(self._settings.value("autoHighPct", 99.65))
         use_roi = self.auto_roi_chk.isChecked()
-        target = self.auto_target_combo.currentText()
         scope = self.auto_scope_combo.currentText()
-        if target == "Current panel":
-            panel_ids = [self.annotate_target]
-        else:
-            panel_ids = self._contrast_target_panels()
+        panel_ids = self._contrast_target_panels()
 
         if not panel_ids:
             return
 
-        auto_img = self.support_image if panel_ids == ["support"] else prim
+        source_panel = str(getattr(self, "annotate_target", "")).strip().lower()
+        if not source_panel:
+            source_panel = panel_ids[0] if panel_ids else "modality_0"
+        if source_panel not in panel_ids:
+            source_panel = panel_ids[0]
+        panel_map = getattr(self, "_panel_modality_map", {})
+        modality = panel_map.get(source_panel)
+        if modality is not None:
+            auto_img = self._image_obj_from_id(int(modality.image_id))
+        else:
+            auto_img = self.primary_image
+        if auto_img is None:
+            return
         if auto_img.array is None:
             self._ensure_loaded(auto_img.id)
             if auto_img.array is None:
@@ -1306,7 +1409,9 @@ class DisplayControlsMixin:
             modality = panel_map.get(panel)
             if modality is not None:
                 image_id = modality.image_id
-                img = self.images[image_id]
+                img = self._image_obj_from_id(image_id)
+                if img is None:
+                    continue
                 data = img.array if img.array is not None else img
             else:
                 image_id = (
@@ -1498,17 +1603,19 @@ class DisplayControlsMixin:
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         modality = panel_map.get(key)
         if modality is not None:
-            text = str(groups.get(int(getattr(modality, "idx", -1)), "")).strip()
-            if text:
-                return text
-        if key == "support":
-            text = str(groups.get("builtin:support", "")).strip()
-            if text:
-                return text
-        if key in {"mean", "std"}:
-            text = str(groups.get(f"builtin:{key}", "")).strip()
-            if text:
-                return text
+            idx = int(getattr(modality, "idx", -1))
+            if idx >= 0:
+                text = str(groups.get(idx, "")).strip()
+                if text:
+                    return text
+        if key.startswith("modality_"):
+            try:
+                idx = int(key.split("_", 1)[1])
+                text = str(groups.get(idx, "")).strip()
+                if text:
+                    return text
+            except Exception:
+                pass
         return ""
 
     def _update_sync_keys_hint(self) -> None:
@@ -1531,7 +1638,10 @@ class DisplayControlsMixin:
             hint.setText(f"Groups available: {', '.join(ordered)} | Target: {mode}")
             if live is not None:
                 if "active view group" in mode:
-                    active_key = str(getattr(self, "annotate_target", "frame")).strip().lower() or "frame"
+                    default_target = (
+                        self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+                    )
+                    active_key = str(getattr(self, "annotate_target", default_target)).strip().lower() or default_target
                     active_group = self._sync_key_for_panel(active_key) or "-"
                     live.setText(f"Sync target: Active group ({active_group})")
                 else:
@@ -1588,6 +1698,16 @@ class DisplayControlsMixin:
             follow.blockSignals(False)
         if follow_active:
             self._set_sync_key_combo_data(self._sync_key_active_group())
+        if hasattr(self, "_apply_roi_for_sync_group"):
+            try:
+                target_group = (
+                    self._sync_key_active_group()
+                    if follow_active
+                    else str(getattr(getattr(self, "sync_key_combo", None), "currentData", lambda: "")() or "")
+                )
+                self._apply_roi_for_sync_group(str(target_group).strip())
+            except Exception:
+                pass
         if combo is not None:
             combo.setEnabled(True)
         self._apply_sync_selection()
@@ -1640,7 +1760,19 @@ class DisplayControlsMixin:
         }
         targets: set[int] = set()
         panel_map = getattr(self, "_panel_modality_map", {})
+        manager = getattr(getattr(self, "controller", None), "session_state", None)
+        manager = getattr(manager, "modality_manager", None)
         for key in selected:
+            key_text = str(key)
+            if key_text.startswith("modality_") and manager is not None:
+                try:
+                    mod_idx = int(key_text.split("_", 1)[1])
+                    base_mod = manager.get_modality(mod_idx)
+                    if base_mod is not None and base_mod.projection_type == ProjectionType.RAW:
+                        targets.add(int(base_mod.idx))
+                    continue
+                except Exception:
+                    pass
             modality = panel_map.get(key)
             if modality is None:
                 continue
@@ -1756,12 +1888,13 @@ class DisplayControlsMixin:
 
     def _contrast_target_panels(self) -> List[str]:
         """Resolve panels affected by contrast edits from selected sync group."""
+        panel_keys = list(getattr(self, "_panel_sync_index", {}).keys())
         selected = [
             key
             for key in self._selected_sync_panels(default_to_all=True)
             if self._sync_mode_enabled_for_panel(str(key), "contrast")
         ]
-        return selected if selected else ["frame"]
+        return selected if selected else panel_keys[:1]
 
     def _on_sync_scope_changed(self, _text: str) -> None:
         """Update sync hint text for current target mode."""

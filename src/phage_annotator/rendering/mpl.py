@@ -145,6 +145,7 @@ class RenderContext:
     support_frame: Optional[np.ndarray]
     projections: Dict[str, np.ndarray]
     panel_images: Dict[str, np.ndarray]
+    primary_panel: str
     view: ViewState
     annotations: Sequence[object]
     panel_visibility: Dict[str, bool]
@@ -196,10 +197,6 @@ class Renderer:
         self.colormaps = list(colormaps)
         self.axes: Dict[str, matplotlib.axes.Axes] = {}
         self.image_artists: Dict[str, Optional[matplotlib.image.AxesImage]] = {
-            "frame": None,
-            "mean": None,
-            "support": None,
-            "std": None,
             "frame_overlay": None,
             "threshold_overlay": None,
         }
@@ -246,8 +243,9 @@ class Renderer:
             self.image_artists[key] = None
         self.overlay_text = None
         self.canvas_header_text = None
-        if "frame" in axes:
-            self.roi_interactor = RoiInteractor(axes["frame"], self._on_roi_change)
+        roi_ax = next(iter(axes.values()), None)
+        if roi_ax is not None:
+            self.roi_interactor = RoiInteractor(roi_ax, self._on_roi_change)
             if self._roi_callback is not None:
                 self.roi_interactor.on_change = self._roi_callback
         self.canvas.draw_idle()
@@ -277,8 +275,9 @@ class Renderer:
             self.image_artists[key] = None
         self.overlay_text = None
         self.canvas_header_text = None
-        if "frame" in axes:
-            self.roi_interactor = RoiInteractor(axes["frame"], self._on_roi_change)
+        roi_ax = next(iter(axes.values()), None)
+        if roi_ax is not None:
+            self.roi_interactor = RoiInteractor(roi_ax, self._on_roi_change)
             if self._roi_callback is not None:
                 self.roi_interactor.on_change = self._roi_callback
         self.canvas.draw_idle()
@@ -289,19 +288,13 @@ class Renderer:
         titles = ctx.titles
         for key, ax in self.axes.items():
             ax.set_title(titles.get(key, ""))
-
-        frame_norm = ctx.norms.get("frame")
-        std_norm = ctx.norms.get("std")
-        mean_norm = ctx.norms.get("mean")
-        support_norm = ctx.norms.get("support")
-        frame_range = ctx.panel_ranges.get("frame", ctx.std_range)
-        mean_range = ctx.panel_ranges.get("mean", ctx.std_range)
-        support_range = ctx.panel_ranges.get("support", ctx.std_range)
-        std_range = ctx.panel_ranges.get("std", ctx.std_range)
-        for key, data in ctx.panel_images.items():
-            if key not in self.axes:
+        for key in list(self.image_artists.keys()):
+            if key in {"frame_overlay", "threshold_overlay"}:
                 continue
-            if key in ("frame", "mean", "support", "std"):
+            if key not in self.axes:
+                self.image_artists.pop(key, None)
+        for key, data in ctx.panel_images.items():
+            if key not in self.axes or data is None:
                 continue
             norm = ctx.norms.get(key)
             prange = ctx.panel_ranges.get(key, ctx.std_range)
@@ -316,23 +309,13 @@ class Renderer:
                 ctx.extents.get(key),
                 norm=norm,
             )
-        if "frame" in self.axes:
-            self.image_artists["frame"] = _update_or_create(
-                self.axes["frame"],
-                self.image_artists["frame"],
-                ctx.image_frame,
-                ctx.panel_cmaps.get("frame", self.colormaps[0]),
-                frame_range[0],
-                frame_range[1],
-                ctx.extents.get("frame"),
-                norm=frame_norm,
-            )
+        primary_ax = self.axes.get(ctx.primary_panel)
+        if primary_ax is not None:
             overlay = ctx.overlay_frame
             if overlay is not None:
-                # P1b: Enforce uint8 dtype for overlay frames
                 overlay_uint8 = _normalize_overlay_to_uint8(overlay)
                 self.image_artists["frame_overlay"] = _update_or_create(
-                    self.axes["frame"],
+                    primary_ax,
                     self.image_artists["frame_overlay"],
                     overlay_uint8,
                     ctx.overlay_cmap or colormaps.get_cmap("magma"),
@@ -348,10 +331,9 @@ class Renderer:
             elif self.image_artists.get("frame_overlay") is not None:
                 self.image_artists["frame_overlay"].set_visible(False)
             if ctx.threshold_visible and ctx.threshold_mask is not None:
-                # P1b: Enforce uint8 dtype for overlays
                 threshold_data = _normalize_overlay_to_uint8(ctx.threshold_mask)
                 self.image_artists["threshold_overlay"] = _update_or_create(
-                    self.axes["frame"],
+                    primary_ax,
                     self.image_artists["threshold_overlay"],
                     threshold_data,
                     colormaps.get_cmap("Reds"),
@@ -366,44 +348,14 @@ class Renderer:
                     self.image_artists["threshold_overlay"].set_visible(True)
             elif self.image_artists.get("threshold_overlay") is not None:
                 self.image_artists["threshold_overlay"].set_visible(False)
-        if "mean" in self.axes:
-            self.image_artists["mean"] = _update_or_create(
-                self.axes["mean"],
-                self.image_artists["mean"],
-                ctx.projections.get("mean"),
-                ctx.panel_cmaps.get("mean", self.colormaps[0]),
-                mean_range[0],
-                mean_range[1],
-                ctx.extents.get("mean"),
-                norm=mean_norm,
-            )
-        if "support" in self.axes and ctx.support_frame is not None:
-            self.image_artists["support"] = _update_or_create(
-                self.axes["support"],
-                self.image_artists["support"],
-                ctx.support_frame,
-                ctx.panel_cmaps.get("support", self.colormaps[0]),
-                support_range[0],
-                support_range[1],
-                ctx.extents.get("support"),
-                norm=support_norm,
-            )
-        if "std" in self.axes:
-            self.image_artists["std"] = _update_or_create(
-                self.axes["std"],
-                self.image_artists["std"],
-                ctx.projections.get("std"),
-                ctx.panel_cmaps.get("std", self.colormaps[0]),
-                std_range[0],
-                std_range[1],
-                ctx.extents.get("std"),
-                norm=std_norm,
-            )
         self._flush()
 
     def update_overlays(self, ctx: RenderContext) -> None:
         """Update annotations, ROI outlines, and overlay text."""
         _clear_overlays(self.axes, self.image_artists)
+        primary_panel = (
+            ctx.primary_panel if ctx.primary_panel in self.axes else next(iter(self.axes.keys()), None)
+        )
         for panel, overlays in ctx.roi_overlays.items():
             ax = self.axes.get(panel)
             if ax is None:
@@ -481,7 +433,7 @@ class Renderer:
                     zorder=15,
                 )
         if ctx.particle_overlays:
-            ax = self.axes.get("frame")
+            ax = self.axes.get(primary_panel) if primary_panel is not None else None
             if ax is not None:
                 for shape, data, color, selected in ctx.particle_overlays:
                     lw = 2.2 if selected else 1.3
@@ -515,19 +467,19 @@ class Renderer:
                             )
                         )
         if ctx.particle_labels:
-            ax = self.axes.get("frame")
+            ax = self.axes.get(primary_panel) if primary_panel is not None else None
             if ax is not None:
                 for x, y, text in ctx.particle_labels:
                     ax.text(x, y, text, fontsize=8, color="yellow")
         if ctx.localization_visible and ctx.localization_points:
-            ax = self.axes.get("frame")
+            ax = self.axes.get(primary_panel) if primary_panel is not None else None
             if ax is not None:
                 xs = [p[0] for p in ctx.localization_points]
                 ys = [p[1] for p in ctx.localization_points]
                 vals = [p[2] for p in ctx.localization_points]
                 ax.scatter(xs, ys, c=vals, s=18, cmap="viridis", edgecolors="none", alpha=0.75)
         if ctx.density_contours and ctx.overlay_frame is not None:
-            ax = self.axes.get("frame")
+            ax = self.axes.get(primary_panel) if primary_panel is not None else None
             if ax is not None:
                 try:
                     ax.contour(ctx.overlay_frame, colors="white", linewidths=0.6, alpha=0.6)
@@ -535,7 +487,7 @@ class Renderer:
                     pass
         self._update_roi_interactor(ctx)
         if ctx.view.overlay_enabled and ctx.overlay_text:
-            ax = self.axes.get("frame") or next(iter(self.axes.values()), None)
+            ax = self.axes.get(primary_panel) or next(iter(self.axes.values()), None)
             if ax is not None:
                 if self.overlay_text is None:
                     self.overlay_text = ax.text(
@@ -559,7 +511,7 @@ class Renderer:
         elif self.overlay_text is not None:
             self.overlay_text.set_visible(False)
         if ctx.canvas_header_text:
-            ax = self.axes.get("frame") or next(iter(self.axes.values()), None)
+            ax = self.axes.get(primary_panel) or next(iter(self.axes.values()), None)
             if ax is not None:
                 if self.canvas_header_text is None:
                     self.canvas_header_text = ax.text(
@@ -618,11 +570,8 @@ class Renderer:
     def render_to_image(self, ctx: RenderContext, options: ExportOptions) -> np.ndarray:
         """Render a view to an RGBA image for export."""
         panel = options.panel
-        if panel == "support":
-            image = ctx.support_frame
-        elif panel in ("mean", "std"):
-            image = ctx.projections.get(panel)
-        else:
+        image = ctx.panel_images.get(panel)
+        if image is None:
             image = ctx.image_frame
         if image is None:
             return np.zeros((1, 1, 4), dtype=np.uint8)
@@ -634,7 +583,7 @@ class Renderer:
             scale = ctx.roi_scale if ctx.roi_scale else 1.0
             rect = ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale)
             roi_overlays.append((ctx.roi_type, rect, "#ffd166"))
-        particle_overlays = ctx.particle_overlays if panel == "frame" else []
+        particle_overlays = ctx.particle_overlays if panel == ctx.primary_panel else []
         overlay_text = ctx.overlay_text if options.include_overlay_text else None
         scalebar_spec = None
         if ctx.scale_bar and options.include_scalebar:
@@ -664,7 +613,7 @@ class Renderer:
         )
 
     def _update_scalebar(self, ctx: RenderContext) -> None:
-        ax = self.axes.get("frame")
+        ax = self.axes.get(ctx.primary_panel) or next(iter(self.axes.values()), None)
         if ax is None:
             return
         if ctx.scale_bar_warning:

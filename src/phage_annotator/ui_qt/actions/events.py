@@ -19,15 +19,27 @@ class EventsMixin(KeyboardEventsMixin):
         self.canvas.mpl_connect("motion_notify_event", self._on_mouse_move)
         self._bind_axis_callbacks()
         self.fov_list.currentRowChanged.connect(self._set_fov)
-        self.primary_combo.currentIndexChanged.connect(self._set_primary_combo)
-        self.support_combo.currentIndexChanged.connect(self._set_support_combo)
+        if getattr(self, "primary_combo", None) is not None:
+            self.primary_combo.currentIndexChanged.connect(self._set_primary_combo)
+        if getattr(self, "support_combo", None) is not None:
+            self.support_combo.currentIndexChanged.connect(self._set_support_combo)
         if getattr(self, "lazy_modality_table", None) is not None:
             self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
         if getattr(self, "lazy_add_raw_btn", None) is not None:
-            self.lazy_add_raw_btn.clicked.connect(lambda: self._add_lazy_modality_view("raw"))
-            self.lazy_add_mean_btn.clicked.connect(lambda: self._add_lazy_modality_view("mean"))
-            self.lazy_add_std_btn.clicked.connect(lambda: self._add_lazy_modality_view("std"))
-            self.lazy_remove_btn.clicked.connect(self._remove_selected_lazy_modality_view)
+            self.lazy_add_raw_btn.pressed.connect(lambda: self._add_lazy_modality_view("raw"))
+            self.lazy_add_mean_btn.pressed.connect(lambda: self._add_lazy_modality_view("mean"))
+            self.lazy_add_std_btn.pressed.connect(lambda: self._add_lazy_modality_view("std"))
+            if getattr(self, "lazy_add_median_btn", None) is not None:
+                self.lazy_add_median_btn.pressed.connect(lambda: self._add_lazy_modality_view("median"))
+            if getattr(self, "lazy_add_min_btn", None) is not None:
+                self.lazy_add_min_btn.pressed.connect(lambda: self._add_lazy_modality_view("min"))
+            if getattr(self, "lazy_add_max_btn", None) is not None:
+                self.lazy_add_max_btn.pressed.connect(lambda: self._add_lazy_modality_view("max"))
+            self.lazy_remove_btn.pressed.connect(self._remove_selected_lazy_modality_view)
+        if getattr(self, "lazy_auto_update_chk", None) is not None:
+            self.lazy_auto_update_chk.toggled.connect(self._on_lazy_auto_update_toggled)
+        if getattr(self, "lazy_apply_btn", None) is not None:
+            self.lazy_apply_btn.pressed.connect(self._apply_lazy_pending_updates)
         self.play_t_btn.clicked.connect(lambda: self._toggle_play("t"))
         self.play_z_btn.clicked.connect(lambda: self._toggle_play("z"))
         self.t_minus_button.clicked.connect(lambda: self._step_slider(self.t_slider, -1))
@@ -255,6 +267,14 @@ class EventsMixin(KeyboardEventsMixin):
             # Event service not available or not initialized; continue gracefully
             pass
 
+    def _toolbar_navigation_active(self) -> bool:
+        """Return True when matplotlib toolbar pan/zoom mode is active."""
+        toolbar = getattr(self, "toolbar", None)
+        if toolbar is None:
+            return False
+        mode = str(getattr(toolbar, "mode", "") or "").strip().lower()
+        return bool(mode)
+
     def _on_annotations_changed_event(self, event) -> None:
         """Handle annotation changes from event bus."""
         try:
@@ -401,16 +421,23 @@ class EventsMixin(KeyboardEventsMixin):
         self._prefetcher.start(self._playback_cursor, self.z_slider.value())
 
     def _on_mouse_press(self, event) -> None:
+        if self._toolbar_navigation_active():
+            return
         if self._interactive:
             return
         self._start_interaction()
 
     def _on_mouse_release(self, event) -> None:
+        if self._toolbar_navigation_active():
+            return
         if not self._interactive:
             return
         self._end_interaction()
 
     def _on_mouse_move(self, event) -> None:
+        if self._toolbar_navigation_active():
+            QtWidgets.QToolTip.hideText()
+            return
         if self._interactive:
             QtWidgets.QToolTip.hideText()
             self._schedule_refresh()

@@ -467,8 +467,12 @@ class SessionDataSource(ComprehensiveDataSource):
         
         if projection_type == "mean":
             return np.mean(data, axis=axes)
+        elif projection_type == "median":
+            return np.median(data, axis=axes)
         elif projection_type == "std":
             return np.std(data, axis=axes)
+        elif projection_type == "min":
+            return np.min(data, axis=axes)
         elif projection_type == "max":
             return np.max(data, axis=axes)
         elif projection_type == "sum":

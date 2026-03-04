@@ -53,11 +53,12 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     from phage_annotator.session.modality import ModalityManager
     
     # Create new modality manager
+    support_id = int(getattr(session_state, "active_support_id", session_state.active_primary_id))
+    if support_id < 0:
+        support_id = int(session_state.active_primary_id)
     manager = ModalityManager.create_from_primary_support(
-        primary_img_id=session_state.active_primary_id,
-        support_img_id=session_state.active_support_id
-        if session_state.active_support_id != session_state.active_primary_id
-        else None,
+        primary_img_id=int(session_state.active_primary_id),
+        support_img_id=support_id,
     )
     
     session_state.modality_manager = manager
@@ -115,7 +116,38 @@ def ensure_modality_system(session_state: SessionState) -> ModalityManager:
     if session_state.modality_manager is None:
         raise RuntimeError("Failed to initialize modality manager")
     
-    return session_state.modality_manager
+    manager = session_state.modality_manager
+    if manager is None:
+        raise RuntimeError("Failed to initialize modality manager")
+
+    # Backfill legacy sessions: ensure base indices 0/1 always exist.
+    modalities = list(manager.get_all_modalities())
+    has_idx0 = any(int(getattr(mod, "idx", -1)) == 0 for mod in modalities)
+    has_idx1 = any(int(getattr(mod, "idx", -1)) == 1 for mod in modalities)
+
+    if not has_idx0:
+        from phage_annotator.session.modality import ModalitySpec
+
+        primary_id = int(getattr(session_state, "active_primary_id", 0))
+        manager.modalities.append(
+            ModalitySpec(idx=0, image_id=primary_id, display_name="Modality 1")
+        )
+
+    if not has_idx1:
+        from phage_annotator.session.modality import ModalitySpec
+
+        primary_id = int(getattr(session_state, "active_primary_id", 0))
+        support_id = int(getattr(session_state, "active_support_id", primary_id))
+        if support_id < 0:
+            support_id = primary_id
+        manager.modalities.append(
+            ModalitySpec(idx=1, image_id=support_id, display_name="Modality 2")
+        )
+
+    manager.modalities.sort(key=lambda m: int(getattr(m, "idx", 0)))
+    if manager.modalities:
+        manager._next_idx = max(int(getattr(m, "idx", 0)) for m in manager.modalities) + 1
+    return manager
 
 
 def get_active_modality_idx(session_state: SessionState) -> int:

@@ -57,31 +57,31 @@ SHORTCUTS: Tuple[ShortcutEntry, ...] = (
         menu_action_attr="shortcuts_act",
     ),
     ShortcutEntry("contextual_help", "Shift+F1", "Contextual Help", "Show context-specific help"),
-    ShortcutEntry("play_pause", "Space", "Play/Pause", "Toggle time-series playback"),
-    ShortcutEntry("nav_time_prev", "Left", "Navigate Time", "Move backward in time"),
-    ShortcutEntry("nav_time_next", "Right", "Navigate Time", "Move forward in time"),
-    ShortcutEntry("nav_z_prev", "Up", "Navigate Z", "Move up in Z-stack"),
-    ShortcutEntry("nav_z_next", "Down", "Navigate Z", "Move down in Z-stack"),
-    ShortcutEntry("accept_suggestion", "A", "Accept Suggestion", "Accept current suggestion (assist mode)"),
-    ShortcutEntry("accept_current_suggestion", "Alt+A / Enter", "Accept Current Suggestion", "Accept focused suggestion only (assist mode)"),
-    ShortcutEntry("reject_suggestion", "R", "Reject Suggestion", "Reject current suggestion (assist mode)"),
-    ShortcutEntry("next_suggestion", "N", "Next Suggestion", "Jump to next uncertain suggestion"),
-    ShortcutEntry("prev_suggestion", "P", "Previous Suggestion", "Jump to previous uncertain suggestion"),
+    ShortcutEntry("play_pause", "Ctrl+Space", "Play/Pause", "Toggle time-series playback"),
+    ShortcutEntry("nav_time_prev", "Alt+Left", "Navigate Time", "Move backward in time"),
+    ShortcutEntry("nav_time_next", "Alt+Right", "Navigate Time", "Move forward in time"),
+    ShortcutEntry("nav_z_prev", "Alt+Up", "Navigate Z", "Move up in Z-stack"),
+    ShortcutEntry("nav_z_next", "Alt+Down", "Navigate Z", "Move down in Z-stack"),
+    ShortcutEntry("accept_suggestion", "Ctrl+A", "Accept Suggestion", "Accept current suggestion (assist mode)"),
+    ShortcutEntry("accept_current_suggestion", "Ctrl+Shift+A", "Accept Current Suggestion", "Accept focused suggestion only (assist mode)"),
+    ShortcutEntry("reject_suggestion", "Ctrl+Shift+R", "Reject Suggestion", "Reject current suggestion (assist mode)"),
+    ShortcutEntry("next_suggestion", "Ctrl+N", "Next Suggestion", "Jump to next uncertain suggestion"),
+    ShortcutEntry("prev_suggestion", "Ctrl+P", "Previous Suggestion", "Jump to previous uncertain suggestion"),
     ShortcutEntry(
         "review_context_pack",
-        "Ctrl+Alt+R",
+        "Ctrl+Alt+V",
         "Review Context Pack",
         "Toggle right-dock review context pack",
         menu_action_attr="review_context_pack_act",
     ),
-    ShortcutEntry("reset_view", "Ctrl+R", "Reset View", "Reset zoom/contrast"),
-    ShortcutEntry("clear_roi", "Shift+R", "Clear ROI", "Clear current ROI when ROI tool active"),
-    ShortcutEntry("delete_selected", "Delete / Backspace", "Delete Point", "Delete selected annotation(s)"),
-    ShortcutEntry("cycle_colormap", "C", "Cycle Colormap", "Cycle current colormap"),
-    ShortcutEntry("quick_save", "S", "Quick Save CSV", "Quick-save annotations CSV"),
-    ShortcutEntry("label_prev", "[", "Previous Label", "Cycle to previous label"),
-    ShortcutEntry("label_next", "]", "Next Label", "Cycle to next label"),
-    ShortcutEntry("focus_canvas_mode", "F", "Focus Canvas", "Toggle canvas-focused mode"),
+    ShortcutEntry("reset_view", "Ctrl+0", "Reset View", "Reset zoom/contrast"),
+    ShortcutEntry("clear_roi", "Ctrl+Shift+Delete", "Clear ROI", "Clear current ROI when ROI tool active"),
+    ShortcutEntry("delete_selected", "Delete", "Delete Point", "Delete selected annotation(s)"),
+    ShortcutEntry("cycle_colormap", "Ctrl+Shift+C", "Cycle Colormap", "Cycle current colormap"),
+    ShortcutEntry("quick_save", "Ctrl+S", "Quick Save CSV", "Quick-save annotations CSV"),
+    ShortcutEntry("label_prev", "Ctrl+[", "Previous Label", "Cycle to previous label"),
+    ShortcutEntry("label_next", "Ctrl+]", "Next Label", "Cycle to next label"),
+    ShortcutEntry("focus_canvas_mode", "Alt+F", "Focus Canvas", "Toggle canvas-focused mode"),
 )
 
 
@@ -110,6 +110,8 @@ def dialog_rows() -> List[Tuple[str, str, str]]:
 
 def apply_menu_shortcuts(window) -> None:
     """Apply registered shortcuts to menu/toolbar Qt actions when available."""
+    if not bool(getattr(window, "_shortcuts_enabled", True)):
+        return
     for entry in SHORTCUTS:
         if not entry.menu_action_attr:
             continue
@@ -127,12 +129,12 @@ def qt_match(event, key: int, modifiers: Any = None) -> bool:
 
 
 def matplotlib_key_bindings() -> dict[str, str]:
-    """Map Matplotlib key string -> action id."""
-    return {
-        "r": "reset_view",
-        "c": "cycle_colormap",
-        "s": "quick_save",
-    }
+    """Map Matplotlib key string -> action id.
+    
+    Note: Matplotlib shortcuts now require modifier keys via Qt handlers.
+    These direct matplotlib bindings are deprecated in favor of Qt key events.
+    """
+    return {}
 
 
 def qt_key_bindings() -> tuple[tuple[int, Any, str], ...]:
@@ -140,24 +142,22 @@ def qt_key_bindings() -> tuple[tuple[int, Any, str], ...]:
     if QtCore is None:
         return ()
     return (
-        (QtCore.Qt.Key_Left, QtCore.Qt.KeyboardModifier.NoModifier, "nav_time_prev"),
-        (QtCore.Qt.Key_Right, QtCore.Qt.KeyboardModifier.NoModifier, "nav_time_next"),
-        (QtCore.Qt.Key_Up, QtCore.Qt.KeyboardModifier.NoModifier, "nav_z_prev"),
-        (QtCore.Qt.Key_Down, QtCore.Qt.KeyboardModifier.NoModifier, "nav_z_next"),
-        (QtCore.Qt.Key_Space, QtCore.Qt.KeyboardModifier.NoModifier, "play_pause"),
+        (QtCore.Qt.Key_Left, QtCore.Qt.KeyboardModifier.AltModifier, "nav_time_prev"),
+        (QtCore.Qt.Key_Right, QtCore.Qt.KeyboardModifier.AltModifier, "nav_time_next"),
+        (QtCore.Qt.Key_Up, QtCore.Qt.KeyboardModifier.AltModifier, "nav_z_prev"),
+        (QtCore.Qt.Key_Down, QtCore.Qt.KeyboardModifier.AltModifier, "nav_z_next"),
+        (QtCore.Qt.Key_Space, QtCore.Qt.KeyboardModifier.ControlModifier, "play_pause"),
         (QtCore.Qt.Key_F1, QtCore.Qt.KeyboardModifier.ShiftModifier, "contextual_help"),
         (QtCore.Qt.Key_Delete, QtCore.Qt.KeyboardModifier.NoModifier, "delete_selected"),
-        (QtCore.Qt.Key_Backspace, QtCore.Qt.KeyboardModifier.NoModifier, "delete_selected"),
-        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.NoModifier, "accept_suggestion"),
-        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.AltModifier, "accept_current_suggestion"),
-        (QtCore.Qt.Key_Return, QtCore.Qt.KeyboardModifier.NoModifier, "accept_current_suggestion"),
-        (QtCore.Qt.Key_Enter, QtCore.Qt.KeyboardModifier.NoModifier, "accept_current_suggestion"),
-        (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.ShiftModifier, "clear_roi"),
-        (QtCore.Qt.Key_N, QtCore.Qt.KeyboardModifier.NoModifier, "next_suggestion"),
-        (QtCore.Qt.Key_P, QtCore.Qt.KeyboardModifier.NoModifier, "prev_suggestion"),
-        (QtCore.Qt.Key_BracketLeft, QtCore.Qt.KeyboardModifier.NoModifier, "label_prev"),
-        (QtCore.Qt.Key_BracketRight, QtCore.Qt.KeyboardModifier.NoModifier, "label_next"),
-        (QtCore.Qt.Key_F, QtCore.Qt.KeyboardModifier.NoModifier, "focus_canvas_mode"),
-        (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.ControlModifier, "reset_view"),
-        (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.NoModifier, "reject_suggestion"),
+        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier, "accept_suggestion"),
+        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "accept_current_suggestion"),
+        (QtCore.Qt.Key_Delete, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "clear_roi"),
+        (QtCore.Qt.Key_N, QtCore.Qt.KeyboardModifier.ControlModifier, "next_suggestion"),
+        (QtCore.Qt.Key_P, QtCore.Qt.KeyboardModifier.ControlModifier, "prev_suggestion"),
+        (QtCore.Qt.Key_BracketLeft, QtCore.Qt.KeyboardModifier.ControlModifier, "label_prev"),
+        (QtCore.Qt.Key_BracketRight, QtCore.Qt.KeyboardModifier.ControlModifier, "label_next"),
+        (QtCore.Qt.Key_F, QtCore.Qt.KeyboardModifier.AltModifier, "focus_canvas_mode"),
+        (QtCore.Qt.Key_0, QtCore.Qt.KeyboardModifier.ControlModifier, "reset_view"),
+        (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "reject_suggestion"),
+        (QtCore.Qt.Key_C, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "cycle_colormap"),
     )

@@ -10,7 +10,7 @@ from typing import Tuple
 import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
-from phage_annotator.analysis.core import compute_mean_std
+from phage_annotator.analysis.core import compute_projection
 from phage_annotator.io.metadata.annotation import format_tokens
 from phage_annotator.data.display_mapping import build_norm
 from phage_annotator.ui_qt.rendering.export_view import (
@@ -37,7 +37,10 @@ class ExportMixin:
         scope = self._tokenize_filename_value(
             getattr(self, "annotation_scope", "current")
         )
-        target = self._tokenize_filename_value(getattr(self, "annotate_target", "frame"))
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        target = self._tokenize_filename_value(getattr(self, "annotate_target", default_target))
         space = self._tokenize_filename_value(
             getattr(self.controller.session_state, "annotation_space", "stack")
         )
@@ -500,7 +503,42 @@ class ExportMixin:
         layout = QtWidgets.QFormLayout(dlg)
         panel_combo = QtWidgets.QComboBox()
         panel_combo.setObjectName("export_dialog_combo_panel")
-        panel_combo.addItems(["Frame", "Mean Projection", "Modality 2", "Std Projection"])
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        if not panel_map and hasattr(self, "_current_layout_spec"):
+            try:
+                self._current_layout_spec()
+            except Exception:
+                pass
+            panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        panel_visibility = dict(getattr(self, "_panel_visibility", {}) or {})
+        added = 0
+        for key, modality in panel_map.items():
+            if not str(key).startswith("modality_"):
+                continue
+            if not bool(panel_visibility.get(str(key), False)):
+                continue
+            label = str(getattr(modality, "display_name", key))
+            panel_combo.addItem(label, str(key))
+            added += 1
+        if added <= 0:
+            for key, modality in panel_map.items():
+                if not str(key).startswith("modality_"):
+                    continue
+                label = str(getattr(modality, "display_name", key))
+                panel_combo.addItem(label, str(key))
+                added += 1
+        if added <= 0:
+            panel_combo.addItem("Modality 1", "modality_0")
+        default_target = str(
+            getattr(
+                self,
+                "annotate_target",
+                self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0",
+            )
+        ).strip()
+        idx = panel_combo.findData(default_target)
+        if idx >= 0:
+            panel_combo.setCurrentIndex(idx)
         scope_combo = QtWidgets.QComboBox()
         scope_combo.setObjectName("export_dialog_combo_scope")
         scope_combo.addItems(["Current slice", "T range", "All frames"])
@@ -593,12 +631,7 @@ class ExportMixin:
 
         fmt = fmt_combo.currentText().lower()
         default_name = pathlib.Path(self.primary_image.path).with_suffix(f".export.{fmt}")
-        panel_key = panel_combo.currentText().strip().lower()
-        panel_key = {
-            "mean projection": "mean",
-            "modality 2": "support",
-            "std projection": "std",
-        }.get(panel_key, panel_key)
+        panel_key = str(panel_combo.currentData() or panel_combo.currentText() or "").strip()
         opts = ExportOptions(
             panel=panel_key,
             region=region_combo.currentText().lower(),
@@ -622,16 +655,7 @@ class ExportMixin:
         t_values = self._export_t_values(scope, t_start.value(), t_end.value())
 
         # P1.5: Export guardrails and preflight validation
-        # 1) Modality 2 panel requires a loaded secondary image
-        if opts.panel == "support":
-            if self.support_image is None or self.support_image.array is None:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Export blocked",
-                    "Modality 2 image is not loaded. Choose a different panel or load a secondary modality.",
-                )
-                return
-        # 2) ROI-based region requires a valid ROI
+        # 1) ROI-based region requires a valid ROI
         if opts.region in ("roi bounds", "roi mask-clipped"):
             if self.roi_shape == "none" or self.roi_rect[2] <= 0 or self.roi_rect[3] <= 0:
                 QtWidgets.QMessageBox.warning(
@@ -640,7 +664,7 @@ class ExportMixin:
                     "ROI region requested but no valid ROI is set.",
                 )
                 return
-        # 3) Overlay-only requires at least one overlay to be selected
+        # 2) Overlay-only requires at least one overlay to be selected
         if opts.overlay_only:
             has_any_overlay = (
                 opts.include_roi_outline
@@ -658,7 +682,7 @@ class ExportMixin:
                     "Overlay-only is selected but no overlays are enabled.",
                 )
                 return
-        # 4) Ensure we actually have frames to export
+        # 3) Ensure we actually have frames to export
         if not t_values:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -687,7 +711,6 @@ class ExportMixin:
         prim = self.primary_image
         if prim.array is None:
             return
-        support = self.support_image if self.support_image.array is not None else None
         z_idx = self.z_slider.value()
         cal = self._get_calibration_state(prim.id)
         scalebar_spec = ScaleBarSpec(
@@ -711,7 +734,7 @@ class ExportMixin:
             for idx, t_idx in enumerate(t_values):
                 if cancel_token.is_cancelled():
                     return None
-                frame = self._export_panel_frame(prim, support, t_idx, z_idx, opts.panel, crop_rect)
+                frame = self._export_panel_frame(t_idx, z_idx, opts.panel, crop_rect)
                 if frame is None:
                     continue
                 frame, offset = self._apply_roi_region(
@@ -727,7 +750,10 @@ class ExportMixin:
                     else []
                 )
                 overlay_text = self._build_overlay_text() if opts.include_overlay_text else None
-                mapping = self._get_display_mapping(prim.id, opts.panel, frame)
+                panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+                modality = panel_map.get(str(opts.panel))
+                mapping_image_id = int(getattr(modality, "image_id", prim.id))
+                mapping = self._get_display_mapping(mapping_image_id, opts.panel, frame)
                 norm = build_norm(mapping)
                 cmap = cmap_for(mapping.lut, mapping.invert)
                 
@@ -878,21 +904,31 @@ class ExportMixin:
         writer.finalize()
 
 
-    def _export_panel_frame(self, prim, support, t_idx: int, z_idx: int, panel: str, crop_rect):
-        if prim.array is None:
+    def _export_panel_frame(self, t_idx: int, z_idx: int, panel: str, crop_rect):
+        panel_key = str(panel or "").strip()
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        modality = panel_map.get(panel_key)
+        if modality is None:
             return None
-        if panel == "support":
-            if support is None or support.array is None:
+        img = self._image_obj_from_id(int(getattr(modality, "image_id", -1)))
+        if img is None:
+            return None
+        if img.array is None:
+            self._ensure_loaded(img.id)
+            if img.array is None:
                 return None
-            data = support.array[t_idx, z_idx, :, :]
-        elif panel == "mean":
-            data, _ = compute_mean_std(prim.array)
-        elif panel == "std":
-            _, data = compute_mean_std(prim.array)
-        else:
-            data = self._build_multichannel_frame(prim, t_idx, z_idx)
+        projection = str(getattr(getattr(modality, "projection_type", None), "value", "raw")).strip().lower()
+        axis = str(
+            getattr(getattr(modality, "display_settings", None), "projection_axis", "t")
+        ).strip().lower()
+        if projection == "raw":
+            data = self._build_multichannel_frame(img, t_idx, z_idx)
             if data is None:
-                data = prim.array[t_idx, z_idx, :, :]
+                t_safe = max(0, min(int(t_idx), int(img.array.shape[0]) - 1))
+                z_safe = max(0, min(int(z_idx), int(img.array.shape[1]) - 1))
+                data = img.array[t_safe, z_safe, :, :]
+        else:
+            data = compute_projection(np.asarray(img.array), projection, axis=axis)
         return self._apply_crop_rect(data, crop_rect, data.shape)
 
     def _apply_roi_region(

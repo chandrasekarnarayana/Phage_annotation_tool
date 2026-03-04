@@ -262,6 +262,38 @@ class SmlmDockWidget(QtWidgets.QWidget):
         export_row.addWidget(self.add_ann_btn)
         layout.addLayout(export_row)
 
+        # TODO: Make the ThunderSTORM panel scrollable
+        # - Wrap main layout in QScrollArea to handle overflow when many controls are visible
+        # - Set scroll area widget resizable and ensure proper minimum size hints
+        # - Consider collapsible sections for advanced parameters to reduce initial vertical space
+        
+        # TODO: Add results table at bottom to display localizations
+        # - Create QTableWidget showing columns: frame, x_px, y_px, sigma_px, photons, uncertainty_px
+        # - Table should be scrollable and resizable
+        # - Enable row selection (single and multiple) with visual highlighting
+        # - Add context menu for table (copy, select all, clear selection)
+        
+        # TODO: Add "Show as Points" option below results table
+        # - Add checkbox/button "Display points on image" to overlay localizations on canvas
+        # - When checked, render localization results as point overlays on the current image view
+        # - Use different colors/markers to distinguish from manual annotations
+        # - Update overlay dynamically when user scrolls through frames/slices
+        
+        # TODO: Implement "Move to Annotations" functionality
+        # - When table rows are selected, enable "Move Selected to Annotations" button
+        # - Convert selected localization results into Keypoint objects
+        # - Add converted points to main annotation table with proper metadata (source="thunderstorm")
+        # - Remove moved points from localization results table
+        # - Show confirmation dialog with count of points to be moved
+        
+        # TODO: Improve CSV export with file dialog
+        # - Replace simple export with QFileDialog.getSaveFileName() for user-selected location
+        # - Default filename: "thunderstorm_results_YYYYMMDD_HHMMSS.csv"
+        # - Remember last export directory in settings
+        # - Add export options: include/exclude uncertainty, photons, background columns
+        # - Show success message with file path after export
+        # - Add "Auto-export after run" checkbox option in settings
+
         layout.addStretch(1)
         self._refresh_effective_config()
 

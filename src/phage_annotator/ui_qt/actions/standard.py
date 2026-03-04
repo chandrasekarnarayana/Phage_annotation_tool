@@ -208,6 +208,7 @@ class ActionsMixin(
             self._handle_annotation_metadata(self.primary_image.id, meta)
         self._mark_dirty()
         self._refresh_image()
+        self._refresh_table()
 
     def _load_annotations_multi(self) -> None:
         cal = self._get_calibration_state(self.primary_image.id)
@@ -218,6 +219,7 @@ class ActionsMixin(
             self._handle_annotation_metadata(self.primary_image.id, meta)
         self._mark_dirty()
         self._refresh_image()
+        self._refresh_table()
 
     def _load_annotations_all(self) -> None:
         targets = []
@@ -274,6 +276,7 @@ class ActionsMixin(
             self._mark_dirty()
             self.controller.annotations_changed.emit()
             self._refresh_image()
+            self._refresh_table()
 
         self.jobs.submit(
             _worker,
@@ -3322,6 +3325,7 @@ class ActionsMixin(
             self.controller.annotations_changed.emit()
             if image_id == self.primary_image.id:
                 self._refresh_image()
+                self._refresh_table()
             try:
                 # Brief user feedback on completion
                 self.statusBar().showMessage("Annotations loaded.", 3000)

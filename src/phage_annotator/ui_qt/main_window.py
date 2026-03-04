@@ -98,6 +98,11 @@ class KeypointAnnotator(
 
     def __init__(self, images: List[LazyImage], labels: Sequence[str] | None = None) -> None:
         super().__init__()
+        
+        # Ensure window doesn't block other applications
+        # Remove any modal or always-on-top flags that might interfere with other windows
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
+        
         if not images:
             raise ValueError("No images provided.")
         # QSettings keys: layout (customGeometry/customState), cacheMaxMB,
@@ -156,11 +161,35 @@ class KeypointAnnotator(
         self._playback_underruns = 0
         # Panel visibility controls which axes exist; at least one must remain visible.
         self._panel_visibility = {
-            "frame": True,
-            "mean": True,
-            "support": True,
-            "std": True,
+            "modality_0": False,
+            "modality_1": False,
         }
+        # Lazy loading modality sync groups: maps modality indices/panel keys to group numbers (default to 1)
+        self._lazy_modality_groups = {
+            0: "1",           # frame -> group 1
+            1: "1",           # support -> group 1
+            "builtin:support": "1",
+            "builtin:mean": "1",
+            "builtin:std": "1",
+        }
+        # Lazy loading sync modes: maps modality indices/panel keys to sync mode flags
+        self._lazy_sync_modes = {
+            0: {"contrast": True, "zoom": True, "playback": True},
+            1: {"contrast": True, "zoom": True, "playback": True},
+            "builtin:support": {"contrast": True, "zoom": True, "playback": True},
+            "builtin:mean": {"contrast": True, "zoom": True, "playback": True},
+            "builtin:std": {"contrast": True, "zoom": True, "playback": True},
+        }
+        # Per-sync-group ROI memory. Group key -> {"shape": str, "rect": (x,y,w,h)} or None.
+        self._roi_by_sync_group = {}
+        # Lazy builtin views configuration (mean and std projections)
+        self._lazy_builtin_views = {}
+        self._lazy_builtin_seeded = False
+        self._lazy_builtin_migrated = False
+        self._lazy_hidden_base_panel_keys = {"modality_0", "modality_1"}
+        self._lazy_panel_order: Dict[str, int] = {}
+        self._canvas_layout_rows = int(self._settings.value("canvasLayoutRows", 0, type=int))
+        self._canvas_layout_cols = int(self._settings.value("canvasLayoutCols", 0, type=int))
         # Skip the next zoom capture when layout is rebuilt to preserve previous zoom.
         self._skip_capture_once = False
         # Pixel size (um per pixel) for density calculations.

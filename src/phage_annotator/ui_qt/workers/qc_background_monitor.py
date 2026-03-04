@@ -29,7 +29,7 @@ class QCBackgroundMonitor(QtCore.QObject):
         super().__init__()
         
         self.is_running = False
-        self.is_enabled = True
+        self.is_enabled = False  # DISABLED: QC monitoring disabled
         self.validation_callback: Optional[callable] = None
         
         # Timers for debounced + periodic checks

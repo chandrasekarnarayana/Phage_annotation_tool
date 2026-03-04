@@ -218,7 +218,14 @@ def _merge_system_docks(self) -> None:
     self.system_tabs = tabs
 
     system_dock = create_dock(self, "system", "System", container)
-    self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, system_dock)
+    self.addDockWidget(QtCore.Qt.RightDockWidgetArea, system_dock)
+    system_dock.setAllowedAreas(QtCore.Qt.RightDockWidgetArea)
+    system_dock.setFloating(False)
+    try:
+        features = system_dock.features()
+        system_dock.setFeatures(features & ~QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+    except Exception:
+        pass
     self.dock_system = system_dock
 
     # Remove old standalone docks and remap panel ids to unified dock.
@@ -291,11 +298,20 @@ def _init_panel_auto_policy_state(self) -> None:
         panel_id = str(spec.id)
         enabled = True
         pinned = False
+        default_auto_open = panel_id not in {"density", "performance", "logs", "qc_issues"}
         if settings is not None:
             try:
-                enabled = bool(settings.value(_panel_auto_open_key(panel_id), True, type=bool))
+                enabled = bool(
+                    settings.value(
+                        _panel_auto_open_key(panel_id),
+                        default_auto_open,
+                        type=bool,
+                    )
+                )
             except Exception:
-                enabled = True
+                enabled = default_auto_open
+        else:
+            enabled = default_auto_open
             try:
                 pinned = bool(settings.value(_panel_pinned_key(panel_id), False, type=bool))
             except Exception:
@@ -748,11 +764,12 @@ class PanelManager:
         _tabify_group_for_panel(self.window, panel_id)
         dock.show()
         _select_system_tab_for_panel(self.window, panel_key)
-        dock.raise_()
-        try:
-            dock.activateWindow()
-        except Exception:
-            pass
+        if not is_auto:
+            dock.raise_()
+            try:
+                dock.activateWindow()
+            except Exception:
+                pass
         self._focus_panel_widget(dock)
         opened_by = "auto" if is_auto else "user"
         if not isinstance(getattr(self.window, "_panel_opened_by", None), dict):
@@ -1047,13 +1064,18 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="logs",
             title="Logs / Diagnostics",
-            default_area=QtCore.Qt.BottomDockWidgetArea,
+            default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_logs_widget,
             toggle_action_text="Logs / Diagnostics",
             bucket="plots",
             tab_group="system",
             search_aliases=("logs", "system logs"),
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="metadata",
@@ -1068,21 +1090,31 @@ def build_panel_registry(self) -> List[PanelSpec]:
         PanelSpec(
             id="performance",
             title="Performance",
-            default_area=QtCore.Qt.BottomDockWidgetArea,
+            default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_performance_widget,
             toggle_action_text="Performance Monitor",
             bucket="plots",
             tab_group="system",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
         PanelSpec(
             id="qc_issues",
             title="QC Issues",
-            default_area=QtCore.Qt.BottomDockWidgetArea,
-            default_visible=True,
+            default_area=QtCore.Qt.RightDockWidgetArea,
+            default_visible=False,
             widget_factory=self._make_qc_issues_widget,
             toggle_action_text="QC Issues",
             bucket="plots",
+            constraints=PanelConstraints(
+                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
+                floatable=False,
+                fixed_area=True,
+            ),
         ),
     ]
 
@@ -1548,34 +1580,37 @@ def setup_status_bar(self) -> None:
     )
 
     # QLabel used by docks as the shared status text widget.
-    self.status = QtWidgets.QLabel("")
+    self.status = QtWidgets.QLabel("", status_bar)
     self.status.setMinimumWidth(180)
     status_bar.addWidget(self.status, stretch=0)
-    self.status_runtime_lbl = QtWidgets.QLabel("Points: 0 | ROI: n/a | Density: n/a | FPS: 30")
+    self.status_runtime_lbl = QtWidgets.QLabel(
+        "Points: 0 | ROI: n/a | Density: n/a | FPS: 30",
+        status_bar,
+    )
     self.status_runtime_lbl.setVisible(False)
     status_bar.addPermanentWidget(self.status_runtime_lbl)
 
     # Permanent operational state widgets (single source of truth).
-    self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -")
-    self.status_tz_lbl = QtWidgets.QLabel("T: -/- | Z: -/-")
-    self.status_points_lbl = QtWidgets.QLabel("Points: 0")
-    self.status_roi_area_lbl = QtWidgets.QLabel("ROI area: -")
-    self.status_density_lbl = QtWidgets.QLabel("Density: -")
-    self.status_fps_lbl = QtWidgets.QLabel("FPS: 30")
-    self.status_label_lbl = QtWidgets.QLabel("Label: -")
-    self.status_scope_lbl = QtWidgets.QLabel("Scope: Slice")
-    self.status_target_lbl = QtWidgets.QLabel("Target: Frame")
-    self.status_modality_combo = QtWidgets.QComboBox()
+    self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -", status_bar)
+    self.status_tz_lbl = QtWidgets.QLabel("T: -/- | Z: -/-", status_bar)
+    self.status_points_lbl = QtWidgets.QLabel("Points: 0", status_bar)
+    self.status_roi_area_lbl = QtWidgets.QLabel("ROI area: -", status_bar)
+    self.status_density_lbl = QtWidgets.QLabel("Density: -", status_bar)
+    self.status_fps_lbl = QtWidgets.QLabel("FPS: 30", status_bar)
+    self.status_label_lbl = QtWidgets.QLabel("Label: -", status_bar)
+    self.status_scope_lbl = QtWidgets.QLabel("Scope: Slice", status_bar)
+    self.status_target_lbl = QtWidgets.QLabel("Target: Frame", status_bar)
+    self.status_modality_combo = QtWidgets.QComboBox(status_bar)
     self.status_modality_combo.setMinimumContentsLength(16)
-    self.status_context_lock_lbl = QtWidgets.QLabel("Write Context: Locked")
-    self.status_effective_context_lbl = QtWidgets.QLabel("Effective Assist Context: -")
-    self.status_assist_lbl = QtWidgets.QLabel("Assist: Off")
-    self.status_suggestion_fresh_lbl = QtWidgets.QLabel("Suggestions: n/a")
-    self.status_qc_lbl = QtWidgets.QLabel("QC: 0 warnings")
-    self.status_results_lbl = QtWidgets.QLabel("Results: empty")
-    self.status_strategy_combo = QtWidgets.QComboBox()
+    self.status_context_lock_lbl = QtWidgets.QLabel("Write Context: Locked", status_bar)
+    self.status_effective_context_lbl = QtWidgets.QLabel("Effective Assist Context: -", status_bar)
+    self.status_assist_lbl = QtWidgets.QLabel("Assist: Off", status_bar)
+    self.status_suggestion_fresh_lbl = QtWidgets.QLabel("Suggestions: n/a", status_bar)
+    self.status_qc_lbl = QtWidgets.QLabel("QC: 0 warnings", status_bar)
+    self.status_results_lbl = QtWidgets.QLabel("Results: empty", status_bar)
+    self.status_strategy_combo = QtWidgets.QComboBox(status_bar)
     self.status_strategy_combo.setMinimumContentsLength(14)
-    self.status_assist_mode_btn = QtWidgets.QToolButton()
+    self.status_assist_mode_btn = QtWidgets.QToolButton(status_bar)
     self.status_assist_mode_btn.setCheckable(True)
     self.status_assist_mode_btn.setText("Assist Mode: Off")
     # Keep status bar transient-first: no always-on permanent info strip widgets.

@@ -8,12 +8,20 @@ from typing import Optional
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
+DISABLE_QC = True
+
 
 class QCActionsMixin:
     """Quality-control issue validation, navigation, and export actions."""
 
+    def _is_qc_enabled(self) -> bool:
+        """Return whether QC runtime/actions are enabled."""
+        return bool(getattr(self, "_qc_enabled", not DISABLE_QC))
+
     def _ensure_qc_runtime(self) -> None:
         """Ensure QC state and timer are initialized."""
+        if not self._is_qc_enabled():
+            return
         if getattr(self, "qc_state", None) is None:
             from phage_annotator.session.qc_state import QCState
 
@@ -48,6 +56,8 @@ class QCActionsMixin:
 
     def _schedule_qc_validation(self, image_id: Optional[int] = None) -> None:
         """Schedule debounced QC validation."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         if image_id is None:
             self._qc_pending_image_id = None
@@ -60,12 +70,16 @@ class QCActionsMixin:
 
     def _execute_scheduled_qc_validation(self) -> None:
         """Run any queued debounced QC validation."""
+        if not self._is_qc_enabled():
+            return
         image_id = getattr(self, "_qc_pending_image_id", None)
         self._qc_pending_image_id = None
         self._run_qc_validation(image_id=image_id)
 
     def _trigger_qc_validation(self) -> None:
         """Run QC validation immediately for all loaded images."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         if getattr(self, "_qc_validation_timer", None) is not None:
             self._qc_validation_timer.stop()
@@ -74,6 +88,8 @@ class QCActionsMixin:
 
     def _run_qc_validation(self, image_id: Optional[int]) -> None:
         """Compute QC issues and refresh the QC issues panel."""
+        if not self._is_qc_enabled():
+            return
         from phage_annotator.analysis.qc_validators import QCValidator
 
         self._ensure_qc_runtime()
@@ -137,9 +153,9 @@ class QCActionsMixin:
         dock_qc = getattr(self, "dock_qc_issues", None)
         if dock_qc is not None:
             dock_qc.setWindowTitle(f"QC Issues ({open_count})" if open_count > 0 else "QC Issues")
-            if open_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", True, type=bool)):
-                self.set_panel_visible("qc_issues", True, source="qc_validation")
-                dock_qc.raise_()
+            if open_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", False, type=bool)):
+                # Non-blocking auto-show: reveal panel without stealing focus.
+                self.set_panel_visible("qc_issues", True, source="auto:qc_validation")
         issue_counts_by_type: dict[str, int] = {}
         for issue in self.qc_state.issues:
             key = str(getattr(issue, "issue_type", "unknown"))
@@ -156,6 +172,8 @@ class QCActionsMixin:
 
     def _on_qc_issue_status_changed(self, issue_id: str, status: str) -> None:
         """Handle resolve/ignore actions from QC panel."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         open_count = int(
             len(
@@ -176,24 +194,32 @@ class QCActionsMixin:
 
     def _on_qc_monitor_status_changed(self, message: str) -> None:
         """Handle status updates from background monitor."""
+        if not self._is_qc_enabled():
+            return
         qc_panel = getattr(self, "qc_issues_panel", None)
         if qc_panel is not None:
             qc_panel.set_monitor_status(message)
 
     def _on_qc_annotations_changed(self) -> None:
         """Handle annotation changes: trigger monitor."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         if getattr(self, "_qc_background_monitor", None) is not None:
             self._qc_background_monitor.on_annotation_changed()
 
     def _on_qc_image_changed(self) -> None:
         """Handle image change: trigger QC monitor to scan new image."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         if getattr(self, "_qc_background_monitor", None) is not None:
             self._qc_background_monitor.on_image_loaded()
 
     def _jump_to_next_qc_issue(self) -> None:
         """Jump to the next visible QC issue in round-robin order."""
+        if not self._is_qc_enabled():
+            return
         self._ensure_qc_runtime()
         visible = list(self.qc_state.get_visible_issues(respect_filters=True))
         if not visible:
@@ -253,6 +279,8 @@ class QCActionsMixin:
 
     def _export_qc_report(self, export_format: str) -> None:
         """Export QC issues in machine-readable format."""
+        if not self._is_qc_enabled():
+            return
         from phage_annotator.io.qc_export import QCReportExporter
 
         self._ensure_qc_runtime()

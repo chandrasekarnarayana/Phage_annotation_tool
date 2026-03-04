@@ -23,12 +23,18 @@ try:
 except ImportError:
     HAS_BCONTRAST = False
 
+# Temporary feature gates.
+DISABLE_QC = True
+DISABLE_DIAGNOSTICS = True
+DISABLE_SHORTCUTS = True
+
 
 class UiSetupMixin:
     """Mixin containing UI construction and dock wiring."""
 
     def _setup_ui(self) -> None:
         """Create menus, toolbars, dock panels, and central widgets."""
+        self._shortcuts_enabled = not DISABLE_SHORTCUTS
         self.setWindowTitle("Phage Annotator - Microscopy Keypoints")
         screen = QtWidgets.QApplication.primaryScreen()
         if screen is not None:
@@ -113,6 +119,17 @@ class UiSetupMixin:
         jump_to_z_act = actions["jump_to_z"]
         show_roi_handles_act = self.show_roi_handles_act
         clear_roi_act = self.clear_roi_act
+        self._qc_enabled = not DISABLE_QC
+
+        if DISABLE_QC:
+            qc_validate_act.setEnabled(False)
+            qc_validate_act.setVisible(False)
+            qc_jump_next_act.setEnabled(False)
+            qc_jump_next_act.setVisible(False)
+            queue_blocked_qc_act.setEnabled(False)
+        if DISABLE_DIAGNOSTICS and getattr(self, "toggle_logs_act", None) is not None:
+            self.toggle_logs_act.setEnabled(False)
+            self.toggle_logs_act.setVisible(False)
 
         # Status widgets must exist before panel factories are constructed.
         self._setup_status_bar()
@@ -165,27 +182,30 @@ class UiSetupMixin:
         primary_box.addWidget(self.primary_combo)
         primary_box.addWidget(QtWidgets.QLabel("Modality 2"))
         primary_box.addWidget(self.support_combo)
-        explore_layout.addLayout(primary_box)
+        # Legacy primary/support selectors remain available for internal wiring,
+        # but the visible control surface is now the lazy modality table only.
+        self.primary_combo.setVisible(False)
+        self.support_combo.setVisible(False)
         modality_group = QtWidgets.QGroupBox("Modalities / Views")
         modality_layout = QtWidgets.QVBoxLayout(modality_group)
         modality_layout.setContentsMargins(6, 6, 6, 6)
         modality_layout.setSpacing(6)
-        self.lazy_modality_table = QtWidgets.QTableWidget(0, 9)
+        self.lazy_modality_table = QtWidgets.QTableWidget(0, 10)
         self.lazy_modality_table.setHorizontalHeaderLabels(
-            ["Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
+            ["No", "Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
         )
         model = self.lazy_modality_table.model()
         model.setHeaderData(
-            1, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
+            2, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            6, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            7, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            7, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            8, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         model.setHeaderData(
-            8, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
+            9, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
         )
         self.lazy_modality_table.verticalHeader().setVisible(False)
         self.lazy_modality_table.horizontalHeader().setStretchLastSection(True)
@@ -201,11 +221,25 @@ class UiSetupMixin:
         self.lazy_add_raw_btn = QtWidgets.QPushButton("Add Modality")
         self.lazy_add_mean_btn = QtWidgets.QPushButton("Add Mean View")
         self.lazy_add_std_btn = QtWidgets.QPushButton("Add Std View")
+        self.lazy_add_median_btn = QtWidgets.QPushButton("Add Median View")
+        self.lazy_add_min_btn = QtWidgets.QPushButton("Add Min View")
+        self.lazy_add_max_btn = QtWidgets.QPushButton("Add Max View")
         self.lazy_remove_btn = QtWidgets.QPushButton("Remove")
+        self.lazy_auto_update_chk = QtWidgets.QCheckBox("Auto Update")
+        # Default to immediate canvas reflection; user can toggle off for batch editing.
+        self.lazy_auto_update_chk.setChecked(True)
+        self.lazy_apply_btn = QtWidgets.QPushButton("Update Canvas")
+        self.lazy_apply_btn.setEnabled(False)
         controls_row.addWidget(self.lazy_add_raw_btn)
         controls_row.addWidget(self.lazy_add_mean_btn)
         controls_row.addWidget(self.lazy_add_std_btn)
+        controls_row.addWidget(self.lazy_add_median_btn)
+        controls_row.addWidget(self.lazy_add_min_btn)
+        controls_row.addWidget(self.lazy_add_max_btn)
         controls_row.addWidget(self.lazy_remove_btn)
+        controls_row.addStretch(1)
+        controls_row.addWidget(self.lazy_auto_update_chk)
+        controls_row.addWidget(self.lazy_apply_btn)
         modality_layout.addLayout(controls_row)
         explore_layout.addWidget(modality_group)
 
@@ -352,6 +386,27 @@ class UiSetupMixin:
         self.sync_key_combo.addItem("Group 1", "1")
         self.sync_key_combo.setEnabled(True)
         self.sync_key_combo.setToolTip("Select numeric Sync Group key from Lazy Loading.")
+        # Fix dropdown text visibility on hover
+        self.sync_key_combo.setStyleSheet("""
+            QComboBox {
+                color: #000000;
+                background-color: #ffffff;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+            }
+            QComboBox QAbstractItemView {
+                color: #000000;
+                background-color: #ffffff;
+                selection-background-color: #0078d7;
+                selection-color: #ffffff;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                color: #ffffff;
+                background-color: #0078d7;
+            }
+        """)
         playback_layout.addWidget(QtWidgets.QLabel("Sync Target"), 4, 0)
         playback_layout.addWidget(self.sync_target_mode_combo, 4, 1)
         playback_layout.addWidget(self.sync_key_combo, 4, 2, 1, 2)
@@ -492,7 +547,8 @@ class UiSetupMixin:
         self.auto_scope_combo = QtWidgets.QComboBox()
         self.auto_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
         self.auto_target_combo = QtWidgets.QComboBox()
-        self.auto_target_combo.addItems(["Current panel", "All visible panels"])
+        self.auto_target_combo.addItem("Bottom Sync Target")
+        self.auto_target_combo.setEnabled(False)
         self.auto_roi_chk = QtWidgets.QCheckBox("Use ROI only")
         auto_group = QtWidgets.QGroupBox("Auto Contrast")
         auto_layout = QtWidgets.QGridLayout(auto_group)
@@ -512,7 +568,9 @@ class UiSetupMixin:
         auto_layout.addWidget(QtWidgets.QLabel("ROI"), 3, 0)
         auto_layout.addWidget(self.auto_roi_chk, 3, 1, 1, 2)
         self.auto_scope_combo.setToolTip("Data extent used to compute automatic contrast.")
-        self.auto_target_combo.setToolTip("Where computed contrast mapping is applied.")
+        self.auto_target_combo.setToolTip(
+            "Auto-contrast target is controlled by the bottom Sync Target group."
+        )
         self.auto_roi_chk.setToolTip("Restrict auto-contrast statistics to current ROI.")
         display_layout.addWidget(auto_group, drow, 0, 1, 3)
         drow += 1
@@ -728,6 +786,19 @@ class UiSetupMixin:
         adv_layout.addWidget(self.pyramid_levels_spin, r, 1)
         r += 1
 
+        self.canvas_layout_rows_spin = QtWidgets.QSpinBox()
+        self.canvas_layout_rows_spin.setRange(0, 6)
+        self.canvas_layout_rows_spin.setValue(int(self._settings.value("canvasLayoutRows", 0, type=int)))
+        self.canvas_layout_cols_spin = QtWidgets.QSpinBox()
+        self.canvas_layout_cols_spin.setRange(0, 12)
+        self.canvas_layout_cols_spin.setValue(int(self._settings.value("canvasLayoutCols", 0, type=int)))
+        adv_layout.addWidget(QtWidgets.QLabel("Canvas rows (0=auto)"), r, 0)
+        adv_layout.addWidget(self.canvas_layout_rows_spin, r, 1)
+        r += 1
+        adv_layout.addWidget(QtWidgets.QLabel("Canvas cols (0=auto)"), r, 0)
+        adv_layout.addWidget(self.canvas_layout_cols_spin, r, 1)
+        r += 1
+
         self.apply_display_btn = QtWidgets.QPushButton("Apply display mapping to pixels…")
         self.apply_display_btn.setToolTip(
             "Destructively rescales pixel values using the current mapping."
@@ -854,7 +925,8 @@ class UiSetupMixin:
         self.open_panel_switcher_act = QtWidgets.QAction("Panels: Open Panel…", self)
         self.open_panel_switcher_act.setObjectName("open_panel_switcher")
         self.open_panel_switcher_act.triggered.connect(self._show_panel_switcher)
-        self.open_panel_switcher_act.setShortcut("Ctrl+Alt+P")
+        if not DISABLE_SHORTCUTS:
+            self.open_panel_switcher_act.setShortcut("Ctrl+Alt+P")
         first_action = dock_panels_menu.actions()[0] if dock_panels_menu.actions() else None
         if first_action is not None:
             dock_panels_menu.insertAction(first_action, self.open_panel_switcher_act)
@@ -862,7 +934,8 @@ class UiSetupMixin:
             dock_panels_menu.addAction(self.open_panel_switcher_act)
         self.addAction(self.open_panel_switcher_act)
         # Re-apply registry shortcuts now that panel-switcher action exists.
-        apply_menu_shortcuts(self)
+        if not DISABLE_SHORTCUTS:
+            apply_menu_shortcuts(self)
         self._init_panel_policy_controls()
         self._init_channel_panel_integration()
         self._setup_annotation_toolbar()
@@ -890,6 +963,14 @@ class UiSetupMixin:
         shortcuts_act = actions.get("shortcuts")
         if shortcuts_act is not None:
             shortcuts_act.triggered.connect(self._show_keyboard_shortcuts)
+            if DISABLE_SHORTCUTS:
+                shortcuts_act.setEnabled(False)
+                shortcuts_act.setVisible(False)
+        if DISABLE_SHORTCUTS:
+            try:
+                self._disable_all_shortcuts()
+            except Exception:
+                pass
         exit_act.triggered.connect(self.close)
         show_roi_handles_act.toggled.connect(self._toggle_roi_handles)
         clear_roi_act.triggered.connect(self._clear_roi)
@@ -973,8 +1054,9 @@ class UiSetupMixin:
             self._propagate_suggestions_remaining_dialog
         )
         toggle_suggestions_overlay_act.triggered.connect(self._toggle_suggestions_overlay)
-        qc_validate_act.triggered.connect(self._trigger_qc_validation)
-        qc_jump_next_act.triggered.connect(self._jump_to_next_qc_issue)
+        if not DISABLE_QC:
+            qc_validate_act.triggered.connect(self._trigger_qc_validation)
+            qc_jump_next_act.triggered.connect(self._jump_to_next_qc_issue)
         set_current_user_act.triggered.connect(self._set_current_user_dialog)
         mark_selected_in_review_act.triggered.connect(
             lambda: self._set_selected_review_state("in_review")
@@ -1024,9 +1106,10 @@ class UiSetupMixin:
             lambda _checked=False: self._toggle_focus_canvas_mode()
         )
         self.command_palette_act.triggered.connect(self._show_command_palette)
-        self.toggle_logs_act.triggered.connect(
-            lambda checked: self.set_panel_visible("logs", bool(checked), source="menu:layout")
-        )
+        if not DISABLE_DIAGNOSTICS:
+            self.toggle_logs_act.triggered.connect(
+                lambda checked: self.set_panel_visible("logs", bool(checked), source="menu:layout")
+            )
         self.toggle_overlay_act.setChecked(True)
         self.reset_view_act.triggered.connect(self.reset_all_view)
         self.show_profiles_act.triggered.connect(self._show_profile_dialog)
@@ -1072,7 +1155,15 @@ class UiSetupMixin:
         self.assist_min_positive_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_negative_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_context_spin.valueChanged.connect(self._on_assist_minima_changed)
-        self.qc_auto_show_chk.toggled.connect(self._on_qc_auto_show_changed)
+        if getattr(self, "canvas_layout_rows_spin", None) is not None:
+            self.canvas_layout_rows_spin.valueChanged.connect(self._on_canvas_grid_rows_changed)
+        if getattr(self, "canvas_layout_cols_spin", None) is not None:
+            self.canvas_layout_cols_spin.valueChanged.connect(self._on_canvas_grid_cols_changed)
+        if not DISABLE_QC:
+            self.qc_auto_show_chk.toggled.connect(self._on_qc_auto_show_changed)
+        else:
+            self.qc_auto_show_chk.setChecked(False)
+            self.qc_auto_show_chk.setEnabled(False)
         self.assist_warmup_next_btn.clicked.connect(self._next_uncertain_suggestion)
         self.assist_warmup_refresh_btn.clicked.connect(self._refresh_assist_warmup_panel)
         if getattr(self, "review_queue_panel", None) is not None:
@@ -1120,11 +1211,15 @@ class UiSetupMixin:
                     self._settings.setValue("firstRunHintModalityLayers", False)
         self.quick_hist_act.triggered.connect(lambda _checked=False: self._toggle_hist_panel())
         self.quick_profile_act.triggered.connect(lambda _checked=False: self._toggle_profile_panel())
-        self.quick_qc_act.triggered.connect(
-            lambda _checked=False: self.set_panel_visible(
-                "qc_issues", True, source="quick_button:qc"
+        if not DISABLE_QC:
+            self.quick_qc_act.triggered.connect(
+                lambda _checked=False: self.set_panel_visible(
+                    "qc_issues", True, source="quick_button:qc"
+                )
             )
-        )
+        else:
+            self.quick_qc_act.setEnabled(False)
+            self.quick_qc_act.setVisible(False)
         for dock_attr in (
             "dock_hist",
             "dock_profile",
@@ -1155,7 +1250,7 @@ class UiSetupMixin:
                 self._density_overlay_changed
             )
             self.density_panel.contours_chk.toggled.connect(self._density_overlay_changed)
-        if getattr(self, "qc_issues_panel", None) is not None:
+        if getattr(self, "qc_issues_panel", None) is not None and not DISABLE_QC:
             self.qc_issues_panel.jump_to_location.connect(self._jump_to_qc_issue)
             self.qc_issues_panel.validation_requested.connect(self._trigger_qc_validation)
             self.qc_issues_panel.export_requested.connect(self._export_qc_report)
@@ -1190,9 +1285,22 @@ class UiSetupMixin:
             self.project_relink_panel.retry_manual_requested.connect(
                 lambda: self._retry_project_relink("manual")
             )
-        self.controller.annotations_changed.connect(
-            lambda: self._schedule_qc_validation(self.controller.session_state.active_primary_id)
-        )
+        if not DISABLE_QC:
+            self.controller.annotations_changed.connect(
+                lambda: self._schedule_qc_validation(self.controller.session_state.active_primary_id)
+            )
+        if DISABLE_QC:
+            dock_qc = getattr(self, "dock_qc_issues", None)
+            if dock_qc is not None:
+                dock_qc.setVisible(False)
+                dock_qc.toggleViewAction().setEnabled(False)
+                dock_qc.toggleViewAction().setVisible(False)
+        if DISABLE_DIAGNOSTICS:
+            dock_logs = getattr(self, "dock_logs", None)
+            if dock_logs is not None:
+                dock_logs.setVisible(False)
+                dock_logs.toggleViewAction().setEnabled(False)
+                dock_logs.toggleViewAction().setVisible(False)
         self._rebuild_figure_layout()
         self._apply_default_layout()
         self._restore_layout()
@@ -1832,3 +1940,13 @@ class UiSetupMixin:
                 integrate_b_contrast_features(self)
             except Exception as e:
                 print(f"[B&C Integration] Warning: Failed to integrate B&C features: {e}")
+
+    def _disable_all_shortcuts(self) -> None:
+        """Disable keyboard shortcuts attached to Qt actions for this session."""
+        # Menu/toolbar actions.
+        for action in self.findChildren(QtWidgets.QAction):
+            try:
+                action.setShortcut("")
+                action.setShortcuts([])
+            except Exception:
+                continue

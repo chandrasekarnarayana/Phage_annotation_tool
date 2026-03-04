@@ -103,7 +103,7 @@ class UiExtrasMixin:
         availability: dict[str, bool] = {}
         if table is not None and table.rowCount() > 0:
             for row in range(table.rowCount()):
-                name_item = table.item(row, 2)
+                name_item = table.item(row, 3)
                 if name_item is None:
                     continue
                 role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -121,7 +121,7 @@ class UiExtrasMixin:
                         panel_key = ""
                 if not panel_key:
                     continue
-                visible_chk = table.cellWidget(row, 0)
+                visible_chk = table.cellWidget(row, 1)
                 is_selected_visible = bool(
                     isinstance(visible_chk, QtWidgets.QCheckBox) and visible_chk.isChecked()
                 )
@@ -129,10 +129,10 @@ class UiExtrasMixin:
             if availability:
                 return availability
         panel_visibility = dict(getattr(self, "_panel_visibility", {}) or {})
-        availability = {"frame": bool(panel_visibility.get("frame", True))}
+        availability = {}
         for key, visible in panel_visibility.items():
             k = str(key)
-            if k in {"mean", "support", "std"} or k.startswith("modality_"):
+            if k.startswith("modality_"):
                 availability[k] = bool(visible)
         return availability
 
@@ -143,39 +143,7 @@ class UiExtrasMixin:
             return
         panel_key = str(panel_key)
         for row in range(table.rowCount()):
-            name_item = table.item(row, 2)
-            if name_item is None:
-                continue
-            role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
-            row_key = ""
-            if isinstance(role_data, str):
-                role_text = str(role_data)
-                if role_text.startswith("builtin:"):
-                    row_key = role_text.split(":", 1)[1]
-                elif role_text.startswith("modality_"):
-                    row_key = role_text
-            else:
-                try:
-                    row_key = self._panel_key_for_modality_idx(int(role_data))
-                except Exception:
-                    row_key = ""
-            if row_key != panel_key:
-                continue
-            chk = table.cellWidget(row, 0)
-            if isinstance(chk, QtWidgets.QCheckBox) and chk.isChecked() != bool(checked):
-                chk.blockSignals(True)
-                chk.setChecked(bool(checked))
-                chk.blockSignals(False)
-            break
-
-    def _set_lazy_row_points_state(self, panel_key: str, checked: bool) -> None:
-        """Mirror annotation point visibility changes into lazy-table Pts checkboxes."""
-        table = getattr(self, "lazy_modality_table", None)
-        if table is None:
-            return
-        panel_key = str(panel_key)
-        for row in range(table.rowCount()):
-            name_item = table.item(row, 2)
+            name_item = table.item(row, 3)
             if name_item is None:
                 continue
             role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -200,6 +168,38 @@ class UiExtrasMixin:
                 chk.blockSignals(False)
             break
 
+    def _set_lazy_row_points_state(self, panel_key: str, checked: bool) -> None:
+        """Mirror annotation point visibility changes into lazy-table Pts checkboxes."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        panel_key = str(panel_key)
+        for row in range(table.rowCount()):
+            name_item = table.item(row, 3)
+            if name_item is None:
+                continue
+            role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
+            row_key = ""
+            if isinstance(role_data, str):
+                role_text = str(role_data)
+                if role_text.startswith("builtin:"):
+                    row_key = role_text.split(":", 1)[1]
+                elif role_text.startswith("modality_"):
+                    row_key = role_text
+            else:
+                try:
+                    row_key = self._panel_key_for_modality_idx(int(role_data))
+                except Exception:
+                    row_key = ""
+            if row_key != panel_key:
+                continue
+            chk = table.cellWidget(row, 2)
+            if isinstance(chk, QtWidgets.QCheckBox) and chk.isChecked() != bool(checked):
+                chk.blockSignals(True)
+                chk.setChecked(bool(checked))
+                chk.blockSignals(False)
+            break
+
     def _lazy_annotation_rows(self) -> list[tuple[str, str]]:
         """Return (panel_key, display_name) rows from lazy table in exact visible order."""
         table = getattr(self, "lazy_modality_table", None)
@@ -207,7 +207,7 @@ class UiExtrasMixin:
         if table is None:
             return rows
         for row in range(table.rowCount()):
-            name_item = table.item(row, 2)
+            name_item = table.item(row, 3)
             if name_item is None:
                 continue
             role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -244,13 +244,8 @@ class UiExtrasMixin:
         checkboxes: dict[str, QtWidgets.QCheckBox] = {}
         ordered_rows = self._lazy_annotation_rows()
         if not ordered_rows:
-            # Fallback: keep base views reachable before lazy table is ready.
             labels = self._annotation_view_labels()
-            ordered_rows = [
-                (k, labels.get(k, k))
-                for k in ("frame", "support", "mean", "std")
-                if k in availability
-            ]
+            ordered_rows = [(k, labels.get(k, k)) for k in availability.keys()]
         for key, label in ordered_rows:
             if not bool(availability.get(str(key), False)):
                 continue
@@ -268,49 +263,43 @@ class UiExtrasMixin:
             chk.blockSignals(True)
             chk.setChecked(bool(point_vis.get(str(key), True)))
             chk.blockSignals(False)
-        self.show_frame_chk = self._annotation_view_checkboxes.get("frame")
-        self.show_mean_chk = self._annotation_view_checkboxes.get("mean")
-        self.show_support_chk = self._annotation_view_checkboxes.get("support")
+        self.show_frame_chk = None
+        self.show_mean_chk = None
+        self.show_support_chk = None
         self._refresh_annotation_target_constraints()
 
     def _annotation_view_labels(self) -> dict[str, str]:
         """Return dynamic labels for annotation views."""
-        labels = {
-            "frame": "Frame",
-            "mean": "Mean Projection",
-            "support": "Modality 2",
-            "std": "Std Projection",
-        }
-        manager = None
-        if getattr(self, "controller", None) is not None:
-            manager = getattr(self.controller.session_state, "modality_manager", None)
-        if manager is not None:
-            try:
-                frame_modality = manager.get_modality(0)
-                support_modality = manager.get_modality(1)
-                if frame_modality is not None:
-                    labels["frame"] = str(frame_modality.display_name or "Frame")
-                if support_modality is not None:
-                    labels["support"] = str(support_modality.display_name or "Modality 2")
-            except Exception:
-                pass
+        labels = {}
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         for key, modality in panel_map.items():
             if str(key).startswith("modality_"):
                 labels[str(key)] = str(getattr(modality, "display_name", key))
-        for key in ("mean", "std"):
-            cfg = dict(dict(getattr(self, "_lazy_builtin_views", {}) or {}).get(key, {}) or {})
-            if cfg.get("name"):
-                labels[key] = str(cfg.get("name"))
-        support_cfg = dict(dict(getattr(self, "_lazy_builtin_views", {}) or {}).get("support", {}) or {})
-        if support_cfg.get("name"):
-            labels["support"] = str(support_cfg.get("name"))
-        support_combo = getattr(self, "support_combo", None)
-        if support_combo is not None and support_combo.count() > 0:
-            idx = int(getattr(self, "support_image_idx", support_combo.currentIndex()))
-            if 0 <= idx < support_combo.count():
-                labels["support"] = f"Modality 2 ({support_combo.itemText(idx)})"
+        for key, name in self._lazy_annotation_rows():
+            labels.setdefault(str(key), str(name))
         return labels
+
+    def _default_panel_key(self) -> str:
+        """Return preferred annotation/render target panel key."""
+        rows = self._lazy_annotation_rows()
+        if rows:
+            return str(rows[0][0])
+        for key, visible in dict(getattr(self, "_panel_visibility", {}) or {}).items():
+            if str(key).startswith("modality_") and bool(visible):
+                return str(key)
+        return "modality_0"
+
+    def _image_index_from_id(self, image_id: int) -> int:
+        """Resolve loaded image id to list index; fallback to current index."""
+        target = int(image_id)
+        images = list(getattr(self, "images", []) or [])
+        for idx, img in enumerate(images):
+            try:
+                if int(getattr(img, "id", -1)) == target:
+                    return idx
+            except Exception:
+                continue
+        return int(getattr(self, "current_image_idx", 0))
 
     def _refresh_annotation_target_constraints(self) -> None:
         """Enable target choices based on currently available visible views."""
@@ -319,7 +308,7 @@ class UiExtrasMixin:
         labels = self._annotation_view_labels()
         if combo is None:
             return
-        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        current_target = str(getattr(self, "annotate_target", self._default_panel_key())).strip().lower()
         combo.blockSignals(True)
         combo.clear()
         for key, label in self._lazy_annotation_rows():
@@ -332,6 +321,7 @@ class UiExtrasMixin:
             if hint is not None:
                 hint.setText("No visible target view. Enable at least one view in Lazy Loading.")
                 hint.setVisible(True)
+            self.annotate_target = ""
             return
         idx = combo.findData(current_target)
         if idx < 0:
@@ -352,7 +342,7 @@ class UiExtrasMixin:
         key = str(panel_key or "").strip()
         if not key:
             return
-        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        current_target = str(getattr(self, "annotate_target", self._default_panel_key())).strip().lower()
         if key == current_target and not bool(checked):
             chk = dict(getattr(self, "_annotation_view_checkboxes", {}) or {}).get(key)
             if chk is not None:
@@ -368,6 +358,8 @@ class UiExtrasMixin:
             self._set_lazy_row_points_state(key, bool(checked))
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
+        if hasattr(self, "_set_lazy_apply_button_state"):
+            self._set_lazy_apply_button_state()
         self._refresh_image()
 
     def _build_sidebar_stack(self) -> QtWidgets.QWidget:
@@ -750,22 +742,6 @@ class UiExtrasMixin:
             action.blockSignals(True)
             action.setChecked(checked)
             action.blockSignals(False)
-        if not any(
-            bool(getattr(self, f"dock_{panel_id}", None) and getattr(self, f"dock_{panel_id}").isVisible())
-            for panel_id in (
-                "annotations",
-                "review_queue",
-                "suggestion_explain",
-                "modality_layers",
-                "advanced_analysis",
-                "status_details",
-                "project_relink",
-            )
-        ):
-            if getattr(self, "dock_annotations", None) is not None and not getattr(
-                self, "_right_sidebar_collapsed", False
-            ):
-                self.set_panel_visible("annotations", True, source="right_sidebar:auto_default")
 
     def _ensure_right_sidebar_panels_not_tabified(self) -> None:
         """Keep right inspect panels as standalone docks (never tab peers)."""
@@ -963,10 +939,8 @@ class UiExtrasMixin:
         self._annotation_view_rows_layout = row
         self._annotation_view_checkboxes = {}
         view_specs = [
-            ("frame", "Frame"),
-            ("mean", "Mean Projection"),
-            ("support", "Modality 2"),
-            ("std", "Std Projection"),
+            ("modality_0", "Modality 1"),
+            ("modality_1", "Modality 2"),
         ]
         for key, label in view_specs:
             chk = QtWidgets.QCheckBox(label)
@@ -975,9 +949,9 @@ class UiExtrasMixin:
             chk.toggled.connect(lambda checked, k=key: self._on_panel_toggle(k, bool(checked)))
             row.addWidget(chk)
             self._annotation_view_checkboxes[key] = chk
-        self.show_frame_chk = self._annotation_view_checkboxes.get("frame")
-        self.show_mean_chk = self._annotation_view_checkboxes.get("mean")
-        self.show_support_chk = self._annotation_view_checkboxes.get("support")
+        self.show_frame_chk = None
+        self.show_mean_chk = None
+        self.show_support_chk = None
         vis_layout.addWidget(self.show_ann_master_chk)
         vis_layout.addLayout(row)
         layout.addWidget(vis_group)
@@ -1077,7 +1051,9 @@ class UiExtrasMixin:
                 point_vis[str(key)] = enabled
                 changed_keys.append(str(key))
         self._annotation_panel_visibility = point_vis
-        current_target = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        current_target = str(
+            getattr(self, "annotate_target", self._default_panel_key())
+        ).strip().lower()
         if not enabled:
             # Keep current target visible to avoid accidental hidden-write confusion.
             self._annotation_panel_visibility[current_target] = True
@@ -1458,12 +1434,10 @@ class UiExtrasMixin:
 
     def _get_target_axis(self):
         axes = self.renderer.axes if getattr(self, "renderer", None) is not None else {}
-        target_key = str(getattr(self, "annotate_target", "frame")).strip().lower()
+        target_key = str(getattr(self, "annotate_target", self._default_panel_key())).strip().lower()
         ax = axes.get(target_key)
         if ax is not None:
             return ax
-        if "frame" in axes:
-            return axes.get("frame")
         # Fallback to first available axis to keep annotation workflow operable.
         return next(iter(axes.values()), None)
 
@@ -1510,28 +1484,18 @@ class UiExtrasMixin:
         from phage_annotator.session.migration import ensure_modality_system
 
         manager = ensure_modality_system(self.controller.session_state)
+        self._migrate_builtin_views_to_modalities(manager)
         self._ensure_lazy_sync_group_keys()
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
-        for panel_key in ("frame", "support"):
+        for panel_key in ("modality_0", "modality_1"):
             if panel_key in hidden_base:
                 self._panel_visibility[str(panel_key)] = False
-        if not bool(getattr(self, "_lazy_builtin_seeded", False)) and not builtin:
-            builtin["mean"] = {
-                "name": "Mean Projection",
-                "image_id": int(getattr(self, "current_image_idx", 0)),
-                "projection": "mean",
-            }
-            builtin["std"] = {
-                "name": "Std Projection",
-                "image_id": int(getattr(self, "current_image_idx", 0)),
-                "projection": "std",
-            }
-            self._lazy_builtin_seeded = True
         self._lazy_builtin_views = builtin
         projection_labels = {
             "raw": "Source Frame",
             "mean": "Mean",
+            "median": "Median",
             "std": "Std",
             "min": "Min",
             "max": "Max",
@@ -1539,26 +1503,35 @@ class UiExtrasMixin:
         table.blockSignals(True)
         table.setRowCount(0)
         saw_support = False
-        for modality in manager.get_all_modalities():
-            panel_key = (
-                "frame"
-                if int(modality.idx) == 0
-                else "support"
-                if int(modality.idx) == 1
-                else f"modality_{int(modality.idx)}"
-            )
+        all_modalities = list(manager.get_all_modalities())
+        panel_order = dict(getattr(self, "_lazy_panel_order", {}) or {})
+        next_order = max([int(v) for v in panel_order.values() if str(v).isdigit()] or [0]) + 1
+        modality_rows = []
+        for modality in all_modalities:
+            panel_key = self._panel_key_for_modality_idx(int(modality.idx))
             if panel_key in hidden_base and int(modality.idx) <= 1:
                 continue
+            order_no = panel_order.get(panel_key)
+            if not str(order_no).isdigit():
+                order_no = next_order
+                next_order += 1
+                panel_order[panel_key] = int(order_no)
+            modality_rows.append((int(order_no), int(modality.idx), panel_key, modality))
+        self._lazy_panel_order = panel_order
+        for order_no, _idx, panel_key, modality in sorted(modality_rows, key=lambda x: (int(x[0]), int(x[1]))):
             row = table.rowCount()
             table.insertRow(row)
-            if panel_key == "support":
+            if panel_key == "modality_1":
                 saw_support = True
+            order_item = QtWidgets.QTableWidgetItem(str(int(order_no)))
+            order_item.setData(QtCore.Qt.ItemDataRole.UserRole, int(modality.idx))
+            table.setItem(row, 0, order_item)
             visible_chk = QtWidgets.QCheckBox(table)
             visible_chk.setChecked(bool(self._panel_visibility.get(panel_key, True)))
             visible_chk.toggled.connect(
                 lambda checked, k=panel_key: self._on_panel_toggle(str(k), bool(checked))
             )
-            table.setCellWidget(row, 0, visible_chk)
+            table.setCellWidget(row, 1, visible_chk)
             pts_chk = QtWidgets.QCheckBox(table)
             pts_chk.setChecked(
                 bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get(panel_key, True))
@@ -1566,11 +1539,11 @@ class UiExtrasMixin:
             pts_chk.toggled.connect(
                 lambda checked, k=panel_key: self._on_annotation_panel_toggle(str(k), bool(checked))
             )
-            table.setCellWidget(row, 1, pts_chk)
+            table.setCellWidget(row, 2, pts_chk)
 
             name_item = QtWidgets.QTableWidgetItem(str(modality.display_name))
             name_item.setData(QtCore.Qt.ItemDataRole.UserRole, int(modality.idx))
-            table.setItem(row, 2, name_item)
+            table.setItem(row, 3, name_item)
 
             source_combo = QtWidgets.QComboBox(table)
             for img in getattr(self, "images", []) or []:
@@ -1582,10 +1555,10 @@ class UiExtrasMixin:
                     mid, int(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 3, source_combo)
+            table.setCellWidget(row, 4, source_combo)
 
             view_combo = QtWidgets.QComboBox(table)
-            for projection in ("raw", "mean", "std", "min", "max"):
+            for projection in ("raw", "mean", "median", "std", "min", "max"):
                 view_combo.addItem(str(projection_labels.get(projection, projection.title())), projection)
             proj_idx = max(0, view_combo.findData(str(modality.projection_type.value)))
             view_combo.setCurrentIndex(proj_idx)
@@ -1594,155 +1567,124 @@ class UiExtrasMixin:
                     mid, str(combo.currentData())
                 )
             )
-            table.setCellWidget(row, 4, view_combo)
+            table.setCellWidget(row, 5, view_combo)
             group_item = QtWidgets.QTableWidgetItem(
                 str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get(int(modality.idx), ""))
             )
             group_item.setData(QtCore.Qt.ItemDataRole.UserRole, int(modality.idx))
-            table.setItem(row, 5, group_item)
-            table.setCellWidget(row, 6, self._sync_mode_toolbutton(table, int(modality.idx), "contrast"))
-            table.setCellWidget(row, 7, self._sync_mode_toolbutton(table, int(modality.idx), "zoom"))
-            table.setCellWidget(row, 8, self._sync_mode_toolbutton(table, int(modality.idx), "playback"))
+            table.setItem(row, 6, group_item)
+            table.setCellWidget(row, 7, self._sync_mode_toolbutton(table, int(modality.idx), "contrast"))
+            table.setCellWidget(row, 8, self._sync_mode_toolbutton(table, int(modality.idx), "zoom"))
+            table.setCellWidget(row, 9, self._sync_mode_toolbutton(table, int(modality.idx), "playback"))
 
         # Remove stale dynamic panel visibility keys no longer represented by modalities.
         valid_dynamic_keys = {
             self._panel_key_for_modality_idx(int(modality.idx))
             for modality in manager.get_all_modalities()
-            if int(modality.idx) >= 2
         }
         for key in list(dict(getattr(self, "_panel_visibility", {}) or {}).keys()):
             k = str(key)
             if k.startswith("modality_") and k not in valid_dynamic_keys:
                 self._panel_visibility.pop(k, None)
 
-        # Keep lazy rows aligned with canvas panels: always expose support panel row.
-        if not saw_support and "support" not in hidden_base:
-            row = table.rowCount()
-            table.insertRow(row)
-            visible_chk = QtWidgets.QCheckBox(table)
-            visible_chk.setChecked(bool(self._panel_visibility.get("support", True)))
-            visible_chk.toggled.connect(
-                lambda checked, k="support": self._on_panel_toggle(str(k), bool(checked))
-            )
-            table.setCellWidget(row, 0, visible_chk)
-            pts_chk = QtWidgets.QCheckBox(table)
-            pts_chk.setChecked(
-                bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get("support", True))
-            )
-            pts_chk.toggled.connect(
-                lambda checked, k="support": self._on_annotation_panel_toggle(str(k), bool(checked))
-            )
-            table.setCellWidget(row, 1, pts_chk)
-            support_name = "Modality 2"
-            support_combo = getattr(self, "support_combo", None)
-            if support_combo is not None and support_combo.count() > 0:
-                idx = int(getattr(self, "support_image_idx", support_combo.currentIndex()))
-                if 0 <= idx < support_combo.count():
-                    support_name = f"Modality 2 ({support_combo.itemText(idx)})"
-            name_item = QtWidgets.QTableWidgetItem(support_name)
-            name_item.setData(QtCore.Qt.ItemDataRole.UserRole, "builtin:support")
-            table.setItem(row, 2, name_item)
-            source_combo = QtWidgets.QComboBox(table)
-            for img in getattr(self, "images", []) or []:
-                source_combo.addItem(str(getattr(img, "name", f"Image {img.id}")), int(img.id))
-            src_idx = max(0, source_combo.findData(int(getattr(self, "support_image_idx", 0))))
-            source_combo.setCurrentIndex(src_idx)
-            source_combo.currentIndexChanged.connect(
-                lambda _i, combo=source_combo: self._on_lazy_builtin_support_source_changed(
-                    int(combo.currentData())
-                )
-            )
-            table.setCellWidget(row, 3, source_combo)
-            view_combo = QtWidgets.QComboBox(table)
-            view_combo.addItem("Source Frame", "raw")
-            view_combo.setCurrentIndex(0)
-            view_combo.setEnabled(False)
-            table.setCellWidget(row, 4, view_combo)
-            group_item = QtWidgets.QTableWidgetItem(
-                str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get("builtin:support", ""))
-            )
-            group_item.setData(QtCore.Qt.ItemDataRole.UserRole, "builtin:support")
-            table.setItem(row, 5, group_item)
-            table.setCellWidget(row, 6, self._sync_mode_toolbutton(table, "builtin:support", "contrast"))
-            table.setCellWidget(row, 7, self._sync_mode_toolbutton(table, "builtin:support", "zoom"))
-            table.setCellWidget(row, 8, self._sync_mode_toolbutton(table, "builtin:support", "playback"))
-
-        for panel_key in ("mean", "std"):
-            cfg = dict(self._lazy_builtin_views.get(panel_key, {}) or {})
-            row = table.rowCount()
-            table.insertRow(row)
-            visible_chk = QtWidgets.QCheckBox(table)
-            visible_chk.setChecked(bool(self._panel_visibility.get(panel_key, True)))
-            visible_chk.toggled.connect(
-                lambda checked, k=panel_key: self._on_panel_toggle(str(k), bool(checked))
-            )
-            table.setCellWidget(row, 0, visible_chk)
-            pts_chk = QtWidgets.QCheckBox(table)
-            pts_chk.setChecked(
-                bool(dict(getattr(self, "_annotation_panel_visibility", {}) or {}).get(panel_key, True))
-            )
-            pts_chk.toggled.connect(
-                lambda checked, k=panel_key: self._on_annotation_panel_toggle(str(k), bool(checked))
-            )
-            table.setCellWidget(row, 1, pts_chk)
-            name_item = QtWidgets.QTableWidgetItem(str(cfg.get("name", panel_key.title())))
-            name_item.setData(QtCore.Qt.ItemDataRole.UserRole, f"builtin:{panel_key}")
-            table.setItem(row, 2, name_item)
-            source_combo = QtWidgets.QComboBox(table)
-            for img in getattr(self, "images", []) or []:
-                source_combo.addItem(str(getattr(img, "name", f"Image {img.id}")), int(img.id))
-            src_idx = max(0, source_combo.findData(int(cfg.get("image_id", 0))))
-            source_combo.setCurrentIndex(src_idx)
-            source_combo.currentIndexChanged.connect(
-                lambda _i, k=panel_key, combo=source_combo: self._on_lazy_builtin_source_changed(
-                    str(k), int(combo.currentData())
-                )
-            )
-            table.setCellWidget(row, 3, source_combo)
-            view_combo = QtWidgets.QComboBox(table)
-            for projection in ("raw", "mean", "std", "min", "max"):
-                view_combo.addItem(str(projection_labels.get(projection, projection.title())), projection)
-            proj_idx = max(0, view_combo.findData(str(cfg.get("projection", panel_key))))
-            view_combo.setCurrentIndex(proj_idx)
-            view_combo.currentIndexChanged.connect(
-                lambda _i, k=panel_key, combo=view_combo: self._on_lazy_builtin_projection_changed(
-                    str(k), str(combo.currentData())
-                )
-            )
-            table.setCellWidget(row, 4, view_combo)
-            group_item = QtWidgets.QTableWidgetItem(
-                str(dict(getattr(self, "_lazy_modality_groups", {}) or {}).get(f"builtin:{panel_key}", ""))
-            )
-            group_item.setData(QtCore.Qt.ItemDataRole.UserRole, f"builtin:{panel_key}")
-            table.setItem(row, 5, group_item)
-            table.setCellWidget(
-                row, 6, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "contrast")
-            )
-            table.setCellWidget(
-                row, 7, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "zoom")
-            )
-            table.setCellWidget(
-                row, 8, self._sync_mode_toolbutton(table, f"builtin:{panel_key}", "playback")
-            )
         table.blockSignals(False)
         table.resizeColumnsToContents()
-        table.setColumnWidth(0, 48)
-        table.setColumnWidth(1, 36)
-        if table.columnCount() >= 9:
-            table.setColumnWidth(6, 28)
+        table.setColumnWidth(0, 40)
+        table.setColumnWidth(1, 48)
+        table.setColumnWidth(2, 36)
+        if table.columnCount() >= 10:
             table.setColumnWidth(7, 28)
             table.setColumnWidth(8, 28)
+            table.setColumnWidth(9, 28)
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
 
     def _panel_key_for_modality_idx(self, modality_idx: int) -> str:
         """Map modality index to panel key used by renderer/sync list."""
-        idx = int(modality_idx)
-        if idx == 0:
-            return "frame"
-        if idx == 1:
-            return "support"
-        return f"modality_{idx}"
+        return f"modality_{int(modality_idx)}"
+
+    def _panel_key_from_role_data(self, role_data) -> str:
+        """Resolve lazy-table role payload (int or builtin:*) to panel key."""
+        if isinstance(role_data, str):
+            role_text = str(role_data).strip()
+            if role_text.startswith("builtin:"):
+                return role_text.split(":", 1)[1]
+            if role_text.startswith("modality_"):
+                return role_text
+            return ""
+        try:
+            return self._panel_key_for_modality_idx(int(role_data))
+        except Exception:
+            return ""
+
+    def _reorder_lazy_panel_by_no(self, panel_key: str, requested_no: int) -> None:
+        """Move one panel key to requested 1-based position and renumber all rows."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        ordered_keys: list[str] = []
+        for row in range(table.rowCount()):
+            name_item = table.item(row, 3)
+            if name_item is None:
+                continue
+            key = self._panel_key_from_role_data(name_item.data(QtCore.Qt.ItemDataRole.UserRole))
+            if key:
+                ordered_keys.append(str(key))
+        if not ordered_keys or str(panel_key) not in ordered_keys:
+            return
+        keys = [k for k in ordered_keys if k != str(panel_key)]
+        pos = max(1, int(requested_no))
+        insert_at = min(len(keys), max(0, pos - 1))
+        keys.insert(insert_at, str(panel_key))
+        self._lazy_panel_order = {k: i + 1 for i, k in enumerate(keys)}
+
+    def _migrate_builtin_views_to_modalities(self, manager) -> None:
+        """One-time migration: convert builtin mean/std configs into regular modalities."""
+        if bool(getattr(self, "_lazy_builtin_migrated", False)):
+            return
+        builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+        migrated_any = False
+        try:
+            from phage_annotator.session.modality import ProjectionType
+        except Exception:
+            return
+        existing = list(getattr(manager, "get_all_modalities", lambda: [])() or [])
+        existing_keys = {
+            (int(getattr(mod, "image_id", -1)), str(getattr(getattr(mod, "projection_type", None), "value", "raw")))
+            for mod in existing
+        }
+        for key in ("mean", "std"):
+            cfg = dict(builtin.get(key, {}) or {})
+            if not cfg:
+                continue
+            image_id = int(cfg.get("image_id", getattr(getattr(self, "primary_image", None), "id", 0)))
+            projection_key = str(cfg.get("projection", key)).strip().lower()
+            try:
+                projection = ProjectionType(projection_key)
+            except Exception:
+                projection = ProjectionType.MEAN if key == "mean" else ProjectionType.STD
+            dedupe = (image_id, str(getattr(projection, "value", projection_key)))
+            if dedupe in existing_keys:
+                builtin.pop(key, None)
+                continue
+            name = str(cfg.get("name", "")).strip() or (
+                "Mean Projection (Modality 1)" if key == "mean" else "Std Projection (Modality 1)"
+            )
+            try:
+                modality = manager.add_modality(
+                    image_id=image_id,
+                    custom_name=name,
+                    projection_type=projection,
+                )
+                self._panel_visibility[self._panel_key_for_modality_idx(int(modality.idx))] = True
+                existing_keys.add(dedupe)
+                migrated_any = True
+                builtin.pop(key, None)
+            except Exception:
+                continue
+        if migrated_any:
+            self._lazy_builtin_views = builtin
+        self._lazy_builtin_migrated = True
 
     def _next_numeric_sync_key(self, groups: dict) -> str:
         """Return next available positive integer sync key as string."""
@@ -1782,7 +1724,11 @@ class UiExtrasMixin:
         modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
         for target_role in target_roles:
             row_modes = dict(modes.get(target_role, {}) or {})
-            row_modes[key] = bool(enabled)
+            # Playback cannot be enabled for projection-only views (single-frame).
+            if key == "playback" and bool(enabled) and self._is_single_frame_projection_role(target_role):
+                row_modes[key] = False
+            else:
+                row_modes[key] = bool(enabled)
             modes[target_role] = {
                 "contrast": bool(row_modes.get("contrast", True)),
                 "zoom": bool(row_modes.get("zoom", True)),
@@ -1818,39 +1764,72 @@ class UiExtrasMixin:
                 "zoom": bool(current.get("zoom", True)),
                 "playback": bool(current.get("playback", True)),
             }
+        # Force playback off for single-frame projection roles.
+        for role_key, flags in list(modes.items()):
+            row_modes = dict(flags or {})
+            if self._is_single_frame_projection_role(role_key):
+                row_modes["playback"] = False
+            modes[role_key] = {
+                "contrast": bool(row_modes.get("contrast", True)),
+                "zoom": bool(row_modes.get("zoom", True)),
+                "playback": bool(row_modes.get("playback", True)),
+            }
         self._lazy_sync_modes = modes
 
+    def _is_single_frame_projection_role(self, role_key) -> bool:
+        """Return True when role represents projection-only (non-RAW) row."""
+        try:
+            role = role_key
+            if isinstance(role, str) and role.startswith("builtin:"):
+                panel_key = role.split(":", 1)[1]
+                cfg = dict(dict(getattr(self, "_lazy_builtin_views", {}) or {}).get(panel_key, {}) or {})
+                projection_key = str(cfg.get("projection", panel_key)).strip().lower()
+                return projection_key in {"mean", "median", "std", "min", "max"}
+            if getattr(self, "controller", None) is None:
+                return False
+            from phage_annotator.session.migration import ensure_modality_system
+
+            manager = ensure_modality_system(self.controller.session_state)
+            modality = manager.get_modality(int(role))
+            if modality is None:
+                return False
+            projection_key = str(getattr(getattr(modality, "projection_type", None), "value", "raw")).strip().lower()
+            return projection_key in {"mean", "median", "std", "min", "max"}
+        except Exception:
+            return False
+
     def _sync_mode_toolbutton(self, table, role_key, mode_key: str):
-        """Create compact lazy-table sync mode toggle button (C/Z/P)."""
+        """Create lazy-table sync checkbox widget."""
         mk = str(mode_key).strip().lower()
-        label = {"contrast": "C", "zoom": "Z", "playback": "P"}.get(mk, "?")
         tooltip = {
             "contrast": "Sync contrast for this row's Sync Group",
             "zoom": "Sync zoom/pan for this row's Sync Group",
             "playback": "Sync playback for this row's Sync Group",
         }.get(mk, "Sync mode")
-        btn = QtWidgets.QToolButton(table)
-        btn.setText(label)
-        btn.setCheckable(True)
-        btn.setAutoRaise(False)
-        btn.setFixedWidth(24)
-        btn.setToolTip(tooltip)
-        btn.setProperty("syncMode", mk)
-        btn.setProperty("roleKey", role_key)
-        btn.setChecked(bool(self._sync_modes_for_role(role_key).get(mk, True)))
-        btn.toggled.connect(
+        chk = QtWidgets.QCheckBox(table)
+        chk.setText("")
+        chk.setToolTip(tooltip)
+        chk.setProperty("syncMode", mk)
+        chk.setProperty("roleKey", role_key)
+        if mk == "playback" and self._is_single_frame_projection_role(role_key):
+            chk.setChecked(False)
+            chk.setEnabled(False)
+            chk.setToolTip("Playback disabled for projection-only views (single-frame).")
+        else:
+            chk.setChecked(bool(self._sync_modes_for_role(role_key).get(mk, True)))
+        chk.toggled.connect(
             lambda checked, rk=role_key, mode=mk: self._set_sync_mode_for_role(
                 rk, mode, bool(checked)
             )
         )
-        return btn
+        return chk
 
     def _role_key_for_lazy_row(self, row: int):
         """Return role key (int or builtin:*) for a lazy-table row."""
         table = getattr(self, "lazy_modality_table", None)
         if table is None or row < 0 or row >= table.rowCount():
             return None
-        item = table.item(row, 2)
+        item = table.item(row, 3)
         if item is None:
             return None
         role_data = item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -1877,7 +1856,7 @@ class UiExtrasMixin:
         mk = str(mode_key).strip().lower()
         if mk not in {"contrast", "zoom", "playback"}:
             return
-        col = {"contrast": 6, "zoom": 7, "playback": 8}[mk]
+        col = {"contrast": 7, "zoom": 8, "playback": 9}[mk]
         role_set = set(role_keys or set())
         for row in range(table.rowCount()):
             rk = self._role_key_for_lazy_row(row)
@@ -1887,10 +1866,13 @@ class UiExtrasMixin:
             if widget is None:
                 continue
             target_checked = bool(self._sync_modes_for_role(rk).get(mk, True))
+            force_disable = mk == "playback" and self._is_single_frame_projection_role(rk)
             widget.blockSignals(True)
             try:
                 if hasattr(widget, "setChecked"):
-                    widget.setChecked(target_checked)
+                    widget.setChecked(False if force_disable else target_checked)
+                if hasattr(widget, "setEnabled"):
+                    widget.setEnabled(not force_disable)
             finally:
                 widget.blockSignals(False)
 
@@ -1907,7 +1889,7 @@ class UiExtrasMixin:
             mid = int(modality.idx)
             key = str(groups.get(mid, "")).strip()
             if not key.isdigit():
-                groups[mid] = self._next_numeric_sync_key(groups)
+                groups[mid] = "1"
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         for builtin_key in ("support", "mean", "std"):
             if builtin_key != "support" and builtin_key not in builtin:
@@ -1915,7 +1897,7 @@ class UiExtrasMixin:
             role_key = f"builtin:{builtin_key}"
             key = str(groups.get(role_key, "")).strip()
             if not key.isdigit():
-                groups[role_key] = self._next_numeric_sync_key(groups)
+                groups[role_key] = "1"
         self._lazy_modality_groups = groups
         self._ensure_lazy_sync_modes()
 
@@ -1923,44 +1905,56 @@ class UiExtrasMixin:
         """Add a new modality/view row and reflect it immediately on canvas."""
         if getattr(self, "controller", None) is None:
             return
+        table = getattr(self, "lazy_modality_table", None)
+        if table is not None:
+            table.clearFocus()
         from phage_annotator.session.migration import ensure_modality_system
         from phage_annotator.session.modality import ProjectionType
 
-        proj_key = str(projection_key).strip().lower()
-        if proj_key in {"mean", "std"}:
-            builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
-            cfg = dict(builtin.get(proj_key, {}) or {})
-            cfg["projection"] = proj_key
-            cfg.setdefault("name", "Mean Projection" if proj_key == "mean" else "Std Projection")
-            cfg.setdefault("image_id", int(getattr(self, "current_image_idx", 0)))
-            builtin[proj_key] = cfg
-            self._lazy_builtin_views = builtin
-            self._panel_visibility[proj_key] = True
-            self._ensure_lazy_sync_group_keys()
-            self._refresh_lazy_modality_table()
-            self._refresh_annotation_view_controls()
-            self._refresh_image()
-            return
+        proj_key = str(projection_key or "raw").strip().lower()
 
         manager = ensure_modality_system(self.controller.session_state)
         proj = {
             "raw": ProjectionType.RAW,
             "mean": ProjectionType.MEAN,
+            "median": ProjectionType.MEDIAN,
             "std": ProjectionType.STD,
             "min": ProjectionType.MIN,
             "max": ProjectionType.MAX,
         }.get(proj_key, ProjectionType.RAW)
         try:
             modality = manager.add_modality(
-                image_id=int(getattr(self, "current_image_idx", 0)),
+                image_id=int(getattr(getattr(self, "primary_image", None), "id", 0)),
                 projection_type=proj,
             )
         except Exception as exc:
             self._set_status(f"Could not add modality/view: {exc}")
             return
         self._panel_visibility[f"modality_{int(modality.idx)}"] = True
+        panel_key = self._panel_key_for_modality_idx(int(modality.idx))
+        order_map = dict(getattr(self, "_lazy_panel_order", {}) or {})
+        next_no = max([int(v) for v in order_map.values() if str(v).isdigit()] or [0]) + 1
+        order_map[str(panel_key)] = int(next_no)
+        self._lazy_panel_order = order_map
+        groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
+        groups[int(modality.idx)] = "1"
+        self._lazy_modality_groups = groups
         self._ensure_lazy_sync_group_keys()
         self._refresh_lazy_modality_table()
+        table = getattr(self, "lazy_modality_table", None)
+        if table is not None:
+            for row in range(table.rowCount()):
+                name_item = table.item(row, 3)
+                if name_item is None:
+                    continue
+                role_data = name_item.data(QtCore.Qt.ItemDataRole.UserRole)
+                try:
+                    role_idx = int(role_data)
+                except Exception:
+                    continue
+                if role_idx == int(modality.idx):
+                    table.selectRow(row)
+                    break
         if hasattr(self, "_update_analysis_panel_modalities"):
             self._update_analysis_panel_modalities()
         if hasattr(self, "_refresh_modality_layers_panel"):
@@ -1976,7 +1970,7 @@ class UiExtrasMixin:
         row = int(table.currentRow())
         if row < 0:
             return
-        item = table.item(row, 2)
+        item = table.item(row, 3)
         if item is None:
             return
         role_data = item.data(QtCore.Qt.ItemDataRole.UserRole)
@@ -1994,6 +1988,9 @@ class UiExtrasMixin:
                 modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
                 modes.pop(f"builtin:{key}", None)
                 self._lazy_sync_modes = modes
+                order_map = dict(getattr(self, "_lazy_panel_order", {}) or {})
+                order_map.pop(str(key), None)
+                self._lazy_panel_order = order_map
                 self._on_panel_toggle(str(key), False)
                 self._refresh_lazy_modality_table()
                 self._refresh_annotation_view_controls()
@@ -2007,6 +2004,9 @@ class UiExtrasMixin:
             hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
             hidden_base.add(str(panel_key))
             self._lazy_hidden_base_panel_keys = hidden_base
+            order_map = dict(getattr(self, "_lazy_panel_order", {}) or {})
+            order_map.pop(str(panel_key), None)
+            self._lazy_panel_order = order_map
             self._on_panel_toggle(str(panel_key), False)
             self._refresh_lazy_modality_table()
             self._refresh_annotation_view_controls()
@@ -2014,6 +2014,9 @@ class UiExtrasMixin:
             return
         if manager.remove_modality(modality_idx):
             self._panel_visibility.pop(f"modality_{modality_idx}", None)
+            order_map = dict(getattr(self, "_lazy_panel_order", {}) or {})
+            order_map.pop(f"modality_{modality_idx}", None)
+            self._lazy_panel_order = order_map
             modes = dict(getattr(self, "_lazy_sync_modes", {}) or {})
             modes.pop(int(modality_idx), None)
             self._lazy_sync_modes = modes
@@ -2026,40 +2029,74 @@ class UiExtrasMixin:
         if item is None or getattr(self, "controller", None) is None:
             return
         col = int(item.column())
-        if col not in (2, 5):
+        if col not in (0, 3, 6):
             return
         from phage_annotator.session.migration import ensure_modality_system
 
         role_data = item.data(QtCore.Qt.ItemDataRole.UserRole)
         role_text = str(role_data)
+        panel_key = ""
         if role_text.startswith("builtin:"):
             panel_key = role_text.split(":", 1)[1]
-            if col == 5:
+        else:
+            try:
+                panel_key = self._panel_key_for_modality_idx(int(role_data))
+            except Exception:
+                panel_key = ""
+        if col == 0:
+            if not panel_key:
+                return
+            new_order = str(item.text()).strip()
+            if not new_order.isdigit():
+                item.setText(str(dict(getattr(self, "_lazy_panel_order", {}) or {}).get(panel_key, 1)))
+                return
+            self._reorder_lazy_panel_by_no(str(panel_key), int(new_order))
+            self._refresh_lazy_modality_table()
+            self._refresh_annotation_view_controls()
+            self._refresh_image()
+            return
+        if role_text.startswith("builtin:"):
+            if col == 6:
                 groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
                 new_key = str(item.text()).strip()
                 if not new_key.isdigit():
-                    new_key = self._next_numeric_sync_key(groups)
+                    new_key = "1"
                 groups[f"builtin:{panel_key}"] = new_key
                 self._lazy_modality_groups = groups
                 item.setText(new_key)
                 self._apply_lazy_group_sync_selection(new_key)
                 self._set_status("Sync group updated.")
                 return
-            builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
-            cfg = dict(builtin.get(panel_key, {}) or {})
-            cfg["name"] = str(item.text()).strip() or cfg.get("name", panel_key.title())
-            builtin[panel_key] = cfg
-            self._lazy_builtin_views = builtin
+            new_name = str(item.text()).strip() or panel_key.title()
+            if panel_key == "support":
+                # Support title is backed by modality idx=1 in manager.
+                manager = ensure_modality_system(self.controller.session_state)
+                support_modality = manager.get_modality(1)
+                if support_modality is not None:
+                    support_modality.display_name = new_name
+                else:
+                    builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+                    cfg = dict(builtin.get("support", {}) or {})
+                    cfg["name"] = new_name
+                    cfg["image_id"] = int(getattr(getattr(self, "support_image", None), "id", -1))
+                    builtin["support"] = cfg
+                    self._lazy_builtin_views = builtin
+            else:
+                builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+                cfg = dict(builtin.get(panel_key, {}) or {})
+                cfg["name"] = new_name
+                builtin[panel_key] = cfg
+                self._lazy_builtin_views = builtin
             self._refresh_annotation_view_controls()
             self._refresh_image()
             return
 
         modality_idx = int(role_data)
-        if col == 5:
+        if col == 6:
             groups = dict(getattr(self, "_lazy_modality_groups", {}) or {})
             new_key = str(item.text()).strip()
             if not new_key.isdigit():
-                new_key = self._next_numeric_sync_key(groups)
+                new_key = "1"
             groups[int(modality_idx)] = new_key
             self._lazy_modality_groups = groups
             item.setText(new_key)
@@ -2100,8 +2137,139 @@ class UiExtrasMixin:
         if hasattr(self, "_on_sync_mode_changed"):
             self._on_sync_mode_changed()
 
-    def _on_lazy_modality_source_changed(self, modality_idx: int, image_id: int) -> None:
+    def _lazy_auto_update_enabled(self) -> bool:
+        """Return whether lazy-table source/view edits apply immediately."""
+        chk = getattr(self, "lazy_auto_update_chk", None)
+        if chk is None:
+            return True
+        try:
+            return bool(chk.isChecked())
+        except Exception:
+            return True
+
+    def _set_lazy_apply_button_state(self) -> None:
+        """Update apply button enabled state based on pending edits."""
+        btn = getattr(self, "lazy_apply_btn", None)
+        if btn is None:
+            return
+        pending = dict(getattr(self, "_lazy_pending_updates", {}) or {})
+        btn.setEnabled(bool(pending))
+
+    def _sync_builtin_projections_with_primary_source(
+        self,
+        old_primary_id: int,
+        new_primary_id: int,
+    ) -> None:
+        """Keep mean/std builtins following Modality 1 unless user explicitly diverged."""
+        old_id = int(old_primary_id)
+        new_id = int(new_primary_id)
+        if old_id == new_id:
+            return
+        builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+        changed = False
+        for key in ("mean", "std"):
+            cfg = dict(builtin.get(key, {}) or {})
+            current = cfg.get("image_id", old_id)
+            try:
+                current_id = int(current)
+            except Exception:
+                current_id = old_id
+            # Follow primary when still on old/default source.
+            if current_id == old_id:
+                cfg["image_id"] = new_id
+                builtin[key] = cfg
+                changed = True
+        if changed:
+            self._lazy_builtin_views = builtin
+
+    def _on_lazy_auto_update_toggled(self, checked: bool) -> None:
+        """Persist auto-update preference for lazy-table edits."""
+        enabled = bool(checked)
+        if getattr(self, "_settings", None) is not None:
+            self._settings.setValue("lazyModalityAutoUpdate", enabled)
+        if enabled:
+            self._apply_lazy_pending_updates()
+        else:
+            self._set_status("Lazy table edits staged. Click Update Canvas to apply.")
+            self._set_lazy_apply_button_state()
+
+    def _queue_lazy_pending_update(self, key: tuple, callback, description: str) -> None:
+        """Queue one lazy-table change for manual apply mode."""
+        pending = dict(getattr(self, "_lazy_pending_updates", {}) or {})
+        pending[tuple(key)] = (callback, str(description))
+        self._lazy_pending_updates = pending
+        self._set_lazy_apply_button_state()
+        self._set_status(f"Pending updates: {len(pending)}")
+
+    def _apply_lazy_pending_updates(self) -> None:
+        """Apply queued lazy-table changes when auto-update is disabled."""
+        pending = dict(getattr(self, "_lazy_pending_updates", {}) or {})
+        if not pending:
+            self._set_lazy_apply_button_state()
+            return
+        self._lazy_pending_updates = {}
+        self._set_lazy_apply_button_state()
+        applied = 0
+        for callback, _desc in pending.values():
+            try:
+                callback()
+                applied += 1
+            except Exception:
+                continue
+        if applied > 0:
+            self._set_status(f"Applied {applied} lazy-table update(s).")
+        else:
+            self._set_status("No lazy-table updates applied.")
+
+    def _on_lazy_modality_source_changed(
+        self,
+        modality_idx: int,
+        image_id: int,
+        *,
+        force_apply: bool = False,
+    ) -> None:
         if getattr(self, "controller", None) is None:
+            return
+        if (not force_apply) and (not self._lazy_auto_update_enabled()):
+            key = ("modality_source", int(modality_idx))
+            self._queue_lazy_pending_update(
+                key,
+                lambda mid=int(modality_idx), img=int(image_id): self._on_lazy_modality_source_changed(
+                    mid, img, force_apply=True
+                ),
+                f"modality {int(modality_idx)} source",
+            )
+            return
+        # Base rows are coupled to main primary/support context.
+        if int(modality_idx) == 0:
+            old_primary_id = int(getattr(getattr(self, "primary_image", None), "id", -1))
+            image_idx = self._image_index_from_id(int(image_id))
+            self._set_primary_combo(
+                int(image_idx),
+                refresh_lazy_table=False,
+                schedule_prefetch=False,
+            )
+            new_primary_id = int(getattr(getattr(self, "primary_image", None), "id", -1))
+            self._sync_builtin_projections_with_primary_source(old_primary_id, new_primary_id)
+            if hasattr(self, "proj_cache"):
+                try:
+                    self.proj_cache.invalidate_image(old_primary_id)
+                    self.proj_cache.invalidate_image(new_primary_id)
+                except Exception:
+                    pass
+            if hasattr(self, "_refresh_lazy_modality_table"):
+                self._refresh_lazy_modality_table()
+            return
+        if int(modality_idx) == 1:
+            image_idx = self._image_index_from_id(int(image_id))
+            self._set_support_combo(int(image_idx), refresh_lazy_table=False)
+            builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+            support_cfg = dict(builtin.get("support", {}) or {})
+            support_cfg["image_id"] = int(image_id)
+            builtin["support"] = support_cfg
+            self._lazy_builtin_views = builtin
+            if hasattr(self, "_refresh_lazy_modality_table"):
+                self._refresh_lazy_modality_table()
             return
         from phage_annotator.session.migration import ensure_modality_system
 
@@ -2109,11 +2277,34 @@ class UiExtrasMixin:
         modality = manager.get_modality(int(modality_idx))
         if modality is None:
             return
+        old_image_id = int(getattr(modality, "image_id", -1))
         modality.image_id = int(image_id)
+        if hasattr(self, "proj_cache"):
+            try:
+                self.proj_cache.invalidate_image(old_image_id)
+                self.proj_cache.invalidate_image(int(image_id))
+            except Exception:
+                pass
         self._refresh_image()
 
-    def _on_lazy_modality_projection_changed(self, modality_idx: int, projection_key: str) -> None:
+    def _on_lazy_modality_projection_changed(
+        self,
+        modality_idx: int,
+        projection_key: str,
+        *,
+        force_apply: bool = False,
+    ) -> None:
         if getattr(self, "controller", None) is None:
+            return
+        if (not force_apply) and (not self._lazy_auto_update_enabled()):
+            key = ("modality_projection", int(modality_idx))
+            self._queue_lazy_pending_update(
+                key,
+                lambda mid=int(modality_idx), proj=str(projection_key): self._on_lazy_modality_projection_changed(
+                    mid, proj, force_apply=True
+                ),
+                f"modality {int(modality_idx)} projection",
+            )
             return
         from phage_annotator.session.migration import ensure_modality_system
         from phage_annotator.session.modality import ProjectionType
@@ -2126,19 +2317,61 @@ class UiExtrasMixin:
             modality.projection_type = ProjectionType(str(projection_key).strip().lower())
         except Exception:
             modality.projection_type = ProjectionType.RAW
+        # Projection rows are single-frame, so playback sync must be forced off.
+        self._ensure_lazy_sync_modes()
+        self._sync_mode_widgets_for_roles({int(modality_idx)}, "playback")
         self._refresh_image()
 
-    def _on_lazy_builtin_source_changed(self, panel_key: str, image_id: int) -> None:
+    def _on_lazy_builtin_source_changed(
+        self,
+        panel_key: str,
+        image_id: int,
+        *,
+        force_apply: bool = False,
+    ) -> None:
         """Update source image for built-in mean/std panel rows."""
+        if (not force_apply) and (not self._lazy_auto_update_enabled()):
+            key = ("builtin_source", str(panel_key))
+            self._queue_lazy_pending_update(
+                key,
+                lambda pk=str(panel_key), img=int(image_id): self._on_lazy_builtin_source_changed(
+                    pk, img, force_apply=True
+                ),
+                f"{str(panel_key)} source",
+            )
+            return
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         cfg = dict(builtin.get(str(panel_key), {}) or {})
+        old_image_id = int(cfg.get("image_id", getattr(getattr(self, "primary_image", None), "id", -1)))
         cfg["image_id"] = int(image_id)
         builtin[str(panel_key)] = cfg
         self._lazy_builtin_views = builtin
+        if hasattr(self, "proj_cache"):
+            try:
+                self.proj_cache.invalidate_image(old_image_id)
+                self.proj_cache.invalidate_image(int(image_id))
+            except Exception:
+                pass
         self._refresh_image()
 
-    def _on_lazy_builtin_projection_changed(self, panel_key: str, projection_key: str) -> None:
+    def _on_lazy_builtin_projection_changed(
+        self,
+        panel_key: str,
+        projection_key: str,
+        *,
+        force_apply: bool = False,
+    ) -> None:
         """Update projection type for built-in mean/std panel rows."""
+        if (not force_apply) and (not self._lazy_auto_update_enabled()):
+            key = ("builtin_projection", str(panel_key))
+            self._queue_lazy_pending_update(
+                key,
+                lambda pk=str(panel_key), proj=str(projection_key): self._on_lazy_builtin_projection_changed(
+                    pk, proj, force_apply=True
+                ),
+                f"{str(panel_key)} projection",
+            )
+            return
         if str(panel_key) == "support":
             return
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
@@ -2146,14 +2379,38 @@ class UiExtrasMixin:
         cfg["projection"] = str(projection_key).strip().lower()
         builtin[str(panel_key)] = cfg
         self._lazy_builtin_views = builtin
+        role_key = f"builtin:{str(panel_key)}"
+        self._ensure_lazy_sync_modes()
+        self._sync_mode_widgets_for_roles({role_key}, "playback")
         self._refresh_image()
 
-    def _on_lazy_builtin_support_source_changed(self, image_id: int) -> None:
+    def _on_lazy_builtin_support_source_changed(
+        self,
+        image_id: int,
+        *,
+        force_apply: bool = False,
+    ) -> None:
         """Update support panel source image from lazy table."""
+        if (not force_apply) and (not self._lazy_auto_update_enabled()):
+            key = ("builtin_support_source", "support")
+            self._queue_lazy_pending_update(
+                key,
+                lambda img=int(image_id): self._on_lazy_builtin_support_source_changed(
+                    img, force_apply=True
+                ),
+                "support source",
+            )
+            return
         try:
-            self._set_support_combo(int(image_id))
+            image_idx = self._image_index_from_id(int(image_id))
+            self._set_support_combo(int(image_idx), refresh_lazy_table=False)
+            builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+            support_cfg = dict(builtin.get("support", {}) or {})
+            support_cfg["image_id"] = int(image_id)
+            builtin["support"] = support_cfg
+            self._lazy_builtin_views = builtin
         except Exception:
-            self.support_image_idx = int(image_id)
+            self.support_image_idx = self._image_index_from_id(int(image_id))
             self._refresh_image()
 
     def _focus_playback_controls(self) -> None:
@@ -2663,12 +2920,24 @@ class UiExtrasMixin:
 
     def _restore_layout(self) -> None:
         """Restore the user's custom layout from QSettings if present."""
-        geometry = self._settings.value("customGeometry", type=QtCore.QByteArray)
-        state = self._settings.value("customState", type=QtCore.QByteArray)
-        if geometry:
-            self.restoreGeometry(geometry)
-        if state:
-            self.restoreState(state)
+        # DISABLED: Layout restoration disabled to prevent floating dock windows
+        # geometry = self._settings.value("customGeometry", type=QtCore.QByteArray)
+        # state = self._settings.value("customState", type=QtCore.QByteArray)
+        # if geometry:
+        #     self.restoreGeometry(geometry)
+        # if state:
+        #     self.restoreState(state)
+        
+        # Ensure no docks are floating
+        for dock_attr in dir(self):
+            if dock_attr.startswith("dock_") and hasattr(self, dock_attr):
+                dock = getattr(self, dock_attr)
+                if isinstance(dock, QtWidgets.QDockWidget) and dock is not None:
+                    try:
+                        dock.setFloating(False)
+                    except Exception:
+                        pass
+        
         if self.dock_sidebar is not None and not self.dock_sidebar.isVisible():
             self.set_panel_visible("sidebar", True, source="layout_restore")
         # Keep status details dock opt-in only; do not auto-restore it.
@@ -2744,8 +3013,6 @@ class UiExtrasMixin:
         if name in {"Default", "Annotate", "Analyze", "Assist Expert"}:
             _dock_to_area("annotations", QtCore.Qt.RightDockWidgetArea)
             _dock_to_area("review_queue", QtCore.Qt.RightDockWidgetArea)
-        if name in {"Analyze", "Assist Expert"}:
-            _dock_to_area("qc_issues", QtCore.Qt.BottomDockWidgetArea)
         if name == "Analyze":
             _dock_to_area("results", QtCore.Qt.BottomDockWidgetArea)
             _dock_to_area("threshold", QtCore.Qt.BottomDockWidgetArea)
@@ -2770,9 +3037,11 @@ class UiExtrasMixin:
                 "hist": False,
                 "profile": False,
                 "logs": False,
+                "performance": False,
+                "density": False,
                 "threshold": False,
                 "particles": False,
-                "qc_issues": True,
+                "qc_issues": False,
                 "modality_layers": False,
                 "orthoview": False,
             },
@@ -2791,7 +3060,9 @@ class UiExtrasMixin:
                 "hist": False,
                 "profile": False,
                 "logs": False,
-                "qc_issues": True,
+                "performance": False,
+                "density": False,
+                "qc_issues": False,
                 "modality_layers": False,
                 "orthoview": False,
             },
@@ -2810,7 +3081,9 @@ class UiExtrasMixin:
                 "hist": False,
                 "profile": False,
                 "logs": False,
-                "qc_issues": True,
+                "performance": False,
+                "density": False,
+                "qc_issues": False,
                 "modality_layers": False,
                 "orthoview": False,
             },
@@ -2830,7 +3103,9 @@ class UiExtrasMixin:
                 "hist": False,
                 "profile": False,
                 "logs": False,
-                "qc_issues": True,
+                "performance": False,
+                "density": False,
+                "qc_issues": False,
                 "modality_layers": False,
             },
             "Assist Expert": {
@@ -2840,7 +3115,7 @@ class UiExtrasMixin:
                 "suggestion_explain": True,
                 "status_details": False,
                 "advanced_analysis": False,
-                "qc_issues": True,
+                "qc_issues": False,
                 "roi": False,
                 "roi_manager": False,
                 "results": False,
@@ -2849,6 +3124,7 @@ class UiExtrasMixin:
                 "hist": False,
                 "profile": False,
                 "logs": False,
+                "performance": False,
                 "metadata": False,
                 "density": False,
                 "modality_layers": True,
@@ -2894,6 +3170,14 @@ class UiExtrasMixin:
             self.dock_review_queue.raise_()
         if name == "Default" and self.dock_annotations is not None:
             self.dock_annotations.raise_()
+        # Keep all docks embedded; presets should not spawn floating windows.
+        for dock in (getattr(self, "panel_docks", {}) or {}).values():
+            if dock is None:
+                continue
+            try:
+                dock.setFloating(False)
+            except Exception:
+                continue
         self.statusBar().showMessage(
             "Layout changed. Use Layout > Layouts > Undo Layout Change.",
             8000,
@@ -2921,9 +3205,32 @@ class UiExtrasMixin:
             per = max(120, int(max(1, self.height()) * 0.20))
         self.resizeDocks(bottom_visible, [per for _ in bottom_visible], QtCore.Qt.Orientation.Vertical)
 
+    def _on_canvas_grid_rows_changed(self, value: int) -> None:
+        """Set preferred canvas grid rows (0 = automatic)."""
+        self._canvas_layout_rows = max(0, int(value))
+        if getattr(self, "_settings", None) is not None:
+            self._settings.setValue("canvasLayoutRows", int(self._canvas_layout_rows))
+        self._rebuild_figure_layout()
+        self._refresh_image()
+
+    def _on_canvas_grid_cols_changed(self, value: int) -> None:
+        """Set preferred canvas grid columns (0 = automatic)."""
+        self._canvas_layout_cols = max(0, int(value))
+        if getattr(self, "_settings", None) is not None:
+            self._settings.setValue("canvasLayoutCols", int(self._canvas_layout_cols))
+        self._rebuild_figure_layout()
+        self._refresh_image()
+
     def closeEvent(self, event) -> None:
         """Persist layout before closing the main window."""
         self._save_layout()
+        lock = getattr(self, "_instance_lock", None)
+        if lock is not None:
+            try:
+                if lock.isLocked():
+                    lock.unlock()
+            except Exception:
+                pass
         for fig_name in ("hist_fig", "profile_fig"):
             fig = getattr(self, fig_name, None)
             if fig is not None:

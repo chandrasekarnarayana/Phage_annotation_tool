@@ -164,155 +164,171 @@ class RenderingMixin:
         if not self.images:
             return
         prim = self.primary_image
-        supp = self.support_image
         self._ensure_loaded(self.current_image_idx)
-        self._ensure_loaded(self.support_image_idx)
         if prim.array is None:
             return
         layout_spec = self._current_layout_spec()
         self._rebuild_figure_layout(layout_spec)
         self._capture_zoom_state()
+        visible_order = [
+            k for k in layout_spec.get("order", [])
+            if bool(layout_spec.get("panel_visibility", {}).get(k, False))
+        ]
+        primary_panel = str(visible_order[0]) if visible_order else self._default_panel_key()
+        if not visible_order:
+            self._update_axes_info()
+            self._update_axis_warning()
+            self._update_status()
+            return
         t_idx, z_idx = self._slice_indices(prim)
-        raw_slice_data = self._slice_data(prim)
-        slice_data = raw_slice_data
-        composite_frame = self._build_multichannel_frame(prim, t_idx, z_idx)
-        if composite_frame is not None:
-            slice_data = composite_frame
-        support_slice = self._slice_data(supp) if supp.array is not None else None
+        panel_specs = dict(getattr(self, "_panel_modality_map", {}) or {})
+
+        def _panel_projection_key(panel_key: str, default_projection: str = "raw") -> str:
+            spec = panel_specs.get(panel_key)
+            if spec is None:
+                return str(default_projection).strip().lower()
+            projection = getattr(spec, "projection_type", default_projection)
+            return str(getattr(projection, "value", projection)).strip().lower()
+
+        def _panel_image(panel_key: str):
+            spec = panel_specs.get(panel_key)
+            default_img = prim
+            if str(panel_key) == "modality_1":
+                default_img = self.support_image
+            if spec is None:
+                return default_img
+            image_id = int(getattr(spec, "image_id", getattr(default_img, "id", -1)))
+            img = next((cand for cand in self.images if int(getattr(cand, "id", -1)) == image_id), None)
+            return img if img is not None else default_img
+
+        panel_images_raw: Dict[str, np.ndarray] = {}
+        panel_images: Dict[str, np.ndarray] = {}
+        panel_sources: Dict[str, object] = {}
+        panel_projections: Dict[str, str] = {}
+        panel_projection_ready: Dict[str, bool] = {}
         crop_rect = self.crop_rect
-        if crop_rect:
-            slice_data = self._apply_crop_rect(
-                slice_data, crop_rect, (slice_data.shape[0], slice_data.shape[1])
-            )
-            if support_slice is not None:
-                support_slice = self._apply_crop_rect(
-                    support_slice,
-                    crop_rect,
-                    (support_slice.shape[0], support_slice.shape[1]),
+        for panel_key in visible_order:
+            img = _panel_image(panel_key)
+            self._ensure_loaded(int(getattr(img, "id", self.current_image_idx)))
+            if getattr(img, "array", None) is None:
+                continue
+            projection_key = _panel_projection_key(panel_key, "raw")
+            panel_sources[panel_key] = img
+            panel_projections[panel_key] = projection_key
+            data = None
+            ready = True
+            if projection_key == "raw":
+                data = self._slice_data(img)
+                if panel_key == primary_panel:
+                    composite_frame = self._build_multichannel_frame(img, t_idx, z_idx)
+                    if composite_frame is not None:
+                        data = composite_frame
+            else:
+                spec = panel_specs.get(panel_key)
+                axis_override = (
+                    getattr(getattr(spec, "display_settings", None), "projection_axis", None)
+                    if spec is not None
+                    else None
                 )
-        if self._binary_view_enabled and self._binary_view_mask is not None:
+                modality_idx = int(getattr(spec, "idx", -1)) if spec is not None else None
+                data, ready = self._get_projection(
+                    img,
+                    projection_key,
+                    axis_override=axis_override,
+                    modality_idx=modality_idx,
+                )
+                if data is None:
+                    data = self._slice_data(img)
+            if crop_rect:
+                data = self._apply_crop_rect(data, crop_rect, (data.shape[0], data.shape[1]))
+            panel_images_raw[panel_key] = data
+            panel_projection_ready[panel_key] = bool(ready)
+
+        if primary_panel in panel_images_raw and self._binary_view_enabled and self._binary_view_mask is not None:
             mask = self._binary_view_mask
             if crop_rect:
                 mask = self._apply_crop_rect(mask, crop_rect, mask.shape)
-            slice_data = mask.astype(np.float32, copy=False)
+            panel_images_raw[primary_panel] = mask.astype(np.float32, copy=False)
 
-        mean_data, mean_ready = self._get_projection(prim, "mean")
-        std_data, std_ready = self._get_projection(prim, "std")
-        if mean_data is None:
-            mean_data = np.zeros_like(raw_slice_data)
-        if std_data is None:
-            std_data = np.zeros_like(raw_slice_data)
-
-        self._last_display_shape = slice_data.shape
+        if primary_panel not in panel_images_raw:
+            primary_panel = next(iter(panel_images_raw.keys()), primary_panel)
+        if not panel_images_raw:
+            self._update_axes_info()
+            self._update_axis_warning()
+            self._update_status()
+            return
+        self._last_display_shape = panel_images_raw[primary_panel].shape
 
         # Interactive downsampling (display-only).
-        slice_display = slice_data
-        support_display = support_slice
-        mean_display = mean_data
-        std_display = std_data
         level = 0
-        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
-        mean_ax = self.renderer.axes.get("mean") if getattr(self, "renderer", None) is not None else None
-        std_ax = self.renderer.axes.get("std") if getattr(self, "renderer", None) is not None else None
+        frame_ax = None
+        if getattr(self, "renderer", None) is not None:
+            frame_ax = self.renderer.axes.get(primary_panel)
+            if frame_ax is None:
+                frame_ax = next(iter(self.renderer.axes.values()), None)
         if self._interactive:
-            level = self._select_pyramid_level(frame_ax, slice_data.shape)
+            level = self._select_pyramid_level(frame_ax, panel_images_raw[primary_panel].shape)
             if level > 0:
                 scale = 2**level
                 self._render_scales = {ax: scale for ax in self.renderer.axes.values()}
-                axis = self._projection_axis_for_image(prim)
-                mean_kind = "mean" if axis == "tz" else f"mean:{axis}"
-                std_kind = "std" if axis == "tz" else f"std:{axis}"
-                if slice_data.ndim == 3:
-                    # RGB composites are display-only and bypass grayscale pyramid cache.
-                    slice_display = self._downsample(slice_data, 2**level)
-                else:
-                    slice_display = self._get_pyramid_display(
-                        prim.id,
-                        "frame",
-                        slice_data,
-                        t_idx,
-                        z_idx,
-                        self.crop_rect or (0, 0, 0, 0),
-                        level,
-                    )
-                mean_display = self._get_pyramid_display(
-                    prim.id,
-                    mean_kind,
-                    mean_data,
-                    -1,
-                    -1,
-                    self.crop_rect or (0, 0, 0, 0),
-                    level,
-                )
-                std_display = self._get_pyramid_display(
-                    prim.id,
-                    std_kind,
-                    std_data,
-                    -1,
-                    -1,
-                    self.crop_rect or (0, 0, 0, 0),
-                    level,
-                )
-                if support_slice is not None:
-                    support_display = self._get_pyramid_display(
-                        supp.id,
-                        "support",
-                        support_slice,
-                        t_idx,
-                        z_idx,
-                        self.crop_rect or (0, 0, 0, 0),
-                        level,
-                    )
             else:
                 self._render_scales = {ax: 1.0 for ax in self.renderer.axes.values()}
         else:
             self._render_scales = {ax: 1.0 for ax in self.renderer.axes.values()}
+        for panel_key, data in panel_images_raw.items():
+            if not (self._interactive and level > 0):
+                panel_images[panel_key] = data
+                continue
+            if data.ndim == 3:
+                panel_images[panel_key] = self._downsample(data, 2**level)
+                continue
+            img = panel_sources.get(panel_key)
+            if img is None:
+                panel_images[panel_key] = self._downsample(data, 2**level)
+                continue
+            projection_key = panel_projections.get(panel_key, "raw")
+            cache_kind = f"{panel_key}:{projection_key}"
+            if projection_key == "raw":
+                panel_images[panel_key] = self._get_pyramid_display(
+                    int(getattr(img, "id", -1)),
+                    cache_kind,
+                    data,
+                    t_idx,
+                    z_idx,
+                    self.crop_rect or (0, 0, 0, 0),
+                    level,
+                )
+            else:
+                panel_images[panel_key] = self._get_pyramid_display(
+                    int(getattr(img, "id", -1)),
+                    cache_kind,
+                    data,
+                    -1,
+                    -1,
+                    self.crop_rect or (0, 0, 0, 0),
+                    level,
+                )
 
         vmin, vmax = self._current_vmin_vmax()
-        titles = {
-            "frame": f"Frame (T={t_idx}, Z={z_idx})",
-            "mean": "Mean Projection",
-            "support": f"Modality 2 (T={t_idx}, Z={z_idx})",
-            "std": "Std Projection",
-        }
+        def _panel_title(panel_key: str, fallback: str) -> str:
+            spec = panel_specs.get(panel_key)
+            base = str(getattr(spec, "display_name", fallback) if spec is not None else fallback)
+            proj = _panel_projection_key(panel_key, "raw")
+            if proj == "raw":
+                return f"{base} (T={t_idx}, Z={z_idx})"
+            return base
+
+        titles = {}
+        for panel_key in panel_images.keys():
+            spec = panel_specs.get(panel_key)
+            fallback = str(getattr(spec, "display_name", panel_key) if spec is not None else panel_key)
+            titles[panel_key] = _panel_title(panel_key, fallback)
         extents = {}
-        panel_images: Dict[str, np.ndarray] = {
-            "frame": slice_display,
-            "mean": mean_display,
-            "support": support_display if support_display is not None else slice_display,
-            "std": std_display,
-        }
         for key, data in list(panel_images.items()):
             if data is None:
                 panel_images.pop(key, None)
                 continue
             extents[key] = (0, data.shape[1], data.shape[0], 0)
-        if getattr(self, "_panel_modality_map", None):
-            for key, modality in self._panel_modality_map.items():
-                if key in panel_images:
-                    continue
-                img = self.images[modality.image_id]
-                self._ensure_loaded(modality.image_id)
-                if img.array is None:
-                    continue
-                if modality.projection_type.value == "raw":
-                    data = self._slice_data(img)
-                else:
-                    data, _ready = self._get_projection(
-                        img,
-                        modality.projection_type.value,
-                        axis_override=modality.display_settings.projection_axis,
-                        modality_idx=modality.idx,
-                    )
-                    if data is None:
-                        data = self._slice_data(img)
-                if self.crop_rect:
-                    data = self._apply_crop_rect(data, self.crop_rect, data.shape)
-                if self._interactive and level > 0:
-                    data = self._downsample(data, 2**level)
-                panel_images[key] = data
-                extents[key] = (0, data.shape[1], data.shape[0], 0)
-                titles[key] = modality.display_name
         panel_annotations = self._build_panel_annotations()
         suggestion_staleness_labels = self._build_suggestion_staleness_labels()
         roi_overlays = self._build_roi_overlays()
@@ -326,34 +342,33 @@ class RenderingMixin:
             roi_rect = None
         roi_scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         roi_offset = (self.crop_rect[0], self.crop_rect[1]) if self.crop_rect else (0.0, 0.0)
-        frame_mapping = self._get_display_mapping(prim.id, "frame", slice_data)
-        mean_mapping = self._get_display_mapping(prim.id, "mean", mean_data)
-        std_mapping = self._get_display_mapping(prim.id, "std", std_data)
-        support_mapping = self._get_display_mapping(supp.id, "support", support_slice)
+        panel_mappings = {}
+        for key, data in panel_images.items():
+            img = panel_sources.get(key)
+            if img is None or data is None:
+                continue
+            panel_mappings[key] = self._get_display_mapping(int(getattr(img, "id", -1)), key, data)
+        primary_mapping = panel_mappings.get(primary_panel)
+        if primary_mapping is None:
+            first_key = next(iter(panel_mappings.keys()), None)
+            if first_key is not None:
+                primary_mapping = panel_mappings[first_key]
+        if primary_mapping is None:
+            return
+        std_panel_key = next(
+            (k for k, p in panel_projections.items() if str(p).strip().lower() == "std" and k in panel_mappings),
+            primary_panel,
+        )
+        std_mapping = panel_mappings.get(std_panel_key, primary_mapping)
         std_vmin, std_vmax = std_mapping.min_val, std_mapping.max_val
-        if self._playback_mode:
-            norms = {
-                "frame": self._norm_cached("frame", frame_mapping),
-                "mean": self._norm_cached("mean", mean_mapping),
-                "support": self._norm_cached("support", support_mapping),
-                "std": self._norm_cached("std", std_mapping),
-            }
-        else:
-            norms = {
-                "frame": build_norm(frame_mapping),
-                "mean": build_norm(mean_mapping),
-                "support": build_norm(support_mapping),
-                "std": build_norm(std_mapping),
-            }
-        if slice_data.ndim == 3:
-            norms["frame"] = None
-        if getattr(self, "_panel_modality_map", None):
-            for key, modality in self._panel_modality_map.items():
-                mapping = self._get_display_mapping(modality.image_id, key, panel_images.get(key))
-                if self._playback_mode:
-                    norms[key] = self._norm_cached(key, mapping)
-                else:
-                    norms[key] = build_norm(mapping)
+        norms = {}
+        for key, mapping in panel_mappings.items():
+            if self._playback_mode:
+                norms[key] = self._norm_cached(key, mapping)
+            else:
+                norms[key] = build_norm(mapping)
+            if panel_images.get(key) is not None and panel_images[key].ndim == 3:
+                norms[key] = None
 
         def _spec(idx: int):
             if idx < 0:
@@ -362,23 +377,11 @@ class RenderingMixin:
                 return LUTS[-1]
             return LUTS[idx]
 
-        panel_cmaps = {
-            "frame": cmap_for(_spec(frame_mapping.lut), frame_mapping.invert),
-            "mean": cmap_for(_spec(mean_mapping.lut), mean_mapping.invert),
-            "support": cmap_for(_spec(support_mapping.lut), support_mapping.invert),
-            "std": cmap_for(_spec(std_mapping.lut), std_mapping.invert),
-        }
-        panel_ranges = {
-            "frame": (frame_mapping.min_val, frame_mapping.max_val),
-            "mean": (mean_mapping.min_val, mean_mapping.max_val),
-            "support": (support_mapping.min_val, support_mapping.max_val),
-            "std": (std_mapping.min_val, std_mapping.max_val),
-        }
-        if getattr(self, "_panel_modality_map", None):
-            for key, modality in self._panel_modality_map.items():
-                mapping = self._get_display_mapping(modality.image_id, key, panel_images.get(key))
-                panel_cmaps[key] = cmap_for(_spec(mapping.lut), mapping.invert)
-                panel_ranges[key] = (mapping.min_val, mapping.max_val)
+        panel_cmaps = {}
+        panel_ranges = {}
+        for key, mapping in panel_mappings.items():
+            panel_cmaps[key] = cmap_for(_spec(mapping.lut), mapping.invert)
+            panel_ranges[key] = (mapping.min_val, mapping.max_val)
         overlay_frame = None
         overlay_extent = None
         if self.show_sr_overlay:
@@ -453,10 +456,11 @@ class RenderingMixin:
                     text_offset_px=self.scale_bar_text_offset_px,
                     background_box=self.scale_bar_background_box,
                 )
-                extent = extents.get("frame") or (
+                primary_shape = panel_images[primary_panel].shape
+                extent = extents.get(primary_panel) or (
                     0,
-                    slice_display.shape[1],
-                    slice_display.shape[0],
+                    primary_shape[1],
+                    primary_shape[0],
                     0,
                 )
                 scale_bar = compute_scalebar(extent, cal.pixel_size_um_per_px, spec)
@@ -466,13 +470,14 @@ class RenderingMixin:
                 scale_bar_warning = "Scale bar requires calibration"
 
         ctx = RenderContext(
-            image_frame=slice_display,
-            support_frame=support_display,
+            image_frame=panel_images.get(primary_panel),
+            support_frame=panel_images.get("support"),
             projections={
-                "mean": mean_display,
-                "std": std_display,
+                "mean": panel_images.get("mean"),
+                "std": panel_images.get("std"),
             },
             panel_images=panel_images,
+            primary_panel=primary_panel,
             view=self.controller.view_state,
             annotations=self._current_keypoints(),
             panel_visibility=layout_spec["panel_visibility"],
@@ -519,11 +524,39 @@ class RenderingMixin:
         )
         self.renderer.update_images(ctx)
         self.renderer.update_overlays(ctx)
-        self.im_frame = self.renderer.image_artists.get("frame")
+        self.im_frame = self.renderer.image_artists.get(primary_panel)
         self.im_mean = self.renderer.image_artists.get("mean")
         self.im_support = self.renderer.image_artists.get("support")
         self.im_std = self.renderer.image_artists.get("std")
-        self._refresh_orthoview(prim, t_idx, z_idx, norms["frame"], panel_cmaps["frame"])
+        self._refresh_orthoview(
+            prim,
+            t_idx,
+            z_idx,
+            norms.get(primary_panel),
+            panel_cmaps.get(primary_panel, self.colormaps[0]),
+        )
+        mean_panel = next((k for k, p in panel_projections.items() if p == "mean"), None)
+        std_panel = next((k for k, p in panel_projections.items() if p == "std"), None)
+        mean_ax = (
+            self.renderer.axes.get(mean_panel)
+            if mean_panel is not None and getattr(self, "renderer", None) is not None
+            else None
+        )
+        std_ax = (
+            self.renderer.axes.get(std_panel)
+            if std_panel is not None and getattr(self, "renderer", None) is not None
+            else None
+        )
+        mean_ready = (
+            panel_projection_ready.get(mean_panel, True)
+            if mean_panel is not None
+            else True
+        )
+        std_ready = (
+            panel_projection_ready.get(std_panel, True)
+            if std_panel is not None
+            else True
+        )
         if mean_ax is not None and not mean_ready:
             mean_ax.text(
                 0.5,
@@ -544,32 +577,32 @@ class RenderingMixin:
             )
 
         if frame_ax is not None:
-            self._restore_zoom(slice_display.shape)
-        self._draw_diagnostics(slice_data, vmin, vmax)
+            self._restore_zoom(panel_images[primary_panel].shape)
+        self._draw_diagnostics(panel_images_raw[primary_panel], vmin, vmax)
         self._update_axes_info()
         self._update_axis_warning()
         if self.lut_combo is not None:
-            if 0 <= frame_mapping.lut < self.lut_combo.count():
+            if 0 <= primary_mapping.lut < self.lut_combo.count():
                 self.lut_combo.blockSignals(True)
-                self.lut_combo.setCurrentIndex(frame_mapping.lut)
+                self.lut_combo.setCurrentIndex(primary_mapping.lut)
                 self.lut_combo.blockSignals(False)
         if self.lut_invert_chk is not None:
             invert_supported = True
-            if 0 <= frame_mapping.lut < len(LUTS):
-                invert_supported = LUTS[frame_mapping.lut].invert_supported
+            if 0 <= primary_mapping.lut < len(LUTS):
+                invert_supported = LUTS[primary_mapping.lut].invert_supported
             self.lut_invert_chk.blockSignals(True)
-            self.lut_invert_chk.setChecked(frame_mapping.invert)
+            self.lut_invert_chk.setChecked(primary_mapping.invert)
             self.lut_invert_chk.setEnabled(invert_supported)
             self.lut_invert_chk.blockSignals(False)
         if self.gamma_slider is not None and self.gamma_label is not None:
-            gamma_val = max(0.2, min(5.0, float(frame_mapping.gamma)))
+            gamma_val = max(0.2, min(5.0, float(primary_mapping.gamma)))
             self.gamma_slider.blockSignals(True)
             self.gamma_slider.setValue(int(round(gamma_val * 10)))
             self.gamma_slider.blockSignals(False)
             self.gamma_label.setText(f"{gamma_val:.2f}")
         if self.log_chk is not None:
             self.log_chk.blockSignals(True)
-            self.log_chk.setChecked(frame_mapping.mode == "log")
+            self.log_chk.setChecked(primary_mapping.mode == "log")
             self.log_chk.blockSignals(False)
         # Update projection selector (Phase γ UI wiring)
         if getattr(self, "projection_selector", None) is not None:
@@ -596,6 +629,8 @@ class RenderingMixin:
         if self.render_level_label is not None:
             self.render_level_label.setText(f"Render: L{level}")
         self._update_status()
+        # Sync modality layers panel to reflect current canvas state
+        self._refresh_modality_layers_panel()
 
     def _refresh_orthoview(self, prim, t_idx: int, z_idx: int, norm, cmap) -> None:
         if self.orthoview_widget is None:
@@ -680,7 +715,9 @@ class RenderingMixin:
             return []
         if not self.particles_panel.show_labels_chk.isChecked():
             return []
-        frame_ax = self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
+        frame_ax = None
+        if getattr(self, "renderer", None) is not None:
+            frame_ax = next(iter(self.renderer.axes.values()), None)
         scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         labels: List[Tuple[float, float, str]] = []
         for idx, particle in enumerate(self._particles_results):
@@ -736,8 +773,9 @@ class RenderingMixin:
         return panel_annotations
 
     def _build_suggestion_staleness_labels(self) -> Dict[str, List[Tuple[float, float, str]]]:
-        """Build lightweight age labels for visible suggestions in the frame panel."""
-        labels: Dict[str, List[Tuple[float, float, str]]] = {"frame": [], "mean": [], "support": []}
+        """Build lightweight age labels for visible suggestions in the primary panel."""
+        panel_keys = list(dict(getattr(self, "_panel_modality_map", {}) or {}).keys())
+        labels: Dict[str, List[Tuple[float, float, str]]] = {str(k): [] for k in panel_keys}
         if not bool(getattr(self, "_show_suggestion_overlay", True)):
             return labels
         image_id = self.primary_image.id
@@ -745,10 +783,11 @@ class RenderingMixin:
         z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
         min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
         now_ts = float(time.time())
-        frame_ax = (
-            self.renderer.axes.get("frame") if getattr(self, "renderer", None) is not None else None
-        )
+        frame_ax = None
+        if getattr(self, "renderer", None) is not None:
+            frame_ax = next(iter(self.renderer.axes.values()), None)
         scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
+        primary_panel = panel_keys[0] if panel_keys else ""
         for suggestion in self.suggestions.get(image_id, []):
             if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
                 continue
@@ -766,12 +805,15 @@ class RenderingMixin:
                 label = f"{int(round(age_s))}s"
             else:
                 label = f"{int(round(age_s / 60.0))}m"
-            labels["frame"].append((float(suggestion.x) / scale, float(suggestion.y) / scale, label))
+            if primary_panel:
+                labels[str(primary_panel)].append(
+                    (float(suggestion.x) / scale, float(suggestion.y) / scale, label)
+                )
         return labels
 
     def _build_roi_overlays(self) -> Dict[str, List[Tuple[str, object, str]]]:
         overlays: Dict[str, List[Tuple[str, object, str]]] = {
-            panel: [] for panel in ["frame", "mean", "support"]
+            panel: [] for panel in dict(getattr(self, "_panel_modality_map", {}) or {}).keys()
         }
         
         # Phase 2: Check if position filtering is enabled
@@ -847,7 +889,8 @@ class RenderingMixin:
         t_idx, z_idx = self._slice_indices(img)
         t_total = img.array.shape[0] if img.array is not None else 1
         z_total = img.array.shape[1] if img.array is not None else 1
-        mapping = self._get_display_mapping(img.id, "frame", img.array)
+        panel_key = self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        mapping = self._get_display_mapping(img.id, panel_key, img.array)
         idx = mapping.lut
         if idx < 0:
             idx = 0
@@ -938,15 +981,16 @@ class RenderingMixin:
         img = self.primary_image
         t_idx, z_idx = self._slice_indices(img)
         z_total = int(img.array.shape[1]) if img.array is not None and img.array.ndim >= 2 else int(self.z_slider.maximum() + 1)
-        target = str(getattr(self, "annotate_target", "frame"))
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        target = str(getattr(self, "annotate_target", default_target))
         scope = str(getattr(self, "annotation_scope", "current"))
 
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         spec = panel_map.get(target)
         if spec is not None:
             target_txt = str(getattr(spec, "display_name", target))
-        elif target == "mean":
-            target_txt = f"Mean Projection (Z=1-{max(1, z_total)})"
         else:
             target_txt = f"{str(target).title()} T={int(t_idx) + 1} Z={int(z_idx) + 1}"
 
@@ -979,10 +1023,10 @@ class RenderingMixin:
             try:
                 p_name, p_axis = self.projection_selector.current_selection()
                 if str(p_name).strip().lower() == "raw":
-                    p_name = "source frame"
+                    p_name = "source slice"
                 projection_txt = f"{p_name} ({p_axis})"
             except Exception:
-                projection_txt = "source frame"
+                projection_txt = "source slice"
         return (
             f"{base_text} | Modality: {modality_txt} ({projection_txt}) | "
             f"Strategy: {strategy} | Label: {active_label}"

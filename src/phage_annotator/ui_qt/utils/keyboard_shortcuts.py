@@ -30,15 +30,8 @@ class KeyboardShortcutManager:
 
     def _initialize_shortcuts(self) -> None:
         """Initialize all keyboard shortcuts."""
-        # Modality switching shortcuts: Ctrl+1 through Ctrl+9
-        for i in range(1, 10):
-            shortcut_key = f"Ctrl+{i}"
-            action_id = f"switch_modality_{i-1}"
-            description = f"Switch to modality {i}"
-            self.register_action(
-                action_id, shortcut_key, description,
-                lambda idx=i-1: self._switch_modality(idx)
-            )
+        # DISABLED: All keyboard shortcuts are disabled for normal working
+        return
 
         # Modality management shortcuts
         self.register_action(

@@ -132,7 +132,7 @@ class JobsMixin:
                 else False
             )
             if auto_open_logs and self.dock_logs is not None:
-                self.set_panel_visible("logs", True, source="exception_hook")
+                self.set_panel_visible("logs", True, source="auto:exception_hook")
 
         sys.excepthook = _hook
 
@@ -164,7 +164,7 @@ class JobsMixin:
             else False
         )
         if auto_open_logs and self.dock_logs is not None:
-            self.set_panel_visible("logs", True, source="job_error")
+            self.set_panel_visible("logs", True, source="auto:job_error")
 
     def _on_job_cancelled(self, name: str, job_id: str) -> None:
         self._append_log(f"[JOB] Cancelled: {name} ({job_id})")

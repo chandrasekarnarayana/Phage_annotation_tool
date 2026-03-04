@@ -18,6 +18,7 @@ class ProjectionType(Enum):
     """Types of projections that can be applied to image data."""
     RAW = "raw"           # Single frame from stack
     MEAN = "mean"         # Mean projection across axis
+    MEDIAN = "median"     # Median projection across axis
     STD = "std"           # Standard deviation projection
     MIN = "min"           # Minimum intensity projection
     MAX = "max"           # Maximum intensity projection

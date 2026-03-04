@@ -282,7 +282,8 @@ class ModalityCanvasManager(QtWidgets.QWidget):
     
     def set_modalities(
         self,
-        modality_specs: List[Tuple[int, str]]
+        modality_specs: List[Tuple[int, str]],
+        grid: Optional[Tuple[int, int]] = None,
     ) -> None:
         """Configure canvas with modalities.
         
@@ -296,7 +297,11 @@ class ModalityCanvasManager(QtWidgets.QWidget):
             return
         
         # Compute layout
-        rows, cols = self._compute_layout_grid(len(modality_specs), self._layout_mode)
+        if grid is not None:
+            rows = max(1, int(grid[0]))
+            cols = max(1, int(grid[1]))
+        else:
+            rows, cols = self._compute_layout_grid(len(modality_specs), self._layout_mode)
         
         # Handle SINGLE mode - only show active or first modality
         if self._layout_mode == LayoutMode.SINGLE:

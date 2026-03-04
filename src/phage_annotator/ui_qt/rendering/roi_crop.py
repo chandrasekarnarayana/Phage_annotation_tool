@@ -8,147 +8,99 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.roi.auto import propose_roi
-from phage_annotator.session.modality import (
-    ModalityDisplaySettings,
-    ModalitySpec,
-    ProjectionType,
-)
 from phage_annotator.ui_qt.widgets.modality_canvas import LayoutMode
 
 
 class RoiCropMixin:
     """Mixin for ROI and crop computations."""
 
+    def _current_sync_group_key_for_roi(self) -> str:
+        """Resolve the active/manual sync group key used for ROI sharing."""
+        try:
+            if hasattr(self, "_sync_follow_active_enabled") and self._sync_follow_active_enabled():
+                if hasattr(self, "_sync_key_active_group"):
+                    return str(self._sync_key_active_group() or "").strip()
+            combo = getattr(self, "sync_key_combo", None)
+            if combo is not None:
+                return str(combo.currentData() or "").strip()
+        except Exception:
+            return ""
+        return ""
+
+    def _store_roi_for_current_sync_group(self) -> None:
+        """Store current ROI state for the active sync group."""
+        key = self._current_sync_group_key_for_roi()
+        if not key:
+            return
+        store = dict(getattr(self, "_roi_by_sync_group", {}) or {})
+        if str(getattr(self, "roi_shape", "none")) == "none":
+            store[key] = None
+        else:
+            store[key] = {
+                "shape": str(getattr(self, "roi_shape", "box")),
+                "rect": tuple(float(v) for v in tuple(getattr(self, "roi_rect", (0, 0, 0, 0)))),
+            }
+        self._roi_by_sync_group = store
+
+    def _apply_roi_for_sync_group(self, group_key: str) -> None:
+        """Apply stored ROI for a sync group, if any."""
+        key = str(group_key or "").strip()
+        if not key:
+            return
+        store = dict(getattr(self, "_roi_by_sync_group", {}) or {})
+        state = store.get(key, "__missing__")
+        if state == "__missing__":
+            return
+        if state is None:
+            self.controller.clear_roi()
+            self.roi_shape = "none"
+            self.roi_rect = (0.0, 0.0, 0.0, 0.0)
+            self._sync_roi_controls()
+            self._refresh_image()
+            return
+        shape = str(state.get("shape", "box"))
+        rect = tuple(state.get("rect", (0.0, 0.0, 0.0, 0.0)))
+        if len(rect) != 4:
+            return
+        current_shape = str(getattr(self, "roi_shape", "none"))
+        current_rect = tuple(getattr(self, "roi_rect", (0.0, 0.0, 0.0, 0.0)))
+        if current_shape == shape and current_rect == tuple(rect):
+            return
+        self.controller.set_roi(tuple(rect), shape=shape)
+        self.roi_shape = shape
+        self.roi_rect = tuple(float(v) for v in rect)
+        self._sync_roi_controls()
+        self._refresh_image()
+
     def _current_layout_spec(self) -> dict:
-        order = ["frame", "mean", "support", "std"]
+        order: list[str] = []
         panel_visibility = dict(self._panel_visibility)
         hidden_base = set(getattr(self, "_lazy_hidden_base_panel_keys", set()) or set())
         self._panel_modality_map = {}
         manager = getattr(self.controller.session_state, "modality_manager", None)
-        if not self.images:
+        if not self.images or manager is None:
             return {
                 "order": order,
                 "panel_visibility": panel_visibility,
             }
-        primary_id = self.current_image_idx
-        support_id = self.support_image_idx
-
-        def _clone_settings(source: Optional[ModalityDisplaySettings]) -> ModalityDisplaySettings:
-            if source is None:
-                return ModalityDisplaySettings()
-            return ModalityDisplaySettings(
-                vmin=source.vmin,
-                vmax=source.vmax,
-                lut=source.lut,
-                projection_axis=source.projection_axis,
-                gamma=source.gamma,
-            )
-
-        primary_modality = None
-        support_modality = None
-        if manager is not None:
-            for modality in manager.get_all_modalities():
-                if modality.image_id == primary_id and primary_modality is None:
-                    primary_modality = modality
-                if modality.image_id == support_id and support_modality is None:
-                    support_modality = modality
-
-        frame_name = "Frame"
-        frame_projection = ProjectionType.RAW
-        if primary_modality is not None:
-            if getattr(primary_modality, "display_name", ""):
-                frame_name = str(primary_modality.display_name)
-            frame_projection = getattr(primary_modality, "projection_type", ProjectionType.RAW)
-        self._panel_modality_map["frame"] = ModalitySpec(
-            idx=-100,
-            image_id=primary_id,
-            display_name=frame_name,
-            projection_type=frame_projection,
-            display_settings=_clone_settings(
-                primary_modality.display_settings if primary_modality else None
-            ),
+        for modality in manager.get_all_modalities():
+            key = f"modality_{int(modality.idx)}"
+            self._panel_modality_map[key] = modality
+            if key in hidden_base:
+                panel_visibility[key] = False
+            else:
+                panel_visibility[key] = bool(panel_visibility.get(key, False))
+        panel_order = dict(getattr(self, "_lazy_panel_order", {}) or {})
+        next_order = max([int(v) for v in panel_order.values() if str(v).isdigit()] or [0]) + 1
+        for key in self._panel_modality_map.keys():
+            if not str(panel_order.get(key, "")).isdigit():
+                panel_order[key] = next_order
+                next_order += 1
+        self._lazy_panel_order = panel_order
+        order = sorted(
+            list(self._panel_modality_map.keys()),
+            key=lambda k: (int(panel_order.get(k, 10**6)), str(k)),
         )
-        self._panel_modality_map["mean"] = ModalitySpec(
-            idx=-101,
-            image_id=primary_id,
-            display_name="Mean Projection",
-            projection_type=ProjectionType.MEAN,
-            display_settings=_clone_settings(
-                primary_modality.display_settings if primary_modality else None
-            ),
-        )
-        support_name = "Modality 2"
-        support_projection = ProjectionType.RAW
-        if support_modality is not None:
-            if getattr(support_modality, "display_name", ""):
-                support_name = str(support_modality.display_name)
-            support_projection = getattr(support_modality, "projection_type", ProjectionType.RAW)
-        elif getattr(self, "support_combo", None) is not None and self.support_combo.count() > 0:
-            idx = int(getattr(self, "support_image_idx", self.support_combo.currentIndex()))
-            if 0 <= idx < self.support_combo.count():
-                support_name = self.support_combo.itemText(idx)
-        self._panel_modality_map["support"] = ModalitySpec(
-            idx=-102,
-            image_id=support_id,
-            display_name=support_name,
-            projection_type=support_projection,
-            display_settings=_clone_settings(
-                support_modality.display_settings if support_modality else None
-            ),
-        )
-        self._panel_modality_map["std"] = ModalitySpec(
-            idx=-103,
-            image_id=primary_id,
-            display_name="Std Projection",
-            projection_type=ProjectionType.STD,
-            display_settings=_clone_settings(
-                primary_modality.display_settings if primary_modality else None
-            ),
-        )
-        builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
-        mean_cfg = dict(builtin.get("mean", {}) or {})
-        std_cfg = dict(builtin.get("std", {}) or {})
-        if "mean" not in builtin:
-            panel_visibility["mean"] = False
-        if "std" not in builtin:
-            panel_visibility["std"] = False
-        if "frame" in hidden_base:
-            panel_visibility["frame"] = False
-        if "support" in hidden_base:
-            panel_visibility["support"] = False
-        for key, cfg, default_projection in (
-            ("mean", mean_cfg, ProjectionType.MEAN),
-            ("std", std_cfg, ProjectionType.STD),
-        ):
-            spec = self._panel_modality_map.get(key)
-            if spec is None:
-                continue
-            image_id = int(cfg.get("image_id", spec.image_id))
-            spec.image_id = image_id
-            if str(cfg.get("name", "")).strip():
-                spec.display_name = str(cfg["name"]).strip()
-            projection_key = str(cfg.get("projection", default_projection.value)).strip().lower()
-            try:
-                spec.projection_type = ProjectionType(projection_key)
-            except Exception:
-                spec.projection_type = default_projection
-            source_modality = None
-            if manager is not None:
-                for modality in manager.get_all_modalities():
-                    if int(getattr(modality, "image_id", -1)) == image_id:
-                        source_modality = modality
-                        break
-            spec.display_settings = _clone_settings(
-                source_modality.display_settings if source_modality else spec.display_settings
-            )
-        if manager is not None:
-            for modality in manager.get_all_modalities():
-                if modality.idx < 2:
-                    continue
-                key = f"modality_{modality.idx}"
-                order.append(key)
-                panel_visibility[key] = bool(panel_visibility.get(key, True))
-                self._panel_modality_map[key] = modality
         valid_order_keys = set(order)
         for key in list(panel_visibility.keys()):
             if str(key).startswith("modality_") and str(key) not in valid_order_keys:
@@ -222,7 +174,10 @@ class RoiCropMixin:
             self._set_roi_rect(rect)
         else:
             self.controller.clear_roi()
+            self.roi_shape = "none"
+            self.roi_rect = (0.0, 0.0, 0.0, 0.0)
             self._sync_roi_controls()
+        self._store_roi_for_current_sync_group()
         self._update_status()
         self._refresh_image()
 
@@ -237,6 +192,7 @@ class RoiCropMixin:
         self.controller.set_roi(rect, shape="circle")
         self.roi_rect = rect
         self.roi_shape = "circle"
+        self._store_roi_for_current_sync_group()
         self._sync_roi_controls()
         self._refresh_image()
 
@@ -299,6 +255,7 @@ class RoiCropMixin:
         rect = (x_clamped, y_clamped, w_clamped, h_clamped)
         self.controller.set_roi(rect, shape=self.roi_shape)
         self.roi_rect = rect
+        self._store_roi_for_current_sync_group()
         self.recorder.record("roi_change", {"rect": self.roi_rect, "shape": self.roi_shape})
         self._refresh_image()
 
@@ -312,6 +269,7 @@ class RoiCropMixin:
             shape = "circle"
         self.controller.set_roi(self.roi_rect, shape=shape)
         self.roi_shape = shape
+        self._store_roi_for_current_sync_group()
         self.recorder.record("roi_shape", {"shape": shape})
         self._refresh_image()
 
@@ -422,6 +380,7 @@ class RoiCropMixin:
                 self.controller.set_roi_box(float(x), float(y), float(w), float(h))
             self.roi_shape = spec.shape
             self.roi_rect = (float(x), float(y), float(w), float(h))
+            self._store_roi_for_current_sync_group()
             self._sync_roi_controls()
             tip = (
                 f"score={diag.get('score', 0):.3f} "
@@ -533,7 +492,8 @@ class RoiCropMixin:
         key = str(key)
         if key not in self._panel_visibility:
             self._panel_visibility[key] = bool(checked)
-        if not checked and sum(self._panel_visibility.values()) <= 1:
+        allow_empty = bool(getattr(self, "_allow_empty_canvas_rows", True))
+        if (not allow_empty) and (not checked) and sum(self._panel_visibility.values()) <= 1:
             if key in self.panel_actions:
                 self.panel_actions[key].setChecked(True)
             if hasattr(self, "_annotation_view_checkboxes"):
@@ -564,11 +524,23 @@ class RoiCropMixin:
     def _panel_grid_shape(self, n: int) -> Tuple[int, int]:
         if n <= 1:
             return 1, 1
-        if n == 2:
-            return 1, 2
-        if n == 3:
-            return 1, 3
-        return 2, 2
+        rows_override = int(getattr(self, "_canvas_layout_rows", 0) or 0)
+        cols_override = int(getattr(self, "_canvas_layout_cols", 0) or 0)
+        if rows_override > 0 and cols_override > 0:
+            return max(1, rows_override), max(1, cols_override)
+        if rows_override > 0:
+            rows = max(1, rows_override)
+            cols = int(np.ceil(float(n) / float(rows)))
+            return rows, max(1, cols)
+        if cols_override > 0:
+            cols = max(1, cols_override)
+            rows = int(np.ceil(float(n) / float(cols)))
+            return max(1, rows), cols
+        # Default auto layout:
+        # <=2 views: 1 row, >2 and <=8: 2 rows, >8: 3 rows.
+        rows = 1 if n <= 2 else 2 if n <= 8 else 3
+        cols = int(np.ceil(float(n) / float(rows)))
+        return rows, max(1, cols)
 
     def _rebuild_figure_layout(self, layout_spec: Optional[dict] = None) -> None:
         if layout_spec is None:
@@ -588,7 +560,7 @@ class RoiCropMixin:
                 title = str(getattr(modality, "display_name", key.title()))
                 specs.append((panel_indices[key], title))
             self.modality_canvas.set_layout_mode(LayoutMode.AUTO)
-            self.modality_canvas.set_modalities(specs)
+            self.modality_canvas.set_modalities(specs, grid=self._panel_grid_shape(len(visible)))
             for key in visible:
                 view = self.modality_canvas.get_view(panel_indices[key])
                 if view is not None:
@@ -596,11 +568,12 @@ class RoiCropMixin:
             axes = self.renderer.init_external_axes(axes, visible)
         else:
             axes = self.renderer.init_figure(layout_spec)
-        self.ax_frame = axes.get("frame")
-        self.ax_mean = axes.get("mean")
+        primary_key = visible[0] if visible else None
+        self.ax_frame = axes.get(primary_key) if primary_key is not None else None
+        self.ax_mean = None
         self.ax_comp = None
-        self.ax_support = axes.get("support")
-        self.ax_std = axes.get("std")
+        self.ax_support = None
+        self.ax_std = None
         self._sync_view_manager_panels(visible)
         self._bind_axis_callbacks()
         if self.tool_router is not None:

@@ -12,6 +12,8 @@ from phage_annotator.ui_qt.keyboard_registry import (
 )
 from phage_annotator.tools import Tool
 
+DISABLE_SHORTCUTS = False
+
 
 class KeyboardEventsMixin:
     """Qt and Matplotlib keyboard shortcut handlers."""
@@ -43,20 +45,20 @@ class KeyboardEventsMixin:
         return len(detect_conflicts(all_shortcuts())) == 0
 
     def _on_key(self, event) -> None:
-        """Handle Matplotlib-key shortcuts for reset, colormap cycle, and quick-save."""
+        """Handle Matplotlib-key shortcuts (deprecated - now using Qt key events with modifiers)."""
+        if DISABLE_SHORTCUTS or not bool(getattr(self, "_shortcuts_enabled", True)):
+            return
+        # Matplotlib direct key bindings are now handled via Qt keyPressEvent with modifiers
+        # This prevents accidental single-key triggers when typing
         key_id = matplotlib_key_bindings().get(str(event.key).lower(), "")
-        if key_id == "reset_view":
-            self.reset_all_view()
-        elif key_id == "cycle_colormap":
-            self.current_cmap_idx = (self.current_cmap_idx + 1) % len(self.colormaps)
-            if self.lut_combo is not None:
-                self.lut_combo.setCurrentIndex(self.current_cmap_idx)
-            self._refresh_image()
-        elif key_id == "quick_save":
-            self._quick_save_csv()
+        if key_id:  # Should be empty now, but keep for backwards compatibility
+            pass
 
     def keyPressEvent(self, event) -> None:
         """Qt-level shortcuts for fast navigation; ignored when editing text fields."""
+        if DISABLE_SHORTCUTS or not bool(getattr(self, "_shortcuts_enabled", True)):
+            self._dispatch_base_key_press(event)
+            return
         focused = QtWidgets.QApplication.focusWidget()
         if isinstance(
             focused,
@@ -77,8 +79,8 @@ class KeyboardEventsMixin:
             if hasattr(self, "redo_last_action"):
                 self.redo_last_action()
             return
-        # Fast label selection: 1..9 map directly to label buttons.
-        if mods == QtCore.Qt.KeyboardModifier.NoModifier and QtCore.Qt.Key_1 <= key <= QtCore.Qt.Key_9:
+        # Fast label selection: Ctrl+1..9 map to label buttons (requires modifier to avoid interference)
+        if mods == QtCore.Qt.KeyboardModifier.ControlModifier and QtCore.Qt.Key_1 <= key <= QtCore.Qt.Key_9:
             idx = int(key - QtCore.Qt.Key_1)
             buttons = list(getattr(self, "label_buttons", QtWidgets.QButtonGroup()).buttons())
             if 0 <= idx < len(buttons):
@@ -171,5 +173,10 @@ class KeyboardEventsMixin:
         elif action_id == "focus_canvas_mode":
             if hasattr(self, "_toggle_focus_canvas_mode"):
                 self._toggle_focus_canvas_mode()
+        elif action_id == "cycle_colormap":
+            self.current_cmap_idx = (self.current_cmap_idx + 1) % len(self.colormaps)
+            if self.lut_combo is not None:
+                self.lut_combo.setCurrentIndex(self.current_cmap_idx)
+            self._refresh_image()
         else:
             self._dispatch_base_key_press(event)
