@@ -63,6 +63,12 @@ phage-annotator --help
 python -m pytest -q --maxfail=1
 ```
 
+For GUI-marker tests (`-m gui`), install dev extras first so `pytest-qt` is available:
+
+```bash
+python -m pip install -e .[dev,cache]
+```
+
 ## Current Capabilities
 
 - Central multi-view canvas for stack/projection annotation.
