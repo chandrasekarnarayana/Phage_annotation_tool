@@ -17,6 +17,17 @@ class _Harness(SessionAnnotationIOMixin):
             ],
             annotation_imports={},
         )
+        self._settings = None
+
+
+class _DummySettings:
+    def __init__(self, um_per_px: float) -> None:
+        self._um_per_px = um_per_px
+
+    def value(self, key: str, default=None, type=None):  # noqa: A002 - Qt-style signature
+        if key == "defaultPixelSizeUmPerPx":
+            return type(self._um_per_px) if callable(type) else self._um_per_px
+        return default
 
 
 def test_dedup_annotations_fallback_uses_xy_coordinates() -> None:
@@ -96,6 +107,45 @@ def test_parse_annotations_force_image_id_and_image_key_normalization(tmp_path: 
     assert len(imports) == 1
     assert imports[0][0] == 1
     assert imports[0][1]["format"] == "json"
+
+
+def test_parse_thunderstorm_nm_uses_settings_default_pixel_size(tmp_path: Path) -> None:
+    """ThunderSTORM nm coordinates should convert to px via default settings scale."""
+    h = _Harness()
+    h._settings = _DummySettings(um_per_px=0.069)  # 69 nm/px
+    thunder = tmp_path / "thunder_nm.csv"
+    thunder.write_text("frame,x [nm],y [nm]\n1,690,1380\n", encoding="utf-8")
+
+    points, imports = h._parse_annotations_from_paths(
+        [thunder],
+        image_id=0,
+        pixel_size_nm=None,
+    )
+
+    assert len(points) == 1
+    assert points[0].x == 10.0
+    assert points[0].y == 20.0
+    assert imports[0][1]["format"] == "thunderstorm"
+    assert imports[0][1]["pixel_size_nm"] == 69.0
+
+
+def test_parse_thunderstorm_px_does_not_apply_nm_conversion(tmp_path: Path) -> None:
+    """ThunderSTORM px coordinates should remain unchanged."""
+    h = _Harness()
+    h._settings = _DummySettings(um_per_px=0.069)  # Should not affect px-unit files
+    thunder = tmp_path / "thunder_px.csv"
+    thunder.write_text("frame,x [px],y [px]\n1,12.5,34.25\n", encoding="utf-8")
+
+    points, imports = h._parse_annotations_from_paths(
+        [thunder],
+        image_id=0,
+        pixel_size_nm=None,
+    )
+
+    assert len(points) == 1
+    assert points[0].x == 12.5
+    assert points[0].y == 34.25
+    assert imports[0][1]["format"] == "thunderstorm"
 
 
 def test_latest_annotation_meta_returns_last_non_empty_meta() -> None:

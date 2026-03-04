@@ -119,6 +119,7 @@ class SessionAnnotationIOMixin:
         name_map = {img.name: img.id for img in self.session_state.images}
         merged: List[Keypoint] = []
         imports: List[Tuple[int, Dict[str, object]]] = []
+        effective_pixel_size_nm = self._resolve_import_pixel_size_nm(pixel_size_nm)
         for path in paths:
             file_meta: Dict[str, object] = {}
             fmt = "other"
@@ -130,7 +131,7 @@ class SessionAnnotationIOMixin:
                     points = parse_thunderstorm_csv(
                         path,
                         self.session_state.images[image_id].name,
-                        pixel_size_nm=pixel_size_nm,
+                        pixel_size_nm=effective_pixel_size_nm,
                     )
                 elif fmt == "legacy":
                     points = parse_legacy_csv(path, self.session_state.images[image_id].name)
@@ -165,12 +166,41 @@ class SessionAnnotationIOMixin:
                     {
                         "format": fmt,
                         "path": str(path.resolve()),
-                        "pixel_size_nm": pixel_size_nm,
+                        "pixel_size_nm": effective_pixel_size_nm,
                         "meta": file_meta,
                     },
                 )
             )
         return merged, imports
+
+    def _resolve_import_pixel_size_nm(self, pixel_size_nm: Optional[float]) -> Optional[float]:
+        """Resolve import conversion scale in nm/px.
+
+        Priority:
+        1) Explicit value passed by caller.
+        2) Application setting ``defaultPixelSizeUmPerPx`` converted to nm/px.
+        """
+        if pixel_size_nm is not None:
+            try:
+                parsed = float(pixel_size_nm)
+                if parsed > 0:
+                    return parsed
+            except (TypeError, ValueError):
+                pass
+
+        settings = getattr(self, "_settings", None)
+        if settings is None:
+            return None
+        try:
+            default_um_per_px = settings.value("defaultPixelSizeUmPerPx", 0.069, type=float)
+            if default_um_per_px is None:
+                return None
+            parsed_um = float(default_um_per_px)
+            if parsed_um <= 0:
+                return None
+            return parsed_um * 1000.0
+        except Exception:
+            return None
 
     def _record_annotation_imports(self, imports: List[Tuple[int, Dict[str, object]]]) -> None:
         for image_id, entry in imports:
