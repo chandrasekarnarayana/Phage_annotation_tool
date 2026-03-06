@@ -11,7 +11,16 @@ from pathlib import Path
 
 
 ROOT = Path.cwd()
-TARGETS = [ROOT / "README.md"] + sorted((ROOT / "docs").rglob("*.md"))
+DOCS = sorted((ROOT / "docs").rglob("*.md"))
+EXCLUDED_PREFIXES = (
+    ROOT / "docs" / "_internal" / "archive",
+    ROOT / "docs" / "_generated",
+)
+TARGETS = [ROOT / "README.md"] + [
+    path
+    for path in DOCS
+    if not any(path.is_relative_to(prefix) for prefix in EXCLUDED_PREFIXES)
+]
 H1_RE = re.compile(r"^#\s+\S")
 
 

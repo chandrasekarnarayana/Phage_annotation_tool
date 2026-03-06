@@ -174,7 +174,9 @@ class RenderingMixin:
             k for k in layout_spec.get("order", [])
             if bool(layout_spec.get("panel_visibility", {}).get(k, False))
         ]
-        primary_panel = str(visible_order[0]) if visible_order else self._default_panel_key()
+        primary_panel = str(visible_order[0]) if visible_order else (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
         if not visible_order:
             self._update_axes_info()
             self._update_axis_warning()

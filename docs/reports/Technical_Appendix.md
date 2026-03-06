@@ -229,6 +229,6 @@ No formal ADR files were found in `docs/` during this audit. Decision rationale 
 |---|---|
 | Main design report | `docs/reports/Design_Report.md` |
 | Reproducibility guide | `docs/reports/Reproducibility_and_Validation.md` |
-| Architecture snapshot | `docs/ARCHITECTURE_DETAILED.md` |
-| Feature matrix snapshot | `docs/dev/feature_control_matrix.md` |
+| Architecture snapshot | `docs/CURRENT_CAPABILITIES.md` |
+| Feature matrix snapshot | `docs/feature_control_matrix.md` |
 | Planned work snapshot | `docs/PLANNED_FEATURES.md` |

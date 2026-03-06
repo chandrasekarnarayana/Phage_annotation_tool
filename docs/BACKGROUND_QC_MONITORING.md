@@ -431,7 +431,7 @@ fano_factor_bounds: Tuple[float, float] = (0.6, 1.8)
 
 ## Related Documentation
 
-- [QC Architecture](ARCHITECTURE_DETAILED.md#qc-module)
-- [Annotation Workflow](USER_GUIDE.md#annotation-workflow)
-- [QC Validators](QC_VALIDATORS_REFERENCE.md) *(coming soon)*
-- [Performance Metrics](PERFORMANCE_METRICS_BCONTRAST.md)
+- [Planned Features](PLANNED_FEATURES.md)
+- [Current Capabilities](CURRENT_CAPABILITIES.md)
+- [Testing Strategy](reports/Testing_Strategy.md)
+- [Design Report](reports/Design_Report.md)

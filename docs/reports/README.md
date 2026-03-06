@@ -7,6 +7,7 @@ This folder contains the reviewer-facing report set.
 - `Technical_Appendix.md`: Deep technical evidence and contract-level details.
 - `Reproducibility_and_Validation.md`: Environment, test, and benchmark reproducibility guide.
 - `Testing_Strategy.md`: Test architecture, coverage posture, and quality roadmap.
+- `THUNDERSTORM_JAR_INTEGRATION_STATUS.md`: current ThunderSTORM/Fiji bridge status and validation notes.
 
 ## Suggested Authoring Order
 1. Complete `Design_Report.md` sections 1-7 (scope and architecture).

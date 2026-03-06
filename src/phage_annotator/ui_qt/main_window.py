@@ -58,6 +58,7 @@ from phage_annotator.session.multi_playback import ModalityPlaybackManager, Play
 from phage_annotator.session.view_sync import ViewSyncManager
 from phage_annotator.tools import Tool
 from phage_annotator.analysis.suggestion_model import LocalPeakSuggestionModel
+from phage_annotator.analysis.interactive_learning import InteractiveLearningModel
 from phage_annotator.ui_qt.services.settings_proxy import UnifiedSettingsProxy
 from phage_annotator.ui_qt.services.settings_schema import (
     apply_settings_migrations,
@@ -345,6 +346,7 @@ class KeypointAnnotator(
         self._density_last_panel = "frame"
         self._show_suggestion_overlay = True
         self._suggestion_model = LocalPeakSuggestionModel()
+        self._interactive_learning_model = InteractiveLearningModel()
         self._suggestion_strategy = "current_view"
         self._canvas_header_verbose_context = True
         self._suggestion_score_threshold = 0.0

@@ -6,11 +6,12 @@ This is the canonical index for tracked project documentation.
 
 - `docs/PLANNED_FEATURES.md`: active implementation backlog and completed cleanup ledger.
 - `docs/CURRENT_CAPABILITIES.md`: canonical snapshot of implemented runtime capabilities.
-- `docs/ARCHITECTURE_DETAILED.md`: architecture and subsystem design details.
 - `docs/feature_control_matrix.md`: feature flags, controls, and operational matrix.
 - `docs/FIJI_THUNDERSTORM_BRIDGE.md`: Fiji/ThunderSTORM bridge backend setup and contract.
 - `docs/FIJI_PLUGIN_MANIFEST_SDK.md`: strict SDK contract for manifest-based Fiji plugin execution.
 - `docs/SMLM_REPRODUCIBILITY_RUNBOOK.md`: runbook mode semantics and provenance export behavior.
+- `docs/BACKGROUND_QC_MONITORING.md`: QC monitoring architecture and operational behavior.
+- `docs/QC_THRESHOLDS_CONFIGURATION_GUIDE.md`: QC threshold tuning and safety guidance.
 - `docs/reports/`: reviewer-facing reports and evaluations.
 - `docs/_internal/`: internal notes, migration guides, and archived runtime-adjacent material.
 - `docs/_generated/`: generated artifacts only (non-authored outputs).
@@ -25,6 +26,16 @@ Current tracked report set includes:
 - `docs/reports/Technical_Appendix.md`
 - `docs/reports/Reproducibility_and_Validation.md`
 - `docs/reports/Testing_Strategy.md`
+- `docs/reports/THUNDERSTORM_JAR_INTEGRATION_STATUS.md`
+
+## Archive Policy
+
+- Historical one-off implementation notes and transient milestone updates are stored under:
+  - `docs/_internal/archive/root_markdown_legacy/`
+- Archived legacy specs and historical test writeups are stored under:
+  - `docs/_internal/archive/legacy_specs/`
+  - `docs/_internal/archive/legacy_reports/`
+- Root-level Markdown files are not used for project documentation (except top-level `README.md`).
 
 ## Contributor Rule
 

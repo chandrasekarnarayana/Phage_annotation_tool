@@ -8,7 +8,7 @@
 | Report Date | 2026-02-27 |
 | Intended Audience | Software reviewers, contributors, developers, JOSS reviewers |
 | Primary Repository Path | `src/phage_annotator/` |
-| Related Documents | `docs/ARCHITECTURE_DETAILED.md`, `docs/dev/feature_control_matrix.md`, `docs/PLANNED_FEATURES.md`, `docs/reports/Technical_Appendix.md`, `docs/reports/Reproducibility_and_Validation.md` |
+| Related Documents | `docs/CURRENT_CAPABILITIES.md`, `docs/feature_control_matrix.md`, `docs/PLANNED_FEATURES.md`, `docs/reports/Technical_Appendix.md`, `docs/reports/Reproducibility_and_Validation.md` |
 
 ## How to Use This Report
 - This file is the reviewer-facing architecture and design narrative.

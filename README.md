@@ -94,15 +94,13 @@ See [Current Capabilities](docs/CURRENT_CAPABILITIES.md) for detailed, versioned
 QT_QPA_PLATFORM=offscreen .venv-phage/bin/python -m pytest -m gui --run-gui
 ```
 
-See [Production Readiness Checklist](docs/PRODUCTION_READINESS_CHECKLIST.md).
-
 ## Documentation
 
+- [Documentation Index](docs/README.md)
 - [Current Capabilities](docs/CURRENT_CAPABILITIES.md)
 - [Planned Features](docs/PLANNED_FEATURES.md)
 - [Fiji ThunderSTORM Bridge](docs/FIJI_THUNDERSTORM_BRIDGE.md)
 - [SMLM Reproducibility Runbook](docs/SMLM_REPRODUCIBILITY_RUNBOOK.md)
-- [Panel Architecture Reference](docs/PANEL_ARCHITECTURE_REFERENCE.md)
 - [Reports Index](docs/reports/README.md)
 
 ## Notes

@@ -139,7 +139,7 @@ P2 (platform maturity):
    - full GUI suite pass verified in venv/headless mode (`-m gui --run-gui`).
    - full repository test pass verified in venv.
    - optional disk-cache tests now dependency-aware (skip when `zstandard` is unavailable).
-   - release checklist added under `docs/PRODUCTION_READINESS_CHECKLIST.md`.
+   - release-readiness validation commands added to `README.md` and CI gates.
 1. Release hygiene enforcement completed:
    - removed tracked demo binary (`phage_annotator_demo.tif`) from source control.
    - removed tracked generated package metadata under `src/phage_annotator.egg-info/`.
@@ -202,7 +202,7 @@ P2 (platform maturity):
    - added a second manifest-only plugin profile (`thunder_storm_fast`) with no backend code changes.
    - added test coverage confirming multi-profile discovery from repository assets.
 1. ThunderSTORM status documentation drift cleanup completed:
-   - replaced stale gap analysis claims in `THUNDERSTORM_JAR_INTEGRATION_STATUS.md` with verified current-state status.
+   - replaced stale gap analysis claims in `docs/reports/THUNDERSTORM_JAR_INTEGRATION_STATUS.md` with verified current-state status.
    - removed contradictory “missing macro/manifest/error handling” statements that no longer match runtime.
 1. Legacy state/mapping compatibility hardening completed:
    - added backward-compatible ROI aliases on `ViewState`/`RoiSpec` (`roi`, `roi_rect`, `roi_shape`, `x/y/w/h`).

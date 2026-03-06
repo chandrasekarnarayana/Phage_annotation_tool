@@ -1,0 +1,56 @@
+/home/cs/Desktop/Phage_annotation_tool/src/phage_annotator/analysis/suggestion_model.py:428: FutureWarning: use_gaussian_derivatives currently defaults to False, but will change to True in a future version. Please specify this argument explicitly to maintain the current behavior
+  H_elems = hessian_matrix(patch.astype(float), sigma=1.0, order='rc')
+
+████████████████████████████████████████████████████████████████████████████████
+█ AUTOMATED ITERATIVE ASSIST TEST: test_60_zstack.tif                          █
+████████████████████████████████████████████████████████████████████████████████
+
+Image: test_60_zstack.tif
+Shape: (2, 3, 64, 64)
+Testing timepoint: 0 with 153 GT points
+Retrain trigger: every 10 decisions
+Generated 2 suggestions in 0.091s
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ ITERATION 1: Review 10 Suggestions (Remaining: 2)                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ Batch Results (Iteration 1) ────────────────────────────────────────────────────┐
+│ [ 1] ✅ ACC  Score: 0.723  Pos: (   24.0,    34.0)
+│ [ 2] ✅ ACC  Score: 0.687  Pos: (   28.0,    27.0)
+├─ Batch Metrics ────────────────────────────────────────────────────────────┤
+│ Accepted:   2  Rejected:   0
+│ TP:   2  FP:   0  FN: 151
+│ Precision: 1.000  Recall: 0.013  F1: 0.026
+└──────────────────────────────────────────────────────────────────────────────┘
+
+████████████████████████████████████████████████████████████████████████████████
+█ FINAL SUMMARY                                                                █
+████████████████████████████████████████████████████████████████████████████████
+Image: test_60_zstack.tif
+Timepoint: 0
+Ground truth points: 153
+Total reviewed: 2
+Accepted: 2
+Rejected: 0
+Precision: 1.000
+Recall: 0.013
+F1: 0.026
+Iterations completed: 1
+Estimated iterations to cover all GT at 10/iter: 16
+Prediction time: 0.091s
+Retrain events: 0
+Total retrain time: 0.0000s
+Total model compute time: 0.091s
+
+Annotation efficiency estimate:
+  Baseline points/min: 50.0
+  Assisted points/min estimate: 75.0
+  Baseline completion time: 3.06 min
+  Assisted completion time: 2.04 min
+  Estimated time saved: 1.02 min
+Decision table exported: /tmp/assist_demo_tests/test_60_zstack_iterative_decisions.csv
+████████████████████████████████████████████████████████████████████████████████
+
+✅ Automated iterative testing complete!
+

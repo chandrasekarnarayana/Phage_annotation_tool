@@ -55,6 +55,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.reject_visible_suggestions_act = assist_menu.addAction("Reject Visible")
     self.clear_suggestions_act = assist_menu.addAction("Clear Suggestions")
     self.show_suggestion_patch_act = assist_menu.addAction("Show Snap View")
+    self.show_all_predictions_act = assist_menu.addAction("Show All Predictions")
     self.toggle_suggestions_overlay_act = assist_menu.addAction("Show Suggestion Overlay")
     self.toggle_suggestions_overlay_act.setCheckable(True)
     self.toggle_suggestions_overlay_act.setChecked(True)
@@ -245,6 +246,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "reject_visible_suggestions": self.reject_visible_suggestions_act,
         "clear_suggestions": self.clear_suggestions_act,
         "show_suggestion_patch": self.show_suggestion_patch_act,
+        "show_all_predictions": self.show_all_predictions_act,
         "start_timed_session_assisted": self.start_timed_session_assisted_act,
         "start_timed_session_manual": self.start_timed_session_manual_act,
         "stop_timed_session": self.stop_timed_session_act,
