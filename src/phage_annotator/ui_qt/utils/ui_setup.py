@@ -1001,7 +1001,10 @@ class UiSetupMixin:
         reject_visible_suggestions_act.triggered.connect(self._reject_visible_suggestions)
         clear_suggestions_act.triggered.connect(self._clear_suggestions_current_image)
         show_suggestion_patch_act.triggered.connect(self._show_current_suggestion_patch)
-        show_all_predictions_act.triggered.connect(self._show_all_predictions_dialog)
+        if getattr(self, "show_all_predictions_act", None) is not None:
+            self.show_all_predictions_act.triggered.connect(
+                self._show_all_predictions_dialog
+            )
         start_timed_session_assisted_act.triggered.connect(
             lambda: self._start_timed_annotation_session(True)
         )

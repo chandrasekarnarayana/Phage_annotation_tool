@@ -84,12 +84,12 @@ class RoiCropMixin:
                 "panel_visibility": panel_visibility,
             }
         for modality in manager.get_all_modalities():
-            key = f"modality_{int(modality.idx)}"
+            key = self._panel_key_for_modality_idx(int(modality.idx))
             self._panel_modality_map[key] = modality
             if key in hidden_base:
                 panel_visibility[key] = False
             else:
-                panel_visibility[key] = bool(panel_visibility.get(key, False))
+                panel_visibility[key] = bool(panel_visibility.get(key, True))
         panel_order = dict(getattr(self, "_lazy_panel_order", {}) or {})
         next_order = max([int(v) for v in panel_order.values() if str(v).isdigit()] or [0]) + 1
         for key in self._panel_modality_map.keys():

@@ -692,16 +692,6 @@ class DisplayControlsMixin:
             self._refresh_image()
 
     def _toggle_play(self, axis: str) -> None:
-        if axis == "t" and getattr(self, "modality_playback", None) is not None:
-            facade = getattr(self, "modality_facade", None)
-            if facade is not None and facade.count_modalities() > 1:
-                active_idx = facade.get_active_modality_idx()
-                if self.modality_playback.is_playing(active_idx):
-                    self.modality_playback.stop_playback()
-                else:
-                    self.modality_playback.set_mode(PlaybackMode.SYNCHRONIZED)
-                    self.modality_playback.start_playback(active_idx)
-                return
         if self.play_mode == axis:
             self.stop_playback_t()
             return

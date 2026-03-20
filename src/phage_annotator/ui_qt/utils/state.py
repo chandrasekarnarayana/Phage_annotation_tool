@@ -867,10 +867,11 @@ class StateMixin:
 
     def _read_playback_block(self, t_start: int, t_stop: int, z_idx: int) -> np.ndarray:
         """Read a contiguous block of frames for playback prefetching."""
-        prim = self.primary_image
-        if prim.array is None:
+        img = self._playback_source_image() if hasattr(self, "_playback_source_image") else self.primary_image
+        if img is None or img.array is None:
             return np.empty((0, 0, 0), dtype=np.float32)
-        block = read_contiguous_block(prim.array, t_start, t_stop, z_idx)
+        z_safe = max(0, min(int(z_idx), int(img.array.shape[1]) - 1))
+        block = read_contiguous_block(img.array, t_start, t_stop, z_safe)
         if self.crop_rect is None:
             return block
         x, y, w, h = self.crop_rect

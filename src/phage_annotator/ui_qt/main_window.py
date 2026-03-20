@@ -162,8 +162,8 @@ class KeypointAnnotator(
         self._playback_underruns = 0
         # Panel visibility controls which axes exist; at least one must remain visible.
         self._panel_visibility = {
-            "modality_0": False,
-            "modality_1": False,
+            "frame": False,
+            "support": False,
         }
         # Lazy loading modality sync groups: maps modality indices/panel keys to group numbers (default to 1)
         self._lazy_modality_groups = {
@@ -187,7 +187,7 @@ class KeypointAnnotator(
         self._lazy_builtin_views = {}
         self._lazy_builtin_seeded = False
         self._lazy_builtin_migrated = False
-        self._lazy_hidden_base_panel_keys = {"modality_0", "modality_1"}
+        self._lazy_hidden_base_panel_keys = {"frame", "support"}
         self._lazy_panel_order: Dict[str, int] = {}
         self._canvas_layout_rows = int(self._settings.value("canvasLayoutRows", 0, type=int))
         self._canvas_layout_cols = int(self._settings.value("canvasLayoutCols", 0, type=int))

@@ -187,19 +187,17 @@ class ModalityCanvasManager(QtWidgets.QWidget):
         modality_specs : List[Tuple[int, str]]
             List of (modality_idx, modality_name) tuples.
         """
-        # Remove old canvas if exists
-        if self._canvas is not None:
-            self.layout().removeWidget(self._canvas)
-            self._canvas.deleteLater()
-        
-        # Create new figure and canvas
-        self._figure = Figure(figsize=(8, 6), dpi=100)
-        self._figure.patch.set_facecolor('#F0F0F0')
-        self._canvas = FigureCanvasQTAgg(self._figure)
-        self._canvas.mpl_connect('button_press_event', self._on_canvas_click)
-        
-        # Add to layout
-        self.layout().addWidget(self._canvas)
+        # Keep a single figure/canvas instance for the widget lifetime so
+        # external renderer, toolbar, and mpl event bindings remain valid.
+        if self._figure is None or self._canvas is None:
+            self._figure = Figure(figsize=(8, 6), dpi=100)
+            self._figure.patch.set_facecolor('#F0F0F0')
+            self._canvas = FigureCanvasQTAgg(self._figure)
+            self._canvas.mpl_connect('button_press_event', self._on_canvas_click)
+            self.layout().addWidget(self._canvas)
+        else:
+            self._figure.clear()
+            self._figure.patch.set_facecolor('#F0F0F0')
         
         # Create subplots and views
         self._modality_views.clear()
