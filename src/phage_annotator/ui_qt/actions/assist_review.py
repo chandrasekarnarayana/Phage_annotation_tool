@@ -141,40 +141,30 @@ def refresh_review_queue_panel(owner) -> None:
         )
     if ranked and hasattr(owner, "_set_right_dock_mode"):
         owner._set_right_dock_mode("review")
-    panel.context_lbl.setText(f"Effective Assist Context: {owner._effective_assist_context_line(ranked)}")
-    delta_txt = str(getattr(owner, "_last_assist_context_delta_text", "")).strip()
-    panel.context_delta_lbl.setText(delta_txt)
-    panel.context_delta_lbl.setVisible(bool(delta_txt))
+    
+    # Update simplified panel labels (context/metrics removed for beginner clarity)
     visible_count = len(ranked)
     roi_count = len([s for s in ranked if owner._point_in_roi(float(s.x), float(s.y))]) if hasattr(owner, "_point_in_roi") else visible_count
-    panel.remaining_lbl.setText(f"Uncertain remaining: {visible_count} | current ROI: {roi_count}")
-    throughput_txt, _sec_per = review_throughput_snapshot(owner)
-    panel.telemetry_lbl.setText(throughput_txt)
-    panel.calib_spark_lbl.setText(calibration_sparkline_text(owner))
-    if getattr(owner, "_settings", None) is not None:
-        show_hint = bool(owner._settings.value("firstRunHintReviewQueue", True, type=bool))
-        panel.first_run_hint_lbl.setVisible(show_hint)
-        if show_hint:
-            owner._settings.setValue("firstRunHintReviewQueue", False)
-    processed, total = review_queue_progress_counts(owner)
-    panel.progress_lbl.setText(f"Progress: {processed} / {total}")
-    panel.progress_bar.setValue(int(round(100.0 * float(processed) / max(1.0, float(total)))) if total > 0 else 0)
+    panel.remaining_lbl.setText(f"Queue: {visible_count} uncertain | ROI: {roi_count}")
+    
+    # Prepare assist state info
     freshness = owner._suggestion_freshness_state(owner.primary_image.id, ranked)
     assist_state = owner._canonical_assist_state(ranked)
     need = owner._assist_context_need_count(ranked)
     metrics = dict(getattr(owner.controller.session_state, "suggestion_metrics", {}) or {})
     trained_pos = int(metrics.get("accepted", 0))
     trained_neg = int(metrics.get("rejected", 0))
-    readiness_txt = f" (Need {need} more labels in this context)" if assist_state.name == "HEURISTIC" and need > 0 else ""
-    panel.header_lbl.setText(
-        f"Assist - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_state_label(assist_state)}{readiness_txt} | trained on: {trained_pos} pos / {trained_neg} neg"
-    )
-    owner._style_assist_state_label(panel.assist_lbl, assist_state, prefix="Assist state: ", suffix=readiness_txt)
+    readiness_txt = f" (Need {need} more)" if assist_state.name == "HEURISTIC" and need > 0 else ""
+    
+    # Update simplified header (removed T/Z indices, metrics)
+    panel.header_lbl.setText(f"Assist Queue - {assist_state_label(assist_state)}{readiness_txt}")
+    
+    # No uncertain suggestions
     if not ranked:
-        panel.coords_lbl.setText("(x=-, y=-)")
-        panel.score_lbl.setText("Acceptance likelihood (p_accept): n/a")
-        panel.stale_lbl.setText("staleness: n/a")
-        panel.details_lbl.setText("No uncertain suggestions on current frame/scope.")
+        panel.coords_lbl.setText("Position: (x=-, y=-)")
+        panel.score_lbl.setText("Confidence: n/a")
+        panel.assist_lbl.setText("Status: Queue empty")
+        panel.details_lbl.setText("No uncertain suggestions on current frame.")
         for attr in ("accept_btn", "accept_next_btn", "reject_btn", "skip_btn", "next_uncertain_btn", "accept_green_btn"):
             getattr(panel, attr).setEnabled(False)
         if hasattr(panel, "set_suggestions"):
@@ -202,33 +192,43 @@ def refresh_review_queue_panel(owner) -> None:
                 }
             )
         panel.set_suggestions(rows, owner._suggestion_cursor)
-    panel.coords_lbl.setText(f"(x={int(round(float(current.x)))}, y={int(round(float(current.y)))})")
+    
+    # Update current suggestion display (simplified labels)
+    panel.coords_lbl.setText(f"Position: (x={int(round(float(current.x)))}, y={int(round(float(current.y)))})")
     candidate_class = str(dict(getattr(current, "meta", {}) or {}).get("candidate_class", "new")).strip().replace("_", " ")
     p_accept = dict(getattr(current, "meta", {}) or {}).get("p_accept")
     uncertainty_score = float(getattr(current, "uncertainty_score", dict(getattr(current, "meta", {}) or {}).get("uncertainty_score", 0.0)) or 0.0)
     uncertainty_reason = str(getattr(current, "uncertainty_reason", dict(getattr(current, "meta", {}) or {}).get("uncertainty_reason", "")) or "")
+    
     if p_accept is None:
-        panel.score_lbl.setText(f"Acceptance likelihood (p_accept): n/a | generator score: {float(current.score):.2f}")
+        panel.score_lbl.setText(f"Confidence: heuristic (score: {float(current.score):.2f})")
+        panel.assist_lbl.setText(f"Status: Review required")
         panel.details_lbl.setText(
-            f"Heuristic-only proposal; review required. Classification: {candidate_class}. "
-            f"Uncertainty {uncertainty_score:.2f}{f' ({uncertainty_reason})' if uncertainty_reason else ''}."
+            f"{candidate_class} | Uncertainty: {uncertainty_score:.2f}{f' - {uncertainty_reason}' if uncertainty_reason else ''}"
         )
     else:
         p_val = float(p_accept)
-        triage = "likely accept" if p_val >= 0.75 else "needs review" if p_val >= 0.5 else "unlikely accept"
-        panel.score_lbl.setText(f"Acceptance likelihood (p_accept): {p_val:.2f} ({triage})")
+        triage = "high" if p_val >= 0.75 else "medium" if p_val >= 0.5 else "low"
+        panel.score_lbl.setText(f"Confidence: {p_val:.2f} ({triage})")
+        panel.assist_lbl.setText(f"Status: {candidate_class}")
         panel.details_lbl.setText(
-            f"Generator score: {float(current.score):.2f} | Classification: {candidate_class} | "
-            f"Uncertainty: {uncertainty_score:.2f}{f' ({uncertainty_reason})' if uncertainty_reason else ''}"
+            f"Uncertainty: {uncertainty_score:.2f}{f' - {uncertainty_reason}' if uncertainty_reason else ''}"
         )
+    
     if freshness.get("is_stale", False):
-        panel.stale_lbl.setText(f"staleness: Stale - regenerate recommended (generated {freshness.get('age_text', 'n/a')} ago)")
-        panel.stale_lbl.setStyleSheet("color: #d84315; font-weight: 600;")
-    else:
-        panel.stale_lbl.setStyleSheet("")
+        stale_msg = f"⚠ Regenerate recommended"
+        panel.details_lbl.setText(f"{panel.details_lbl.text()} | {stale_msg}")
+    
+    # Enable action buttons
     for attr in ("accept_btn", "accept_next_btn", "reject_btn", "skip_btn", "next_uncertain_btn"):
         getattr(panel, attr).setEnabled(True)
     panel.accept_green_btn.setEnabled(True)
+    
+    # Update progress
+    processed, total = review_queue_progress_counts(owner)
+    panel.progress_lbl.setText(f"Progress: {processed} / {total}")
+    panel.progress_bar.setValue(int(round(100.0 * float(processed) / max(1.0, float(total)))) if total > 0 else 0)
+    
     owner._refresh_suggestion_explain_panel(current)
 
 
