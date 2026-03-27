@@ -176,17 +176,14 @@ class UiSetupMixin(UiSetupRegistryMixin):
         explore_layout = QtWidgets.QVBoxLayout(self.explore_panel)
         explore_layout.setContentsMargins(8, 8, 8, 8)
         explore_layout.setSpacing(8)
-        self.fov_list = QtWidgets.QListWidget()
+        self.fov_list = QtWidgets.QListWidget(self.explore_panel)
         for img in self.images:
             self.fov_list.addItem(img.name)
         self.fov_list.setCurrentRow(self.current_image_idx)
-        explore_layout.addWidget(QtWidgets.QLabel("FOVs"))
-        explore_layout.addWidget(self.fov_list)
-        self.clear_fovs_btn = QtWidgets.QPushButton("Clear FOV list")
-        explore_layout.addWidget(self.clear_fovs_btn)
+        self.fov_list.setVisible(False)
+        self.clear_fovs_btn = QtWidgets.QPushButton("Clear FOV list", self.explore_panel)
+        self.clear_fovs_btn.setVisible(False)
 
-        primary_box = QtWidgets.QHBoxLayout()
-        primary_box.addWidget(QtWidgets.QLabel("Modality 1"))
         self.primary_combo = QtWidgets.QComboBox(self.explore_panel)
         self.support_combo = QtWidgets.QComboBox(self.explore_panel)
         for img in self.images:
@@ -201,11 +198,8 @@ class UiSetupMixin(UiSetupRegistryMixin):
         self.support_combo.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.support_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
         
-        primary_box.addWidget(self.primary_combo)
-        primary_box.addWidget(QtWidgets.QLabel("Modality 2"))
-        primary_box.addWidget(self.support_combo)
-        # Primary/support selectors remain available for internal wiring and the
-        # Prepare workflow page, but stay out of the default canvas strip.
+        # Primary/support selectors remain available for internal wiring, but
+        # stay out of the default lazy-loading workflow surface.
         self.primary_combo.setVisible(False)
         self.support_combo.setVisible(False)
         build_modality_loader_section(self, explore_layout)

@@ -1797,6 +1797,43 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._request_lazy_canvas_refresh("lazy-loader-remove", refresh_table=True)
         self._status_success(f"Removed loader entry: {Path(path).name}", source="ui_extra.lazy_loader")
 
+    def _clear_lazy_loader_sources(self) -> None:
+        """Reset the lazy-loader source list back to the current primary image only."""
+        if not getattr(self, "images", None):
+            return
+        self._clear_fov_list()
+        manifest = getattr(self, "_lazy_loader_manifest", None)
+        if manifest is None or not getattr(self, "images", None):
+            return
+        keep_img = self.images[0]
+        keep_path = Path(str(getattr(keep_img, "path", "")))
+        if not keep_path:
+            return
+        path_to_ids = {str(keep_path): [int(getattr(keep_img, "id", 0))]}
+        self._lazy_loader_path_to_ids = path_to_ids
+        manifest.clear()
+        manifest.add_paths([keep_path], path_to_ids)
+        self._refresh_lazy_loader_tree()
+        self._request_lazy_canvas_refresh("lazy-loader-clear", refresh_table=True)
+        self._status_info("Cleared previous loader sources.", source="ui_extra.lazy_loader")
+
+    def _open_annotation_table_for_panel(self, panel_key: str) -> None:
+        """Open the annotation table focused on one lazy-loader panel context."""
+        key = str(panel_key or "").strip()
+        if not key:
+            return
+        try:
+            self.annotate_target = key
+        except Exception:
+            pass
+        self.open_panel("annotations", reason="lazy_loader:annotation_table")
+        if getattr(self, "annotation_table_mode_combo", None) is not None:
+            idx = self.annotation_table_mode_combo.findData("truth")
+            if idx >= 0:
+                self.annotation_table_mode_combo.setCurrentIndex(idx)
+        if hasattr(self, "_refresh_table"):
+            self._refresh_table()
+
     def _on_lazy_modality_item_changed(self, item) -> None:
         """Handle lazy-table inline rename and propagate to canvas titles."""
         if item is None or getattr(self, "controller", None) is None:
@@ -2129,25 +2166,24 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self._collapse_right_sidebar()
         else:
             self._expand_right_sidebar()
-            # Keep right side usable by default: if nothing is visible, show Annotation Table.
-            any_right_visible = any(
-                bool(getattr(self, attr, None) is not None and getattr(self, attr).isVisible())
-                for attr in (
-                    "dock_annotations",
-                    "dock_review_queue",
-                    "dock_advanced_settings",
-                    "dock_advanced_analysis",
-                    "dock_status_details",
-                    "dock_qc_issues",
-                )
-            )
-            if not any_right_visible and getattr(self, "dock_annotations", None) is not None:
-                self.set_panel_visible("annotations", True, source="restore_defaults")
-                try:
-                    self.dock_annotations.raise_()
-                except Exception:
-                    pass
-                self._apply_canvas_priority_layout()
+        
+        # ALWAYS normalize right sidebar to show only Annotations at startup
+        # This ensures consistent behavior regardless of previous session state
+        for panel_id in (
+            "review_queue",
+            "advanced_settings",
+            "advanced_analysis",
+            "status_details",
+            "qc_issues",
+        ):
+            self.set_panel_visible(panel_id, False, source="startup_normalize")
+        if getattr(self, "dock_annotations", None) is not None:
+            self.set_panel_visible("annotations", True, source="startup_normalize")
+            try:
+                self.dock_annotations.raise_()
+            except Exception:
+                pass
+        self._apply_canvas_priority_layout()
 
     def _apply_canvas_priority_layout(self) -> None:
         """Resize docks so the canvas remains the primary focus."""
@@ -2969,6 +3005,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             on_toggled=lambda checked, k=row_spec.panel_key: self._on_annotation_panel_toggle(str(k), bool(checked)),
         )
         table.setCellWidget(row, LAZY_TABLE_COLUMN_POINTS, points_widget)
+
+        table_btn = QtWidgets.QToolButton(table)
+        table_btn.setText("Open")
+        table_btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
+        table_btn.setToolTip("Open the annotation table focused on this panel row.")
+        table_btn.clicked.connect(
+            lambda _checked=False, k=row_spec.panel_key: self._open_annotation_table_for_panel(str(k))
+        )
+        table.setCellWidget(row, LAZY_TABLE_COLUMN_TABLE, table_btn)
 
         name_item = QtWidgets.QTableWidgetItem(str(row_spec.panel_name))
         name_item.setData(QtCore.Qt.ItemDataRole.UserRole, row_spec.role_key)

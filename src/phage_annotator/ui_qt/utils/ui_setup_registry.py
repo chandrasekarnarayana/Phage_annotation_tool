@@ -478,10 +478,7 @@ class UiSetupRegistryMixin:
         if getattr(self, "support_combo", None) is not None:
             self.support_combo.setVisible(True)
 
-        lazy_loading_content = _stack_sections(
-            self.explore_panel,
-            _build_lazy_loading_section(),
-        )
+        lazy_loading_content = self.explore_panel
         if hasattr(self, "_update_sync_keys_hint"):
             self._update_sync_keys_hint()
         if hasattr(self, "_refresh_prepare_setup_summary"):

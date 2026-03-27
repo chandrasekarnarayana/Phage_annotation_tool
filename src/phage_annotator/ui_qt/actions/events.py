@@ -37,7 +37,7 @@ class EventsMixin(KeyboardEventsMixin):
             self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
         if getattr(self, "lazy_open_btn", None) is not None:
             self.lazy_open_btn.pressed.connect(self._open_lazy_loader_dialog)
-            self.lazy_remove_btn.pressed.connect(self._remove_selected_lazy_modality_view)
+            self.lazy_remove_btn.pressed.connect(self._clear_lazy_loader_sources)
         if getattr(self, "lazy_auto_update_chk", None) is not None:
             self.lazy_auto_update_chk.toggled.connect(self._on_lazy_auto_update_toggled)
         if getattr(self, "lazy_apply_btn", None) is not None:
@@ -182,7 +182,8 @@ class EventsMixin(KeyboardEventsMixin):
                 lambda _idx: self._refresh_review_queue_panel()
             )
         self.show_ann_master_chk.stateChanged.connect(self._on_show_annotations_master_changed)
-        self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
+        if getattr(self, "clear_fovs_btn", None) is not None:
+            self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
         if self.roi_manager_widget is not None:
             widget = self.roi_manager_widget
             widget.add_btn.clicked.connect(self._roi_mgr_add)

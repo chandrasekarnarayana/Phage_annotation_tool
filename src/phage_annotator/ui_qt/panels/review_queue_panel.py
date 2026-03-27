@@ -31,91 +31,52 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        self.header_lbl = QtWidgets.QLabel("Assist - T:- Z:-")
-        self.header_lbl.setStyleSheet("font-weight: 600;")
+        self.header_lbl = QtWidgets.QLabel("Assist Queue")
+        self.header_lbl.setStyleSheet("font-weight: 600; font-size: 12px;")
         layout.addWidget(self.header_lbl)
-        self.context_lbl = QtWidgets.QLabel("Effective Assist Context: -")
-        self.context_lbl.setWordWrap(True)
-        self.context_lbl.setStyleSheet("color: #37474f;")
-        layout.addWidget(self.context_lbl)
-        self.context_delta_lbl = QtWidgets.QLabel("")
-        self.context_delta_lbl.setWordWrap(True)
-        self.context_delta_lbl.setStyleSheet("color: #ef6c00;")
-        self.context_delta_lbl.setVisible(False)
-        layout.addWidget(self.context_delta_lbl)
-        self.legend_lbl = QtWidgets.QLabel(
-            "Legend: <span style='color:#9e9e9e;'>■ heuristic</span> | "
-            "<span style='color:#2e7d32;'>■ high</span> | "
-            "<span style='color:#f9a825;'>■ medium</span> | "
-            "<span style='color:#c62828;'>■ low</span>"
-        )
-        self.legend_lbl.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        layout.addWidget(self.legend_lbl)
 
         controls_row = QtWidgets.QHBoxLayout()
         controls_row.setSpacing(6)
         self.filter_combo = QtWidgets.QComboBox()
-        self.filter_combo.addItem("All visible", "all")
-        self.filter_combo.addItem("New only", "new_only")
-        self.filter_combo.addItem("Conflicts", "conflicts_only")
-        self.filter_combo.addItem("Near existing", "near_existing")
+        self.filter_combo.addItem("All", "all")
         self.filter_combo.addItem("High confidence", "high_confidence")
-        self.filter_combo.addItem("High uncertainty", "high_uncertainty")
-        self.filter_combo.addItem("Heuristic only", "heuristic_only")
-        self.filter_combo.addItem("Dense ambiguity", "dense_ambiguity")
-        self.filter_combo.addItem("Control contradiction", "control_contradiction")
-        self.filter_combo.addItem("Current ROI", "current_roi")
-        self.filter_combo.addItem("Current frame", "current_frame")
+        self.filter_combo.addItem("Uncertain", "high_uncertainty")
         self.sort_combo = QtWidgets.QComboBox()
         self.sort_combo.addItem("Confidence", "confidence")
         self.sort_combo.addItem("Uncertainty", "uncertainty")
-        self.sort_combo.addItem("Nearest truth", "nearest_truth")
-        self.sort_combo.addItem("Evidence quality", "evidence_quality")
-        self.sort_combo.addItem("Batch / created", "batch_id")
-        controls_row.addWidget(QtWidgets.QLabel("Filter"))
+        controls_row.addWidget(QtWidgets.QLabel("Filter:"))
         controls_row.addWidget(self.filter_combo, 1)
-        controls_row.addWidget(QtWidgets.QLabel("Sort"))
+        controls_row.addWidget(QtWidgets.QLabel("Sort:"))
         controls_row.addWidget(self.sort_combo, 1)
         layout.addLayout(controls_row)
 
-        self.remaining_lbl = QtWidgets.QLabel("Uncertain remaining: 0")
+        self.remaining_lbl = QtWidgets.QLabel("Queue: 0 uncertain")
+        self.remaining_lbl.setStyleSheet("font-size: 11px; color: #546e7a;")
         layout.addWidget(self.remaining_lbl)
-        self.telemetry_lbl = QtWidgets.QLabel("Throughput: n/a")
-        self.telemetry_lbl.setStyleSheet("color: #546e7a;")
-        layout.addWidget(self.telemetry_lbl)
-        self.calib_spark_lbl = QtWidgets.QLabel("Calibration: -")
-        self.calib_spark_lbl.setStyleSheet("color: #546e7a;")
-        layout.addWidget(self.calib_spark_lbl)
-        self.first_run_hint_lbl = QtWidgets.QLabel(
-            "Tip: Use A/R/N/P for fast triage. Check context line before bulk actions."
-        )
-        self.first_run_hint_lbl.setWordWrap(True)
-        self.first_run_hint_lbl.setStyleSheet("color: #455a64; font-style: italic;")
-        layout.addWidget(self.first_run_hint_lbl)
 
-        current_group = QtWidgets.QGroupBox("Current")
+        current_group = QtWidgets.QGroupBox("Current Suggestion")
         current_layout = QtWidgets.QVBoxLayout(current_group)
         current_layout.setContentsMargins(8, 8, 8, 8)
-        self.coords_lbl = QtWidgets.QLabel("(x=-, y=-)")
-        self.score_lbl = QtWidgets.QLabel("Acceptance likelihood (p_accept): n/a")
-        self.stale_lbl = QtWidgets.QLabel("staleness: n/a")
-        self.assist_lbl = QtWidgets.QLabel("Assist state: Off")
+        current_layout.setSpacing(4)
+        self.coords_lbl = QtWidgets.QLabel("Position: (x=-, y=-)")
+        self.score_lbl = QtWidgets.QLabel("Confidence: n/a")
+        self.assist_lbl = QtWidgets.QLabel("Status: -")
         self.details_lbl = QtWidgets.QLabel("")
         self.details_lbl.setWordWrap(True)
+        self.details_lbl.setStyleSheet("font-size: 10px; color: #37474f;")
         current_layout.addWidget(self.coords_lbl)
         current_layout.addWidget(self.score_lbl)
-        current_layout.addWidget(self.stale_lbl)
         current_layout.addWidget(self.assist_lbl)
         current_layout.addWidget(self.details_lbl)
         layout.addWidget(current_group)
 
-        table_group = QtWidgets.QGroupBox("Suggested points")
+        table_group = QtWidgets.QGroupBox("Queue")
         table_layout = QtWidgets.QVBoxLayout(table_group)
         table_layout.setContentsMargins(8, 8, 8, 8)
         table_layout.setSpacing(4)
-        self.suggestions_table = QtWidgets.QTableWidget(0, 7, table_group)
+        self.suggestions_table = QtWidgets.QTableWidget(0, 6, table_group)
         self.suggestions_table.setHorizontalHeaderLabels(
-            ["#", "X", "Y", "T", "Z", "Acceptance", "State"]
+            ["#", "X", "Y", "T/Z", "Confidence", "Action"]
         )
         self.suggestions_table.setSelectionBehavior(
             QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
@@ -142,7 +103,6 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.suggestions_table.itemSelectionChanged.connect(self._emit_selected_suggestion_row)
         table_layout.addWidget(self.suggestions_table)
         decision_row = QtWidgets.QHBoxLayout()
@@ -261,14 +221,21 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.suggestions_table.setRowCount(len(rows))
         for ridx, row in enumerate(rows):
             key = str(row.get("status", "proposed")).strip().lower()
+            t_val = str(row.get("t", "-"))
+            z_val = str(row.get("z", "-"))
+            t_z = f"{t_val}/{z_val}" if t_val != "-" or z_val != "-" else "-"
+            action_state = str(row.get("state", "proposed")).upper()
+            if key == "accepted":
+                action_state = "✓ ACCEPT"
+            elif key == "rejected":
+                action_state = "✗ REJECT"
             values = [
                 str(row.get("index", ridx + 1)),
                 str(row.get("x", "-")),
                 str(row.get("y", "-")),
-                str(row.get("t", "-")),
-                str(row.get("z", "-")),
+                t_z,
                 str(row.get("acceptance", "n/a")),
-                str(row.get("state", "proposed")),
+                action_state,
             ]
             for cidx, value in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(value)
@@ -277,7 +244,9 @@ class ReviewQueuePanel(QtWidgets.QWidget):
                     item.setData(QtCore.Qt.ItemDataRole.UserRole, str(row.get("suggestion_id", "")))
                 if key in status_bg:
                     item.setBackground(status_bg[key])
-                if cidx in (5, 6) and key in status_fg:
+                if cidx == 4 and key in status_fg:
+                    item.setForeground(status_fg[key])
+                if cidx == 5 and key in status_fg:
                     item.setForeground(status_fg[key])
                 self.suggestions_table.setItem(ridx, cidx, item)
         if rows:
