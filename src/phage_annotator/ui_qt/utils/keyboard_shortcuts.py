@@ -259,9 +259,8 @@ class KeyboardShortcutManager:
     # Modality action handlers
     def _switch_modality(self, idx: int) -> None:
         """Switch to specified modality."""
-        if hasattr(self.main_window, 'primary_combo'):
-            if idx < self.main_window.primary_combo.count():
-                self.main_window.primary_combo.setCurrentIndex(idx)
+        if 0 <= idx < len(getattr(self.main_window, "images", []) or []):
+            self.main_window._set_fov(idx)
 
     def _add_modality(self) -> None:
         """Add new modality (placeholder - requires session integration)."""

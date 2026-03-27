@@ -1467,30 +1467,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         tree.expandAll()
         tree.blockSignals(False)
 
-    def _sync_lazy_loader_selectors(self) -> None:
-        """Refresh image selector widgets from controller-owned state."""
-        names = [str(getattr(img, "name", f"Image {idx}")) for idx, img in enumerate(getattr(self, "images", []) or [])]
-        current_primary = int(getattr(self, "current_image_idx", 0))
-        current_support = int(getattr(self, "support_image_idx", 0))
-        fov_list = getattr(self, "fov_list", None)
-        if fov_list is not None:
-            fov_list.blockSignals(True)
-            fov_list.clear()
-            fov_list.addItems(names)
-            if names:
-                fov_list.setCurrentRow(max(0, min(current_primary, len(names) - 1)))
-            fov_list.blockSignals(False)
-        for combo_name, current_index in (("primary_combo", current_primary), ("support_combo", current_support)):
-            combo = getattr(self, combo_name, None)
-            if combo is None:
-                continue
-            combo.blockSignals(True)
-            combo.clear()
-            combo.addItems(names)
-            if names:
-                combo.setCurrentIndex(max(0, min(current_index, len(names) - 1)))
-            combo.blockSignals(False)
-
     def _open_lazy_loader_dialog(self) -> None:
         """Open a small menu that can add files or folders through one button."""
         btn = getattr(self, "lazy_open_btn", None)
@@ -1586,10 +1562,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             if int(modality.image_id) not in visible_ids:
                 modality.image_id = fallback_id
 
-    def _ensure_lazy_loader_base_modalities(self) -> None:
-        """Legacy no-op: base rows are now created explicitly by the user."""
-        return
-
     def _request_lazy_canvas_refresh(self, reason: str, *, refresh_table: bool = True) -> None:
         """Queue a lazy-panel refresh on the Qt event loop.
 
@@ -1608,7 +1580,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         """Apply queued table/tree changes to the canvas asynchronously."""
         if bool(getattr(self, "_lazy_apply_table_refresh", False)):
             # Rebuild browser + controls first, then render once from the latest state.
-            self._sync_lazy_loader_selectors()
             self._refresh_lazy_modality_table()
             self._refresh_lazy_loader_tree()
         self._reconcile_lazy_loader_sources()
@@ -1758,41 +1729,79 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._request_lazy_canvas_refresh("lazy-add-view", refresh_table=True)
 
     def _remove_selected_lazy_modality_view(self) -> None:
-        """Remove the selected file/folder entry from the lazy loader tree."""
-        tree = getattr(self, "lazy_loader_tree", None)
-        manifest = getattr(self, "_lazy_loader_manifest", None)
-        if tree is None or manifest is None:
+        """Remove the selected modality/view row from the lazy table."""
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
             return
-        item = tree.currentItem()
-        if item is None:
+        row = int(table.currentRow())
+        role_key = self._role_key_for_lazy_row(row)
+        if role_key is None:
+            self._status_warning("Select a modality/view row to remove.", source="ui_extra.lazy_loader")
             return
-        path = str(item.data(0, QtCore.Qt.ItemDataRole.UserRole) or "")
-        if not path:
-            return
-        removed_ids = set(manifest.subtree_image_ids(path))
-        remaining = [image_id for image_id in self._lazy_loader_visible_image_ids() if image_id not in removed_ids]
-        if not remaining and manifest.contains(path):
-            self._status_warning(
-                "At least one loaded image must remain in the lazy loader.",
-                source="ui_extra.lazy_loader",
-            )
-            return
-        if not manifest.remove_path(path):
-            return
-        self._refresh_lazy_loader_tree()
-        self._reconcile_lazy_loader_sources()
-        self._request_lazy_canvas_refresh("lazy-loader-remove", refresh_table=True)
-        self._status_success(f"Removed loader entry: {Path(path).name}", source="ui_extra.lazy_loader")
+
+        removed_name = ""
+        if isinstance(role_key, str) and role_key.startswith("builtin:"):
+            panel_key = str(role_key).split(":", 1)[1]
+            builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+            cfg = dict(builtin.get(panel_key, {}) or {})
+            removed_name = str(cfg.get("name", panel_key.title()))
+            if panel_key not in builtin:
+                return
+            builtin.pop(panel_key, None)
+            self._lazy_builtin_views = builtin
+            self._panel_visibility.pop(panel_key, None)
+            self._annotation_panel_visibility.pop(panel_key, None)
+        else:
+            try:
+                modality_idx = int(role_key)
+            except Exception:
+                self._status_warning("Could not resolve the selected modality/view.", source="ui_extra.lazy_loader")
+                return
+            from phage_annotator.session.migration import ensure_modality_system
+
+            manager = ensure_modality_system(self.controller.session_state)
+            modalities = list(manager.get_all_modalities() or [])
+            modality = next((m for m in modalities if int(getattr(m, "idx", -1)) == modality_idx), None)
+            if modality is None:
+                return
+            if len(modalities) <= 1:
+                self._status_warning(
+                    "At least one modality/view must remain available.",
+                    source="ui_extra.lazy_loader",
+                )
+                return
+            removed_name = str(getattr(modality, "display_name", f"Modality {modality_idx + 1}"))
+            if not manager.remove_modality(modality_idx):
+                return
+            panel_key = self._panel_key_for_modality_idx(modality_idx)
+            self._panel_visibility.pop(panel_key, None)
+            self._annotation_panel_visibility.pop(panel_key, None)
+
+        self._ensure_lazy_sync_group_keys()
+        if hasattr(self, "_update_analysis_panel_modalities"):
+            self._update_analysis_panel_modalities()
+        self._request_lazy_canvas_refresh("lazy-remove-view", refresh_table=True)
+        self._status_success(
+            f"Removed modality/view: {removed_name or 'selected row'}",
+            source="ui_extra.lazy_loader",
+        )
 
     def _clear_lazy_loader_sources(self) -> None:
         """Reset the lazy-loader source list back to the current primary image only."""
         if not getattr(self, "images", None):
             return
-        self._clear_fov_list()
+        self.stop_playback_t()
+        self._cancel_all_jobs()
+        self._bump_job_generation()
+        keep_idx = int(getattr(self, "current_image_idx", 0))
+        self.controller.retain_single_image(keep_idx)
+        self.current_image_idx = 0
+        self.support_image_idx = 0
         manifest = getattr(self, "_lazy_loader_manifest", None)
         if manifest is None or not getattr(self, "images", None):
             return
         keep_img = self.images[0]
+        keep_img.id = 0
         keep_path = Path(str(getattr(keep_img, "path", "")))
         if not keep_path:
             return
@@ -1800,6 +1809,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._lazy_loader_path_to_ids = path_to_ids
         manifest.clear()
         manifest.add_paths([keep_path], path_to_ids)
+        self.roi_manager.rois_by_image = {0: self.roi_manager.list_rois(keep_idx)}
+        self.roi_manager.set_active(self.roi_manager.active_roi_id)
+        self._refresh_roi_manager()
         self._refresh_lazy_loader_tree()
         self._request_lazy_canvas_refresh("lazy-loader-clear", refresh_table=True)
         self._status_info("Cleared previous loader sources.", source="ui_extra.lazy_loader")
@@ -1957,14 +1969,10 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
 
     def _on_lazy_builtin_support_source_changed(self, image_id: int) -> None:
         """Update support panel source image from lazy table."""
-        try:
-            self._set_support_combo(
-                self._image_index_for_id(int(image_id)),
-                refresh_lazy_table=False,
-            )
-        except Exception:
-            self.support_image_idx = self._image_index_for_id(int(image_id))
-            self._request_lazy_canvas_refresh("lazy-support-source", refresh_table=False)
+        self._set_support_combo(
+            self._image_index_for_id(int(image_id)),
+            refresh_lazy_table=False,
+        )
 
     def _focus_playback_controls(self) -> None:
         """Focus playback controls in the bottom bar from sidebar launcher page."""
@@ -2831,7 +2839,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         """Return the current image-list index for an image id.
 
         Lazy-table source selectors use stable image ids as their row state,
-        while several legacy display selectors still work with combo indices.
+        while display/runtime code still works with image-list indices.
         This keeps the table source-of-truth on image ids and only adapts at
         the display-control boundary when needed.
         """

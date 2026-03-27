@@ -627,11 +627,11 @@ class TableStatusMixin:
     def _apply_legacy_status_snapshot(self, snapshot: DerivedStatusSnapshot) -> None:
         """Update compatibility widgets from the unified status snapshot."""
         status_modality_combo = getattr(self, "status_modality_combo", None)
-        if status_modality_combo is not None and getattr(self, "primary_combo", None) is not None:
+        if status_modality_combo is not None:
             status_modality_combo.blockSignals(True)
             status_modality_combo.clear()
-            for idx in range(self.primary_combo.count()):
-                status_modality_combo.addItem(self.primary_combo.itemText(idx), idx)
+            for idx, img in enumerate(getattr(self, "images", []) or []):
+                status_modality_combo.addItem(str(getattr(img, "name", f"Image {idx}")), idx)
             if 0 <= int(getattr(self, "current_image_idx", 0)) < status_modality_combo.count():
                 status_modality_combo.setCurrentIndex(int(self.current_image_idx))
             status_modality_combo.setToolTip(

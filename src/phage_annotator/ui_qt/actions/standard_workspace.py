@@ -6,7 +6,7 @@ import pathlib
 from typing import List, Optional
 
 import numpy as np
-from matplotlib.backends.qt_compat import QtGui, QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.io.metadata.reader import MetadataBundle
 from phage_annotator.session.signal_hub import emit_annotations_changed
@@ -77,9 +77,6 @@ class WorkspaceActionsMixin:
             new_images.append(meta)
         self.controller.add_images(new_images)
         for meta in new_images:
-            self.fov_list.addItem(meta.name)
-            self.primary_combo.addItem(meta.name)
-            self.support_combo.addItem(meta.name)
             self.roi_manager.rois_by_image[meta.id] = []
         self._refresh_annotation_availability()
         self._refresh_roi_manager()
@@ -88,19 +85,25 @@ class WorkspaceActionsMixin:
         self._update_analysis_panel_modalities()
 
     def _refresh_annotation_availability(self) -> None:
-        if self.fov_list is None:
+        tree = getattr(self, "lazy_loader_tree", None)
+        if tree is None:
             return
         icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView)
-        for idx, img in enumerate(self.images):
-            item = self.fov_list.item(idx)
-            if item is None:
-                continue
-            if self.controller.annotations_available(img.id):
-                item.setIcon(icon)
-                item.setToolTip("Annotations available")
+        available_paths = {
+            str(getattr(img, "path", ""))
+            for img in (getattr(self, "images", []) or [])
+            if self.controller.annotations_available(int(getattr(img, "id", -1)))
+        }
+        root = tree.invisibleRootItem()
+        for row in range(root.childCount()):
+            item = root.child(row)
+            path = str(item.data(0, QtCore.Qt.ItemDataRole.UserRole) or "")
+            if path in available_paths:
+                item.setIcon(0, icon)
+                item.setToolTip(0, path)
             else:
-                item.setIcon(QtGui.QIcon())
-                item.setToolTip("")
+                item.setIcon(0, QtGui.QIcon())
+                item.setToolTip(0, path)
 
     def _maybe_autoload_annotations(self, image_id: int) -> None:
         if not self._settings.value("autoLoadAnnotations", True, type=bool):

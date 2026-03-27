@@ -248,11 +248,10 @@ class UiAnnotationViewsMixin:
         support_cfg = dict(dict(getattr(self, "_lazy_builtin_views", {}) or {}).get("support", {}) or {})
         if support_cfg.get("name"):
             labels["support"] = str(support_cfg.get("name"))
-        support_combo = getattr(self, "support_combo", None)
-        if support_combo is not None and support_combo.count() > 0:
-            idx = int(getattr(self, "support_image_idx", support_combo.currentIndex()))
-            if 0 <= idx < support_combo.count():
-                labels["support"] = f"Modality 2 ({support_combo.itemText(idx)})"
+        images = list(getattr(self, "images", []) or [])
+        idx = int(getattr(self, "support_image_idx", 0))
+        if 0 <= idx < len(images):
+            labels["support"] = f"Modality 2 ({getattr(images[idx], 'name', f'Image {idx}')})"
         return labels
 
     def _refresh_annotation_target_constraints(self) -> None:

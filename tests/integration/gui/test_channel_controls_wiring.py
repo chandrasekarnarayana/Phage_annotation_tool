@@ -100,12 +100,12 @@ def test_channel_panel_visibility_tracks_active_image(qtbot, tmp_path):
     assert win.dock_channels is not None
     assert win.dock_channels.isVisible()
 
-    win.primary_combo.setCurrentIndex(1)  # single-channel image
+    win._set_fov(1)  # single-channel image
     qtbot.wait(120)
     assert win.primary_image.channel_count == 1
     assert not win.dock_channels.isVisible()
 
-    win.primary_combo.setCurrentIndex(0)  # back to multi-channel image
+    win._set_fov(0)  # back to multi-channel image
     qtbot.wait(120)
     assert win.primary_image.channel_count > 1
     assert win.dock_channels.isVisible()

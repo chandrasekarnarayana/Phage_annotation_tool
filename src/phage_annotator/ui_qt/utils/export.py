@@ -451,18 +451,8 @@ class ExportMixin:
     def _apply_loaded_project_to_ui(self) -> None:
         """Apply controller-loaded project state to UI widgets/docks."""
         self.stop_playback_t()
-        self.fov_list.clear()
-        self.primary_combo.clear()
-        self.support_combo.clear()
-        for img in self.images:
-            self.fov_list.addItem(img.name)
-            self.primary_combo.addItem(img.name)
-            self.support_combo.addItem(img.name)
         self.current_image_idx = self.controller.session_state.active_primary_id
         self.support_image_idx = self.controller.session_state.active_support_id
-        self.fov_list.setCurrentRow(self.current_image_idx)
-        self.primary_combo.setCurrentIndex(self.current_image_idx)
-        self.support_combo.setCurrentIndex(self.support_image_idx)
         if hasattr(self, "_refresh_lazy_modality_table"):
             self._refresh_lazy_modality_table()
         self.speed_slider.setValue(int(self.controller.session_state.fps))

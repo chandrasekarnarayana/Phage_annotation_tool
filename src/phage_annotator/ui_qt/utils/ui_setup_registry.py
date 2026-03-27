@@ -473,11 +473,6 @@ class UiSetupRegistryMixin:
             if action is not None:
                 action.trigger()
 
-        if getattr(self, "primary_combo", None) is not None:
-            self.primary_combo.setVisible(True)
-        if getattr(self, "support_combo", None) is not None:
-            self.support_combo.setVisible(True)
-
         lazy_loading_content = self.explore_panel
         if hasattr(self, "_update_sync_keys_hint"):
             self._update_sync_keys_hint()

@@ -28,11 +28,6 @@ class EventsMixin(KeyboardEventsMixin):
         self.canvas.mpl_connect("button_release_event", self._on_mouse_release)
         self.canvas.mpl_connect("motion_notify_event", self._on_mouse_move)
         self._bind_axis_callbacks()
-        self.fov_list.currentRowChanged.connect(self._set_fov)
-        if getattr(self, "primary_combo", None) is not None:
-            self.primary_combo.currentIndexChanged.connect(self._set_primary_combo)
-        if getattr(self, "support_combo", None) is not None:
-            self.support_combo.currentIndexChanged.connect(self._set_support_combo)
         if getattr(self, "lazy_modality_table", None) is not None:
             self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
         if getattr(self, "lazy_open_btn", None) is not None:
@@ -191,8 +186,6 @@ class EventsMixin(KeyboardEventsMixin):
                 lambda _idx: self._refresh_review_queue_panel()
             )
         self.show_ann_master_chk.stateChanged.connect(self._on_show_annotations_master_changed)
-        if getattr(self, "clear_fovs_btn", None) is not None:
-            self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
         if self.roi_manager_widget is not None:
             widget = self.roi_manager_widget
             widget.add_btn.clicked.connect(self._roi_mgr_add)

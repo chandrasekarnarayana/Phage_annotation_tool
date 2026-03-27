@@ -31,9 +31,23 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
+        # Header with keyboard help button
+        header_row = QtWidgets.QHBoxLayout()
         self.header_lbl = QtWidgets.QLabel("Assist Queue")
-        self.header_lbl.setStyleSheet("font-weight: 600; font-size: 12px;")
-        layout.addWidget(self.header_lbl)
+        self.header_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #1976d2;")
+        header_row.addWidget(self.header_lbl)
+        header_row.addStretch()
+        self.help_btn = QtWidgets.QPushButton("?")
+        self.help_btn.setMaximumWidth(24)
+        self.help_btn.setMaximumHeight(24)
+        self.help_btn.setToolTip("Show keyboard shortcuts")
+        self.help_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.help_btn.setStyleSheet(
+            "QPushButton { background-color: #2196f3; color: white; font-weight: bold; border-radius: 12px; }"
+            "QPushButton:hover { background-color: #1976d2; }"
+        )
+        header_row.addWidget(self.help_btn)
+        layout.addLayout(header_row)
 
         controls_row = QtWidgets.QHBoxLayout()
         controls_row.setSpacing(6)
@@ -41,9 +55,17 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.filter_combo.addItem("All", "all")
         self.filter_combo.addItem("High confidence", "high_confidence")
         self.filter_combo.addItem("Uncertain", "high_uncertainty")
+        self.filter_combo.setStyleSheet(
+            "QComboBox { padding: 4px; border: 1px solid #ccc; border-radius: 3px; }"
+            "QComboBox:hover { border: 1px solid #999; }"
+        )
         self.sort_combo = QtWidgets.QComboBox()
         self.sort_combo.addItem("Confidence", "confidence")
         self.sort_combo.addItem("Uncertainty", "uncertainty")
+        self.sort_combo.setStyleSheet(
+            "QComboBox { padding: 4px; border: 1px solid #ccc; border-radius: 3px; }"
+            "QComboBox:hover { border: 1px solid #999; }"
+        )
         controls_row.addWidget(QtWidgets.QLabel("Filter:"))
         controls_row.addWidget(self.filter_combo, 1)
         controls_row.addWidget(QtWidgets.QLabel("Sort:"))
@@ -51,19 +73,26 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         layout.addLayout(controls_row)
 
         self.remaining_lbl = QtWidgets.QLabel("Queue: 0 uncertain")
-        self.remaining_lbl.setStyleSheet("font-size: 11px; color: #546e7a;")
+        self.remaining_lbl.setStyleSheet("font-size: 11px; color: #546e7a; padding: 6px; background-color: #f5f5f5; border-radius: 3px;")
         layout.addWidget(self.remaining_lbl)
 
         current_group = QtWidgets.QGroupBox("Current Suggestion")
+        current_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
         current_layout = QtWidgets.QVBoxLayout(current_group)
         current_layout.setContentsMargins(8, 8, 8, 8)
         current_layout.setSpacing(4)
         self.coords_lbl = QtWidgets.QLabel("Position: (x=-, y=-)")
+        self.coords_lbl.setStyleSheet("font-size: 11px; font-weight: 500; color: #1976d2;")
         self.score_lbl = QtWidgets.QLabel("Confidence: n/a")
+        self.score_lbl.setStyleSheet("font-size: 11px; font-weight: 500; color: #388e3c;")
         self.assist_lbl = QtWidgets.QLabel("Status: -")
+        self.assist_lbl.setStyleSheet("font-size: 11px; font-weight: 500; color: #f57c00;")
         self.details_lbl = QtWidgets.QLabel("")
         self.details_lbl.setWordWrap(True)
-        self.details_lbl.setStyleSheet("font-size: 10px; color: #37474f;")
+        self.details_lbl.setStyleSheet("font-size: 10px; color: #37474f; padding: 4px; background-color: #fafafa; border-radius: 3px;")
         current_layout.addWidget(self.coords_lbl)
         current_layout.addWidget(self.score_lbl)
         current_layout.addWidget(self.assist_lbl)
@@ -107,23 +136,68 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         table_layout.addWidget(self.suggestions_table)
         decision_row = QtWidgets.QHBoxLayout()
         decision_row.setSpacing(6)
-        self.mark_accept_btn = QtWidgets.QPushButton("Set Accepted")
-        self.mark_reject_btn = QtWidgets.QPushButton("Set Rejected")
-        self.mark_proposed_btn = QtWidgets.QPushButton("Set Proposed")
+        self.mark_accept_btn = QtWidgets.QPushButton("✓ Mark Accepted")
+        self.mark_reject_btn = QtWidgets.QPushButton("✗ Mark Rejected")
+        self.mark_proposed_btn = QtWidgets.QPushButton("⊕ Mark Proposed")
         for btn in (self.mark_accept_btn, self.mark_reject_btn, self.mark_proposed_btn):
             btn.setMinimumHeight(26)
-            decision_row.addWidget(btn)
+            btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.mark_accept_btn.setStyleSheet(
+            "QPushButton { background-color: #4caf50; color: white; font-weight: 500; border-radius: 3px; font-size: 10px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+        )
+        self.mark_reject_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; font-weight: 500; border-radius: 3px; font-size: 10px; }"
+            "QPushButton:hover { background-color: #da190b; }"
+        )
+        self.mark_proposed_btn.setStyleSheet(
+            "QPushButton { background-color: #ffc107; color: black; font-weight: 500; border-radius: 3px; font-size: 10px; }"
+            "QPushButton:hover { background-color: #ffb300; }"
+        )
+        self.mark_accept_btn.setToolTip("Change selected suggestion status to Accepted")
+        self.mark_reject_btn.setToolTip("Change selected suggestion status to Rejected")
+        self.mark_proposed_btn.setToolTip("Change selected suggestion status back to Proposed (undecided)")
+        decision_row.addWidget(self.mark_accept_btn)
+        decision_row.addWidget(self.mark_reject_btn)
+        decision_row.addWidget(self.mark_proposed_btn)
         table_layout.addLayout(decision_row)
         layout.addWidget(table_group)
 
         btn_row = QtWidgets.QHBoxLayout()
         btn_row.setSpacing(6)
-        self.accept_btn = QtWidgets.QPushButton("Accept")
-        self.accept_next_btn = QtWidgets.QPushButton("Accept + Next")
-        self.reject_btn = QtWidgets.QPushButton("Reject")
-        self.skip_btn = QtWidgets.QPushButton("Skip")
+        self.accept_btn = QtWidgets.QPushButton("✓ Accept")
+        self.accept_next_btn = QtWidgets.QPushButton("✓ Accept + Next")
+        self.reject_btn = QtWidgets.QPushButton("✗ Reject")
+        self.skip_btn = QtWidgets.QPushButton("⊗ Skip")
         for btn in (self.accept_btn, self.accept_next_btn, self.reject_btn, self.skip_btn):
             btn.setMinimumHeight(30)
+            btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        # Color the buttons for clarity
+        self.accept_btn.setStyleSheet(
+            "QPushButton { background-color: #4caf50; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton:pressed { background-color: #3d8b40; }"
+        )
+        self.accept_next_btn.setStyleSheet(
+            "QPushButton { background-color: #2196f3; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #0b7dda; }"
+            "QPushButton:pressed { background-color: #0a5bb9; }"
+        )
+        self.reject_btn.setStyleSheet(
+            "QPushButton { background-color: #f44336; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #da190b; }"
+            "QPushButton:pressed { background-color: #ba0000; }"
+        )
+        self.skip_btn.setStyleSheet(
+            "QPushButton { background-color: #ff9800; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #e68900; }"
+            "QPushButton:pressed { background-color: #cc7700; }"
+        )
+        # Add helpful tooltips
+        self.accept_btn.setToolTip("Accept current suggestion and add to annotations\nKeyboard: A")
+        self.accept_next_btn.setToolTip("Accept and automatically move to next uncertain suggestion\nKeyboard: A → N")
+        self.reject_btn.setToolTip("Reject current suggestion as a false positive\nKeyboard: R")
+        self.skip_btn.setToolTip("Skip to next suggestion without deciding\nKeyboard: N")
         btn_row.addWidget(self.accept_btn)
         btn_row.addWidget(self.accept_next_btn)
         btn_row.addWidget(self.reject_btn)
@@ -132,15 +206,33 @@ class ReviewQueuePanel(QtWidgets.QWidget):
 
         next_row = QtWidgets.QHBoxLayout()
         next_row.setSpacing(6)
-        self.next_uncertain_btn = QtWidgets.QPushButton("Next uncertain")
-        self.accept_green_btn = QtWidgets.QPushButton("Accept All Green")
+        self.next_uncertain_btn = QtWidgets.QPushButton("↓ Next Uncertain")
+        self.accept_green_btn = QtWidgets.QPushButton("✓ Accept All High Conf")
         self.next_uncertain_btn.setMinimumHeight(30)
         self.accept_green_btn.setMinimumHeight(30)
+        self.next_uncertain_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.accept_green_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.next_uncertain_btn.setStyleSheet(
+            "QPushButton { background-color: #757575; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #616161; }"
+            "QPushButton:pressed { background-color: #424242; }"
+        )
+        self.accept_green_btn.setStyleSheet(
+            "QPushButton { background-color: #8bc34a; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #7cb342; }"
+            "QPushButton:pressed { background-color: #689f38; }"
+        )
+        self.next_uncertain_btn.setToolTip("Jump to next uncertain suggestion\nKeyboard: W")
+        self.accept_green_btn.setToolTip("Batch accept all high-confidence suggestions (score ≥ 0.75)")
         next_row.addWidget(self.next_uncertain_btn)
         next_row.addWidget(self.accept_green_btn)
         layout.addLayout(next_row)
 
         offset_group = QtWidgets.QGroupBox("Offset correction")
+        offset_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
         offset_layout = QtWidgets.QGridLayout(offset_group)
         offset_layout.setContentsMargins(8, 8, 8, 8)
         offset_layout.setHorizontalSpacing(6)
@@ -148,15 +240,24 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.offset_count_spin = QtWidgets.QSpinBox(offset_group)
         self.offset_count_spin.setRange(1, 1)
         self.offset_count_spin.setValue(1)
+        self.offset_count_spin.setToolTip("Number of top suggestions to correct")
         self.offset_dx_spin = QtWidgets.QDoubleSpinBox(offset_group)
         self.offset_dx_spin.setRange(-500.0, 500.0)
         self.offset_dx_spin.setDecimals(2)
         self.offset_dx_spin.setValue(0.0)
+        self.offset_dx_spin.setToolTip("X-axis offset in pixels")
         self.offset_dy_spin = QtWidgets.QDoubleSpinBox(offset_group)
         self.offset_dy_spin.setRange(-500.0, 500.0)
         self.offset_dy_spin.setDecimals(2)
         self.offset_dy_spin.setValue(0.0)
-        self.apply_offset_btn = QtWidgets.QPushButton("Apply XY offset", offset_group)
+        self.offset_dy_spin.setToolTip("Y-axis offset in pixels")
+        self.apply_offset_btn = QtWidgets.QPushButton("📍 Apply XY offset", offset_group)
+        self.apply_offset_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.apply_offset_btn.setStyleSheet(
+            "QPushButton { background-color: #9c27b0; color: white; font-weight: 600; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #7b1fa2; }"
+            "QPushButton:pressed { background-color: #6a0dad; }"
+        )
         offset_layout.addWidget(QtWidgets.QLabel("Top-N"), 0, 0)
         offset_layout.addWidget(self.offset_count_spin, 0, 1)
         offset_layout.addWidget(QtWidgets.QLabel("dx"), 0, 2)
@@ -166,7 +267,11 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         offset_layout.addWidget(self.apply_offset_btn, 1, 0, 1, 6)
         layout.addWidget(offset_group)
 
-        reasoning_group = QtWidgets.QGroupBox("Reasoning")
+        reasoning_group = QtWidgets.QGroupBox("Confidence Details")
+        reasoning_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
         reasoning_layout = QtWidgets.QVBoxLayout(reasoning_group)
         reasoning_layout.setContentsMargins(0, 0, 0, 0)
         self.explain_panel = SuggestionExplainPanel(parent=reasoning_group)
@@ -174,9 +279,23 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         layout.addWidget(reasoning_group)
 
         self.progress_lbl = QtWidgets.QLabel("Progress: 0 / 0")
+        self.progress_lbl.setStyleSheet("font-weight: 500; font-size: 11px; color: #546e7a;")
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self.progress_bar.setStyleSheet(
+            "QProgressBar {"
+            "  background-color: #e0e0e0;"
+            "  border: 1px solid #bdbdbd;"
+            "  border-radius: 4px;"
+            "  text-align: center;"
+            "}"
+            "QProgressBar::chunk {"
+            "  background-color: #4caf50;"
+            "  border-radius: 3px;"
+            "}"
+        )
+        self.progress_bar.setTextVisible(True)
         layout.addWidget(self.progress_lbl)
         layout.addWidget(self.progress_bar)
         layout.addStretch(1)
@@ -188,6 +307,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.reject_btn.clicked.connect(self.reject_requested.emit)
         self.skip_btn.clicked.connect(self.skip_requested.emit)
         self.next_uncertain_btn.clicked.connect(self.next_uncertain_requested.emit)
+        self.help_btn.clicked.connect(self._show_keyboard_shortcuts)
         self.apply_offset_btn.clicked.connect(
             lambda: self.apply_offset_requested.emit(
                 int(self.offset_count_spin.value()),
@@ -204,6 +324,29 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.mark_proposed_btn.clicked.connect(
             lambda: self._emit_decision_for_selected("proposed")
         )
+
+    def _show_keyboard_shortcuts(self) -> None:
+        """Show a helpful dialog with keyboard shortcuts for assist workflow."""
+        shortcuts = [
+            ("A", "Accept current suggestion"),
+            ("R", "Reject current suggestion"),
+            ("N", "Skip to next suggestion"),
+            ("W", "Jump to next uncertain"),
+            ("A → N", "Accept & move to next (fast workflow)"),
+            ("Space", "Pan view to suggestion"),
+        ]
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setWindowTitle("Assist Keyboard Shortcuts")
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        
+        text = "Quick Keyboard Reference:\n\n"
+        for key, desc in shortcuts:
+            text += f"  {key:<8} → {desc}\n"
+        text += "\n💡 Tip: Hover over buttons for more details"
+        
+        msg_box.setText(text)
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     def set_suggestions(self, rows: list[dict[str, str]], current_row: int) -> None:
         """Populate suggested-points table and keep selected row in sync."""

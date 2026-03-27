@@ -754,7 +754,7 @@ def test_modality_ab_compare_preserves_camera_limits(qtbot, tmp_path):
 
 @pytest.mark.gui
 def test_status_modality_combo_switches_active_view(qtbot, tmp_path):
-    """Status-bar modality selector should switch primary view like main combo."""
+    """Status-bar modality selector should switch the active view."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -766,7 +766,6 @@ def test_status_modality_combo_switches_active_view(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    assert win.primary_combo.count() >= 2
     assert win.status_modality_combo.count() >= 2
 
     initial = int(win.current_image_idx)
@@ -775,7 +774,7 @@ def test_status_modality_combo_switches_active_view(qtbot, tmp_path):
     qtbot.wait(60)
 
     assert int(win.current_image_idx) == target
-    assert int(win.primary_combo.currentIndex()) == target
+    assert int(win.status_modality_combo.currentIndex()) == target
 
 
 @pytest.mark.gui
@@ -1220,8 +1219,8 @@ def test_prepare_page_exposes_setup_context_and_live_summaries(qtbot, tmp_path):
     win._set_sidebar_mode(prepare_idx)
     qtbot.wait(30)
 
-    assert win.primary_combo.isVisible(), "Lazy Loading should expose the primary/reference selectors"
-    assert win.support_combo.isVisible(), "Lazy Loading should expose the primary/reference selectors"
+    assert not hasattr(win, "primary_combo"), "Lazy Loading should not expose legacy primary selectors"
+    assert not hasattr(win, "support_combo"), "Lazy Loading should not expose legacy support selectors"
     assert hasattr(win, "prepare_reference_summary_lbl")
     assert hasattr(win, "prepare_sync_target_lbl")
     assert hasattr(win, "prepare_sync_contract_lbl")

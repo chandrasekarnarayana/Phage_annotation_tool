@@ -168,7 +168,7 @@ class UiSetupMixin(UiSetupRegistryMixin):
         central_layout.setContentsMargins(12, 12, 12, 12)
         central_layout.setSpacing(10)
 
-        # Explore pane: FOV list + primary/support (sidebar page)
+        # Explore pane: lazy loading and modality/view management.
         self.explore_panel = QtWidgets.QWidget()
         self.explore_panel.setStyleSheet(
             "QWidget { border: 1px solid #d8d8d8; border-radius: 3px; background: #fafafa; }"
@@ -176,32 +176,6 @@ class UiSetupMixin(UiSetupRegistryMixin):
         explore_layout = QtWidgets.QVBoxLayout(self.explore_panel)
         explore_layout.setContentsMargins(8, 8, 8, 8)
         explore_layout.setSpacing(8)
-        self.fov_list = QtWidgets.QListWidget(self.explore_panel)
-        for img in self.images:
-            self.fov_list.addItem(img.name)
-        self.fov_list.setCurrentRow(self.current_image_idx)
-        self.fov_list.setVisible(False)
-        self.clear_fovs_btn = QtWidgets.QPushButton("Clear FOV list", self.explore_panel)
-        self.clear_fovs_btn.setVisible(False)
-
-        self.primary_combo = QtWidgets.QComboBox(self.explore_panel)
-        self.support_combo = QtWidgets.QComboBox(self.explore_panel)
-        for img in self.images:
-            self.primary_combo.addItem(img.name)
-            self.support_combo.addItem(img.name)
-        self.primary_combo.setCurrentIndex(self.current_image_idx)
-        self.support_combo.setCurrentIndex(self.support_image_idx)
-        
-        # Add context menu for renaming modalities (Phase γ)
-        self.primary_combo.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-        self.primary_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
-        self.support_combo.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-        self.support_combo.customContextMenuRequested.connect(self._on_modality_context_menu)
-        
-        # Primary/support selectors remain available for internal wiring, but
-        # stay out of the default lazy-loading workflow surface.
-        self.primary_combo.setVisible(False)
-        self.support_combo.setVisible(False)
         build_modality_loader_section(self, explore_layout)
 
         build_annotation_table_panel(self)

@@ -187,9 +187,6 @@ class DisplayControlsMixin(DisplayContrastMixin):
         self._binary_view_mask = None
         self._binary_view_enabled = False
         self.current_image_idx = idx
-        self.primary_combo.blockSignals(True)
-        self.primary_combo.setCurrentIndex(idx)
-        self.primary_combo.blockSignals(False)
         status_combo = getattr(self, "status_modality_combo", None)
         if status_combo is not None:
             status_combo.blockSignals(True)
@@ -226,52 +223,10 @@ class DisplayControlsMixin(DisplayContrastMixin):
         schedule_prefetch: bool = True,
     ) -> None:
         if 0 <= idx < len(self.images):
-            self.stop_playback_t()
-            self._smlm_overlay = None
-            self._smlm_overlay_extent = None
-            self._smlm_results = []
-            self._deepstorm_overlay = None
-            self._deepstorm_overlay_extent = None
-            self._deepstorm_results = []
-            self._sr_overlay = None
-            self._sr_overlay_extent = None
-            self._particles_results = []
-            self._particles_overlays = []
-            self._particles_selected = None
-            self._binary_view_mask = None
-            self._binary_view_enabled = False
-            self.current_image_idx = idx
-            self.primary_combo.blockSignals(True)
-            self.primary_combo.setCurrentIndex(idx)
-            self.primary_combo.blockSignals(False)
-            status_combo = getattr(self, "status_modality_combo", None)
-            if status_combo is not None:
-                status_combo.blockSignals(True)
-                status_combo.setCurrentIndex(idx)
-                status_combo.blockSignals(False)
-            self.fov_list.blockSignals(True)
-            self.fov_list.setCurrentRow(idx)
-            self.fov_list.blockSignals(False)
-            if self.threshold_panel is not None:
-                cfg = self.controller.session_state.threshold_configs_by_image.get(idx)
-                if cfg:
-                    self._apply_threshold_settings(cfg)
-            self._sync_base_modality_sources()
-            self.axis_mode_combo.setCurrentText(self.primary_image.interpret_3d_as)
-            self._refresh_roi_manager()
-            self._refresh_metadata_dock(self.primary_image.id)
-            self._maybe_autoload_annotations(self.primary_image.id)
-            if hasattr(self, "_sync_channel_panel_for_active_image"):
-                self._sync_channel_panel_for_active_image()
-            if hasattr(self, "_refresh_annotation_view_controls"):
-                self._refresh_annotation_view_controls()
-            if refresh_lazy_table and hasattr(self, "_refresh_lazy_modality_table"):
-                self._refresh_lazy_modality_table()
+            self._set_fov(idx)
+            if not refresh_lazy_table:
+                self._lazy_apply_table_refresh = False
             self._refresh_prepare_setup_summary()
-            if hasattr(self, "_refresh_advanced_settings_panel"):
-                self._refresh_advanced_settings_panel()
-            self._request_ui_refresh("display-controls", metadata=True)
-            # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
             if schedule_prefetch:
                 self._schedule_adjacent_fov_prefetch()
 
@@ -353,7 +308,6 @@ class DisplayControlsMixin(DisplayContrastMixin):
         if 0 <= idx < len(self.images):
             self.stop_playback_t()
             self.support_image_idx = idx
-            self.support_combo.setCurrentIndex(idx)
             self._sync_base_modality_sources()
             self._maybe_autoload_annotations(self.support_image.id)
             if hasattr(self, "_refresh_annotation_view_controls"):
@@ -1430,18 +1384,15 @@ class DisplayControlsMixin(DisplayContrastMixin):
         """Refresh the Prepare-page mirrors for reference, sync, and ROI setup."""
         reference_lbl = getattr(self, "prepare_reference_summary_lbl", None)
         if reference_lbl is not None:
-            primary_combo = getattr(self, "primary_combo", None)
-            support_combo = getattr(self, "support_combo", None)
-            primary_name = (
-                str(primary_combo.currentText()).strip()
-                if primary_combo is not None and primary_combo.count() > 0
-                else "-"
-            )
-            support_name = (
-                str(support_combo.currentText()).strip()
-                if support_combo is not None and support_combo.count() > 0
-                else "-"
-            )
+            primary_name = "-"
+            support_name = "-"
+            images = list(getattr(self, "images", []) or [])
+            primary_idx = int(getattr(self, "current_image_idx", 0))
+            support_idx = int(getattr(self, "support_image_idx", 0))
+            if 0 <= primary_idx < len(images):
+                primary_name = str(getattr(images[primary_idx], "name", "-")).strip() or "-"
+            if 0 <= support_idx < len(images):
+                support_name = str(getattr(images[support_idx], "name", "-")).strip() or "-"
             relation = "same view" if primary_name == support_name else "compare pair"
             reference_lbl.setText(
                 f"Reference views: Primary {primary_name} | Reference {support_name} ({relation})"

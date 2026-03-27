@@ -176,9 +176,6 @@ class ActionsMixin(
                 # Add images and update UI on GUI thread
                 self.controller.add_images(new_images)
                 for meta in new_images:
-                    self.fov_list.addItem(meta.name)
-                    self.primary_combo.addItem(meta.name)
-                    self.support_combo.addItem(meta.name)
                     self.roi_manager.rois_by_image[meta.id] = []
                 # Build annotation index (lightweight) and update availability
                 try:
@@ -2948,34 +2945,3 @@ class ActionsMixin(
         if getattr(self, "dock_particles", None) is not None:
             self.set_panel_visible("particles", True, source="advanced_panel")
             self.dock_particles.raise_()
-
-    def _clear_fov_list(self) -> None:
-        """Remove all FOVs except the current primary to reset the list."""
-        if not self.images:
-            return
-        self.stop_playback_t()
-        self._cancel_all_jobs()
-        self._bump_job_generation()
-        keep_idx = self.current_image_idx
-        keep_img = self.images[keep_idx]
-        self.controller.retain_single_image(keep_idx)
-        self.fov_list.clear()
-        self.primary_combo.clear()
-        self.support_combo.clear()
-        keep_img.id = 0
-        self.fov_list.addItem(keep_img.name)
-        self.primary_combo.addItem(keep_img.name)
-        self.support_combo.addItem(keep_img.name)
-        self.current_image_idx = 0
-        self.support_image_idx = 0
-        if hasattr(self, "_refresh_lazy_modality_table"):
-            self._refresh_lazy_modality_table()
-        self._status_info(
-            "Cleared FOV list; kept current image.",
-            timeout_ms=3000,
-            source="standard.clear_fov",
-        )
-        self.roi_manager.rois_by_image = {0: self.roi_manager.list_rois(keep_idx)}
-        self.roi_manager.set_active(self.roi_manager.active_roi_id)
-        self._refresh_roi_manager()
-        self._request_ui_refresh("standard-actions")
