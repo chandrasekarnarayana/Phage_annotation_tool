@@ -19,6 +19,12 @@ from phage_annotator.ui_qt.rendering.lut_manager import LUTS, lut_names
 class DisplayControlsMixin(DisplayContrastMixin):
     """Mixin for display, playback, and general control handlers."""
 
+    def _hist_region_widget(self):
+        return getattr(self, "contrast_hist_region_combo", None) or getattr(self, "hist_region_combo", None)
+
+    def _hist_scope_widget(self):
+        return getattr(self, "contrast_hist_scope_combo", None) or getattr(self, "hist_scope_combo", None)
+
     def _sync_mode_enabled_for_panel(self, panel_key: str, mode_key: str) -> bool:
         """Return whether a panel participates in a given sync mode."""
         key = str(panel_key or "").strip()
@@ -204,6 +210,8 @@ class DisplayControlsMixin(DisplayContrastMixin):
             self._refresh_annotation_view_controls()
         if hasattr(self, "_refresh_lazy_modality_table"):
             self._refresh_lazy_modality_table()
+        if hasattr(self, "_refresh_advanced_settings_panel"):
+            self._refresh_advanced_settings_panel()
         self._request_ui_refresh("display-controls", metadata=True)
         
         # Trigger QC monitor for new image
@@ -260,6 +268,8 @@ class DisplayControlsMixin(DisplayContrastMixin):
             if refresh_lazy_table and hasattr(self, "_refresh_lazy_modality_table"):
                 self._refresh_lazy_modality_table()
             self._refresh_prepare_setup_summary()
+            if hasattr(self, "_refresh_advanced_settings_panel"):
+                self._refresh_advanced_settings_panel()
             self._request_ui_refresh("display-controls", metadata=True)
             # P7c: Schedule prefetch for adjacent FOVs (multi-FOV stacks)
             if schedule_prefetch:
@@ -422,6 +432,8 @@ class DisplayControlsMixin(DisplayContrastMixin):
         # Force reload for current primary to honor new interpretation.
         self._evict_image_cache(self.primary_image)
         self.proj_cache.invalidate_image(self.primary_image.id)
+        if hasattr(self, "_refresh_advanced_settings_panel"):
+            self._refresh_advanced_settings_panel()
         self.recorder.record(
             "set_axis_interpretation", {"image": self.primary_image.name, "mode": mode}
         )
@@ -815,7 +827,10 @@ class DisplayControlsMixin(DisplayContrastMixin):
         self._request_ui_refresh("display-controls")
 
     def _on_hist_region(self) -> None:
-        text = self.hist_region_combo.currentText()
+        widget = self._hist_region_widget()
+        if widget is None:
+            return
+        text = widget.currentText()
         if text == "ROI":
             self.hist_region = "roi"
         elif text == "Crop area":
@@ -825,7 +840,10 @@ class DisplayControlsMixin(DisplayContrastMixin):
         self._request_ui_refresh("display-controls")
 
     def _on_hist_scope_change(self) -> None:
-        self._hist_scope_mode = self.hist_scope_combo.currentText()
+        widget = self._hist_scope_widget()
+        if widget is None:
+            return
+        self._hist_scope_mode = widget.currentText()
         self._hist_cache = None
         self._hist_cache_key = None
         if self._hist_job_id is not None:

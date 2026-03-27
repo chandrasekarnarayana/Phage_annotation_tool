@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
+from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
+
 
 class ReviewQueuePanel(QtWidgets.QWidget):
     """Right-dock panel showing current uncertain suggestion and queue progress."""
@@ -29,7 +31,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        self.header_lbl = QtWidgets.QLabel("Review Queue - T:- Z:-")
+        self.header_lbl = QtWidgets.QLabel("Assist - T:- Z:-")
         self.header_lbl.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.header_lbl)
         self.context_lbl = QtWidgets.QLabel("Effective Assist Context: -")
@@ -203,6 +205,13 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         offset_layout.addWidget(self.offset_dy_spin, 0, 5)
         offset_layout.addWidget(self.apply_offset_btn, 1, 0, 1, 6)
         layout.addWidget(offset_group)
+
+        reasoning_group = QtWidgets.QGroupBox("Reasoning")
+        reasoning_layout = QtWidgets.QVBoxLayout(reasoning_group)
+        reasoning_layout.setContentsMargins(0, 0, 0, 0)
+        self.explain_panel = SuggestionExplainPanel(parent=reasoning_group)
+        reasoning_layout.addWidget(self.explain_panel)
+        layout.addWidget(reasoning_group)
 
         self.progress_lbl = QtWidgets.QLabel("Progress: 0 / 0")
         self.progress_bar = QtWidgets.QProgressBar()

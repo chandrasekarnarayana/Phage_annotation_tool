@@ -228,6 +228,8 @@ def init_widget_placeholder_state(owner) -> None:
         "im_std",
         "hist_fig",
         "hist_canvas",
+        "contrast_hist_fig",
+        "contrast_hist_canvas",
         "profile_fig",
         "profile_canvas",
         "dock_hist",
@@ -239,12 +241,10 @@ def init_widget_placeholder_state(owner) -> None:
         "dock_channels",
         "dock_annotations",
         "dock_review_queue",
-        "dock_suggestion_explain",
         "dock_roi",
         "dock_logs",
         "dock_metadata",
         "dock_density",
-        "dock_modality_layers",
         "dock_sidebar",
         "sidebar_stack",
         "annotation_toolbar",
@@ -265,6 +265,7 @@ def init_widget_placeholder_state(owner) -> None:
         "show_hist_chk",
         "show_profile_chk",
         "ax_hist",
+        "ax_contrast_hist",
         "ax_line",
         "profile_mode_chk",
         "orthoview_widget",
@@ -392,12 +393,14 @@ def init_feature_runtime_state(owner) -> None:
 
 def init_runtime_state(owner) -> None:
     """Initialize window runtime state in explicit phases."""
-    init_view_runtime_state(owner)
     init_playback_runtime_state(owner)
     init_refresh_runtime_state(owner)
     init_render_job_runtime_state(owner)
     init_widget_placeholder_state(owner)
-    init_feature_runtime_state(owner)
+    # These phases require owner.controller and must run after controller init.
+    if getattr(owner, "controller", None) is not None:
+        init_view_runtime_state(owner)
+        init_feature_runtime_state(owner)
 
 
 def init_controller_runtime(owner, images: List[LazyImage], labels: Sequence[str] | None) -> None:
@@ -430,6 +433,8 @@ def init_controller_runtime(owner, images: List[LazyImage], labels: Sequence[str
 def bootstrap_runtime(owner, images: List[LazyImage], labels: Sequence[str] | None) -> None:
     """Initialize window-local runtime state before widgets are built."""
     init_settings_runtime(owner)
-    init_runtime_state(owner)
     init_display_runtime_preferences(owner)
+    init_runtime_state(owner)
     init_controller_runtime(owner, images, labels)
+    init_view_runtime_state(owner)
+    init_feature_runtime_state(owner)

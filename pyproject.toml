@@ -22,6 +22,8 @@ dependencies = [
   "lmfit>=1.3",
   "scikit-learn>=1.3",
   "scikit-image>=0.22",
+  "qtawesome>=1.4",
+  "simpleicons>=7.21",
 ]
 
 [project.scripts]

@@ -36,7 +36,15 @@ def bind_runtime_services(owner) -> None:
     owner._attach_recorder()
     owner._install_exception_hook()
     owner._setup_tool_router()
-    owner._bind_events()
+    try:
+        owner._bind_events()
+    except AttributeError as exc:
+        # Keep startup resilient when optional controls are not present in a given layout build.
+        if hasattr(owner, "_append_log"):
+            try:
+                owner._append_log(f"[UI] Skipping some event bindings: {exc}")
+            except Exception:
+                pass
     owner._bind_job_signals()
 
 

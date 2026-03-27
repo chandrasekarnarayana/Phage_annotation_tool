@@ -73,7 +73,8 @@ class EventsMixin(KeyboardEventsMixin):
         self.vmax_slider.sliderReleased.connect(self._on_contrast_slider_released)
         self.auto_btn.clicked.connect(self._auto_contrast)
         self.auto_set_btn.clicked.connect(self._auto_set_dialog)
-        self.pixel_size_spin.valueChanged.connect(self._on_pixel_size_change)
+        if getattr(self, "pixel_size_spin", None) is not None:
+            self.pixel_size_spin.valueChanged.connect(self._on_pixel_size_change)
         self.reset_view_btn.clicked.connect(self.reset_all_view)
         self.lut_combo.currentIndexChanged.connect(self._on_lut_change)
         self.lut_invert_chk.stateChanged.connect(self._on_lut_invert)
@@ -106,8 +107,20 @@ class EventsMixin(KeyboardEventsMixin):
         self.show_profile_chk.stateChanged.connect(self._on_profile_chk_changed)
         self.show_hist_chk.stateChanged.connect(self._on_hist_chk_changed)
         self.profile_clear_btn.clicked.connect(self._clear_profile)
-        self.hist_region_combo.currentIndexChanged.connect(self._on_hist_region)
-        self.hist_scope_combo.currentIndexChanged.connect(self._on_hist_scope_change)
+        if getattr(self, "hist_region_combo", None) is not None:
+            self.hist_region_combo.currentIndexChanged.connect(self._on_hist_region)
+        if getattr(self, "hist_scope_combo", None) is not None:
+            self.hist_scope_combo.currentIndexChanged.connect(self._on_hist_scope_change)
+        if getattr(self, "hist_bins_spin", None) is not None:
+            self.hist_bins_spin.valueChanged.connect(lambda _value: self._request_ui_refresh("display-controls"))
+        if getattr(self, "contrast_hist_region_combo", None) is not None:
+            self.contrast_hist_region_combo.currentIndexChanged.connect(self._on_hist_region)
+        if getattr(self, "contrast_hist_scope_combo", None) is not None:
+            self.contrast_hist_scope_combo.currentIndexChanged.connect(self._on_hist_scope_change)
+        if getattr(self, "contrast_hist_bins_spin", None) is not None:
+            self.contrast_hist_bins_spin.valueChanged.connect(
+                lambda _value: self._request_ui_refresh("display-controls")
+            )
         if getattr(self, "bc_range_slider", None) is not None:
             self.bc_range_slider.rangeChanged.connect(self._on_bc_range_changed)
         if getattr(self, "bc_min_slider", None) is not None:

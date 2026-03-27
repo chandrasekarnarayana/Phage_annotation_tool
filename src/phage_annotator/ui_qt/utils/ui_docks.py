@@ -16,12 +16,10 @@ from phage_annotator.roi.widgets import RoiManagerWidget
 from phage_annotator.ui_qt.panels.particles import AnalyzeParticlesPanel
 from phage_annotator.ui_qt.panels.channel_controls import ChannelControlPanel
 from phage_annotator.ui_qt.panels.density import DensityPanel
-from phage_annotator.ui_qt.panels.modality_layers_panel import ModalityLayersPanel
+from phage_annotator.ui_qt.panels.advanced_settings_panel import AdvancedSettingsPanel
 from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
 from phage_annotator.ui_qt.panels.review_queue_panel import ReviewQueuePanel
-from phage_annotator.ui_qt.panels.project_relink_panel import ProjectRelinkPanel
 from phage_annotator.ui_qt.panels.status_details_panel import StatusDetailsPanel
-from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
 from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
 from phage_annotator.ui_qt.panels.registry_legacy import PanelConstraints, PanelSpec
 from phage_annotator.ui_qt.panels.threshold import ThresholdPanel
@@ -535,7 +533,7 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_sidebar = self.panel_docks.get("sidebar")
     self.dock_annotations = self.panel_docks.get("annotations")
     self.dock_review_queue = self.panel_docks.get("review_queue")
-    self.dock_suggestion_explain = self.panel_docks.get("suggestion_explain")
+    self.dock_advanced_settings = self.panel_docks.get("advanced_settings")
     self.dock_advanced_analysis = self.panel_docks.get("advanced_analysis")
     self.dock_roi = self.panel_docks.get("roi")
     self.dock_roi_manager = self.panel_docks.get("roi_manager")
@@ -550,7 +548,6 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_recorder = self.panel_docks.get("recorder")
     self.dock_metadata = self.panel_docks.get("metadata")
     self.dock_density = self.panel_docks.get("density")
-    self.dock_modality_layers = self.panel_docks.get("modality_layers")
     self.dock_channels = self.panel_docks.get("channels")
     self.dock_performance = self.panel_docks.get("performance")
     self.dock_qc_issues = self.panel_docks.get("qc_issues")
@@ -613,10 +610,9 @@ def _apply_panel_constraints(self, dock: QtWidgets.QDockWidget, spec: PanelSpec)
     right_sidebar_panels = {
         "annotations",
         "review_queue",
-        "suggestion_explain",
-        "qc_issues",
+        "advanced_settings",
         "advanced_analysis",
-        "modality_layers",
+        "qc_issues",
         "status_details",
     }
     if spec.id not in {"sidebar"} | right_sidebar_panels:
@@ -867,11 +863,11 @@ def build_panel_registry(self) -> List[PanelSpec]:
         ),
         PanelSpec(
             id="review_queue",
-            title="Review Queue",
+            title="Assist",
             default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_review_queue_widget,
-            toggle_action_text="Review Queue",
+            toggle_action_text="Assist",
             bucket="inspect",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
@@ -880,13 +876,14 @@ def build_panel_registry(self) -> List[PanelSpec]:
             ),
         ),
         PanelSpec(
-            id="suggestion_explain",
-            title="Suggestion Rationale",
+            id="advanced_settings",
+            title="Advanced Settings",
             default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
-            widget_factory=self._make_suggestion_explain_widget,
-            toggle_action_text="Suggestion Rationale",
+            widget_factory=self._make_advanced_settings_widget,
+            toggle_action_text="Advanced Settings",
             bucket="inspect",
+            search_aliases=("advanced settings", "calibration", "pixel size", "axis mode"),
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -902,21 +899,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             toggle_action_text="Status Details",
             bucket="inspect",
             search_aliases=("status details", "run context", "session status"),
-            constraints=PanelConstraints(
-                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
-                floatable=False,
-                fixed_area=True,
-            ),
-        ),
-        PanelSpec(
-            id="project_relink",
-            title="Project Relink",
-            default_area=QtCore.Qt.RightDockWidgetArea,
-            default_visible=False,
-            widget_factory=self._make_project_relink_widget,
-            toggle_action_text="Project Relink",
-            bucket="inspect",
-            search_aliases=("relink", "missing images", "project relink"),
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
                 floatable=False,
@@ -1042,20 +1024,6 @@ def build_panel_registry(self) -> List[PanelSpec]:
             widget_factory=self._make_density_widget,
             toggle_action_text="Density",
             bucket="tools",
-        ),
-        PanelSpec(
-            id="modality_layers",
-            title="Modality Layers",
-            default_area=QtCore.Qt.RightDockWidgetArea,
-            default_visible=False,
-            widget_factory=self._make_modality_layers_widget,
-            toggle_action_text="Modality Layers",
-            bucket="inspect",
-            constraints=PanelConstraints(
-                allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
-                floatable=False,
-                fixed_area=True,
-            ),
         ),
         PanelSpec(
             id="channels",
@@ -1204,12 +1172,13 @@ def make_annotations_widget(self) -> QtWidgets.QWidget:
 def make_review_queue_widget(self) -> QtWidgets.QWidget:
     widget = ReviewQueuePanel(parent=self)
     self.review_queue_panel = widget
+    self.suggestion_explain_panel = widget.explain_panel
     return widget
 
 
-def make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
-    widget = SuggestionExplainPanel(parent=self)
-    self.suggestion_explain_panel = widget
+def make_advanced_settings_widget(self) -> QtWidgets.QWidget:
+    widget = AdvancedSettingsPanel(parent=self)
+    self.advanced_settings_panel = widget
     return widget
 
 
@@ -1228,12 +1197,6 @@ def make_status_details_widget(self) -> QtWidgets.QWidget:
             details_panel=widget,
             log_status_label=getattr(self, "status_logs_lbl", None),
         )
-    return widget
-
-
-def make_project_relink_widget(self) -> QtWidgets.QWidget:
-    widget = ProjectRelinkPanel(parent=self)
-    self.project_relink_panel = widget
     return widget
 
 
@@ -1297,9 +1260,34 @@ def make_roi_widget(self) -> QtWidgets.QWidget:
     roi_layout = QtWidgets.QVBoxLayout(roi_widget)
     roi_layout.setContentsMargins(8, 8, 8, 8)
     roi_layout.setSpacing(8)
-    roi_layout.addWidget(QtWidgets.QLabel("ROI (X, Y, W, H)"))
-    if self._roi_controls_layout is not None:
-        roi_layout.addLayout(self._roi_controls_layout)
+    summary_lbl = QtWidgets.QLabel(
+        "ROI editing now lives in the ROI page in the left workflow sidebar."
+    )
+    summary_lbl.setWordWrap(True)
+    roi_layout.addWidget(summary_lbl)
+    helper_lbl = QtWidgets.QLabel(
+        "Use this dock only for quick access to the ROI page, ROI manager, and reset actions."
+    )
+    helper_lbl.setWordWrap(True)
+    helper_lbl.setStyleSheet("color: #4b5563;")
+    roi_layout.addWidget(helper_lbl)
+    open_prepare_btn = QtWidgets.QPushButton("Open ROI Page")
+    open_prepare_btn.setToolTip("Focus the workflow sidebar on ROI, where the live ROI controls now live.")
+    open_prepare_btn.clicked.connect(
+        lambda: (
+            self._set_sidebar_mode(self._sidebar_action_index_for_label("ROI"))
+            if self._sidebar_action_index_for_label("ROI") >= 0
+            else None
+        )
+    )
+    roi_layout.addWidget(open_prepare_btn)
+    open_manager_btn = QtWidgets.QPushButton("Open ROI Manager")
+    open_manager_btn.clicked.connect(lambda: self.open_panel("roi_manager", reason="roi_dock"))
+    roi_layout.addWidget(open_manager_btn)
+    clear_roi_btn = QtWidgets.QPushButton("Clear ROI")
+    clear_roi_btn.clicked.connect(self._clear_roi)
+    roi_layout.addWidget(clear_roi_btn)
+    roi_layout.addStretch(1)
     return roi_widget
 
 
@@ -1675,12 +1663,6 @@ def make_metadata_widget(self) -> QtWidgets.QWidget:
 def make_density_widget(self) -> QtWidgets.QWidget:
     widget = DensityPanel(parent=self)
     self.density_panel = widget
-    return widget
-
-
-def make_modality_layers_widget(self) -> QtWidgets.QWidget:
-    widget = ModalityLayersPanel(parent=self)
-    self.modality_layers_panel = widget
     return widget
 
 

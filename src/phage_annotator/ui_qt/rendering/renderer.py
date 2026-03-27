@@ -201,6 +201,37 @@ class RenderingMixin(RenderingOverlayMixin):
         self._ensure_loaded(self.current_image_idx)
         if prim.array is None:
             return
+        has_time, has_z = self._effective_axes(prim)
+        t_max = max(0, int(prim.array.shape[0]) - 1)
+        z_max = max(0, int(prim.array.shape[1]) - 1)
+        if not has_time and has_z:
+            t_max = z_max
+
+        if getattr(self, "t_slider", None) is not None:
+            self.t_slider.blockSignals(True)
+            self.t_slider.setEnabled(bool(has_time or has_z))
+            self.t_slider.setMaximum(int(max(0, t_max)))
+            if self.t_slider.value() > t_max:
+                self.t_slider.setValue(int(t_max))
+            self.t_slider.blockSignals(False)
+
+        if getattr(self, "z_slider", None) is not None:
+            self.z_slider.blockSignals(True)
+            self.z_slider.setEnabled(bool(has_z and has_time))
+            self.z_slider.setMaximum(int(max(0, z_max)))
+            if self.z_slider.value() > z_max:
+                self.z_slider.setValue(int(z_max))
+            self.z_slider.blockSignals(False)
+
+        if getattr(self, "t_slider_label", None) is not None:
+            self.t_slider_label.setText(
+                f"T: {int(self.t_slider.value()) + 1}/{int(max(0, t_max)) + 1}"
+            )
+        if getattr(self, "z_slider_label", None) is not None:
+            self.z_slider_label.setText(
+                f"Z: {int(self.z_slider.value()) + 1}/{int(max(0, z_max)) + 1}"
+            )
+
         layout_spec = self._current_layout_spec()
         self._rebuild_figure_layout(layout_spec)
         self._capture_zoom_state()
@@ -665,7 +696,7 @@ class RenderingMixin(RenderingOverlayMixin):
         if self.render_level_label is not None:
             self.render_level_label.setText(f"Render: L{level}")
         self._update_status()
-        # Sync modality layers panel to reflect current canvas state
+        # Keep evidence-layer config normalized with current session defaults.
         self._refresh_modality_layers_panel()
 
     def _refresh_orthoview(self, prim, t_idx: int, z_idx: int, norm, cmap) -> None:
@@ -812,29 +843,31 @@ class RenderingMixin(RenderingOverlayMixin):
         if self.profile_canvas is not None:
             self.profile_canvas.draw_idle()
 
-        hist_visible = self.dock_hist is None or self.dock_hist.isVisible()
-        if (
-            self.hist_enabled
-            and self.hist_chk.isChecked()
-            and hist_visible
-            and self.ax_hist is not None
-        ):
+        hist_canvases = []
+        primary_hist_visible = self.dock_hist is None or self.dock_hist.isVisible()
+        if getattr(self, "ax_hist", None) is not None and getattr(self, "hist_canvas", None) is not None:
+            hist_canvases.append((self.ax_hist, self.hist_canvas, bool(primary_hist_visible)))
+        embedded_ax = getattr(self, "ax_contrast_hist", None)
+        embedded_canvas = getattr(self, "contrast_hist_canvas", None)
+        if embedded_ax is not None and embedded_canvas is not None:
+            hist_canvases.append((embedded_ax, embedded_canvas, bool(embedded_canvas.isVisible())))
+
+        hist_visible = any(visible for _ax, _canvas, visible in hist_canvases)
+        hist_enabled = bool(getattr(self, "hist_enabled", True))
+        hist_chk = getattr(self, "hist_chk", None)
+        hist_checked = True if hist_chk is None else bool(hist_chk.isChecked())
+        if hist_enabled and hist_checked and hist_visible and hist_canvases:
             if self._playback_mode and (time.monotonic() - self._hist_last_time) < 0.5:
                 return
             self._hist_last_time = time.monotonic()
             vals = self._hist_values(slice_data)
             if vals is None:
                 return
-            bins = self.hist_bins_spin.value()
-            self.ax_hist.clear()
+            bins_widget = getattr(self, "contrast_hist_bins_spin", None) or getattr(self, "hist_bins_spin", None)
+            bins = int(bins_widget.value()) if bins_widget is not None else 64
             counts, edges = np.histogram(vals, bins=bins)
             centers = 0.5 * (edges[:-1] + edges[1:])
-            self.ax_hist.plot(centers, counts, color="#5555aa")
-            self.ax_hist.axvline(vmin, color="#ff8800", linestyle="--", linewidth=1)
-            self.ax_hist.axvline(vmax, color="#ff8800", linestyle="--", linewidth=1)
-            self.ax_hist.set_title("Intensity histogram")
-            self.ax_hist.set_xlabel("Intensity")
-            self.ax_hist.set_ylabel("Count")
+            stats = None
             if vals.size:
                 mean = float(np.mean(vals))
                 median = float(np.median(vals))
@@ -845,22 +878,33 @@ class RenderingMixin(RenderingOverlayMixin):
                     f"Mean {mean:.3f} | Median {median:.3f} | Std {std:.3f} | "
                     f"Sat low {sat_low} | Sat high {sat_high}"
                 )
-                self.ax_hist.text(
-                    0.02,
-                    0.95,
-                    stats,
-                    transform=self.ax_hist.transAxes,
-                    va="top",
-                    fontsize=8,
-                )
+            for axis, canvas, visible in hist_canvases:
+                if not visible:
+                    continue
+                axis.clear()
+                axis.plot(centers, counts, color="#5555aa")
+                axis.axvline(vmin, color="#ff8800", linestyle="--", linewidth=1)
+                axis.axvline(vmax, color="#ff8800", linestyle="--", linewidth=1)
+                axis.set_title("Intensity histogram")
+                axis.set_xlabel("Intensity")
+                axis.set_ylabel("Count")
+                if stats:
+                    axis.text(
+                        0.02,
+                        0.95,
+                        stats,
+                        transform=axis.transAxes,
+                        va="top",
+                        fontsize=8,
+                    )
+                axis.axis("on")
+                canvas.draw_idle()
             self._update_bc_controls(vals, vmin, vmax)
-            self.ax_hist.axis("on")
         else:
-            if self.ax_hist is not None:
-                self.ax_hist.clear()
-                self.ax_hist.axis("off")
-        if self.hist_canvas is not None:
-            self.hist_canvas.draw_idle()
+            for axis, canvas, _visible in hist_canvases:
+                axis.clear()
+                axis.axis("off")
+                canvas.draw_idle()
 
     def _hist_values(self, slice_data: np.ndarray) -> Optional[np.ndarray]:
         region = self.hist_region

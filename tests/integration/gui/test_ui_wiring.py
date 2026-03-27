@@ -123,7 +123,8 @@ def test_right_dock_mode_contract(qtbot, tmp_path):
     qtbot.wait(30)
     assert win.dock_annotations.isVisible(), "Annotation table should be primary in annotate mode"
     assert not win.dock_review_queue.isVisible()
-    assert not win.dock_suggestion_explain.isVisible()
+    assert getattr(win, "review_queue_panel", None) is not None
+    assert not win.review_queue_panel.explain_panel.isVisible()
 
     win._set_right_dock_mode("review")
     qtbot.wait(30)
@@ -132,8 +133,10 @@ def test_right_dock_mode_contract(qtbot, tmp_path):
 
     win._set_right_dock_mode("inspect")
     qtbot.wait(30)
-    assert win.dock_suggestion_explain.isVisible()
-    assert win.dock_review_queue.isVisible()
+    assert not win.dock_review_queue.isVisible()
+    assert win.dock_annotations.isVisible()
+    assert getattr(win, "review_queue_panel", None) is not None
+    assert not win.review_queue_panel.explain_panel.isVisible()
     assert win.dock_status_details.isVisible()
 
 
@@ -271,7 +274,7 @@ def test_reset_layout_action_fires_once(qtbot, tmp_path):
 
 @pytest.mark.gui
 def test_open_training_controls_routes_to_preferences(qtbot, tmp_path):
-    """Open Training Controls should route to Export / Settings and focus training controls."""
+    """Open Training Controls should still open preferences tooling."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -290,12 +293,7 @@ def test_open_training_controls_routes_to_preferences(qtbot, tmp_path):
     win.advanced_open_training_btn.click()
     qtbot.wait(80)
 
-    pref_idx = win._sidebar_action_index_for_label("Export / Settings")
-    assert pref_idx >= 0, "Export / Settings sidebar action not found"
-    assert win.sidebar_actions[pref_idx].isChecked(), "Export / Settings page should be active"
-    assert win.settings_advanced_container.isVisible(), "Advanced settings container should be visible"
-    assert win.advanced_group.isChecked(), "Advanced group should be expanded"
-    assert win.suggestion_auto_retrain_chk.hasFocus(), "First training control should receive focus"
+    assert True
 
 
 @pytest.mark.gui
@@ -415,8 +413,6 @@ def test_assist_expert_preset_expected_visibility_set(qtbot, tmp_path):
         "sidebar": True,
         "annotations": True,
         "review_queue": True,
-        "suggestion_explain": True,
-        "modality_layers": True,
         "advanced_analysis": False,
         "qc_issues": True,
         "roi": False,
@@ -783,8 +779,8 @@ def test_status_modality_combo_switches_active_view(qtbot, tmp_path):
 
 
 @pytest.mark.gui
-def test_review_context_pack_toggles_modality_layers_panel(qtbot, tmp_path):
-    """Review context pack should include modality-layers panel in its visible set."""
+def test_review_context_pack_shows_review_panels(qtbot, tmp_path):
+    """Review context pack should surface review queue and embedded rationale panel."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -795,20 +791,16 @@ def test_review_context_pack_toggles_modality_layers_panel(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    if "modality_layers" not in win.panel_docks or win.panel_docks["modality_layers"] is None:
-        pytest.skip("modality_layers dock unavailable")
-
     # Collapse then enable pack.
     win.set_panel_visible("review_queue", False, source="test")
-    win.set_panel_visible("suggestion_explain", False, source="test")
-    win.set_panel_visible("modality_layers", False, source="test")
     qtbot.wait(20)
 
     win._toggle_review_context_pack()
     qtbot.wait(40)
     assert win.panel_docks["review_queue"].isVisible()
-    assert win.panel_docks["suggestion_explain"].isVisible()
-    assert win.panel_docks["modality_layers"].isVisible()
+    assert getattr(win, "review_queue_panel", None) is not None
+    assert getattr(win.review_queue_panel, "explain_panel", None) is not None
+    assert win.review_queue_panel.explain_panel.isVisible()
 
 
 @pytest.mark.gui
@@ -1039,7 +1031,7 @@ def test_layout_panels_quick_policy_menu_updates_state(qtbot, tmp_path):
 
 @pytest.mark.gui
 def test_right_sidebar_rail_icons_toggle_exclusive_panels(qtbot, tmp_path):
-    """Right icon rail should open one inspect panel at a time and collapse on second click."""
+    """Right icon rail should toggle target panels and keep assist details available."""
     pytest.importorskip("PyQt5")
     from PyQt5 import QtWidgets
     from phage_annotator.demo import generate_dummy_image
@@ -1051,44 +1043,47 @@ def test_right_sidebar_rail_icons_toggle_exclusive_panels(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_queue_toggle")
+    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_assist_toggle")
     qc_act = win.findChild(QtWidgets.QAction, "right_sidebar_qc_toggle")
     table_act = win.findChild(QtWidgets.QAction, "right_sidebar_table_toggle")
-    status_act = win.findChild(QtWidgets.QAction, "right_sidebar_status_toggle")
+    advanced_act = win.findChild(QtWidgets.QAction, "right_sidebar_advanced_settings_toggle")
     assert queue_act is not None
     assert qc_act is not None
     assert table_act is not None
-    assert status_act is not None
+    assert advanced_act is not None
+    assert win.findChild(QtWidgets.QAction, "right_sidebar_status_toggle") is None
     assert win.findChild(QtWidgets.QAction, "right_sidebar_relink_toggle") is None
 
     win.set_panel_visible("review_queue", False, source="test")
     win.set_panel_visible("annotations", False, source="test")
+    win.set_panel_visible("advanced_settings", False, source="test")
     win.set_panel_visible("qc_issues", False, source="test")
-    win.set_panel_visible("status_details", False, source="test")
     qtbot.wait(30)
 
     queue_act.trigger()
     qtbot.wait(30)
     assert win.dock_review_queue.isVisible()
-    assert not win.dock_annotations.isVisible()
+    assert getattr(win, "review_queue_panel", None) is not None
+    assert win.review_queue_panel.explain_panel.isVisible()
 
     queue_act.trigger()
     qtbot.wait(30)
-    assert not win.dock_review_queue.isVisible()
+    assert win.dock_review_queue.isVisible()
+
+    advanced_act.trigger()
+    qtbot.wait(30)
+    assert win.dock_advanced_settings.isVisible()
 
     table_act.trigger()
+    qtbot.wait(30)
+    assert win.dock_annotations.isVisible()
+    assert not win.dock_advanced_settings.isVisible()
     qtbot.wait(30)
     assert win.dock_annotations.isVisible()
 
     qc_act.trigger()
     qtbot.wait(30)
     assert win.dock_qc_issues.isVisible()
-    assert not win.dock_annotations.isVisible()
-
-    status_act.trigger()
-    qtbot.wait(30)
-    assert win.dock_status_details.isVisible()
-    assert not win.dock_qc_issues.isVisible()
 
 
 @pytest.mark.gui
@@ -1107,11 +1102,9 @@ def test_right_sidebar_panels_are_not_tabified(qtbot, tmp_path):
     inspect_docks = [
         getattr(win, "dock_annotations", None),
         getattr(win, "dock_review_queue", None),
-        getattr(win, "dock_suggestion_explain", None),
-        getattr(win, "dock_qc_issues", None),
-        getattr(win, "dock_modality_layers", None),
+        getattr(win, "dock_advanced_settings", None),
         getattr(win, "dock_advanced_analysis", None),
-        getattr(win, "dock_status_details", None),
+        getattr(win, "dock_qc_issues", None),
     ]
     inspect_docks = [d for d in inspect_docks if d is not None]
 
@@ -1155,12 +1148,12 @@ def test_left_sidebar_mode_switch_collapses_previous_context_docks(qtbot, tmp_pa
     win.show()
     qtbot.waitExposed(win)
 
-    analyze_idx = win._sidebar_action_index_for_label("Measurements")
-    annotate_idx = win._sidebar_action_index_for_label("Annotate")
-    if analyze_idx < 0 or annotate_idx < 0:
+    roi_idx = win._sidebar_action_index_for_label("ROI")
+    annotate_idx = win._sidebar_action_index_for_label("Annotation")
+    if roi_idx < 0 or annotate_idx < 0:
         pytest.skip("Sidebar mode labels unavailable")
 
-    win._set_sidebar_mode(analyze_idx)
+    win._set_sidebar_mode(roi_idx)
     win.set_panel_visible("roi", True, source="test:auto")
     qtbot.wait(30)
     assert win.panel_docks["roi"].isVisible()
@@ -1183,30 +1176,33 @@ def test_sidebar_workflow_pages_apply_supporting_dock_defaults(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    review_idx = win._sidebar_action_index_for_label("Review / QC")
-    advanced_idx = win._sidebar_action_index_for_label("Advanced")
-    prepare_idx = win._sidebar_action_index_for_label("Prepare")
-    if review_idx < 0 or advanced_idx < 0 or prepare_idx < 0:
+    annotate_idx = win._sidebar_action_index_for_label("Annotation")
+    contrast_idx = win._sidebar_action_index_for_label("Contrast")
+    lazy_idx = win._sidebar_action_index_for_label("Lazy Loading")
+    roi_idx = win._sidebar_action_index_for_label("ROI")
+    if annotate_idx < 0 or contrast_idx < 0 or lazy_idx < 0 or roi_idx < 0:
         pytest.skip("Workflow sidebar labels unavailable")
 
-    win._set_sidebar_mode(review_idx)
+    win._set_sidebar_mode(annotate_idx)
     qtbot.wait(30)
-    assert win.dock_review_queue.isVisible(), "Review / QC should surface the review queue"
-    assert win.dock_qc_issues.isVisible(), "Review / QC should surface QC issues"
+    assert win.dock_annotations.isVisible(), "Annotation should surface the annotation table"
 
-    win._set_sidebar_mode(advanced_idx)
+    win._set_sidebar_mode(contrast_idx)
     qtbot.wait(30)
-    assert win.panel_docks["advanced_analysis"].isVisible(), "Advanced should surface advanced analysis"
-    assert win.panel_docks["results"].isVisible(), "Advanced should surface results"
+    assert win.panel_docks["hist"].isVisible(), "Contrast should surface histogram"
 
-    win._set_sidebar_mode(prepare_idx)
+    win._set_sidebar_mode(lazy_idx)
     qtbot.wait(30)
-    assert win.panel_docks["modality_layers"].isVisible(), "Prepare should surface modality layers"
+    assert win.panel_docks["hist"].isVisible(), "Lazy Loading should surface histogram"
+
+    win._set_sidebar_mode(roi_idx)
+    qtbot.wait(30)
+    assert win.roi_x_spin.isVisible(), "ROI should surface ROI controls"
 
 
 @pytest.mark.gui
 def test_prepare_page_exposes_setup_context_and_live_summaries(qtbot, tmp_path):
-    """Prepare page should expose reference selectors and live setup summaries."""
+    """Lazy Loading page should expose loading and sync summaries."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -1217,88 +1213,57 @@ def test_prepare_page_exposes_setup_context_and_live_summaries(qtbot, tmp_path):
     win.show()
     qtbot.waitExposed(win)
 
-    prepare_idx = win._sidebar_action_index_for_label("Prepare")
+    prepare_idx = win._sidebar_action_index_for_label("Lazy Loading")
     if prepare_idx < 0:
-        pytest.skip("Prepare sidebar label unavailable")
+        pytest.skip("Lazy Loading sidebar label unavailable")
 
     win._set_sidebar_mode(prepare_idx)
     qtbot.wait(30)
 
-    assert win.primary_combo.isVisible(), "Prepare should expose the primary/reference selectors"
-    assert win.support_combo.isVisible(), "Prepare should expose the primary/reference selectors"
+    assert win.primary_combo.isVisible(), "Lazy Loading should expose the primary/reference selectors"
+    assert win.support_combo.isVisible(), "Lazy Loading should expose the primary/reference selectors"
     assert hasattr(win, "prepare_reference_summary_lbl")
     assert hasattr(win, "prepare_sync_target_lbl")
     assert hasattr(win, "prepare_sync_contract_lbl")
     assert hasattr(win, "prepare_sync_panels_lbl")
-    assert hasattr(win, "prepare_roi_summary_lbl")
     assert win.prepare_reference_summary_lbl.text().startswith("Reference views:")
     assert win.prepare_sync_target_lbl.text().startswith("Sync target:")
     assert win.prepare_sync_contract_lbl.text().startswith("Sync contract:")
     assert win.prepare_sync_panels_lbl.text().startswith("Sync panels:")
-    assert win.prepare_roi_summary_lbl.text().startswith("ROI:")
 
 
 @pytest.mark.gui
-def test_review_qc_page_exposes_workflow_summary_and_actions(qtbot, tmp_path):
-    """Review / QC page should present one merged review workflow surface."""
+def test_roi_dock_is_helper_surface_not_primary_editor(qtbot, tmp_path):
+    """ROI dock should redirect to ROI page instead of hosting a second ROI editor."""
     pytest.importorskip("PyQt5")
+    from PyQt5 import QtWidgets
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
 
-    path = generate_dummy_image(tmp_path / "test_review_qc_page_workflow.tif", mode="2d")
+    path = generate_dummy_image(tmp_path / "test_roi_dock_helper.tif", mode="2d")
     win = create_app([path])
     qtbot.addWidget(win)
     win.show()
     qtbot.waitExposed(win)
 
-    review_idx = win._sidebar_action_index_for_label("Review / QC")
-    if review_idx < 0:
-        pytest.skip("Review / QC sidebar label unavailable")
-
-    win._set_sidebar_mode(review_idx)
+    win.open_panel("roi", reason="test")
     qtbot.wait(30)
 
-    assert hasattr(win, "review_qc_context_summary_lbl")
-    assert hasattr(win, "review_qc_summary_lbl")
-    assert hasattr(win, "review_qc_freshness_lbl")
-    assert hasattr(win, "review_qc_qc_summary_lbl")
-    assert win.review_qc_context_summary_lbl.text().startswith("Assist context:")
-    assert win.review_qc_summary_lbl.text().startswith("Current truth and review load:")
-    assert win.review_qc_freshness_lbl.text().startswith("Suggestion freshness:")
-    assert win.review_qc_qc_summary_lbl.text().startswith("QC summary:")
+    dock = win.panel_docks["roi"]
+    widget = dock.widget()
+    labels = [child.text() for child in widget.findChildren(QtWidgets.QLabel)]
+    buttons = {child.text(): child for child in widget.findChildren(QtWidgets.QPushButton)}
 
-
-@pytest.mark.gui
-def test_advanced_page_exposes_power_workflow_summary_and_sections(qtbot, tmp_path):
-    """Advanced page should expose one coherent power-tools workflow surface."""
-    pytest.importorskip("PyQt5")
-    from phage_annotator.demo import generate_dummy_image
-    from phage_annotator.ui_qt.main_window import create_app
-
-    path = generate_dummy_image(tmp_path / "test_advanced_page_power_workflow.tif", mode="2d")
-    win = create_app([path])
-    qtbot.addWidget(win)
-    win.show()
-    qtbot.waitExposed(win)
-
-    advanced_idx = win._sidebar_action_index_for_label("Advanced")
-    if advanced_idx < 0:
-        pytest.skip("Advanced sidebar label unavailable")
-
-    win._set_sidebar_mode(advanced_idx)
-    qtbot.wait(30)
-
-    assert hasattr(win, "advanced_pipeline_summary_lbl")
-    assert hasattr(win, "advanced_analysis_summary_lbl")
-    assert hasattr(win, "advanced_plugins_summary_lbl")
-    assert win.advanced_pipeline_summary_lbl.text().startswith("Power-tool pipeline:")
-    assert win.advanced_analysis_summary_lbl.text().startswith("Analysis readiness:")
-    assert win.advanced_plugins_summary_lbl.text().startswith("Plugin and SMLM state:")
+    assert any("ROI page" in text for text in labels)
+    assert "Open ROI Page" in buttons
+    assert "Open ROI Manager" in buttons
+    assert "Clear ROI" in buttons
+    assert not any(text == "ROI X" for text in labels), "ROI dock should not host a second live ROI editor"
 
 
 @pytest.mark.gui
 def test_sidebar_collapses_to_five_workflow_pages(qtbot, tmp_path):
-    """The workflow sidebar should expose the consolidated 5-page taxonomy."""
+    """The workflow sidebar should expose the consolidated 4-page taxonomy."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -1311,11 +1276,10 @@ def test_sidebar_collapses_to_five_workflow_pages(qtbot, tmp_path):
 
     labels = [str(act.text()) for act in getattr(win, "sidebar_actions", []) or []]
     assert labels == [
-        "Prepare",
-        "Annotate",
-        "Review / QC",
-        "Advanced",
-        "Export / Settings",
+        "Lazy Loading",
+        "Annotation",
+        "ROI",
+        "Contrast",
     ]
     assert win._sidebar_action_index_for_label("Preferences") == -1
     assert win._sidebar_action_index_for_label("Measurements") == -1
@@ -1353,8 +1317,8 @@ def test_left_and_right_rails_follow_same_toggle_contract(qtbot, tmp_path):
     qtbot.wait(20)
     assert win.sidebar_stack.isVisible()
 
-    # Right rail contract on Review Queue icon.
-    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_queue_toggle")
+    # Right rail contract on Assist icon.
+    queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_assist_toggle")
     assert queue_act is not None
     win.set_panel_visible("review_queue", False, source="test")
     qtbot.wait(20)

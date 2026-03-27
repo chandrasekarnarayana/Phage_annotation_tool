@@ -167,7 +167,7 @@ def refresh_review_queue_panel(owner) -> None:
     trained_neg = int(metrics.get("rejected", 0))
     readiness_txt = f" (Need {need} more labels in this context)" if assist_state.name == "HEURISTIC" and need > 0 else ""
     panel.header_lbl.setText(
-        f"Review Queue - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_state_label(assist_state)}{readiness_txt} | trained on: {trained_pos} pos / {trained_neg} neg"
+        f"Assist - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_state_label(assist_state)}{readiness_txt} | trained on: {trained_pos} pos / {trained_neg} neg"
     )
     owner._style_assist_state_label(panel.assist_lbl, assist_state, prefix="Assist state: ", suffix=readiness_txt)
     if not ranked:

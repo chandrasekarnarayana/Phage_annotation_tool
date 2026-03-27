@@ -17,6 +17,11 @@ class DockActionsMixin:
     def _resolve_panel_dock(self, panel: str):
         """Return dock widget for a panel id, if present."""
         key = str(panel).strip().lower()
+        aliases = {
+            "suggestion_explain": "review_queue",
+            "project_relink": "advanced_settings",
+        }
+        key = aliases.get(key, key)
         dock = None
         panel_docks = getattr(self, "panel_docks", {})
         if isinstance(panel_docks, dict):
@@ -71,7 +76,7 @@ class DockActionsMixin:
             "results",
             "annotations",
             "review_queue",
-            "suggestion_explain",
+            "advanced_settings",
             "advanced_analysis",
         )
         for key in panel_keys:

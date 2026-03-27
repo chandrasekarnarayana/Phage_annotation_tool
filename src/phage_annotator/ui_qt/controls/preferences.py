@@ -281,6 +281,8 @@ class PreferencesControlsMixin:
     def _on_pixel_size_change(self, val: float) -> None:
         self.pixel_size_um_per_px = float(val)
         self._settings.setValue("defaultPixelSizeUmPerPx", self.pixel_size_um_per_px)
+        if hasattr(self, "_refresh_advanced_settings_panel"):
+            self._refresh_advanced_settings_panel()
         self._update_status()
         self._request_ui_refresh("preferences")
 

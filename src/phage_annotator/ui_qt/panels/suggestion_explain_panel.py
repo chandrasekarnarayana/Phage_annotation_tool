@@ -19,7 +19,7 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        self.header_lbl = QtWidgets.QLabel("Why Was This Suggested?")
+        self.header_lbl = QtWidgets.QLabel("Assist Details")
         self.header_lbl.setStyleSheet("font-weight: 600;")
         layout.addWidget(self.header_lbl)
         self.assist_state_lbl = QtWidgets.QLabel("Assist: Heuristic")

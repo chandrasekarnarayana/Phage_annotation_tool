@@ -81,13 +81,12 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.assist_warmup_act = assist_menu.addAction("Warmup (Balanced A/R)")
     self.train_ranker_now_act = assist_menu.addAction("Train Ranker Now")
     self.show_calibration_visualizer_act = assist_menu.addAction("Show Calibration Visualizer")
-    self.compare_layer_presets_act = assist_menu.addAction("Compare Layer Presets A/B")
     self.batch_correct_suggestions_act = assist_menu.addAction("Batch Correct Offset...")
     self.propagate_suggestions_act = assist_menu.addAction(
         "Propagate Suggestions to Remaining T/Z..."
     )
 
-    review_menu = menubar.addMenu("&Review / QC")
+    review_menu = menubar.addMenu("&Review")
     self.set_current_user_act = review_menu.addAction("Set Current User…")
     self.mark_selected_in_review_act = review_menu.addAction("Mark Selected: In Review")
     self.mark_selected_approved_act = review_menu.addAction("Mark Selected: Approved")
@@ -108,7 +107,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     review_menu.addSeparator()
     self.qc_validate_act = review_menu.addAction("Validate QC")
     self.qc_jump_next_act = review_menu.addAction("Jump to Next QC Issue")
-    self.review_context_pack_act = review_menu.addAction("Toggle Review Context Pack")
+    self.review_context_pack_act = review_menu.addAction("Toggle Assist Context Pack")
 
     export_menu = menubar.addMenu("&Export")
     annotation_export_menu = export_menu.addMenu("Annotations")
@@ -131,9 +130,9 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.toggle_left_act = view_menu.addAction("Toggle Left Sidebar")
     self.toggle_left_act.setCheckable(True)
     self.toggle_left_act.setChecked(True)
-    self.toggle_settings_act = view_menu.addAction("Toggle Preferences")
+    self.toggle_settings_act = view_menu.addAction("Toggle Advanced Settings")
     self.toggle_settings_act.setCheckable(True)
-    self.toggle_settings_act.setChecked(True)
+    self.toggle_settings_act.setChecked(False)
     self.toggle_overlay_act = view_menu.addAction("Show Overlay")
     self.toggle_overlay_act.setCheckable(True)
     self.toggle_overlay_act.setChecked(True)
@@ -153,16 +152,6 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.focus_canvas_mode_act.setCheckable(True)
     self.focus_canvas_mode_act.setChecked(False)
     self.focus_canvas_mode_act.setShortcut("F")
-    # Keep legacy layout preset actions registered for command/shortcut flows
-    # without surfacing them in the visible menu tree.
-    self.preset_default_act = QtWidgets.QAction("Default Layout Preset", self)
-    self.preset_annotate_act = QtWidgets.QAction("Annotate Layout Preset", self)
-    self.preset_analyze_act = QtWidgets.QAction("Analyze Layout Preset", self)
-    self.preset_minimal_act = QtWidgets.QAction("Minimal Layout Preset", self)
-    self.addAction(self.preset_default_act)
-    self.addAction(self.preset_annotate_act)
-    self.addAction(self.preset_analyze_act)
-    self.addAction(self.preset_minimal_act)
     self.save_layout_default_act = view_menu.addAction("Save Layout as Default")
     self.reset_layout_act = view_menu.addAction("Reset Layout")
     self.link_zoom_act = view_menu.addAction("Link Zoom/Pan")
@@ -272,7 +261,6 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "assist_warmup": self.assist_warmup_act,
         "train_ranker_now": self.train_ranker_now_act,
         "show_calibration_visualizer": self.show_calibration_visualizer_act,
-        "compare_layer_presets": self.compare_layer_presets_act,
         "batch_correct_suggestions": self.batch_correct_suggestions_act,
         "propagate_suggestions": self.propagate_suggestions_act,
         "toggle_suggestions_overlay": self.toggle_suggestions_overlay_act,
@@ -323,6 +311,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     _describe(self.accept_visible_suggestions_act, "Accept currently visible suggestions")
     _describe(self.reject_visible_suggestions_act, "Reject currently visible suggestions")
     _describe(self.qc_validate_act, "Run quality-control validation for loaded annotations")
+    _describe(self.review_context_pack_act, "Toggle the Assist review context pack (table, assist queue, and QC)")
     _describe(self.save_csv_act, "Write the active annotation context to CSV")
     _describe(self.save_json_act, "Write the active annotation context to JSON")
     _describe(self.export_view_act, "Export the current rendered view with overlays")
@@ -333,7 +322,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     )
     _describe(self.open_panel_policy_act, "Choose which panels auto-open and remain pinned")
     _describe(self.toggle_left_act, "Show or hide the left workflow sidebar")
-    _describe(self.toggle_settings_act, "Show or hide preferences and settings")
+    _describe(self.toggle_settings_act, "Show or hide the Advanced Settings panel on the right sidebar")
     _describe(self.link_zoom_act, "Link zoom and pan across synchronized image panels")
     _describe(self.reset_view_act, "Reset the canvas view to the default zoom and pan")
     _describe(self.toggle_logs_act, "Show or hide the diagnostics dock")

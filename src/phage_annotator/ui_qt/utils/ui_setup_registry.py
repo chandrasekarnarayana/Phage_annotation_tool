@@ -18,6 +18,47 @@ from phage_annotator.ui_qt.utils.ui_setup_panels import (
 class UiSetupRegistryMixin:
     """Mixin for dock registry wiring and dock factory wrappers."""
 
+    def _refresh_advanced_settings_panel(self) -> None:
+        """Mirror current calibration state into the right-side expert panel."""
+        panel = getattr(self, "advanced_settings_panel", None)
+        if panel is None:
+            return
+        image = getattr(self, "primary_image", None)
+        report = dict(getattr(self.controller.session_state, "project_relink_report", {}) or {})
+        unresolved = list(report.get("unresolved", []) or [])
+        relinked = list(report.get("relinked", []) or [])
+        loaded = int(report.get("loaded_count", 0))
+        partial = bool(report.get("partial_load", False))
+        skipped = int(report.get("skipped_count", len(report.get("missing", []) or [])))
+        relink_summary = (
+            f"Loaded {loaded} image(s). "
+            f"{'Partial load active. ' if partial else ''}"
+            f"Relinked: {len(relinked)} | Unresolved: {len(unresolved)} | Skipped: {skipped}"
+            if report
+            else "No relink activity."
+        )
+        if image is None:
+            panel.set_state(
+                image_name="-",
+                effective_pixel_size_um=None,
+                pixel_source="-",
+                default_pixel_size_um=float(getattr(self, "pixel_size_um_per_px", 0.069) or 0.069),
+                axis_mode=str(getattr(getattr(self, "axis_mode_combo", None), "currentText", lambda: "auto")() or "auto"),
+                relink_summary=relink_summary,
+                relink_retry_enabled=bool(unresolved),
+            )
+            return
+        calibration = self._get_calibration_state(int(image.id))
+        panel.set_state(
+            image_name=str(getattr(image, "name", "") or getattr(image, "path", "") or "-"),
+            effective_pixel_size_um=getattr(calibration, "pixel_size_um_per_px", None),
+            pixel_source=str(getattr(calibration, "source", "unknown") or "unknown"),
+            default_pixel_size_um=float(getattr(self, "pixel_size_um_per_px", 0.069) or 0.069),
+            axis_mode=str(getattr(image, "interpret_3d_as", None) or getattr(getattr(self, "axis_mode_combo", None), "currentText", lambda: "auto")() or "auto"),
+            relink_summary=relink_summary,
+            relink_retry_enabled=bool(unresolved),
+        )
+
     def _refresh_review_qc_page_summary(self) -> None:
         """Refresh the workflow summary labels shown on the Review / QC page."""
         context_lbl = getattr(self, "review_qc_context_summary_lbl", None)
@@ -218,14 +259,11 @@ class UiSetupRegistryMixin:
     def _make_review_queue_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_review_queue_widget(self)
 
-    def _make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_suggestion_explain_widget(self)
+    def _make_advanced_settings_widget(self) -> QtWidgets.QWidget:
+        return ui_docks.make_advanced_settings_widget(self)
 
     def _make_status_details_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_status_details_widget(self)
-
-    def _make_project_relink_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_project_relink_widget(self)
 
     def _make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_advanced_analysis_widget(self)
@@ -262,9 +300,6 @@ class UiSetupRegistryMixin:
 
     def _make_density_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_density_widget(self)
-
-    def _make_modality_layers_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_modality_layers_widget(self)
 
     def _make_channel_controls_widget(self) -> QtWidgets.QWidget:
         return ui_docks.make_channel_controls_widget(self)
@@ -319,10 +354,11 @@ class UiSetupRegistryMixin:
             title_lbl.setStyleSheet("font-weight: 700; font-size: 13px;")
             layout.addWidget(title_lbl)
 
-            desc_lbl = QtWidgets.QLabel(str(description))
-            desc_lbl.setWordWrap(True)
-            desc_lbl.setStyleSheet("color: #4b5563;")
-            layout.addWidget(desc_lbl)
+            if str(description or "").strip():
+                desc_lbl = QtWidgets.QLabel(str(description))
+                desc_lbl.setWordWrap(True)
+                desc_lbl.setStyleSheet("color: #4b5563;")
+                layout.addWidget(desc_lbl)
 
             if quick_buttons:
                 quick_row = QtWidgets.QHBoxLayout()
@@ -363,54 +399,25 @@ class UiSetupRegistryMixin:
                 layout.addWidget(button)
             return group
 
-        def _build_prepare_setup_section() -> QtWidgets.QWidget:
+        def _build_lazy_loading_section() -> QtWidgets.QWidget:
             section = QtWidgets.QWidget()
             layout = QtWidgets.QVBoxLayout(section)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(10)
 
-            compare_group = QtWidgets.QGroupBox("Reference and Comparison")
+            compare_group = QtWidgets.QGroupBox("Reference Views")
             compare_layout = QtWidgets.QVBoxLayout(compare_group)
             compare_layout.setContentsMargins(8, 8, 8, 8)
             compare_layout.setSpacing(6)
-            compare_help = QtWidgets.QLabel(
-                "Use the primary and reference views to compare evidence before annotation begins."
-            )
-            compare_help.setWordWrap(True)
-            compare_help.setStyleSheet("color: #4b5563;")
-            compare_layout.addWidget(compare_help)
             self.prepare_reference_summary_lbl = QtWidgets.QLabel("Reference views: -")
             self.prepare_reference_summary_lbl.setStyleSheet("color: #455a64;")
             compare_layout.addWidget(self.prepare_reference_summary_lbl)
-            compare_buttons = QtWidgets.QHBoxLayout()
-            compare_buttons.addWidget(
-                _dock_button(
-                    "Modality Layers",
-                    "modality_layers",
-                    "Open modality layers and A/B comparison controls.",
-                )
-            )
-            compare_presets_btn = QtWidgets.QPushButton("Compare Presets A/B")
-            compare_presets_btn.setToolTip("Run the configured modality preset comparison action.")
-            compare_presets_btn.clicked.connect(
-                lambda: getattr(self, "compare_layer_presets_act", None)
-                and self.compare_layer_presets_act.trigger()
-            )
-            compare_buttons.addWidget(compare_presets_btn)
-            compare_buttons.addStretch(1)
-            compare_layout.addLayout(compare_buttons)
             layout.addWidget(compare_group)
 
             sync_group = QtWidgets.QGroupBox("Synchronized Navigation")
             sync_layout = QtWidgets.QVBoxLayout(sync_group)
             sync_layout.setContentsMargins(8, 8, 8, 8)
             sync_layout.setSpacing(6)
-            sync_help = QtWidgets.QLabel(
-                "Confirm the sync target before comparing modalities. Contrast, zoom/pan, playback, and ROI sharing follow the same centralized sync state."
-            )
-            sync_help.setWordWrap(True)
-            sync_help.setStyleSheet("color: #4b5563;")
-            sync_layout.addWidget(sync_help)
             self.prepare_sync_target_lbl = QtWidgets.QLabel("Sync target: -")
             self.prepare_sync_contract_lbl = QtWidgets.QLabel("Sync contract: -")
             self.prepare_sync_panels_lbl = QtWidgets.QLabel("Sync panels: -")
@@ -426,33 +433,39 @@ class UiSetupRegistryMixin:
             focus_sync_btn.setToolTip("Move focus to the bottom playback/sync control strip.")
             focus_sync_btn.clicked.connect(self._focus_playback_controls)
             sync_buttons.addWidget(focus_sync_btn)
-            sync_buttons.addWidget(
-                _dock_button("Histogram", "hist", "Open histogram and brightness/contrast controls.")
-            )
             sync_buttons.addStretch(1)
             sync_layout.addLayout(sync_buttons)
             layout.addWidget(sync_group)
 
-            roi_group = QtWidgets.QGroupBox("ROI Setup")
+            return section
+
+        def _build_roi_page_section() -> QtWidgets.QWidget:
+            section = QtWidgets.QWidget()
+            layout = QtWidgets.QVBoxLayout(section)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(10)
+
+            roi_group = QtWidgets.QGroupBox("ROI")
             roi_layout = QtWidgets.QVBoxLayout(roi_group)
             roi_layout.setContentsMargins(8, 8, 8, 8)
             roi_layout.setSpacing(6)
-            roi_help = QtWidgets.QLabel(
-                "Define the working ROI before annotation. The active ROI is shared through the current sync group."
-            )
-            roi_help.setWordWrap(True)
-            roi_help.setStyleSheet("color: #4b5563;")
-            roi_layout.addWidget(roi_help)
             self.prepare_roi_summary_lbl = QtWidgets.QLabel("ROI: Full field")
             self.prepare_roi_summary_lbl.setStyleSheet("color: #455a64;")
             roi_layout.addWidget(self.prepare_roi_summary_lbl)
+            if getattr(self, "_roi_controls_layout", None) is not None:
+                roi_layout.addLayout(self._roi_controls_layout)
             roi_buttons = QtWidgets.QHBoxLayout()
-            roi_buttons.addWidget(_dock_button("ROI Controls", "roi", "Open ROI controls for the current view."))
-            roi_buttons.addWidget(_dock_button("ROI Manager", "roi_manager", "Open saved ROI management tools."))
+            roi_buttons.addWidget(
+                _dock_button("ROI Manager", "roi_manager", "Open saved ROI management tools.")
+            )
+            clear_roi_btn = QtWidgets.QPushButton("Clear ROI")
+            clear_roi_btn.setToolTip("Remove the active ROI and return to full field.")
+            clear_roi_btn.clicked.connect(self._clear_roi)
+            roi_buttons.addWidget(clear_roi_btn)
             roi_buttons.addStretch(1)
             roi_layout.addLayout(roi_buttons)
             layout.addWidget(roi_group)
-
+            layout.addStretch(1)
             return section
 
         def _trigger_action(action_name: str) -> None:
@@ -460,208 +473,14 @@ class UiSetupRegistryMixin:
             if action is not None:
                 action.trigger()
 
-        def _build_review_qc_workflow_section() -> QtWidgets.QWidget:
-            section = QtWidgets.QWidget()
-            layout = QtWidgets.QVBoxLayout(section)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(10)
-
-            generate_group = QtWidgets.QGroupBox("Generate")
-            generate_layout = QtWidgets.QVBoxLayout(generate_group)
-            generate_layout.setContentsMargins(8, 8, 8, 8)
-            generate_layout.setSpacing(6)
-            generate_help = QtWidgets.QLabel(
-                "Generate source-aware candidates, then review them against the current annotation truth."
-            )
-            generate_help.setWordWrap(True)
-            generate_help.setStyleSheet("color: #4b5563;")
-            generate_layout.addWidget(generate_help)
-            self.review_qc_context_summary_lbl = QtWidgets.QLabel("Assist context: -")
-            self.review_qc_context_summary_lbl.setStyleSheet("color: #455a64;")
-            generate_layout.addWidget(self.review_qc_context_summary_lbl)
-            generate_layout.addWidget(self._build_assist_panel())
-            layout.addWidget(generate_group)
-
-            merge_group = QtWidgets.QGroupBox("Merge Policy")
-            merge_layout = QtWidgets.QVBoxLayout(merge_group)
-            merge_layout.setContentsMargins(8, 8, 8, 8)
-            merge_layout.setSpacing(6)
-            merge_help = QtWidgets.QLabel(
-                "Committed annotations remain the source of truth. Suggestions are reviewed explicitly and stale batches require acknowledgement before bulk acceptance."
-            )
-            merge_help.setWordWrap(True)
-            merge_help.setStyleSheet("color: #4b5563;")
-            merge_layout.addWidget(merge_help)
-            merge_points = QtWidgets.QLabel(
-                "Manual and imported points are preserved. Accepted suggestions become committed annotations only through the review/command path."
-            )
-            merge_points.setWordWrap(True)
-            merge_points.setStyleSheet("color: #455a64;")
-            merge_layout.addWidget(merge_points)
-            layout.addWidget(merge_group)
-
-            summary_group = QtWidgets.QGroupBox("Summary")
-            summary_layout = QtWidgets.QVBoxLayout(summary_group)
-            summary_layout.setContentsMargins(8, 8, 8, 8)
-            summary_layout.setSpacing(6)
-            self.review_qc_summary_lbl = QtWidgets.QLabel("Current truth and review load: -")
-            self.review_qc_summary_lbl.setWordWrap(True)
-            self.review_qc_summary_lbl.setStyleSheet("color: #455a64;")
-            self.review_qc_freshness_lbl = QtWidgets.QLabel("Suggestion freshness: -")
-            self.review_qc_freshness_lbl.setStyleSheet("color: #455a64;")
-            summary_layout.addWidget(self.review_qc_summary_lbl)
-            summary_layout.addWidget(self.review_qc_freshness_lbl)
-            layout.addWidget(summary_group)
-
-            review_group = QtWidgets.QGroupBox("Review Actions")
-            review_layout = QtWidgets.QGridLayout(review_group)
-            review_layout.setContentsMargins(8, 8, 8, 8)
-            review_layout.setHorizontalSpacing(8)
-            review_layout.setVerticalSpacing(6)
-            review_layout.addWidget(
-                _dock_button("Review Queue", "review_queue", "Open the review queue."),
-                0,
-                0,
-            )
-            review_layout.addWidget(
-                _dock_button("Rationale", "suggestion_explain", "Open suggestion rationale."),
-                0,
-                1,
-            )
-            next_btn = QtWidgets.QPushButton("Next Uncertain")
-            next_btn.clicked.connect(self._next_uncertain_suggestion)
-            review_layout.addWidget(next_btn, 0, 2)
-            accept_visible_btn = QtWidgets.QPushButton("Accept Visible")
-            accept_visible_btn.clicked.connect(lambda: _trigger_action("accept_visible_suggestions_act"))
-            review_layout.addWidget(accept_visible_btn, 1, 0)
-            accept_green_btn = QtWidgets.QPushButton("Accept High-Confidence")
-            accept_green_btn.clicked.connect(lambda: _trigger_action("accept_green_suggestions_act"))
-            review_layout.addWidget(accept_green_btn, 1, 1)
-            accept_roi_btn = QtWidgets.QPushButton("Accept In ROI")
-            accept_roi_btn.clicked.connect(lambda: _trigger_action("accept_suggestions_in_roi_act"))
-            review_layout.addWidget(accept_roi_btn, 1, 2)
-            reject_visible_btn = QtWidgets.QPushButton("Reject Visible")
-            reject_visible_btn.clicked.connect(lambda: _trigger_action("reject_visible_suggestions_act"))
-            review_layout.addWidget(reject_visible_btn, 2, 0)
-            layout.addWidget(review_group)
-
-            qc_group = QtWidgets.QGroupBox("QC")
-            qc_layout = QtWidgets.QVBoxLayout(qc_group)
-            qc_layout.setContentsMargins(8, 8, 8, 8)
-            qc_layout.setSpacing(6)
-            self.review_qc_qc_summary_lbl = QtWidgets.QLabel("QC summary: -")
-            self.review_qc_qc_summary_lbl.setStyleSheet("color: #455a64;")
-            qc_layout.addWidget(self.review_qc_qc_summary_lbl)
-            qc_buttons = QtWidgets.QHBoxLayout()
-            run_qc_btn = QtWidgets.QPushButton("Run QC Validation")
-            run_qc_btn.clicked.connect(self._trigger_qc_validation)
-            qc_buttons.addWidget(run_qc_btn)
-            qc_buttons.addWidget(_dock_button("QC Issues", "qc_issues", "Open QC issues."))
-            qc_buttons.addWidget(_dock_button("Histogram", "hist", "Open histogram for QC inspection."))
-            qc_buttons.addStretch(1)
-            qc_layout.addLayout(qc_buttons)
-            qc_layout.addWidget(self._build_qc_panel())
-            layout.addWidget(qc_group)
-
-            return section
-
-        def _build_advanced_workflow_section() -> QtWidgets.QWidget:
-            section = QtWidgets.QWidget()
-            layout = QtWidgets.QVBoxLayout(section)
-            layout.setContentsMargins(0, 0, 0, 0)
-            layout.setSpacing(10)
-
-            summary_group = QtWidgets.QGroupBox("Summary")
-            summary_layout = QtWidgets.QVBoxLayout(summary_group)
-            summary_layout.setContentsMargins(8, 8, 8, 8)
-            summary_layout.setSpacing(6)
-            self.advanced_pipeline_summary_lbl = QtWidgets.QLabel("Power-tool pipeline: -")
-            self.advanced_pipeline_summary_lbl.setWordWrap(True)
-            self.advanced_pipeline_summary_lbl.setStyleSheet("color: #455a64;")
-            self.advanced_analysis_summary_lbl = QtWidgets.QLabel("Analysis readiness: -")
-            self.advanced_analysis_summary_lbl.setWordWrap(True)
-            self.advanced_analysis_summary_lbl.setStyleSheet("color: #455a64;")
-            self.advanced_plugins_summary_lbl = QtWidgets.QLabel("Plugin and SMLM state: -")
-            self.advanced_plugins_summary_lbl.setWordWrap(True)
-            self.advanced_plugins_summary_lbl.setStyleSheet("color: #455a64;")
-            summary_layout.addWidget(self.advanced_pipeline_summary_lbl)
-            summary_layout.addWidget(self.advanced_analysis_summary_lbl)
-            summary_layout.addWidget(self.advanced_plugins_summary_lbl)
-            layout.addWidget(summary_group)
-
-            segmentation_group = QtWidgets.QGroupBox("Segmentation and Candidate Generation")
-            segmentation_layout = QtWidgets.QVBoxLayout(segmentation_group)
-            segmentation_layout.setContentsMargins(8, 8, 8, 8)
-            segmentation_layout.setSpacing(6)
-            segmentation_help = QtWidgets.QLabel(
-                "Use thresholding and particle-style extraction as power workflows. Any accepted detections should still re-enter the same annotation and review truth path."
-            )
-            segmentation_help.setWordWrap(True)
-            segmentation_help.setStyleSheet("color: #4b5563;")
-            segmentation_layout.addWidget(segmentation_help)
-            segmentation_buttons = QtWidgets.QHBoxLayout()
-            segmentation_buttons.addWidget(
-                _dock_button("Threshold", "threshold", "Open threshold and mask controls.")
-            )
-            segmentation_buttons.addWidget(
-                _dock_button("Particles", "particles", "Open particle analysis results.")
-            )
-            segmentation_buttons.addStretch(1)
-            segmentation_layout.addLayout(segmentation_buttons)
-            segmentation_layout.addWidget(self._build_threshold_panel())
-            layout.addWidget(segmentation_group)
-
-            quant_group = QtWidgets.QGroupBox("Quantitative Analysis")
-            quant_layout = QtWidgets.QVBoxLayout(quant_group)
-            quant_layout.setContentsMargins(8, 8, 8, 8)
-            quant_layout.setSpacing(6)
-            quant_help = QtWidgets.QLabel(
-                "Use ROI-driven measurements, density, orthoviews, and results tables when the task shifts from marking objects to quantifying them."
-            )
-            quant_help.setWordWrap(True)
-            quant_help.setStyleSheet("color: #4b5563;")
-            quant_layout.addWidget(quant_help)
-            quant_buttons = QtWidgets.QHBoxLayout()
-            quant_buttons.addWidget(_dock_button("Results", "results", "Open the results table."))
-            quant_buttons.addWidget(_dock_button("Density", "density", "Open density analysis."))
-            quant_buttons.addWidget(_dock_button("Histogram", "hist", "Open histogram inspection."))
-            quant_buttons.addStretch(1)
-            quant_layout.addLayout(quant_buttons)
-            quant_layout.addWidget(self._build_analyze_panel())
-            layout.addWidget(quant_group)
-
-            plugin_group = QtWidgets.QGroupBox("SMLM, Plugins, and Automation")
-            plugin_layout = QtWidgets.QVBoxLayout(plugin_group)
-            plugin_layout.setContentsMargins(8, 8, 8, 8)
-            plugin_layout.setSpacing(6)
-            plugin_help = QtWidgets.QLabel(
-                "Run ThunderSTORM, Deep-STORM, plugin bridges, and repeatable batch workflows here. These tools should augment the same scientific review pipeline rather than create parallel truth stores."
-            )
-            plugin_help.setWordWrap(True)
-            plugin_help.setStyleSheet("color: #4b5563;")
-            plugin_layout.addWidget(plugin_help)
-            plugin_buttons = QtWidgets.QHBoxLayout()
-            plugin_buttons.addWidget(_dock_button("SMLM", "smlm", "Open SMLM analysis controls."))
-            plugin_buttons.addWidget(
-                _dock_button("Analysis", "advanced_analysis", "Open advanced analysis helpers.")
-            )
-            plugin_buttons.addWidget(_dock_button("Logs", "logs", "Open logs and plugin diagnostics."))
-            plugin_buttons.addStretch(1)
-            plugin_layout.addLayout(plugin_buttons)
-            plugin_layout.addWidget(self._build_automate_panel())
-            layout.addWidget(plugin_group)
-
-            return section
-
         if getattr(self, "primary_combo", None) is not None:
             self.primary_combo.setVisible(True)
         if getattr(self, "support_combo", None) is not None:
             self.support_combo.setVisible(True)
 
-        prepare_content = _stack_sections(
+        lazy_loading_content = _stack_sections(
             self.explore_panel,
-            _build_prepare_setup_section(),
-            display_group,
+            _build_lazy_loading_section(),
         )
         if hasattr(self, "_update_sync_keys_hint"):
             self._update_sync_keys_hint()
@@ -670,84 +489,57 @@ class UiSetupRegistryMixin:
 
         pages.append(
             (
-                "Prepare",
+                "Lazy Loading",
                 QtWidgets.QStyle.StandardPixmap.SP_DirOpenIcon,
                 _page_shell(
-                    "Prepare",
-                    "Load datasets, choose modality views, define ROI, and establish synchronized comparison before annotation begins.",
-                    prepare_content,
+                    "Lazy Loading",
+                    "",
+                    lazy_loading_content,
                 ),
             )
         )
         pages.append(
             (
-                "Annotate",
+                "Annotation",
                 QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView,
                 _page_shell(
                     "Annotation",
-                    "Add, edit, label, and target annotations. Use the right sidebar to inspect the annotation table and contextual review panels.",
+                    "",
                     self._build_annotate_panel(),
                     quick_buttons=[
                         _dock_button("Annotation Table", "annotations", "Open the annotation table dock."),
-                        _dock_button("Review Queue", "review_queue", "Open the review queue dock."),
+                        _dock_button("Assist", "review_queue", "Open assist review and decision tools."),
+                        _dock_button("QC", "qc_issues", "Open quality-control issues."),
                     ],
                 ),
             )
         )
         pages.append(
             (
-                "Review / QC",
-                QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton,
+                "ROI",
+                QtWidgets.QStyle.StandardPixmap.SP_DialogResetButton,
                 _page_shell(
-                    "Review / QC",
-                    "Generate source-aware suggestions, review uncertain detections, inspect rationale, and validate quality-control issues in one workflow.",
-                    _build_review_qc_workflow_section(),
+                    "ROI",
+                    "",
+                    _build_roi_page_section(),
                     quick_buttons=[
-                        _dock_button("Review Queue", "review_queue", "Open the queue of uncertain suggestions."),
-                        _dock_button("Rationale", "suggestion_explain", "Open suggestion rationale for the focused prediction."),
-                        _dock_button("QC Issues", "qc_issues", "Open the QC issues dock."),
-                        _dock_button("Histogram", "hist", "Open the histogram for review-time inspection."),
+                        _dock_button("ROI Manager", "roi_manager", "Open the ROI manager."),
                     ],
                 ),
             )
         )
         pages.append(
             (
-                "Advanced",
-                QtWidgets.QStyle.StandardPixmap.SP_DriveHDIcon,
+                "Contrast",
+                QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView,
                 _page_shell(
-                    "Advanced",
-                    "Use segmentation, quantitative analysis, SMLM, and automation without disturbing the core annotation and review workspace. Advanced outputs should still land in the same scientific truth and review pipeline.",
-                    _build_advanced_workflow_section(),
+                    "Contrast",
+                    "",
+                    display_group,
                     quick_buttons=[
-                        _dock_button("Threshold", "threshold", "Open threshold controls."),
-                        _dock_button("Particles", "particles", "Open particle analysis results."),
-                        _dock_button("Results", "results", "Open the results table."),
-                        _dock_button("Density", "density", "Open the density analysis dock."),
-                        _dock_button("SMLM", "smlm", "Open SMLM analysis controls."),
-                        _dock_button("Analysis", "advanced_analysis", "Open advanced analysis tools."),
+                        _dock_button("Profile", "profile", "Open the line profile."),
                     ],
                 ),
             )
         )
-        pages.append(
-            (
-                "Export / Settings",
-                QtWidgets.QStyle.StandardPixmap.SP_DialogSaveButton,
-                _page_shell(
-                    "Export / Settings",
-                    "Finalize outputs, save projects, and configure application behavior, performance, and panel policy.",
-                    _stack_sections(self._build_export_panel(), self._build_settings_panel()),
-                    quick_buttons=[
-                        _dock_button("Performance", "performance", "Open performance diagnostics."),
-                        _dock_button("Metadata", "metadata", "Open metadata controls and batch metadata tools."),
-                        _dock_button("Status Details", "status_details", "Open expanded operational status."),
-                    ],
-                ),
-            )
-        )
-        if hasattr(self, "_refresh_review_qc_page_summary"):
-            self._refresh_review_qc_page_summary()
-        if hasattr(self, "_refresh_advanced_page_summary"):
-            self._refresh_advanced_page_summary()
         return pages

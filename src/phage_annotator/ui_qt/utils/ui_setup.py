@@ -44,6 +44,16 @@ DISABLE_SHORTCUTS = False
 class UiSetupMixin(UiSetupRegistryMixin):
     """Mixin containing UI construction and dock wiring."""
 
+    def _has_canvas_rows(self) -> bool:
+        """Return True when modality rows exist for canvas rendering."""
+        controller = getattr(self, "controller", None)
+        if controller is None:
+            return False
+        manager = getattr(controller.session_state, "modality_manager", None)
+        if manager is None:
+            return False
+        return bool(manager.get_all_modalities())
+
     def _setup_ui(self) -> None:
         """Create menus, toolbars, dock panels, and central widgets."""
         self._shortcuts_enabled = not DISABLE_SHORTCUTS
@@ -177,8 +187,8 @@ class UiSetupMixin(UiSetupRegistryMixin):
 
         primary_box = QtWidgets.QHBoxLayout()
         primary_box.addWidget(QtWidgets.QLabel("Modality 1"))
-        self.primary_combo = QtWidgets.QComboBox()
-        self.support_combo = QtWidgets.QComboBox()
+        self.primary_combo = QtWidgets.QComboBox(self.explore_panel)
+        self.support_combo = QtWidgets.QComboBox(self.explore_panel)
         for img in self.images:
             self.primary_combo.addItem(img.name)
             self.support_combo.addItem(img.name)
@@ -364,6 +374,45 @@ class UiSetupMixin(UiSetupRegistryMixin):
         display_layout.addWidget(auto_group, drow, 0, 1, 3)
         drow += 1
 
+        self.contrast_hist_region_combo = QtWidgets.QComboBox()
+        self.contrast_hist_region_combo.addItems(["Full image", "ROI", "Crop area"])
+        self.contrast_hist_scope_combo = QtWidgets.QComboBox()
+        self.contrast_hist_scope_combo.addItems(["Current slice", "Sampled stack"])
+        self.contrast_hist_bins_spin = QtWidgets.QSpinBox()
+        self.contrast_hist_bins_spin.setRange(16, 512)
+        self.contrast_hist_bins_spin.setValue(int(getattr(self, "hist_bins", 64)))
+        if getattr(self, "hist_region", "full") == "roi":
+            self.contrast_hist_region_combo.setCurrentText("ROI")
+        elif getattr(self, "hist_region", "full") == "crop":
+            self.contrast_hist_region_combo.setCurrentText("Crop area")
+        else:
+            self.contrast_hist_region_combo.setCurrentText("Full image")
+        self.contrast_hist_scope_combo.setCurrentText(str(getattr(self, "_hist_scope_mode", "Current slice")))
+        self.contrast_hist_fig = Figure(figsize=(5, 2.6))
+        self.contrast_hist_canvas = FigureCanvasQTAgg(self.contrast_hist_fig)
+        self.ax_contrast_hist = self.contrast_hist_fig.add_subplot(111)
+        self.contrast_hist_canvas.setMinimumHeight(180)
+        hist_group = QtWidgets.QGroupBox("Histogram")
+        hist_layout = QtWidgets.QVBoxLayout(hist_group)
+        hist_layout.setContentsMargins(10, 8, 10, 8)
+        hist_layout.setSpacing(6)
+        hist_controls = QtWidgets.QHBoxLayout()
+        hist_controls.addWidget(QtWidgets.QLabel("Region"))
+        hist_controls.addWidget(self.contrast_hist_region_combo)
+        hist_controls.addWidget(QtWidgets.QLabel("Scope"))
+        hist_controls.addWidget(self.contrast_hist_scope_combo)
+        hist_controls.addWidget(QtWidgets.QLabel("Bins"))
+        hist_controls.addWidget(self.contrast_hist_bins_spin)
+        hist_controls.addStretch(1)
+        hist_layout.addLayout(hist_controls)
+        hist_hint = QtWidgets.QLabel("Orange markers show the active min and max contrast limits.")
+        hist_hint.setWordWrap(True)
+        hist_hint.setStyleSheet("color: #546e7a;")
+        hist_layout.addWidget(hist_hint)
+        hist_layout.addWidget(self.contrast_hist_canvas)
+        display_layout.addWidget(hist_group, drow, 0, 1, 3)
+        drow += 1
+
         # Replace projection_axis_combo with full ProjectionSelectorWidget
         from phage_annotator.ui_qt.widgets.projection_selector import ProjectionSelectorWidget
         self.projection_selector = ProjectionSelectorWidget(self)
@@ -491,25 +540,6 @@ class UiSetupMixin(UiSetupRegistryMixin):
         profile_controls.addWidget(self.profile_clear_btn)
         adv_layout.addWidget(QtWidgets.QLabel("Line profile actions"), r, 0)
         adv_layout.addLayout(profile_controls, r, 1, 1, 3)
-        r += 1
-
-        # Histogram controls.
-        hist_controls = QtWidgets.QHBoxLayout()
-        self.hist_region_combo = QtWidgets.QComboBox()
-        self.hist_region_combo.addItems(["ROI", "Full"])
-        self.hist_scope_combo = QtWidgets.QComboBox()
-        self.hist_scope_combo.addItems(["Current slice", "All frames", "Whole image"])
-        self.hist_bins_spin = QtWidgets.QSpinBox()
-        self.hist_bins_spin.setRange(10, 512)
-        self.hist_bins_spin.setValue(64)
-        hist_controls.addWidget(QtWidgets.QLabel("Region:"))
-        hist_controls.addWidget(self.hist_region_combo)
-        hist_controls.addWidget(QtWidgets.QLabel("Scope:"))
-        hist_controls.addWidget(self.hist_scope_combo)
-        hist_controls.addWidget(QtWidgets.QLabel("Bins:"))
-        hist_controls.addWidget(self.hist_bins_spin)
-        adv_layout.addWidget(QtWidgets.QLabel("Histogram"), r, 0)
-        adv_layout.addLayout(hist_controls, r, 1, 1, 3)
         r += 1
 
         # Correction toggles.
@@ -728,17 +758,6 @@ class UiSetupMixin(UiSetupRegistryMixin):
             self.show_calibration_visualizer_act.triggered.connect(
                 self._show_calibration_visualizer
             )
-        if getattr(self, "compare_layer_presets_act", None) is not None:
-            def _compare_from_panel() -> None:
-                panel = getattr(self, "modality_layers_panel", None)
-                if panel is None:
-                    self._compare_modality_layer_presets("default", "default")
-                    return
-                a_name = str(panel.compare_a_edit.text() or "default")
-                b_name = str(panel.compare_b_edit.text() or "default")
-                self._compare_modality_layer_presets(a_name, b_name)
-
-            self.compare_layer_presets_act.triggered.connect(_compare_from_panel)
         batch_correct_suggestions_act.triggered.connect(
             self._batch_correct_suggestions_dialog
         )
@@ -887,23 +906,30 @@ class UiSetupMixin(UiSetupRegistryMixin):
             self.review_queue_panel.decision_requested.connect(
                 self._set_selected_suggestion_decision
             )
-        if getattr(self, "modality_layers_panel", None) is not None:
-            self.modality_layers_panel.layer_changed.connect(self._on_modality_layer_changed)
-            self.modality_layers_panel.save_preset_requested.connect(
-                self._save_modality_layer_preset
+        if getattr(self, "advanced_settings_panel", None) is not None:
+            self.advanced_settings_panel.pixel_size_changed.connect(self._on_pixel_size_change)
+            self.advanced_settings_panel.axis_mode_changed.connect(self._on_axis_mode_change)
+            self.advanced_settings_panel.open_metadata_requested.connect(
+                lambda: self.open_panel("metadata", reason="advanced_settings")
             )
-            self.modality_layers_panel.load_preset_requested.connect(
-                self._load_modality_layer_preset
+            self.advanced_settings_panel.open_preferences_requested.connect(
+                lambda: self._show_preferences_dialog()
             )
-            self.modality_layers_panel.compare_presets_requested.connect(
-                self._compare_modality_layer_presets
+            self.advanced_settings_panel.retry_project_relink_requested.connect(
+                self._retry_project_relink
             )
-            self._refresh_modality_layers_panel()
-            if getattr(self, "_settings", None) is not None:
-                show_hint = bool(self._settings.value("firstRunHintModalityLayers", True, type=bool))
-                self.modality_layers_panel.first_run_hint_lbl.setVisible(show_hint)
-                if show_hint:
-                    self._settings.setValue("firstRunHintModalityLayers", False)
+            self._refresh_advanced_settings_panel()
+        if getattr(self, "dock_advanced_settings", None) is not None and getattr(self, "toggle_settings_act", None) is not None:
+            self.toggle_settings_act.blockSignals(True)
+            self.toggle_settings_act.setChecked(self.dock_advanced_settings.isVisible())
+            self.toggle_settings_act.blockSignals(False)
+            self.dock_advanced_settings.visibilityChanged.connect(
+                lambda visible: (
+                    self.toggle_settings_act.blockSignals(True),
+                    self.toggle_settings_act.setChecked(bool(visible)),
+                    self.toggle_settings_act.blockSignals(False),
+                )
+            )
         self.quick_hist_act.triggered.connect(lambda _checked=False: self._toggle_hist_panel())
         self.quick_profile_act.triggered.connect(lambda _checked=False: self._toggle_profile_panel())
         if not DISABLE_QC:
@@ -920,13 +946,12 @@ class UiSetupMixin(UiSetupRegistryMixin):
             "dock_profile",
             "dock_qc_issues",
             "dock_density",
-            "dock_modality_layers",
             "dock_logs",
             "dock_metadata",
             "dock_results",
             "dock_annotations",
             "dock_review_queue",
-            "dock_suggestion_explain",
+            "dock_advanced_settings",
             "dock_advanced_analysis",
         ):
             dock = getattr(self, dock_attr, None)
@@ -963,7 +988,7 @@ class UiSetupMixin(UiSetupRegistryMixin):
             self._refresh_lazy_modality_table()
         if hasattr(self, "advanced_open_explain_btn"):
             self.advanced_open_explain_btn.clicked.connect(
-                lambda: self._set_panel_visibility("suggestion_explain", True)
+                lambda: self._set_panel_visibility("review_queue", True)
             )
         if hasattr(self, "advanced_open_training_btn"):
             self.advanced_open_training_btn.clicked.connect(
@@ -975,13 +1000,6 @@ class UiSetupMixin(UiSetupRegistryMixin):
             self.advanced_open_calib_btn.clicked.connect(self._show_calibration_visualizer)
         if hasattr(self, "metadata_widget"):
             self.metadata_widget.load_full_requested.connect(self._load_full_metadata)
-        if hasattr(self, "project_relink_panel"):
-            self.project_relink_panel.retry_auto_requested.connect(
-                lambda: self._retry_project_relink("auto")
-            )
-            self.project_relink_panel.retry_manual_requested.connect(
-                lambda: self._retry_project_relink("manual")
-            )
         if not DISABLE_QC:
             self.controller.annotations_changed.connect(
                 lambda: self._schedule_qc_validation(self.controller.session_state.active_primary_id)
@@ -1008,6 +1026,10 @@ class UiSetupMixin(UiSetupRegistryMixin):
     def _apply_default_preferences(self) -> None:
         """Apply startup preferences from QSettings without overwriting layouts."""
         preset = self._settings.value("defaultLayoutPreset", "Default", type=str)
+        if not self._has_canvas_rows() and preset != "Default":
+            # Loader-first startup should not auto-apply non-default canvas presets.
+            self._settings.setValue("defaultLayoutPreset", "Default")
+            preset = "Default"
         if preset and preset != "Default":
             if not self._settings.value("customState", type=QtCore.QByteArray):
                 self.apply_preset(preset)
@@ -1118,183 +1140,9 @@ class UiSetupMixin(UiSetupRegistryMixin):
     def _build_sidebar_pages(
         self, display_group: QtWidgets.QGroupBox
     ) -> List[Tuple[str, QtWidgets.QStyle.StandardPixmap, QtWidgets.QWidget]]:
-        pages: List[Tuple[str, QtWidgets.QStyle.StandardPixmap, QtWidgets.QWidget]] = []
-
-        def _make_scroll(widget: QtWidgets.QWidget) -> QtWidgets.QWidget:
-            scroll = QtWidgets.QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setWidget(widget)
-            return scroll
-
-        def _dock_button(text: str, dock_attr: str) -> QtWidgets.QPushButton:
-            btn = QtWidgets.QPushButton(text)
-            btn.clicked.connect(
-                lambda: self.set_panel_visible(
-                    str(dock_attr).replace("dock_", ""),
-                    True,
-                    source="sidebar_button",
-                )
-            )
-            return btn
-
-        # Explore
-        explore_panel = QtWidgets.QWidget()
-        explore_layout = QtWidgets.QVBoxLayout(explore_panel)
-        explore_layout.setContentsMargins(8, 8, 8, 8)
-        explore_layout.setSpacing(8)
-        explore_layout.addWidget(QtWidgets.QLabel("Lazy loading: enabled"))
-        explore_layout.addWidget(self.explore_panel)
-        explore_layout.addStretch(1)
-        pages.append(("Explore", QtWidgets.QStyle.StandardPixmap.SP_DirIcon, _make_scroll(explore_panel)))
-
-        # Annotate
-        annotate_panel = QtWidgets.QWidget()
-        annotate_layout = QtWidgets.QVBoxLayout(annotate_panel)
-        annotate_layout.setContentsMargins(8, 8, 8, 8)
-        annotate_layout.setSpacing(8)
-        annotate_layout.addWidget(self.annotate_panel)
-        annotate_layout.addStretch(1)
-        pages.append(
-            (
-                "Annotate",
-                QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView,
-                _make_scroll(annotate_panel),
-            )
-        )
-
-        # Display
-        display_panel = QtWidgets.QWidget()
-        display_layout = QtWidgets.QVBoxLayout(display_panel)
-        display_layout.setContentsMargins(8, 8, 8, 8)
-        display_layout.setSpacing(8)
-        self.reset_view_btn = QtWidgets.QPushButton("Reset view")
-        self.reset_view_btn.setToolTip("Reset zoom and contrast")
-        display_layout.addWidget(_dock_button("Show Histogram/B&C", "dock_hist"))
-        display_layout.addWidget(_dock_button("Show Channels", "dock_channels"))
-        display_layout.addWidget(self.reset_view_btn)
-        display_layout.addWidget(display_group)
-        display_layout.addStretch(1)
-        pages.append(
-            (
-                "Display",
-                QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView,
-                _make_scroll(display_panel),
-            )
-        )
-
-        # Playback
-        playback_panel = QtWidgets.QWidget()
-        playback_layout = QtWidgets.QVBoxLayout(playback_panel)
-        playback_layout.setContentsMargins(8, 8, 8, 8)
-        playback_layout.setSpacing(8)
-        playback_layout.addWidget(QtWidgets.QLabel("This page configures tools. Working views open as panels."))
-        playback_layout.addWidget(QtWidgets.QLabel("Playback controls are in the fixed bottom bar."))
-        open_playback_btn = QtWidgets.QPushButton("Open Playback Controls")
-        open_playback_btn.clicked.connect(self._focus_playback_controls)
-        playback_layout.addWidget(open_playback_btn)
-        playback_layout.addWidget(self.axis_warning)
-        playback_layout.addWidget(self.axes_info_label)
-        playback_layout.addStretch(1)
-        pages.append(("Playback Settings", QtWidgets.QStyle.StandardPixmap.SP_MediaPlay, _make_scroll(playback_panel)))
-
-        # ROI/Crop
-        roi_panel = QtWidgets.QWidget()
-        roi_layout = QtWidgets.QVBoxLayout(roi_panel)
-        roi_layout.setContentsMargins(8, 8, 8, 8)
-        roi_layout.setSpacing(8)
-        roi_layout.addWidget(_dock_button("Show ROI Controls", "dock_roi"))
-        roi_layout.addWidget(_dock_button("Show ROI Manager", "dock_roi_manager"))
-        clear_roi_btn = QtWidgets.QPushButton("Clear ROI")
-        clear_roi_btn.clicked.connect(self._clear_roi)
-        roi_layout.addWidget(clear_roi_btn)
-        roi_layout.addWidget(QtWidgets.QLabel("ROI tools are available in the ROI dock."))
-        roi_layout.addStretch(1)
-        pages.append(("ROI/Crop", QtWidgets.QStyle.StandardPixmap.SP_ArrowUp, _make_scroll(roi_panel)))
-
-        # Analysis
-        analysis_panel = QtWidgets.QWidget()
-        analysis_layout = QtWidgets.QVBoxLayout(analysis_panel)
-        analysis_layout.setContentsMargins(8, 8, 8, 8)
-        analysis_layout.setSpacing(8)
-        analysis_layout.addWidget(_dock_button("Results", "dock_results"))
-        analysis_layout.addWidget(_dock_button("Threshold", "dock_threshold"))
-        analysis_layout.addWidget(_dock_button("Analyze Particles", "dock_particles"))
-        analysis_layout.addWidget(_dock_button("SMLM", "dock_smlm"))
-        analysis_layout.addWidget(_dock_button("Density", "dock_density"))
-        analysis_layout.addWidget(_dock_button("Ortho Views", "dock_orthoview"))
-        analysis_layout.addStretch(1)
-        pages.append(("Analyze", QtWidgets.QStyle.StandardPixmap.SP_ComputerIcon, _make_scroll(analysis_panel)))
-
-        # Results
-        results_panel = QtWidgets.QWidget()
-        results_layout = QtWidgets.QVBoxLayout(results_panel)
-        results_layout.setContentsMargins(8, 8, 8, 8)
-        results_layout.setSpacing(8)
-        results_layout.addWidget(QtWidgets.QLabel("This page configures tools. Working views open as panels."))
-        open_results_btn = QtWidgets.QPushButton("Open Results Table")
-        open_results_btn.clicked.connect(
-            lambda: self.open_panel("results", reason="sidebar_button")
-        )
-        results_layout.addWidget(open_results_btn)
-        results_layout.addWidget(_dock_button("Open Export Panel", "dock_results"))
-        results_layout.addStretch(1)
-        pages.append(("Results Hub", QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton, _make_scroll(results_panel)))
-
-        # Project
-        project_panel = QtWidgets.QWidget()
-        project_layout = QtWidgets.QVBoxLayout(project_panel)
-        project_layout.setContentsMargins(8, 8, 8, 8)
-        project_layout.setSpacing(8)
-        save_proj_btn = QtWidgets.QPushButton("Save Project")
-        save_proj_btn.clicked.connect(self._save_project)
-        project_layout.addWidget(save_proj_btn)
-        load_proj_btn = QtWidgets.QPushButton("Load Project")
-        load_proj_btn.clicked.connect(self._load_project)
-        project_layout.addWidget(load_proj_btn)
-        project_layout.addStretch(1)
-        pages.append(("Project", QtWidgets.QStyle.StandardPixmap.SP_DirLinkIcon, _make_scroll(project_panel)))
-
-        # Export
-        export_panel = QtWidgets.QWidget()
-        export_layout = QtWidgets.QVBoxLayout(export_panel)
-        export_layout.setContentsMargins(8, 8, 8, 8)
-        export_layout.setSpacing(8)
-        export_csv_btn = QtWidgets.QPushButton("Save CSV")
-        export_csv_btn.clicked.connect(self._save_csv)
-        export_layout.addWidget(export_csv_btn)
-        export_json_btn = QtWidgets.QPushButton("Save JSON")
-        export_json_btn.clicked.connect(self._save_json)
-        export_layout.addWidget(export_json_btn)
-        export_view_btn = QtWidgets.QPushButton("Export View")
-        export_view_btn.clicked.connect(self._export_view_dialog)
-        export_layout.addWidget(export_view_btn)
-        export_layout.addStretch(1)
-        pages.append(("Export", QtWidgets.QStyle.StandardPixmap.SP_DialogSaveButton, _make_scroll(export_panel)))
-
-        # Preferences / Debug
-        prefs_panel = QtWidgets.QWidget()
-        prefs_layout = QtWidgets.QVBoxLayout(prefs_panel)
-        prefs_layout.setContentsMargins(8, 8, 8, 8)
-        prefs_layout.setSpacing(8)
-        self.pixel_size_spin = QtWidgets.QDoubleSpinBox()
-        self.pixel_size_spin.setDecimals(4)
-        self.pixel_size_spin.setRange(1e-4, 100.0)
-        self.pixel_size_spin.setValue(self.pixel_size_um_per_px)
-        pixel_row = QtWidgets.QHBoxLayout()
-        pixel_row.addWidget(QtWidgets.QLabel("Pixel size (um/px)"))
-        pixel_row.addWidget(self.pixel_size_spin)
-        prefs_layout.addLayout(pixel_row)
-        prefs_layout.addWidget(self.settings_advanced_container)
-        prefs_btn = QtWidgets.QPushButton("Preferences…")
-        prefs_btn.clicked.connect(self._show_preferences_dialog)
-        prefs_layout.addWidget(prefs_btn)
-        prefs_layout.addWidget(_dock_button("Logs", "dock_logs"))
-        prefs_layout.addWidget(_dock_button("Performance", "dock_performance"))
-        prefs_layout.addWidget(_dock_button("Metadata", "dock_metadata"))
-        prefs_layout.addStretch(1)
-        pages.append(("Preferences", QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView, _make_scroll(prefs_panel)))
-
-        return pages
+        # Delegate to the registry-driven workflow sidebar so legacy pages like
+        # "Playback Settings" do not reappear beside the fixed bottom bar.
+        return super()._build_sidebar_pages(display_group)
 
     def _build_roi_controls_layout(self) -> None:
         """Build ROI/crop controls used by the ROI dock."""

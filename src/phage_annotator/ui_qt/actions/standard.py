@@ -331,9 +331,21 @@ class ActionsMixin(
         self._set_panel_visibility("sidebar")
 
     def _toggle_settings_pane(self) -> None:
-        self.settings_advanced_container.setVisible(
-            not self.settings_advanced_container.isVisible()
-        )
+        dock = getattr(self, "dock_advanced_settings", None)
+        if dock is None:
+            return
+        visible = bool(dock.isVisible())
+        if hasattr(self, "_toggle_right_sidebar_panel"):
+            if visible:
+                self._toggle_right_sidebar_panel("advanced_settings")
+            else:
+                self.open_panel("advanced_settings", reason="menu:advanced_settings")
+                try:
+                    dock.raise_()
+                except Exception:
+                    pass
+        else:
+            dock.setVisible(not visible)
 
     def _on_link_zoom_menu(self) -> None:
         self.link_zoom = self.link_zoom_act.isChecked()
@@ -475,10 +487,11 @@ class ActionsMixin(
         }
 
     def _refresh_modality_layers_panel(self) -> None:
-        """Sync layer-like modality/evidence controls with current state."""
-        panel = getattr(self, "modality_layers_panel", None)
-        if panel is None:
-            return
+        """Normalize evidence-layer config with defaults.
+
+        The Modality Layers panel has been removed from the UI, but evidence
+        layer settings still exist in session state for suggestion generation.
+        """
         base = self._default_evidence_layer_config()
         current = dict(getattr(self, "_evidence_layer_config", {}) or {})
         for key, value in current.items():
@@ -489,18 +502,6 @@ class ActionsMixin(
                 "role": str(dict(value).get("role", "proposal evidence")),
             }
         self._evidence_layer_config = base
-        rows = []
-        for modality_id, entry in base.items():
-            rows.append(
-                {
-                    "modality_id": modality_id,
-                    "visible": bool(entry.get("visible", True)),
-                    "opacity": float(entry.get("opacity", 1.0)),
-                    "lut": str(entry.get("lut", "gray")),
-                    "role": str(entry.get("role", "proposal evidence")),
-                }
-            )
-        panel.set_layers(rows)
 
     def _on_modality_layer_changed(
         self,

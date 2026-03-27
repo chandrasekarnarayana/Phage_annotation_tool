@@ -649,23 +649,13 @@ class ExportMixin:
         unresolved = list(report.get("unresolved", []) or [])
         if not relinked and not unresolved:
             return
-        panel = getattr(self, "project_relink_panel", None)
-        if panel is not None:
-            panel.set_report(report)
-            self.open_panel("project_relink", reason="project_relink:load")
-            self._status_warning(
-                f"Project relink summary: {len(relinked)} relinked, {len(unresolved)} unresolved."
-                ,
-                timeout_ms=5000,
-                source="export.project_relink_summary",
-            )
-            return
-        # Safety fallback if panel is unavailable.
-        QtWidgets.QMessageBox.information(
-            self,
-            "Project Relink Summary",
-            f"Loaded {int(report.get('loaded_count', 0))} image(s).\n"
-            f"Relinked: {len(relinked)}\nUnresolved: {len(unresolved)}",
+        if hasattr(self, "_refresh_advanced_settings_panel"):
+            self._refresh_advanced_settings_panel()
+        self.open_panel("advanced_settings", reason="project_relink:load")
+        self._status_warning(
+            f"Project relink summary: {len(relinked)} relinked, {len(unresolved)} unresolved.",
+            timeout_ms=5000,
+            source="export.project_relink_summary",
         )
 
     def _retry_project_relink(self, mode: str) -> None:

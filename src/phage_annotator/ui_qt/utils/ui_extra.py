@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Set, Tuple
 
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.ui_qt.models.lazy_loader import (
     LAZY_LOADER_FILE_FILTER,
@@ -32,9 +32,22 @@ from phage_annotator.ui_qt.utils.ui_extra_annotations import (
 )
 from phage_annotator.ui_qt.utils.ui_extra_refresh import UiRefreshMixin
 from phage_annotator.ui_qt.utils.ui_extra_tooltips import UiTooltipMixin
+from phage_annotator.ui_qt.utils.iconography import right_sidebar_icon, tool_icon, workflow_sidebar_icon
 from phage_annotator.ui_qt.utils.image_io import read_metadata
 from phage_annotator.ui_qt.utils.sidebar_manager import SidebarLayoutConfig, SidebarManager
 from phage_annotator.tools import Tool, ToolCallbacks, ToolRouter
+
+PRIMARY_RIGHT_SIDEBAR_PANELS = (
+    "annotations",
+    "review_queue",
+    "advanced_settings",
+    "advanced_analysis",
+    "qc_issues",
+)
+SUPPLEMENTAL_RIGHT_SIDEBAR_PANELS = (
+    "status_details",
+)
+ALL_RIGHT_SIDEBAR_PANELS = PRIMARY_RIGHT_SIDEBAR_PANELS + SUPPLEMENTAL_RIGHT_SIDEBAR_PANELS
 
 
 class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
@@ -76,7 +89,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         # Breadcrumb label for the current sidebar section
         self.sidebar_breadcrumb = QtWidgets.QLabel()
         self.sidebar_breadcrumb.setObjectName("sidebar_breadcrumb")
-        self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text("Annotate"))
+        self.sidebar_breadcrumb.setText(self.sidebar_manager.breadcrumb_text("Annotation"))
         self.sidebar_breadcrumb.setStyleSheet("font-weight: 600; padding: 6px 8px;")
         
         # Use the workflow-page registry if sidebar_pages are built
@@ -110,12 +123,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             stack_idx = 0
             default_action_idx = 0
             for page_idx, (label, icon, widget) in enumerate(pages):
-                act = QtWidgets.QAction(self.style().standardIcon(icon), label, self)
+                if isinstance(icon, QtGui.QIcon):
+                    resolved_icon = icon
+                else:
+                    resolved_icon = workflow_sidebar_icon(self.style(), str(label))
+                act = QtWidgets.QAction(resolved_icon, label, self)
                 act.setObjectName(f"sidebar_action_{label.lower().replace('/', '_').replace(' ', '_')}")
                 act.setCheckable(True)
                 act.setToolTip(label)
-                if label == "Annotate":
-                    default_action_idx = page_idx
                 
                 # Connect with toggle behavior
                 act.triggered.connect(lambda checked, i=page_idx: self._on_sidebar_action_triggered(i))
@@ -126,7 +141,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 self.sidebar_panel_indices[page_idx] = stack_idx
                 stack_idx += 1
             
-            # Default to Annotate page for annotation-first workflow.
+            # Default to Lazy Loading for startup setup tasks.
             if self.sidebar_actions:
                 self.sidebar_actions[default_action_idx].setChecked(True)
                 stack_default_idx = self.sidebar_panel_indices.get(default_action_idx, 0)
@@ -146,7 +161,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             )
             annotate_act = QtWidgets.QAction(
                 self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
-                "Annotate",
+                "Annotation",
                 self,
             )
             analyze_act = QtWidgets.QAction(
@@ -239,7 +254,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         bar.setAllowedAreas(QtCore.Qt.ToolBarArea.RightToolBarArea)
 
         table_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
+            right_sidebar_icon(self.style(), "annotations"),
             "Annotation Table",
             self,
         )
@@ -254,37 +269,52 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         bar.addAction(table_act)
 
         queue_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowRight),
-            "Review Queue",
+            right_sidebar_icon(self.style(), "review_queue"),
+            "Assist",
             self,
         )
-        queue_act.setObjectName("right_sidebar_queue_toggle")
+        queue_act.setObjectName("right_sidebar_assist_toggle")
         queue_act.setCheckable(True)
         queue_act.setChecked(False)
-        queue_act.setToolTip("Review Queue: work through uncertain or review-targeted suggestions.")
-        queue_act.setStatusTip("Open the review queue for assist and reviewer workflows.")
+        queue_act.setToolTip("Assist: review suggestions, rationale, and accept/reject actions.")
+        queue_act.setStatusTip("Open assist review tools for the current context.")
         queue_act.triggered.connect(
-            lambda checked=False: self._toggle_right_sidebar_panel("review_queue")
+            lambda checked=False: self._toggle_assist_sidebar_mode()
         )
         bar.addAction(queue_act)
 
-        explain_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation),
-            "Suggestion Rationale",
+        advanced_act = QtWidgets.QAction(
+            right_sidebar_icon(self.style(), "advanced_settings"),
+            "Advanced Settings",
             self,
         )
-        explain_act.setObjectName("right_sidebar_why_toggle")
-        explain_act.setCheckable(True)
-        explain_act.setChecked(False)
-        explain_act.setToolTip("Suggestion Rationale: inspect why the focused suggestion was proposed.")
-        explain_act.setStatusTip("Open rationale and evidence for the focused suggestion.")
-        explain_act.triggered.connect(
-            lambda checked=False: self._toggle_right_sidebar_panel("suggestion_explain")
+        advanced_act.setObjectName("right_sidebar_advanced_settings_toggle")
+        advanced_act.setCheckable(True)
+        advanced_act.setChecked(False)
+        advanced_act.setToolTip("Advanced Settings: calibration and expert image/session controls.")
+        advanced_act.setStatusTip("Open advanced settings for pixel size, axis interpretation, and metadata access.")
+        advanced_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("advanced_settings")
         )
-        bar.addAction(explain_act)
+        bar.addAction(advanced_act)
+
+        analysis_act = QtWidgets.QAction(
+            right_sidebar_icon(self.style(), "advanced_analysis"),
+            "Analysis",
+            self,
+        )
+        analysis_act.setObjectName("right_sidebar_analysis_toggle")
+        analysis_act.setCheckable(True)
+        analysis_act.setChecked(False)
+        analysis_act.setToolTip("Analysis: advanced quantitative and diagnostics tools.")
+        analysis_act.setStatusTip("Open advanced analysis tools on the right sidebar.")
+        analysis_act.triggered.connect(
+            lambda checked=False: self._toggle_right_sidebar_panel("advanced_analysis")
+        )
+        bar.addAction(analysis_act)
 
         qc_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxWarning),
+            right_sidebar_icon(self.style(), "qc_issues"),
             "QC Issues",
             self,
         )
@@ -298,55 +328,10 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         bar.addAction(qc_act)
 
-        layers_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogContentsView),
-            "Modality Layers",
-            self,
-        )
-        layers_act.setObjectName("right_sidebar_layers_toggle")
-        layers_act.setCheckable(True)
-        layers_act.setChecked(False)
-        layers_act.setToolTip("Modality Layers: compare or tune view-layer presets across modalities.")
-        layers_act.setStatusTip("Open layer controls for modality and evidence overlays.")
-        layers_act.triggered.connect(
-            lambda checked=False: self._toggle_right_sidebar_panel("modality_layers")
-        )
-        bar.addAction(layers_act)
-
-        advanced_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_TitleBarMenuButton),
-            "Analysis",
-            self,
-        )
-        advanced_act.setObjectName("right_sidebar_advanced_toggle")
-        advanced_act.setCheckable(True)
-        advanced_act.setChecked(False)
-        advanced_act.setToolTip("Analysis: open advanced analysis tools without leaving the main canvas.")
-        advanced_act.setStatusTip("Open advanced analysis tools and measurement helpers.")
-        advanced_act.triggered.connect(
-            lambda checked=False: self._toggle_right_sidebar_panel("advanced_analysis")
-        )
-        bar.addAction(advanced_act)
-
-        status_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation),
-            "Status Details",
-            self,
-        )
-        status_act.setObjectName("right_sidebar_status_toggle")
-        status_act.setCheckable(True)
-        status_act.setChecked(False)
-        status_act.setToolTip("Status Details: expanded operational summary of sync, write context, jobs, and diagnostics.")
-        status_act.setStatusTip("Open detailed run and workflow status.")
-        status_act.triggered.connect(
-            lambda checked=False: self._toggle_right_sidebar_panel("status_details")
-        )
-        bar.addAction(status_act)
-
         # Add separator and collapse/expand toggle
         bar.addSeparator()
         collapse_act = QtWidgets.QAction(
-            self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowLeft),
+            right_sidebar_icon(self.style(), "collapse"),
             "Collapse/Expand Sidebar",
             self,
         )
@@ -361,24 +346,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self.right_sidebar_actions = {
             "annotations": table_act,
             "review_queue": queue_act,
-            "suggestion_explain": explain_act,
+            "advanced_settings": advanced_act,
+            "advanced_analysis": analysis_act,
             "qc_issues": qc_act,
-            "modality_layers": layers_act,
-            "advanced_analysis": advanced_act,
-            "status_details": status_act,
         }
 
         self.addToolBar(QtCore.Qt.RightToolBarArea, bar)
 
-        for panel_id in (
-            "annotations",
-            "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "modality_layers",
-            "advanced_analysis",
-            "status_details",
-        ):
+        for panel_id in PRIMARY_RIGHT_SIDEBAR_PANELS:
             dock = getattr(self, f"dock_{panel_id}", None)
             if dock is not None:
                 dock.visibilityChanged.connect(self._sync_annotation_toolbar)
@@ -386,17 +361,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._ensure_right_sidebar_panels_not_tabified()
         self._sync_annotation_toolbar(True)
 
+    def _primary_right_sidebar_panels(self) -> tuple[str, ...]:
+        return PRIMARY_RIGHT_SIDEBAR_PANELS
+
+    def _all_right_sidebar_panels(self) -> tuple[str, ...]:
+        return ALL_RIGHT_SIDEBAR_PANELS
+
     def _capture_right_sidebar_width(self) -> None:
         """Persist right-sidebar open width for consistent reopen behavior."""
-        for panel_id in (
-            "annotations",
-            "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "modality_layers",
-            "advanced_analysis",
-            "status_details",
-        ):
+        for panel_id in self._all_right_sidebar_panels():
             dock = getattr(self, f"dock_{panel_id}", None)
             if dock is None or not dock.isVisible():
                 continue
@@ -432,15 +405,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         # This allows full collapse of the right sidebar
         if not any(
             bool(getattr(self, f"dock_{panel_id}", None) and getattr(self, f"dock_{panel_id}").isVisible())
-            for panel_id in (
-                "annotations",
-                "review_queue",
-                "suggestion_explain",
-                "qc_issues",
-                "modality_layers",
-                "advanced_analysis",
-                "status_details",
-            )
+            for panel_id in self._all_right_sidebar_panels()
         ):
             # Only auto-open if sidebar is NOT explicitly collapsed
             if (getattr(self, "dock_annotations", None) is not None 
@@ -448,17 +413,28 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 and not getattr(self, "_right_sidebar_intentionally_closed", False)):
                 self.set_panel_visible("annotations", True, source="right_sidebar:auto_default")
 
+    def _toggle_assist_sidebar_mode(self) -> None:
+        """Toggle assist as one coherent right-side workflow surface."""
+        assist_ids = ("review_queue", "qc_issues")
+        assist_visible = any(
+            bool(getattr(self, f"dock_{panel_id}", None) and getattr(self, f"dock_{panel_id}").isVisible())
+            for panel_id in assist_ids
+        )
+        annotations_visible = bool(
+            getattr(self, "dock_annotations", None) is not None and self.dock_annotations.isVisible()
+        )
+        if assist_visible and not annotations_visible:
+            for panel_id in assist_ids:
+                self.set_panel_visible(panel_id, False, source="right_sidebar")
+            self._collapse_right_sidebar()
+            self._right_sidebar_intentionally_closed = True
+            self._sync_annotation_toolbar(False)
+            return
+        self._set_right_dock_mode("review")
+
     def _ensure_right_sidebar_panels_not_tabified(self) -> None:
         """Keep right inspect panels as standalone docks (never tab peers)."""
-        panel_ids = (
-            "annotations",
-            "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "modality_layers",
-            "advanced_analysis",
-            "status_details",
-        )
+        panel_ids = self._all_right_sidebar_panels()
         for panel_id in panel_ids:
             dock = getattr(self, f"dock_{panel_id}", None)
             if dock is None:
@@ -475,15 +451,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
     def _toggle_right_sidebar_panel(self, panel_id: str) -> None:
         """VSCode-like right rail behavior: select one panel or collapse current."""
         panel_id = str(panel_id)
-        inspect_ids = [
-            "annotations",
-            "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "modality_layers",
-            "advanced_analysis",
-            "status_details",
-        ]
+        inspect_ids = list(self._primary_right_sidebar_panels())
         target_dock = getattr(self, f"dock_{panel_id}", None)
         if target_dock is None:
             return
@@ -587,10 +555,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         for panel_id in (
             "annotations",
             "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "modality_layers",
+            "advanced_settings",
             "advanced_analysis",
+            "qc_issues",
             "status_details",
         ):
             dock = getattr(self, f"dock_{panel_id}", None)
@@ -602,10 +569,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 for pid in (
                     "annotations",
                     "review_queue",
-                    "suggestion_explain",
-                    "qc_issues",
-                    "modality_layers",
+                    "advanced_settings",
                     "advanced_analysis",
+                    "qc_issues",
                     "status_details",
                 )
                 if getattr(self, f"dock_{pid}", None) is not None
@@ -647,9 +613,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
-        intro_lbl = QtWidgets.QLabel(
-            "Choose where points will be written, which label they use, and whether you are annotating the current slice or the full stack."
-        )
+        intro_lbl = QtWidgets.QLabel("Target, label, scope, and tool.")
         intro_lbl.setWordWrap(True)
         intro_lbl.setStyleSheet("color: #546e7a;")
         layout.addWidget(intro_lbl)
@@ -664,8 +628,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         open_annotations_btn.clicked.connect(
             lambda: self.open_panel("annotations", reason="annotate_sidebar")
         )
-        open_review_btn = QtWidgets.QPushButton("Review Queue")
-        open_review_btn.setToolTip("Open the review queue for uncertain or review-targeted points.")
+        open_review_btn = QtWidgets.QPushButton("Assist")
+        open_review_btn.setToolTip("Open assist review tools for suggestions and decisions.")
         open_review_btn.clicked.connect(
             lambda: self.open_panel("review_queue", reason="annotate_sidebar")
         )
@@ -677,9 +641,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         target_layout = QtWidgets.QVBoxLayout(target_group)
         target_layout.setContentsMargins(8, 8, 8, 8)
         target_layout.setSpacing(6)
-        target_help_lbl = QtWidgets.QLabel(
-            "New points are written into the selected modality/context. Read-only targets are excluded automatically."
-        )
+        target_help_lbl = QtWidgets.QLabel("Active write target")
         target_help_lbl.setWordWrap(True)
         target_help_lbl.setStyleSheet("color: #546e7a;")
         target_layout.addWidget(target_help_lbl)
@@ -743,9 +705,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         tool_layout.setSpacing(6)
         self.tool_label = QtWidgets.QLabel("Tool: Annotate")
         tool_layout.addWidget(self.tool_label)
-        tool_help_lbl = QtWidgets.QLabel(
-            "Use the top toolbar or number shortcuts to switch between pan, annotate, ROI, profile, and eraser tools."
-        )
+        tool_help_lbl = QtWidgets.QLabel("Toolbar and shortcuts control the active tool.")
         tool_help_lbl.setWordWrap(True)
         tool_help_lbl.setStyleSheet("color: #546e7a;")
         tool_layout.addWidget(tool_help_lbl)
@@ -767,9 +727,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         vis_layout = QtWidgets.QVBoxLayout(vis_group)
         vis_layout.setContentsMargins(8, 8, 8, 8)
         vis_layout.setSpacing(6)
-        vis_help_lbl = QtWidgets.QLabel(
-            "Control where annotations remain visible. The active write target stays visible to avoid hidden-write mistakes."
-        )
+        vis_help_lbl = QtWidgets.QLabel("Overlay visibility")
         vis_help_lbl.setWordWrap(True)
         vis_help_lbl.setStyleSheet("color: #546e7a;")
         vis_layout.addWidget(vis_help_lbl)
@@ -859,10 +817,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         right_ids = [
             "annotations",
             "review_queue",
-            "suggestion_explain",
-            "qc_issues",
+            "advanced_settings",
             "advanced_analysis",
-            "modality_layers",
+            "qc_issues",
             "status_details",
         ]
         bottom_ids = [
@@ -1032,7 +989,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             set_profile_line=self._set_profile_line,
             set_profile_mode=self._set_profile_mode,
             refresh=self._refresh_image,
-            set_status=self._set_status,
+            set_status=lambda text: self._status_info(str(text), source="tool.router"),
         )
         self.tool_router = ToolRouter(callbacks)
         # Restore last active tool from QSettings
@@ -1054,23 +1011,13 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         group = QtWidgets.QActionGroup(self)
         group.setExclusive(True)
         icons = {
-            Tool.PAN_ZOOM: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowUp),
-            Tool.ANNOTATE_POINT: self.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_DialogYesButton
-            ),
-            Tool.ROI_BOX: self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_DirIcon),
-            Tool.ROI_CIRCLE: self.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_DriveNetIcon
-            ),
-            Tool.ROI_EDIT: self.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_FileDialogListView
-            ),
-            Tool.PROFILE_LINE: self.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView
-            ),
-            Tool.ERASER: self.style().standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_DialogCancelButton
-            ),
+            Tool.PAN_ZOOM: tool_icon(self.style(), "pan_zoom"),
+            Tool.ANNOTATE_POINT: tool_icon(self.style(), "annotate_point"),
+            Tool.ROI_BOX: tool_icon(self.style(), "roi_box"),
+            Tool.ROI_CIRCLE: tool_icon(self.style(), "roi_circle"),
+            Tool.ROI_EDIT: tool_icon(self.style(), "roi_edit"),
+            Tool.PROFILE_LINE: tool_icon(self.style(), "profile_line"),
+            Tool.ERASER: tool_icon(self.style(), "eraser"),
         }
         tool_specs = [
             (Tool.PAN_ZOOM, "Pan/Zoom"),
@@ -1138,28 +1085,22 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self._show_right_dock_mode("annotations")
             return
         if target == "review":
-            extras: tuple[str, ...] = ("qc_issues",)
+            extras: tuple[str, ...] = ()
             if getattr(self, "_visible_suggestions_uncertain_first", None) is not None:
                 try:
-                    if bool(self._visible_suggestions_uncertain_first()):
-                        extras = extras + ("suggestion_explain",)
+                    if bool(getattr(self, "qc_state", None) and len(getattr(self.qc_state, "issues", []) or []) > 0):
+                        extras = extras + ("qc_issues",)
                 except Exception:
-                    extras = ("qc_issues",)
+                    extras = ()
             self._show_right_dock_mode("review_queue", extras=extras)
             return
         if target == "inspect":
-            self._show_right_dock_mode("suggestion_explain", extras=("review_queue", "status_details"))
+            self._show_right_dock_mode("annotations")
             return
 
     def _show_right_dock_mode(self, primary_panel: str, *, extras: tuple[str, ...] = ()) -> None:
         """Show one right-dock workflow state with an optional supporting context panel."""
-        right_ids = (
-            "annotations",
-            "review_queue",
-            "suggestion_explain",
-            "qc_issues",
-            "status_details",
-        )
+        right_ids = self._all_right_sidebar_panels()
         wanted = {str(primary_panel)} | {str(panel_id) for panel_id in extras}
         self._set_right_handle_compact(False)
         if getattr(self, "_right_sidebar_collapsed", False):
@@ -1188,11 +1129,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             btn.setText("Assist Mode: On" if enabled else "Assist Mode: Off")
             btn.blockSignals(False)
         if enabled:
-            self._show_right_dock_mode("review_queue", extras=("suggestion_explain", "qc_issues"))
+            self._show_right_dock_mode("review_queue", extras=("qc_issues",))
             self._status_info("Assist Mode enabled.", timeout_ms=2500, source="ui_extra.assist_mode")
             return
         # OFF: keep review queue available, but raise table and reduce inspect clutter.
-        self._show_right_dock_mode("annotations", extras=("review_queue",))
+        self._show_right_dock_mode("annotations")
         self._status_info("Assist Mode disabled.", timeout_ms=2500, source="ui_extra.assist_mode")
 
     def _sync_nav_mode(self, tool: Tool) -> None:
@@ -1272,7 +1213,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         from phage_annotator.session.migration import ensure_modality_system
 
         manager = ensure_modality_system(self.controller.session_state)
-        self._ensure_lazy_loader_base_modalities()
         row_specs = self._lazy_table_row_specs(manager)
         normalized_groups = normalize_lazy_sync_groups(
             row_specs,
@@ -1625,7 +1565,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self.controller.add_images(new_images)
         self._lazy_loader_path_to_ids = path_to_ids
         self._lazy_loader_manifest.add_paths(roots, path_to_ids)
-        self._ensure_lazy_loader_base_modalities()
         self._schedule_lazy_panel_sync("lazy-loader-open")
 
     def _undo_lazy_loader_removal(self) -> bool:
@@ -1661,23 +1600,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 modality.image_id = fallback_id
 
     def _ensure_lazy_loader_base_modalities(self) -> None:
-        """Populate base frame/support rows when the modality manager is empty."""
-        if getattr(self, "controller", None) is None:
-            return
-        from phage_annotator.session.migration import ensure_modality_system
-        from phage_annotator.session.modality import ProjectionType
-
-        manager = ensure_modality_system(self.controller.session_state)
-        if manager.get_all_modalities():
-            return
-        visible_ids = self._lazy_loader_visible_image_ids()
-        if not visible_ids:
-            return
-        manager.add_modality(int(visible_ids[0]), "Modality 1", ProjectionType.RAW)
-        self._panel_visibility["frame"] = True
-        if len(visible_ids) > 1:
-            manager.add_modality(int(visible_ids[1]), "Modality 2", ProjectionType.RAW)
-            self._panel_visibility["support"] = True
+        """Legacy no-op: base rows are now created explicitly by the user."""
+        return
 
     def _request_lazy_canvas_refresh(self, reason: str, *, refresh_table: bool = True) -> None:
         """Queue a lazy-panel refresh on the Qt event loop.
@@ -1844,8 +1768,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._ensure_lazy_sync_group_keys()
         if hasattr(self, "_update_analysis_panel_modalities"):
             self._update_analysis_panel_modalities()
-        if hasattr(self, "_refresh_modality_layers_panel"):
-            self._refresh_modality_layers_panel()
         self._request_lazy_canvas_refresh("lazy-add-view", refresh_table=True)
 
     def _remove_selected_lazy_modality_view(self) -> None:
@@ -2051,54 +1973,27 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         """
         target = str(mode_label or "").strip().lower()
         contracts: dict[str, dict[str, object]] = {
-            "prepare": {
-                "keep": {"modality_layers", "status_details", "roi", "roi_manager", "hist"},
-                "auto_open": ("modality_layers",),
+            "lazy loading": {
+                "keep": {"hist"},
+                "auto_open": (),
                 "right_mode": None,
             },
-            "annotate": {
+            "annotation": {
                 "keep": {
                     "annotations",
                     "review_queue",
-                    "suggestion_explain",
-                    "modality_layers",
-                    "status_details",
-                    "roi",
-                    "hist",
+                    "qc_issues",
                 },
-                "auto_open": ("annotations",),
+                "auto_open": (),
                 "right_mode": "annotate",
             },
-            "review / qc": {
-                "keep": {
-                    "annotations",
-                    "review_queue",
-                    "suggestion_explain",
-                    "qc_issues",
-                    "status_details",
-                    "hist",
-                },
-                "auto_open": ("review_queue", "qc_issues"),
-                "right_mode": "review",
-            },
-            "advanced": {
-                "keep": {
-                    "annotations",
-                    "status_details",
-                    "advanced_analysis",
-                    "threshold",
-                    "particles",
-                    "results",
-                    "density",
-                    "orthoview",
-                    "smlm",
-                    "metadata",
-                },
-                "auto_open": ("advanced_analysis", "results"),
+            "roi": {
+                "keep": {"roi", "roi_manager"},
+                "auto_open": (),
                 "right_mode": None,
             },
-            "export / settings": {
-                "keep": {"annotations", "status_details", "performance", "logs"},
+            "contrast": {
+                "keep": {"hist", "profile"},
                 "auto_open": (),
                 "right_mode": None,
             },
@@ -2112,9 +2007,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         managed = {
             "annotations",
             "review_queue",
-            "suggestion_explain",
+            "advanced_settings",
             "advanced_analysis",
-            "modality_layers",
             "status_details",
             "qc_issues",
             "roi",
@@ -2152,39 +2046,32 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
 
     def _sidebar_action_index_for_label(self, label: str) -> int:
         """Return sidebar action index by label, or -1 if not found."""
-        want = str(label).strip().lower()
+        aliases = {
+            "prepare": "lazy loading",
+            "lazy loading": "lazy loading",
+            "annotate": "annotation",
+            "annotation": "annotation",
+            "review / qc": "annotation",
+            "assist / review": "annotation",
+            "advanced": "contrast",
+            "display": "contrast",
+            "contrast": "contrast",
+            "export / settings": None,
+            "settings": None,
+            "roi": "roi",
+        }
+        raw = str(label).strip().lower()
+        want = aliases.get(raw, raw)
+        if want is None:
+            return -1
         for i, act in enumerate(getattr(self, "sidebar_actions", []) or []):
             if str(act.text()).strip().lower() == want:
                 return i
         return -1
 
     def open_preferences(self, section: str | None = None) -> None:
-        """Open Export / Settings and optionally focus a specific settings section."""
-        if getattr(self, "dock_sidebar", None) is not None:
-            self.set_panel_visible("sidebar", True, source="open_preferences")
-        self._expand_sidebar()
-        pref_idx = self._sidebar_action_index_for_label("Export / Settings")
-        if pref_idx >= 0:
-            self._set_sidebar_mode(pref_idx)
-        if section not in {"training_controls", "panel_policy"}:
-            return
-
-        if getattr(self, "settings_advanced_container", None) is not None:
-            self.settings_advanced_container.setVisible(True)
-        if getattr(self, "advanced_group", None) is not None:
-            self.advanced_group.setChecked(True)
-        if section == "panel_policy" and hasattr(self, "_refresh_panel_policy_controls"):
-            self._refresh_panel_policy_controls()
-
-        scroll = self.sidebar_stack.currentWidget() if self.sidebar_stack is not None else None
-        if isinstance(scroll, QtWidgets.QScrollArea):
-            target = (
-                getattr(self, "panel_policy_group", None)
-                if section == "panel_policy"
-                else self.settings_advanced_container
-            )
-            if target is not None:
-                scroll.ensureWidgetVisible(target, 0, 24)
+        """Open the preferences dialog and optionally focus a settings subsection."""
+        self._show_preferences_dialog()
 
         focus_widget = (
             getattr(self, "suggestion_auto_retrain_chk", None)
@@ -2248,10 +2135,10 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 for attr in (
                     "dock_annotations",
                     "dock_review_queue",
-                    "dock_suggestion_explain",
-                    "dock_modality_layers",
+                    "dock_advanced_settings",
                     "dock_advanced_analysis",
                     "dock_status_details",
+                    "dock_qc_issues",
                 )
             )
             if not any_right_visible and getattr(self, "dock_annotations", None) is not None:
@@ -2272,10 +2159,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         for attr in (
             "dock_annotations",
             "dock_review_queue",
-            "dock_suggestion_explain",
-            "dock_qc_issues",
+            "dock_advanced_settings",
             "dock_advanced_analysis",
-            "dock_modality_layers",
+            "dock_qc_issues",
             "dock_status_details",
         ):
             candidate = getattr(self, attr, None)
@@ -2540,8 +2426,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         dlg.open()
 
     def _toggle_review_context_pack(self) -> None:
-        """One-click toggle for Table + Queue + Why review context pack."""
-        keys = ("annotations", "review_queue", "suggestion_explain", "qc_issues")
+        """One-click toggle for the review workspace: table, assist, and QC."""
+        keys = ("annotations", "review_queue", "qc_issues")
         visible_now = [
             bool(getattr(self, "panel_docks", {}).get(k).isVisible())
             for k in keys
@@ -2558,7 +2444,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         else:
             self.set_panel_visible("annotations", True, source="review_context_pack")
             self.set_panel_visible("review_queue", False, source="review_context_pack")
-            self.set_panel_visible("suggestion_explain", False, source="review_context_pack")
             self.set_panel_visible("qc_issues", False, source="review_context_pack")
             self.set_panel_visible("status_details", False, source="review_context_pack")
             self._status_info("Review Context Pack collapsed to table.", source="ui_extra.review_pack")
@@ -2678,16 +2563,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             if self.dock_results is not None and self.dock_threshold is not None:
                 self.tabifyDockWidget(self.dock_results, self.dock_threshold)
             _dock_to_area("orthoview", QtCore.Qt.RightDockWidgetArea)
-        if name == "Assist Expert":
-            _dock_to_area("suggestion_explain", QtCore.Qt.RightDockWidgetArea)
-            _dock_to_area("modality_layers", QtCore.Qt.RightDockWidgetArea)
+        if name == "Analyze":
+            _dock_to_area("advanced_analysis", QtCore.Qt.RightDockWidgetArea)
 
         preset_visibility: dict[str, dict[str, bool]] = {
             "Default": {
                 "sidebar": True,
                 "annotations": True,
                 "review_queue": True,
-                "suggestion_explain": False,
                 "status_details": False,
                 "advanced_analysis": False,
                 "roi": False,
@@ -2699,14 +2582,12 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 "threshold": False,
                 "particles": False,
                 "qc_issues": True,
-                "modality_layers": False,
                 "orthoview": False,
             },
             "Minimal": {
                 "sidebar": True,
                 "annotations": False,
                 "review_queue": False,
-                "suggestion_explain": False,
                 "status_details": False,
                 "advanced_analysis": False,
                 "roi": False,
@@ -2718,14 +2599,12 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
-                "modality_layers": False,
                 "orthoview": False,
             },
             "Annotate": {
                 "sidebar": True,
                 "annotations": True,
                 "review_queue": True,
-                "suggestion_explain": False,
                 "status_details": False,
                 "advanced_analysis": False,
                 "roi": False,
@@ -2737,16 +2616,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
-                "modality_layers": False,
                 "orthoview": False,
             },
             "Analyze": {
                 "sidebar": True,
                 "annotations": True,
                 "review_queue": True,
-                "suggestion_explain": False,
                 "status_details": False,
-                "advanced_analysis": False,
+                "advanced_analysis": True,
                 "results": True,
                 "threshold": True,
                 "orthoview": True,
@@ -2757,13 +2634,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 "profile": False,
                 "logs": False,
                 "qc_issues": True,
-                "modality_layers": False,
             },
             "Assist Expert": {
                 "sidebar": True,
                 "annotations": True,
                 "review_queue": True,
-                "suggestion_explain": True,
                 "status_details": False,
                 "advanced_analysis": False,
                 "qc_issues": True,
@@ -2777,17 +2652,16 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 "logs": False,
                 "metadata": False,
                 "density": False,
-                "modality_layers": True,
                 "orthoview": False,
             },
         }
 
         preset_sidebar = {
-            "Default": ("Prepare", False),
+            "Default": ("Lazy Loading", False),
             "Minimal": (None, False),
-            "Annotate": ("Annotate", True),
-            "Analyze": ("Advanced", True),
-            "Assist Expert": ("Review / QC", True),
+            "Annotate": ("Annotation", True),
+            "Analyze": ("Contrast", True),
+            "Assist Expert": ("Annotation", True),
         }
         if name not in preset_sidebar:
             return
@@ -2805,7 +2679,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         if preset is not None:
             self.apply_panel_visibility_preset(preset, source=f"preset:{name.lower().replace(' ', '_')}")
         if name == "Default":
-            for key in ("annotations", "suggestion_explain", "advanced_analysis", "modality_layers"):
+            for key in ("annotations", "advanced_analysis"):
                 self.set_panel_visible(key, False, source="preset:default_canvas_home")
             self.set_panel_visible("review_queue", True, source="preset:default_canvas_home")
             self._set_right_handle_compact(False)
@@ -2860,7 +2734,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                     lock.unlock()
             except Exception:
                 pass
-        for fig_name in ("hist_fig", "profile_fig"):
+        for fig_name in ("hist_fig", "contrast_hist_fig", "profile_fig"):
             fig = getattr(self, fig_name, None)
             if fig is not None:
                 fig.clear()
@@ -2904,37 +2778,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 )
             )
         has_support = any(spec.panel_key == "support" for spec in specs)
-        if not has_support and "support" not in hidden_base:
-            support_name = "Support View"
-            support_combo = getattr(self, "support_combo", None)
-            support_image_id = 0
-            if support_combo is not None and support_combo.count() > 0:
-                idx = int(getattr(self, "support_image_idx", support_combo.currentIndex()))
-                if 0 <= idx < support_combo.count():
-                    support_name = f"Support View ({support_combo.itemText(idx)})"
-                    support_image_id = int(support_combo.itemData(idx))
-            elif getattr(self, "support_image", None) is not None:
-                support_image_id = int(getattr(self.support_image, "id", 0))
-            specs.append(
-                LazyTableRowSpec(
-                    role_key="builtin:support",
-                    panel_key="support",
-                    panel_name=support_name,
-                    source_image_id=int(support_image_id),
-                    projection_key="raw",
-                    group_key=str(groups.get("builtin:support", "")),
-                    visible=bool(panel_visibility.get("support", True)),
-                    show_points=bool(point_visibility.get("support", True)),
-                    sync_contrast=bool(self._sync_modes_for_role("builtin:support").get("contrast", True)),
-                    sync_view=bool(self._sync_modes_for_role("builtin:support").get("zoom", True)),
-                    sync_time=bool(self._sync_modes_for_role("builtin:support").get("playback", True)),
-                    annotation_mode=str(self.controller.ensure_annotation_context_for_panel("support", writable=True).get("mode", "independent")),
-                    annotation_writable=bool(self.controller.ensure_annotation_context_for_panel("support", writable=True).get("writable", True)),
-                    annotation_context_key=str(self.controller.ensure_annotation_context_for_panel("support", writable=True).get("context_key", "")),
-                    annotation_binding_path=str(self.controller.annotation_binding_for_panel("support").get("path", "")),
-                    projection_editable=False,
-                )
-            )
+        _ = has_support  # kept for readability around built-in panel handling below
         for panel_key in ("mean", "std"):
             if panel_key not in builtin:
                 continue
