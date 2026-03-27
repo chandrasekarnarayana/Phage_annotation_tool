@@ -53,8 +53,7 @@ def build_sidebar_panel_registry(self) -> list[SidebarPanelSpec]:
     PLAYBACK is conceptually present but implemented as bottom bar only.
     """
 
-    # Import the page builder function from gui_ui_setup
-    # This reuses the existing widget factories
+    # Reuse the existing page builder and widget factories from the active UI setup.
     pages = self._build_sidebar_pages(self.display_group)
 
     # Map the existing pages to SidebarPanelSpec

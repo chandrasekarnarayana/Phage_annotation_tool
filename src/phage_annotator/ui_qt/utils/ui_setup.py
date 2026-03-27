@@ -22,7 +22,7 @@ from phage_annotator.ui_qt.utils.ui_setup_panels import (
 from phage_annotator.ui_qt.utils.ui_setup_workspace import build_modality_loader_section
 from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
-from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.registry import PanelSpec
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
 from phage_annotator.rendering.mpl import Renderer

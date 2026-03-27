@@ -4,7 +4,7 @@ import pytest
 
 @pytest.mark.gui
 # Widget initialization issues resolved by adding all missing widgets.
-# to gui_ui_setup.py. GUI now launches successfully. Re-enabling test.
+# to the active UI setup helpers. GUI now launches successfully. Re-enabling test.
 def test_gui_launch(qtbot, tmp_path) -> None:
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image

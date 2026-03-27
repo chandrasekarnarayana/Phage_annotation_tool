@@ -97,7 +97,7 @@ class FileActionsMixin:
         """Rebuild the 'Recent Images' menu from session state.
 
         This is called after loading images or updating the recent list.
-        The actual menu wiring is in gui_ui_setup.py.
+        The actual menu wiring is in the active UI setup helpers.
         """
         recent = self._load_recent_images()
         # Menu updates are handled by the UI setup; this ensures consistency

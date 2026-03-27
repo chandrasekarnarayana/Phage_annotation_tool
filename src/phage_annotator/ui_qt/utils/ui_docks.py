@@ -20,11 +20,11 @@ from phage_annotator.ui_qt.panels.advanced_settings_panel import AdvancedSetting
 from phage_annotator.ui_qt.panels.qc_issues_panel import QCIssuesPanel
 from phage_annotator.ui_qt.panels.review_queue_panel import ReviewQueuePanel
 from phage_annotator.ui_qt.panels.status_details_panel import StatusDetailsPanel
-from phage_annotator.ui_qt.panels.recorder_legacy import RecorderWidget
-from phage_annotator.ui_qt.panels.registry_legacy import PanelConstraints, PanelSpec
+from phage_annotator.ui_qt.panels.recorder import RecorderWidget
+from phage_annotator.ui_qt.panels.registry import PanelConstraints, PanelSpec
 from phage_annotator.ui_qt.panels.threshold import ThresholdPanel
 from phage_annotator.ui_qt.docks.metadata_dock import MetadataDock
-from phage_annotator.ui_qt.widgets.table_legacy import ResultsTableWidget
+from phage_annotator.ui_qt.widgets.results_table import ResultsTableWidget
 from phage_annotator.ui_qt.widgets.orthoview import OrthoViewWidget
 from phage_annotator.ui_qt.widgets.slider_panel_double import SliderPanelDouble
 from phage_annotator.ui_qt.panels.smlm import SmlmPanel

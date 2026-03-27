@@ -168,7 +168,7 @@ def test_view_menu_toggle_wiring(qtbot, tmp_path):
     if hasattr(win, "show_frame_act"):
         initial = win.show_frame_act.isChecked()
         win.show_frame_act.trigger()
-        # Panel state updated via gui_roi_crop._on_panel_toggle()
+        # Panel state updated via the active ROI crop toggle handler.
         assert True  # Toggle executed without error
 
 

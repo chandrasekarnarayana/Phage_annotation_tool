@@ -19,8 +19,8 @@ from phage_annotator.session.modality_facade import ModalityFacade
 from phage_annotator.session.multi_playback import ModalityPlaybackManager
 from phage_annotator.session.view_sync import ViewSyncManager
 from phage_annotator.ui_qt.models.lazy_loader import LazyLoaderManifest
-from phage_annotator.ui_qt.panels.recorder_legacy import ActionRecorder
-from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.recorder import ActionRecorder
+from phage_annotator.ui_qt.panels.registry import PanelSpec
 from phage_annotator.ui_qt.rendering.lut_manager import lut_names
 from phage_annotator.ui_qt.services.jobs import JobManager
 from phage_annotator.ui_qt.services.status import StatusService

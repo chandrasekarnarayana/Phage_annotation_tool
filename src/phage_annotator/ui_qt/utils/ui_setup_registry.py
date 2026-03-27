@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
-from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.registry import PanelSpec
 from phage_annotator.ui_qt.utils import ui_docks
 from phage_annotator.ui_qt.utils.ui_setup_panels import (
     build_panel_policy_controls,

@@ -45,7 +45,7 @@ from phage_annotator.ui_qt.handlers.keyboard_handlers import KeyboardHandlersMix
 from phage_annotator.ui_qt.utils.context_menu import ContextMenuMixin
 from phage_annotator.data.models import LazyImage
 from phage_annotator.ui_qt.rendering.lut_manager import lut_names
-from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
+from phage_annotator.ui_qt.panels.registry import PanelSpec
 from phage_annotator.session.multi_playback import PlaybackMode
 from phage_annotator.tools import Tool
 
