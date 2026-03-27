@@ -42,17 +42,51 @@ from phage_annotator.data.channel_display import MultiChannelDisplaySettings
 from phage_annotator.data.display_mapping import DisplayMapping, build_norm
 from phage_annotator.ui_qt.rendering.blend_modes import composite_channels
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for
+from phage_annotator.ui_qt.rendering.renderer_overlays import RenderingOverlayMixin
 from phage_annotator.ui_qt.utils.image_io import load_array
 from phage_annotator.rendering.mpl import RenderContext
 from phage_annotator.rendering.scalebar import ScaleBarSpec, compute_scalebar
 
 
-class RenderingMixin:
+class RenderingMixin(RenderingOverlayMixin):
     """Mixin for image rendering and overlay composition."""
+
+    def _request_render_refresh(self, reason: str = "render", *, debounce: bool = False) -> None:
+        """Queue an image refresh without hard-wiring callers to `_refresh_image`.
+
+        Parameters
+        ----------
+        reason:
+            Diagnostic reason string for the queued refresh.
+        debounce:
+            When ``True``, use the dedicated debounce timer. This is reserved for
+            render/projection job completions where an immediate queued refresh
+            could re-enter projection scheduling too aggressively.
+        """
+        if debounce and hasattr(self, "_debounce_timer"):
+            try:
+                self._debounce_timer.start()
+                return
+            except RuntimeError:
+                return
+        if hasattr(self, "_request_ui_refresh"):
+            self._request_ui_refresh(str(reason), image=True, status=True)
+            return
+        self._refresh_image()
 
     def _suggestion_overlay_style(self, suggestion) -> tuple[str, str]:
         """Return (color, trust_state) for a suggestion overlay marker."""
         meta = dict(getattr(suggestion, "meta", {}) or {})
+        candidate_class = str(meta.get("candidate_class", "new")).strip().lower()
+        status = str(getattr(suggestion, "status", "proposed")).strip().lower()
+        if status == "rejected":
+            return "#b0bec5", "rejected"
+        if status == "accepted":
+            return "#1565c0", "accepted"
+        if candidate_class == "conflict":
+            return "#e53935", "conflict"
+        if candidate_class == "near_existing":
+            return "#fb8c00", "near_existing"
         confidence_available = bool(meta.get("confidence_available", False))
         if not confidence_available:
             return "#9e9e9e", "heuristic"
@@ -149,13 +183,13 @@ class RenderingMixin:
                 self._hist_job_id = None
             self._hist_cache = None
             self._hist_cache_key = None
-            if hasattr(self, "statusBar"):
-                try:
-                    self.statusBar().showMessage("Histogram cache cleared.", 2500)
-                except Exception:
-                    pass
+            self._status_success(
+                "Histogram cache cleared.",
+                timeout_ms=2500,
+                source="renderer.histogram_cache",
+            )
             # Redraw to reflect cleared cache; will recompute on demand
-            self._refresh_image()
+            self._request_render_refresh("histogram-cache-cleared")
         except Exception as exc:
             self._append_log(f"[Hist] Clear cache error: {exc}")
 
@@ -686,7 +720,7 @@ class RenderingMixin:
         """Update the crosshair position used by orthogonal views."""
         self._cursor_xy = (float(x), float(y))
         if refresh:
-            self._refresh_image()
+            self._request_render_refresh("cursor-updated")
 
     def _on_orthoview_xz_click(self, x: int, z: int) -> None:
         y = self._cursor_xy[1] if self._cursor_xy is not None else self._default_cursor()[1]
@@ -712,327 +746,6 @@ class RenderingMixin:
             return (0.0, 0.0)
         return (x_dim / 2.0, y_dim / 2.0)
 
-    def _particle_labels(self) -> List[Tuple[float, float, str]]:
-        if self.particles_panel is None:
-            return []
-        if not self.particles_panel.show_labels_chk.isChecked():
-            return []
-        frame_ax = None
-        if getattr(self, "renderer", None) is not None:
-            frame_ax = next(iter(self.renderer.axes.values()), None)
-        scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
-        labels: List[Tuple[float, float, str]] = []
-        for idx, particle in enumerate(self._particles_results):
-            x = (particle.centroid_x - (self.crop_rect[0] if self.crop_rect else 0.0)) / scale
-            y = (particle.centroid_y - (self.crop_rect[1] if self.crop_rect else 0.0)) / scale
-            labels.append((x, y, str(idx + 1)))
-        return labels
-
-    def _build_panel_annotations(
-        self,
-    ) -> Dict[str, List[Tuple[float, float, str, bool]]]:
-        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        show_all_annotations = bool(
-            getattr(getattr(self, "show_ann_master_chk", None), "isChecked", lambda: True)()
-        )
-        points_visible_by_panel = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
-        
-        points = []
-        for kp in self._current_keypoints():
-            color = self._label_color(kp.label, faded=kp.image_id != self.primary_image.id)
-            selected_ids = getattr(self, "_selected_annotation_ids", set()) or set()
-            selected = str(kp.annotation_id) in selected_ids
-            points.append((kp.x, kp.y, color, selected))
-
-        if bool(getattr(self, "_show_suggestion_overlay", True)):
-            image_id = self.primary_image.id
-            t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
-            z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
-            min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
-            for suggestion in self.suggestions.get(image_id, []):
-                if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
-                    continue
-                if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
-                    continue
-                score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
-                if score < min_score:
-                    continue
-                color, _state = self._suggestion_overlay_style(suggestion)
-                points.append((float(suggestion.x), float(suggestion.y), color, False))
-
-        panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]] = {}
-        for panel in panel_map.keys():
-            if not show_all_annotations:
-                pts = []
-            else:
-                pts = points if bool(points_visible_by_panel.get(str(panel), True)) else []
-            if not pts:
-                panel_annotations[panel] = []
-                continue
-            panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
-            scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
-            panel_annotations[panel] = [(x / scale, y / scale, c, s) for x, y, c, s in pts]
-        return panel_annotations
-
-    def _build_suggestion_staleness_labels(self) -> Dict[str, List[Tuple[float, float, str]]]:
-        """Build lightweight age labels for visible suggestions in the primary panel."""
-        panel_keys = list(dict(getattr(self, "_panel_modality_map", {}) or {}).keys())
-        labels: Dict[str, List[Tuple[float, float, str]]] = {str(k): [] for k in panel_keys}
-        if not bool(getattr(self, "_show_suggestion_overlay", True)):
-            return labels
-        image_id = self.primary_image.id
-        t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
-        z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
-        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
-        now_ts = float(time.time())
-        frame_ax = None
-        if getattr(self, "renderer", None) is not None:
-            frame_ax = next(iter(self.renderer.axes.values()), None)
-        scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
-        primary_panel = panel_keys[0] if panel_keys else ""
-        for suggestion in self.suggestions.get(image_id, []):
-            if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
-                continue
-            if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
-                continue
-            score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
-            if score < min_score:
-                continue
-            meta = dict(getattr(suggestion, "meta", {}) or {})
-            ts = meta.get("generated_at_ts")
-            if ts is None:
-                continue
-            age_s = max(0.0, now_ts - float(ts))
-            if age_s < 60.0:
-                label = f"{int(round(age_s))}s"
-            else:
-                label = f"{int(round(age_s / 60.0))}m"
-            if primary_panel:
-                labels[str(primary_panel)].append(
-                    (float(suggestion.x) / scale, float(suggestion.y) / scale, label)
-                )
-        return labels
-
-    def _build_roi_overlays(self) -> Dict[str, List[Tuple[str, object, str]]]:
-        overlays: Dict[str, List[Tuple[str, object, str]]] = {
-            panel: [] for panel in dict(getattr(self, "_panel_modality_map", {}) or {}).keys()
-        }
-        
-        # Phase 2: Check if position filtering is enabled
-        show_current_slice_only = getattr(self, '_roi_show_current_slice_only', False)
-        
-        if show_current_slice_only:
-            # Get current slice indices from view_state
-            current_z = getattr(self.controller.view_state, 'z', 0)
-            current_t = getattr(self.controller.view_state, 't', 0)
-            current_c = getattr(self.controller.view_state, 'c', 0)
-            # Use filter_rois_by_position for position-aware filtering
-            rois = self.roi_manager.filter_rois_by_position(
-                self.primary_image.id, z=current_z, t=current_t, c=current_c
-            )
-        else:
-            # Use all ROIs (default behavior)
-            rois = self.roi_manager.list_rois(self.primary_image.id)
-        
-        for roi in rois:
-            if not roi.visible:
-                continue
-            for panel in overlays:
-                panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
-                scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
-                if roi.roi_type == "circle" and len(roi.points) >= 2:
-                    (cx, cy), (px, py) = roi.points[:2]
-                    r = float(np.hypot(px - cx, py - cy))
-                    rect = (cx - r, cy - r, 2 * r, 2 * r)
-                    overlays[panel].append(
-                        (
-                            "circle",
-                            (
-                                rect[0] / scale,
-                                rect[1] / scale,
-                                rect[2] / scale,
-                                rect[3] / scale,
-                            ),
-                            roi.color,
-                        )
-                    )
-                elif roi.roi_type == "box" and len(roi.points) >= 2:
-                    (x0, y0), (x1, y1) = roi.points[:2]
-                    rect = (min(x0, x1), min(y0, y1), abs(x1 - x0), abs(y1 - y0))
-                    overlays[panel].append(
-                        (
-                            "box",
-                            (
-                                rect[0] / scale,
-                                rect[1] / scale,
-                                rect[2] / scale,
-                                rect[3] / scale,
-                            ),
-                            roi.color,
-                        )
-                    )
-                elif roi.roi_type in ("polygon", "polyline") and len(roi.points) >= 3:
-                    pts = [(x / scale, y / scale) for x, y in roi.points]
-                    overlays[panel].append((roi.roi_type, pts, roi.color))
-        if self.crop_rect:
-            for panel in overlays:
-                panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
-                scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
-                x, y, w, h = self.crop_rect
-                overlays[panel].append(
-                    ("box", (x / scale, y / scale, w / scale, h / scale), "#00c0ff")
-                )
-        return overlays
-
-    def _build_overlay_text(self) -> Optional[str]:
-        if not self.overlay_enabled:
-            return None
-        img = self.primary_image
-        t_idx, z_idx = self._slice_indices(img)
-        t_total = img.array.shape[0] if img.array is not None else 1
-        z_total = img.array.shape[1] if img.array is not None else 1
-        panel_key = self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
-        mapping = self._get_display_mapping(img.id, panel_key, img.array)
-        idx = mapping.lut
-        if idx < 0:
-            idx = 0
-        if idx >= len(LUTS):
-            idx = len(LUTS) - 1
-        lut = LUTS[idx].name
-        inv = " (inv)" if mapping.invert else ""
-        vmin = f"{mapping.min_val:.3f}"
-        vmax = f"{mapping.max_val:.3f}"
-        gamma = f"{mapping.gamma:.2f}"
-        mode = mapping.mode
-        crop_txt = "yes" if self.crop_rect else "no"
-        roi_active = (
-            self.roi_shape != "none"
-            and self.roi_rect
-            and self.roi_rect[2] > 0
-            and self.roi_rect[3] > 0
-        )
-        roi_txt = "yes" if roi_active else "no"
-        crop_rect = self.crop_rect if self.crop_rect else (0, 0, 0, 0)
-        roi_rect = self.roi_rect if roi_active else (0, 0, 0, 0)
-        cal = self._get_calibration_state(img.id)
-        pixel_size = (
-            f"{cal.pixel_size_um_per_px:.4f} um/px" if cal.pixel_size_um_per_px else "unknown"
-        )
-        
-        # Add memory pressure diagnostics
-        diag_lines = []
-        if img.downsampled:
-            diag_lines.append(f"Spatial downsampling: {img.downsample_factor}x (memory pressure)")
-        
-        # Check for interactive downsampling
-        render_scales = getattr(self, "_render_scales", {}) or {}
-        render_scale = max(render_scales.values()) if render_scales else 1
-        if render_scale > 1:
-            diag_lines.append(f"Interactive downsampling: {int(render_scale)}x")
-        
-        # Check for LOD mode
-        lod_active = getattr(self, "_lod_mode_active", {}) or {}
-        if lod_active.get(img.id, False):
-            diag_lines.append("LOD mode: computing full-resolution")
-        
-        diag_txt = "\n".join(diag_lines)
-        if diag_txt:
-            diag_txt = "\n" + diag_txt
-        
-        stale_count = 0
-        visible_suggestions = 0
-        now_ts = float(time.time())
-        for suggestion in self.suggestions.get(img.id, []):
-            t_match = int(getattr(suggestion, "t", -1)) in (t_idx, -1)
-            z_match = int(getattr(suggestion, "z", -1)) in (z_idx, -1)
-            if not (t_match and z_match):
-                continue
-            visible_suggestions += 1
-            ts = dict(getattr(suggestion, "meta", {}) or {}).get("generated_at_ts")
-            if ts is None:
-                continue
-            if (now_ts - float(ts)) >= 300.0:
-                stale_count += 1
-        stale_txt = (
-            f"\nSuggestion staleness: {stale_count}/{visible_suggestions} >= 5m old"
-            if visible_suggestions > 0
-            else ""
-        )
-        stale_badge = ""
-        if hasattr(self, "_suggestion_freshness_state"):
-            try:
-                freshness = self._suggestion_freshness_state(self.primary_image.id)
-                if freshness.get("is_stale", False):
-                    stale_badge = "\nStale - regenerate recommended"
-            except Exception:
-                stale_badge = ""
-
-        return (
-            f"{img.name}\n"
-            f"T {t_idx + 1}/{t_total} | Z {z_idx + 1}/{z_total}\n"
-            f"Pixel size: {pixel_size}\n"
-            f"LUT: {lut}{inv} | Mode: {mode} | Gamma: {gamma}\n"
-            f"vmin/vmax: {vmin}/{vmax}\n"
-            f"Crop: {crop_txt} {crop_rect}\n"
-            f"ROI: {roi_txt} {roi_rect}\n"
-            f"Memmap: {'yes' if getattr(img.array, 'filename', None) else 'no'}{diag_txt}{stale_txt}{stale_badge}"
-        )
-
-    def _build_canvas_header_text(self) -> str:
-        """Build always-visible canvas header for target/scope context."""
-        img = self.primary_image
-        t_idx, z_idx = self._slice_indices(img)
-        z_total = int(img.array.shape[1]) if img.array is not None and img.array.ndim >= 2 else int(self.z_slider.maximum() + 1)
-        default_target = (
-            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
-        )
-        target = str(getattr(self, "annotate_target", default_target))
-        scope = str(getattr(self, "annotation_scope", "current"))
-
-        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        spec = panel_map.get(target)
-        if spec is not None:
-            target_txt = str(getattr(spec, "display_name", target))
-        else:
-            target_txt = f"{str(target).title()} T={int(t_idx) + 1} Z={int(z_idx) + 1}"
-
-        if scope == "all":
-            scope_txt = "Stack Annotation (All Z)"
-        else:
-            scope_txt = "Slice Annotation (Current Z)"
-        lock_pending = bool(
-            hasattr(self, "_is_annotation_context_guard_pending")
-            and self._is_annotation_context_guard_pending()
-        )
-        lock_txt = " | Write Context: Pending Confirm" if lock_pending else ""
-        base_text = f"{target_txt} | {scope_txt}{lock_txt}"
-        if not bool(getattr(self, "_canvas_header_verbose_context", False)):
-            return base_text
-        strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
-        active_label = str(getattr(self, "current_label", "phage"))
-        modality_txt = f"Modality {int(getattr(self, '_active_modality_idx', -1))}"
-        manager = getattr(getattr(self, "controller", None).session_state, "modality_manager", None) if getattr(self, "controller", None) is not None else None
-        if manager is not None:
-            try:
-                for modality in manager.get_all_modalities():
-                    if int(modality.image_id) == int(self.primary_image.id):
-                        modality_txt = str(modality.display_name)
-                        break
-            except Exception:
-                pass
-        projection_txt = "raw"
-        if getattr(self, "projection_selector", None) is not None:
-            try:
-                p_name, p_axis = self.projection_selector.current_selection()
-                if str(p_name).strip().lower() == "raw":
-                    p_name = "source slice"
-                projection_txt = f"{p_name} ({p_axis})"
-            except Exception:
-                projection_txt = "source slice"
-        return (
-            f"{base_text} | Modality: {modality_txt} ({projection_txt}) | "
-            f"Strategy: {strategy} | Label: {active_label}"
-        )
 
     def _get_display_mapping(
         self, image_id: int, panel: str, data: Optional[np.ndarray]
@@ -1063,7 +776,7 @@ class RenderingMixin:
 
     def _toggle_overlay(self, checked: bool) -> None:
         self.overlay_enabled = checked
-        self._refresh_image()
+        self._request_render_refresh("overlay-toggled")
 
     def _draw_diagnostics(self, slice_data: np.ndarray, vmin: float, vmax: float) -> None:
         """Update histogram and profile diagnostics."""
@@ -1252,14 +965,19 @@ class RenderingMixin:
             self._hist_cache = sample
             self._hist_cache_key = key
             self._hist_job_id = None
-            self._refresh_image()
+            self._request_render_refresh("histogram-job-finished", debounce=True)
 
         def _on_error(err: str) -> None:
             self._hist_job_id = None
             self._append_log(f"[JOB] Histogram error\n{err}")
 
         handle = self.jobs.submit(
-            _job, name="Histogram sample", on_result=_on_result, on_error=_on_error
+            _job,
+            name="Histogram sample",
+            on_result=_on_result,
+            on_error=_on_error,
+            priority="interactive",
+            replace_key="histogram-sample",
         )
         self._hist_job_id = handle.job_id
 

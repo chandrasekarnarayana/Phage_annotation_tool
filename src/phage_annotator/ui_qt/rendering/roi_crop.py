@@ -32,23 +32,29 @@ class RoiCropMixin:
         key = self._current_sync_group_key_for_roi()
         if not key:
             return
-        store = dict(getattr(self, "_roi_by_sync_group", {}) or {})
-        if str(getattr(self, "roi_shape", "none")) == "none":
-            store[key] = None
-        else:
-            store[key] = {
+        state = None
+        if str(getattr(self, "roi_shape", "none")) != "none":
+            state = {
                 "shape": str(getattr(self, "roi_shape", "box")),
                 "rect": tuple(float(v) for v in tuple(getattr(self, "roi_rect", (0, 0, 0, 0)))),
             }
-        self._roi_by_sync_group = store
+        controller = getattr(self, "controller", None)
+        if controller is not None and hasattr(controller, "set_roi_state_for_sync_group"):
+            controller.set_roi_state_for_sync_group(key, state)
+            return
 
     def _apply_roi_for_sync_group(self, group_key: str) -> None:
         """Apply stored ROI for a sync group, if any."""
         key = str(group_key or "").strip()
         if not key:
             return
-        store = dict(getattr(self, "_roi_by_sync_group", {}) or {})
-        state = store.get(key, "__missing__")
+        controller = getattr(self, "controller", None)
+        if controller is not None and hasattr(controller, "roi_state_for_sync_group"):
+            state = controller.roi_state_for_sync_group(key)
+            if state is None and key not in dict(getattr(controller.session_state, "roi_by_sync_group", {}) or {}):
+                state = "__missing__"
+        else:
+            state = "__missing__"
         if state == "__missing__":
             return
         if state is None:
@@ -56,7 +62,7 @@ class RoiCropMixin:
             self.roi_shape = "none"
             self.roi_rect = (0.0, 0.0, 0.0, 0.0)
             self._sync_roi_controls()
-            self._refresh_image()
+            self._request_ui_refresh("roi-crop")
             return
         shape = str(state.get("shape", "box"))
         rect = tuple(state.get("rect", (0.0, 0.0, 0.0, 0.0)))
@@ -70,7 +76,7 @@ class RoiCropMixin:
         self.roi_shape = shape
         self.roi_rect = tuple(float(v) for v in rect)
         self._sync_roi_controls()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _current_layout_spec(self) -> dict:
         order: list[str] = []
@@ -148,13 +154,13 @@ class RoiCropMixin:
                 return
         self.controller.clear_roi()
         self._sync_roi_controls()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _toggle_roi_handles(self, checked: bool) -> None:
         """Show/hide ROI resize handles on the canvas."""
         self.show_roi_handles = bool(checked)
         self._settings.setValue("showRoiHandles", self.show_roi_handles)
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _on_roi_interactor_change(self, roi_type, rect, circle) -> None:
         """Sync Matplotlib ROI interactions back into controller/UI state."""
@@ -179,7 +185,7 @@ class RoiCropMixin:
             self._sync_roi_controls()
         self._store_roi_for_current_sync_group()
         self._update_status()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _reset_roi(self) -> None:
         """Reset ROI to the full image bounds."""
@@ -194,7 +200,7 @@ class RoiCropMixin:
         self.roi_shape = "circle"
         self._store_roi_for_current_sync_group()
         self._sync_roi_controls()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _sync_roi_controls(self) -> None:
         rect = self.roi_rect
@@ -250,14 +256,14 @@ class RoiCropMixin:
             self.roi_h_spin.blockSignals(False)
             
             # Show feedback to user
-            self._set_status("ROI clamped to image bounds")
+            self._status_warning("ROI clamped to image bounds", source="roi.crop")
         
         rect = (x_clamped, y_clamped, w_clamped, h_clamped)
         self.controller.set_roi(rect, shape=self.roi_shape)
         self.roi_rect = rect
         self._store_roi_for_current_sync_group()
         self.recorder.record("roi_change", {"rect": self.roi_rect, "shape": self.roi_shape})
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _on_roi_shape_change(self) -> None:
         btns = self.roi_shape_group.buttons()
@@ -271,7 +277,7 @@ class RoiCropMixin:
         self.roi_shape = shape
         self._store_roi_for_current_sync_group()
         self.recorder.record("roi_shape", {"shape": shape})
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _auto_roi_mode_changed(self, text: str) -> None:
         if not hasattr(self, "auto_roi_wh_widget"):
@@ -315,7 +321,7 @@ class RoiCropMixin:
 
     def _run_auto_roi(self) -> None:
         if self.primary_image.array is None:
-            self._set_status("Load an image first.")
+            self._status_warning("Load an image first.", source="roi.auto")
             return
         if self._auto_roi_job_id is not None:
             self.jobs.cancel(self._auto_roi_job_id)
@@ -389,17 +395,24 @@ class RoiCropMixin:
                 f"grad={diag.get('grad', 0):.3f}"
             )
             self.auto_roi_btn.setToolTip(tip)
-            self._set_status("Auto ROI applied.")
+            self._status_success("Auto ROI applied.", source="roi.auto")
             self.recorder.record("auto_roi", {"shape": spec.shape, "rect": self.roi_rect, **diag})
-            self._refresh_image()
+            self._request_ui_refresh("roi-crop")
 
         def _on_error(err: str) -> None:
             self._append_log(f"[Auto ROI] Error\n{err}")
-            self._set_status("Auto ROI failed.")
+            self._status_error("Auto ROI failed.", source="roi.auto")
 
-        handle = self.jobs.submit(_job, name="Auto ROI", on_result=_on_result, on_error=_on_error)
+        handle = self.jobs.submit(
+            _job,
+            name="Auto ROI",
+            on_result=_on_result,
+            on_error=_on_error,
+            priority="interactive",
+            replace_key="auto-roi",
+        )
         self._auto_roi_job_id = handle.job_id
-        self._set_status("Auto ROI running…")
+        self._status_info("Auto ROI running…", timeout_ms=2500, source="roi.auto")
 
     def _reset_crop(self, initial: bool = False) -> None:
         """Reset crop to full frame bounds."""
@@ -413,7 +426,7 @@ class RoiCropMixin:
         else:
             self.crop_rect = None
         self._sync_crop_controls()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _on_crop_change(self) -> None:
         """Handle crop spinbox changes with validation and clamping to image bounds."""
@@ -426,7 +439,7 @@ class RoiCropMixin:
         # Handle zero/negative dimensions
         if w <= 0 or h <= 0:
             self.crop_rect = None
-            self._refresh_image()
+            self._request_ui_refresh("roi-crop")
             return
         
         # Get image bounds
@@ -460,10 +473,10 @@ class RoiCropMixin:
             self.crop_h_spin.blockSignals(False)
             
             # Show feedback to user
-            self._set_status("Crop clamped to image bounds")
+            self._status_warning("Crop clamped to image bounds", source="crop.bounds")
         
         self.crop_rect = (x_clamped, y_clamped, w_clamped, h_clamped)
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _sync_crop_controls(self) -> None:
         if self.crop_rect is None:
@@ -519,7 +532,7 @@ class RoiCropMixin:
         if hasattr(self, "_refresh_annotation_view_controls"):
             self._refresh_annotation_view_controls()
         self._rebuild_figure_layout()
-        self._refresh_image()
+        self._request_ui_refresh("roi-crop")
 
     def _panel_grid_shape(self, n: int) -> Tuple[int, int]:
         if n <= 1:
@@ -705,7 +718,7 @@ class RoiCropMixin:
                 )
                 self.controller.set_roi(rect, shape=new_roi.roi_type)
                 self._sync_roi_controls()
-                self._refresh_image()
+                self._request_ui_refresh("roi-crop")
                 self.recorder.record("apply_roi_template", {"template": template_name})
                 QtWidgets.QMessageBox.information(
                     self,

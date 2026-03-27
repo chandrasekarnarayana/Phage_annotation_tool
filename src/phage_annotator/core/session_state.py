@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from phage_annotator.io.metadata.index import AnnotationIndexEntry
@@ -189,8 +189,16 @@ class SessionState:
             "accepted": 0.0,
             "rejected": 0.0,
             "mean_correction_distance": 0.0,
+            "classified_new": 0.0,
+            "classified_near_existing": 0.0,
+            "classified_conflict": 0.0,
+            "classified_duplicate": 0.0,
+            "calibration_ece": 0.0,
+            "calibration_brier": 0.0,
+            "calibration_drift": 0.0,
         }
     )
+    last_suggestion_generation_summary: Dict[str, float] = field(default_factory=dict)
     suggestion_ranker_state: Dict[str, object] = field(default_factory=dict)
     suggestion_training_samples: List[Dict[str, object]] = field(default_factory=list)
     suggestion_training_pending: int = 0
@@ -198,6 +206,11 @@ class SessionState:
     suggestion_score_threshold: float = 0.0
     suggestion_auto_retrain_enabled: bool = True
     suggestion_auto_retrain_min_labels: int = 25
+    assist_local_update_radius_px: float = 24.0
+    assist_local_rescore_radius_px: float = 48.0
+    assist_local_rescore_debounce_ms: int = 700
+    assist_local_rescore_edit_threshold: int = 4
+    assist_local_generate_visible_candidates: bool = True
     annotation_space: str = "stack"  # stack | projection
     generation_space: str = "stack"  # stack | projection
     assist_min_total_labels: int = 30
@@ -205,6 +218,7 @@ class SessionState:
     assist_min_negative_labels: int = 15
     assist_min_labels_per_context: int = 10
     suggestion_context_stats: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    last_local_suggestion_update_summary: Dict[str, float] = field(default_factory=dict)
     evidence_layer_config: Dict[str, dict] = field(default_factory=dict)
     evidence_layer_presets: Dict[str, dict] = field(default_factory=dict)
     disable_bulk_accept_when_stale: bool = True
@@ -214,3 +228,10 @@ class SessionState:
     # Collaboration metadata for local workflows.
     current_user: str = "local_user"
     audit_log: List[Dict[str, object]] = field(default_factory=list)
+    feature_flags: Dict[str, bool] = field(default_factory=dict)
+    workflow_metrics: Dict[str, object] = field(default_factory=dict)
+    annotation_contexts: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    annotation_file_bindings: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    lazy_sync_groups: Dict[Any, str] = field(default_factory=dict)
+    lazy_sync_modes: Dict[Any, Dict[str, bool]] = field(default_factory=dict)
+    roi_by_sync_group: Dict[str, Optional[Dict[str, object]]] = field(default_factory=dict)

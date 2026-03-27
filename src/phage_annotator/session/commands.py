@@ -14,6 +14,14 @@ from typing import TYPE_CHECKING, Any, Optional, Tuple
 if TYPE_CHECKING:
     from phage_annotator.session.controller import SessionController
 
+from phage_annotator.session.signal_hub import (
+    annotation_notification_batch,
+    emit_display_changed,
+    emit_roi_changed,
+    emit_state_changed,
+    emit_view_changed,
+)
+
 
 @dataclass
 class CommandMemento:
@@ -58,6 +66,14 @@ class Command(ABC):
             "before": asdict(self.memento_before) if self.memento_before else None,
             "after": asdict(self.memento_after) if self.memento_after else None,
         }
+
+    def emit_change_signals(self) -> None:
+        """Publish command effects after execute/undo/redo.
+
+        Commands that already emit typed notifications during their own mutation
+        methods should override this as a no-op to avoid duplicate emissions.
+        """
+        emit_state_changed(self.controller)
 
 
 class SetROICommand(Command):
@@ -117,6 +133,11 @@ class SetROICommand(Command):
         view_state.roi_rect = self.memento_after.data["roi_rect"]
         return True
 
+    def emit_change_signals(self) -> None:
+        rect = tuple(self.controller.view_state.roi_rect)
+        emit_view_changed(self.controller, change_type="roi", roi_rect=rect)
+        emit_roi_changed(self.controller)
+
 
 class SetCropCommand(Command):
     """Command to change crop region (P3.1)."""
@@ -158,6 +179,13 @@ class SetCropCommand(Command):
             return False
         self.controller.view_state.crop_rect = self.memento_after.data["crop_rect"]
         return True
+
+    def emit_change_signals(self) -> None:
+        emit_view_changed(
+            self.controller,
+            change_type="crop",
+            crop_rect=self.controller.view_state.crop_rect,
+        )
 
 
 class SetDisplayMappingCommand(Command):
@@ -228,6 +256,9 @@ class SetDisplayMappingCommand(Command):
         mapping.gamma = self.memento_after.data["gamma"]
         return True
 
+    def emit_change_signals(self) -> None:
+        emit_display_changed(self.controller)
+
 
 class SetThresholdCommand(Command):
     """Command to change threshold parameters (P3.1)."""
@@ -279,6 +310,9 @@ class SetThresholdCommand(Command):
             self.memento_after.data["settings"]
         )
         return True
+
+    def emit_change_signals(self) -> None:
+        emit_state_changed(self.controller)
 
 
 def command_from_dict(data: dict, controller: "SessionController") -> Optional[Command]:
@@ -457,10 +491,11 @@ class TransactionCommand(Command):
         
         # Execute each command
         success = True
-        for cmd in self.commands:
-            if not cmd.execute():
-                success = False
-                break
+        with annotation_notification_batch(self.controller):
+            for cmd in self.commands:
+                if not cmd.execute():
+                    success = False
+                    break
         
         # If any failed, capture state and return False
         # (Caller should decide whether to rollback)
@@ -508,10 +543,11 @@ class TransactionCommand(Command):
         
         # Undo in reverse order
         success = True
-        for cmd in reversed(self.commands):
-            if not cmd.undo():
-                success = False
-                break
+        with annotation_notification_batch(self.controller):
+            for cmd in reversed(self.commands):
+                if not cmd.undo():
+                    success = False
+                    break
         
         return success
     
@@ -528,9 +564,14 @@ class TransactionCommand(Command):
         
         # Redo in order
         success = True
-        for cmd in self.commands:
-            if not cmd.redo():
-                success = False
-                break
-        
+        with annotation_notification_batch(self.controller):
+            for cmd in self.commands:
+                if not cmd.redo():
+                    success = False
+                    break
+
         return success
+
+    def emit_change_signals(self) -> None:
+        """Sub-commands already emit their own notifications."""
+        return None

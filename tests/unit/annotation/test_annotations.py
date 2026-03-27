@@ -3,6 +3,8 @@ from pathlib import Path
 from phage_annotator.annotation.core import (
     Keypoint,
     keypoints_to_dataframe,
+    keypoints_from_csv,
+    keypoints_from_json,
     save_keypoints_csv,
     save_keypoints_json,
 )
@@ -52,3 +54,51 @@ def test_annotation_meta_defaults() -> None:
     assert kp.meta["timestamp"] is None
     assert kp.meta["comment"] == ""
     assert kp.meta["uncertain"] is False
+
+
+def test_provenance_roundtrip_csv_json(tmp_path: Path) -> None:
+    kp = Keypoint(
+        image_id=0,
+        image_name="img.tif",
+        t=0,
+        z=0,
+        y=1.0,
+        x=2.0,
+        label="phage",
+        source="assist",
+    )
+    kp.status = "accepted"
+    kp.confidence = 0.87
+    kp.roi_name = "roi-a"
+    kp.notes = "verified"
+    csv_path = tmp_path / "ann.csv"
+    json_path = tmp_path / "ann.json"
+
+    df = keypoints_to_dataframe([kp], include_provenance=True)
+    assert list(df.columns) == [
+        "image_id",
+        "image_name",
+        "t",
+        "z",
+        "y",
+        "x",
+        "label",
+        "source",
+        "status",
+        "confidence",
+        "roi",
+        "notes",
+    ]
+
+    save_keypoints_csv([kp], csv_path, include_provenance=True)
+    save_keypoints_json([kp], json_path, include_provenance=True)
+
+    loaded_csv = keypoints_from_csv(csv_path)
+    loaded_json = keypoints_from_json(json_path)
+    assert loaded_csv[0].source == "assist"
+    assert loaded_csv[0].status == "accepted"
+    assert loaded_csv[0].confidence == 0.87
+    assert loaded_csv[0].roi_name == "roi-a"
+    assert loaded_csv[0].notes == "verified"
+    assert loaded_json[0].status == "accepted"
+    assert loaded_json[0].confidence == 0.87

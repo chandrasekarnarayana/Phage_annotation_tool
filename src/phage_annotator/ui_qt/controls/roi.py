@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import logging
 import pathlib
 import time
@@ -28,6 +29,87 @@ logger = logging.getLogger(__name__)
 
 class RoiControlsMixin:
     """Mixin for ROI manager and ROI measurement handlers."""
+    def _roi_measurement_frame(self, arr: np.ndarray, t: int) -> np.ndarray:
+        """Resolve a 2D measurement frame from T/Y/X or T/Z/Y/X image data."""
+        frame = np.asarray(arr[t])
+        if frame.ndim == 2:
+            return frame
+        if frame.ndim == 3:
+            return np.asarray(frame[0])
+        raise ValueError(f"Unsupported ROI measurement shape: {arr.shape}")
+
+    def _roi_measurement_rows(self, arr: np.ndarray, rois: list[Roi], image_id: int) -> list[dict]:
+        """Build deterministic ROI measurement rows with traceable ROI/image context."""
+        results: list[dict] = []
+        n_frames = int(arr.shape[0])
+        image_shape = "x".join(str(int(v)) for v in np.shape(arr))
+        for t in range(n_frames):
+            try:
+                frame = self._roi_measurement_frame(arr, t)
+            except Exception as e:
+                logger.warning(f"Failed to resolve ROI measurement frame at t={t}: {e}")
+                continue
+
+            for roi in rois:
+                try:
+                    mask = roi_mask_from_points(frame.shape, roi.roi_type, roi.points)
+                    vals = frame[mask]
+
+                    if vals.size == 0:
+                        continue
+
+                    y_idx, x_idx = np.where(mask)
+                    results.append({
+                        "Image_ID": int(image_id),
+                        "Image_Shape": image_shape,
+                        "Frame_T": int(t),
+                        "ROI_ID": int(roi.roi_id),
+                        "ROI_Name": roi.name,
+                        "ROI_Type": roi.roi_type,
+                        "ROI_Tags": ",".join(str(tag) for tag in getattr(roi, "tags", []) if str(tag).strip()),
+                        "ROI_Z_Binding": int(getattr(roi, "z_index", -1)),
+                        "ROI_T_Binding": int(getattr(roi, "t_index", -1)),
+                        "ROI_C_Binding": int(getattr(roi, "c_index", -1)),
+                        "Area_px2": float(mask.sum()),
+                        "Mean_Intensity": float(vals.mean()),
+                        "Min_Intensity": float(vals.min()),
+                        "Max_Intensity": float(vals.max()),
+                        "Centroid_X_px": float(x_idx.mean()) if len(x_idx) > 0 else 0.0,
+                        "Centroid_Y_px": float(y_idx.mean()) if len(y_idx) > 0 else 0.0,
+                        "Integral_Sum": float(vals.sum()),
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to measure ROI {roi.name} at frame {t}: {e}")
+                    continue
+        results.sort(key=lambda row: (int(row["Frame_T"]), str(row["ROI_Name"]), int(row["ROI_ID"])))
+        return results
+
+    def _roi_measurement_summary_text(self, rows: list[dict], roi_count: int, frame_count: int, image_id: int) -> str:
+        """Summarize ROI measurement scope and aggregate output for the dialog header."""
+        if not rows:
+            return f"Image {image_id} | {roi_count} ROI(s) | {frame_count} frame(s) | 0 measurement row(s)"
+        mean_area = sum(float(row["Area_px2"]) for row in rows) / float(len(rows))
+        mean_signal = sum(float(row["Mean_Intensity"]) for row in rows) / float(len(rows))
+        return (
+            f"Image {image_id} | {roi_count} ROI(s) | {frame_count} frame(s) | "
+            f"{len(rows)} measurement row(s) | Mean area {mean_area:.1f} px^2 | "
+            f"Mean signal {mean_signal:.3f}"
+        )
+
+    def _roi_measurement_default_path(self) -> pathlib.Path:
+        """Return a traceable default CSV export path for ROI measurements."""
+        image_id = int(getattr(getattr(self, "primary_image", None), "id", -1))
+        stamp = dt.datetime.now().strftime("%Y%m%d")
+        return pathlib.Path.cwd() / f"roi_measurements_image_{image_id}_{stamp}.csv"
+
+    def _write_roi_measurements_csv(self, path: pathlib.Path, rows: list[dict]) -> None:
+        """Write ROI measurements with stable metadata-rich columns."""
+        with open(path, "w", newline="") as f:
+            if rows:
+                writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
+
     def _refresh_roi_manager(self) -> None:
         if self.roi_manager_widget is None:
             return
@@ -49,7 +131,11 @@ class RoiControlsMixin:
 
         def _apply() -> None:
             if self.roi_shape == "none" or self.roi_rect[2] <= 0 or self.roi_rect[3] <= 0:
-                self._set_status("Set an ROI first.")
+                self._status_warning(
+                    "Set an ROI first.",
+                    timeout_ms=2500,
+                    source="roi.add",
+                )
                 return
             roi_type = type_combo.currentText()
             roi_id = int(time.time() * 1000)
@@ -72,7 +158,11 @@ class RoiControlsMixin:
                 self._sync_active_roi(roi)
                 dlg.accept()
             else:
-                self._set_status("Failed to add ROI")
+                self._status_error(
+                    "Failed to add ROI.",
+                    timeout_ms=3500,
+                    source="roi.add",
+                )
 
         buttons.accepted.connect(_apply)
         buttons.rejected.connect(dlg.reject)
@@ -102,7 +192,7 @@ class RoiControlsMixin:
         else:
             logger.error(f"Failed to delete ROI(s)")
         self._refresh_roi_manager()
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
 
     def _roi_mgr_deselect(self) -> None:
         """Deselect active ROI without deleting it (Fiji parity F-118)."""
@@ -113,7 +203,7 @@ class RoiControlsMixin:
         if self.roi_manager_widget:
             self.roi_manager_widget.table.clearSelection()
         logger.info(f"ROI deselected (id was {self.roi_manager.active_roi_id})")
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
 
     def _roi_mgr_update(self) -> None:
         """Update selected ROI geometry from editor, preserving identity (Fiji parity F-119)."""
@@ -226,7 +316,7 @@ class RoiControlsMixin:
                 self.roi_manager.set_active(rois[0].roi_id)
                 self._sync_active_roi(rois[0])
             self._refresh_roi_manager()
-            self._refresh_image()
+            self._request_ui_refresh("roi-controls")
             QtWidgets.QMessageBox.information(self, "Success", f"Loaded {len(rois)} ROIs from:\n{path}")
             logger.info(f"Loaded {len(rois)} ROIs from {path}")
         except Exception as e:
@@ -245,50 +335,9 @@ class RoiControlsMixin:
             return
         
         arr = self.primary_image.array
-        n_frames = arr.shape[0]
-        
-        # Build results table
-        results = []
+        n_frames = int(arr.shape[0])
         logger.info(f"Measuring {len(rois)} ROIs over {n_frames} frames...")
-        
-        for t in range(n_frames):
-            frame = arr[t, 0, :, :]  # Assume (T, Z, Y, X)
-            
-            for roi in rois:
-                try:
-                    mask = roi_mask_from_points(frame.shape, roi.roi_type, roi.points)
-                    vals = frame[mask]
-                    
-                    if vals.size == 0:
-                        continue
-                    
-                    # Standard metrics (Fiji-compatible)
-                    area_px2 = float(mask.sum())
-                    mean_px = float(vals.mean())
-                    min_px = float(vals.min())
-                    max_px = float(vals.max())
-                    int_sum = float(vals.sum())
-                    
-                    # Centroid
-                    y_idx, x_idx = np.where(mask)
-                    cx = float(x_idx.mean()) if len(x_idx) > 0 else 0.0
-                    cy = float(y_idx.mean()) if len(y_idx) > 0 else 0.0
-                    
-                    results.append({
-                        "Frame": t,
-                        "ROI_Name": roi.name,
-                        "ROI_Type": roi.roi_type,
-                        "Area_px2": area_px2,
-                        "Mean": mean_px,
-                        "Min": min_px,
-                        "Max": max_px,
-                        "Centroid_X": cx,
-                        "Centroid_Y": cy,
-                        "IntegralSum": int_sum,
-                    })
-                except Exception as e:
-                    logger.warning(f"Failed to measure ROI {roi.name} at frame {t}: {e}")
-                    continue
+        results = self._roi_measurement_rows(arr, rois, int(self.primary_image.id))
         
         logger.info(f"Measured {len(results)} ROI-frame combinations")
         
@@ -297,6 +346,8 @@ class RoiControlsMixin:
         dlg.setWindowTitle(f"ROI Measurements ({len(results)} rows)")
         dlg.resize(1000, 600)
         layout = QtWidgets.QVBoxLayout(dlg)
+        summary = QtWidgets.QLabel(self._roi_measurement_summary_text(results, len(rois), n_frames, int(self.primary_image.id)))
+        layout.addWidget(summary)
         
         # Results table
         table = QtWidgets.QTableWidget(len(results), len(results[0]) if results else 0)
@@ -308,6 +359,8 @@ class RoiControlsMixin:
                     item = QtWidgets.QTableWidgetItem(f"{data[key]:.4f}" if isinstance(data[key], float) else str(data[key]))
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)  # Read-only
                     table.setItem(row, col, item)
+            table.setSortingEnabled(True)
+            table.sortItems(0, QtCore.Qt.SortOrder.AscendingOrder)
             table.resizeColumnsToContents()
         
         layout.addWidget(table)
@@ -319,15 +372,11 @@ class RoiControlsMixin:
         
         def _export_csv():
             path, _ = QtWidgets.QFileDialog.getSaveFileName(
-                dlg, "Export Results", str(pathlib.Path.cwd() / "roi_measurements.csv"), "CSV (*.csv)"
+                dlg, "Export Results", str(self._roi_measurement_default_path()), "CSV (*.csv)"
             )
             if path:
                 try:
-                    with open(path, "w", newline="") as f:
-                        if results:
-                            writer = csv.DictWriter(f, fieldnames=results[0].keys())
-                            writer.writeheader()
-                            writer.writerows(results)
+                    self._write_roi_measurements_csv(pathlib.Path(path), results)
                     QtWidgets.QMessageBox.information(dlg, "Success", f"Exported {len(results)} rows to:\n{path}")
                     logger.info(f"ROI measurements exported to {path}")
                 except Exception as e:
@@ -348,7 +397,7 @@ class RoiControlsMixin:
             return
         self.roi_manager.set_active(roi.roi_id)
         self._sync_active_roi(roi)
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
     def _roi_mgr_item_changed(self, item: QtWidgets.QTableWidgetItem) -> None:
         if self.roi_manager_widget is None:
             return
@@ -378,7 +427,7 @@ class RoiControlsMixin:
         elif item.column() == 6:  # Visible
             roi.visible = item.checkState() == QtCore.Qt.CheckState.Checked
             logger.debug(f"ROI {roi.roi_id} visibility toggled: {roi.visible}")
-            self._refresh_image()
+            self._request_ui_refresh("roi-controls")
 
     def _roi_mgr_show_all_toggled(self, checked: bool) -> None:
         """Toggle overlay of all ROIs on canvas (Fiji parity F-120)."""
@@ -386,7 +435,7 @@ class RoiControlsMixin:
             self._roi_show_all_enabled = False
         self._roi_show_all_enabled = checked
         logger.info(f"Show All ROIs: {'ON' if checked else 'OFF'}")
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
 
     def _roi_mgr_show_current_slice_only_toggled(self, checked: bool) -> None:
         """Toggle filtering ROIs to show only current z/t/c slice."""
@@ -400,7 +449,7 @@ class RoiControlsMixin:
         current_c = getattr(self.controller.view_state, 'c', 0)
         
         logger.info(f"Show Current Slice Only: {'ON' if checked else 'OFF'} (z={current_z}, t={current_t}, c={current_c})")
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
 
     def _roi_mgr_batch_bind_to_slice(self) -> None:
         """Bind all selected ROIs to current z/t/c slice."""
@@ -409,7 +458,11 @@ class RoiControlsMixin:
         
         if not selected_rois:
             logger.warning("Bind to slice: no ROIs selected")
-            self._set_status("Select ROIs to bind to current slice")
+            self._status_info(
+                "Select ROIs to bind to current slice.",
+                timeout_ms=2500,
+                source="roi.bind_slice",
+            )
             return
         
         # Get current slice indices
@@ -424,7 +477,11 @@ class RoiControlsMixin:
                 bind_count += 1
         
         logger.info(f"Batch bind to slice: {bind_count} ROI(s) bound to z={current_z}, t={current_t}, c={current_c}")
-        self._set_status(f"Bound {bind_count} ROI(s) to slice z={current_z}, t={current_t}, c={current_c}")
+        self._status_success(
+            f"Bound {bind_count} ROI(s) to slice z={current_z}, t={current_t}, c={current_c}.",
+            timeout_ms=3000,
+            source="roi.bind_slice",
+        )
         self._refresh_roi_manager()
 
     def _roi_mgr_batch_color_change(self) -> None:
@@ -434,7 +491,11 @@ class RoiControlsMixin:
         
         if not selected_rois:
             logger.warning("Batch color change: no ROIs selected")
-            self._set_status("Select ROIs to change color")
+            self._status_info(
+                "Select ROIs to change color.",
+                timeout_ms=2500,
+                source="roi.color",
+            )
             return
         
         # Color picker dialog
@@ -450,9 +511,13 @@ class RoiControlsMixin:
             roi.color = color_hex
         
         logger.info(f"Batch color change: {len(selected_rois)} ROI(s) changed to {color_hex}")
-        self._set_status(f"Changed color for {len(selected_rois)} ROI(s)")
+        self._status_success(
+            f"Changed color for {len(selected_rois)} ROI(s).",
+            timeout_ms=3000,
+            source="roi.color",
+        )
         self._refresh_roi_manager()
-        self._refresh_image()
+        self._request_ui_refresh("roi-controls")
 
     def _copy_roi_diagnostics(self) -> None:
         """Copy ROI manager diagnostics to clipboard (for debugging)."""
@@ -472,40 +537,44 @@ class RoiControlsMixin:
         """Undo last ROI operation."""
         if not self.roi_manager.can_undo():
             logger.debug("Undo: no operations to undo")
-            self._set_status("Nothing to undo")
+            self._status_info("Nothing to undo.", timeout_ms=2000, source="roi.undo")
             return
         
         if self.roi_manager.undo():
             logger.info("ROI operation undone")
-            self._set_status("Undone")
+            self._status_success("Undone.", timeout_ms=2000, source="roi.undo")
             self._refresh_roi_manager()
-            self._refresh_image()
+            self._request_ui_refresh("roi-controls")
         else:
             logger.error("Failed to undo ROI operation")
-            self._set_status("Undo failed")
+            self._status_error("Undo failed.", timeout_ms=3000, source="roi.undo")
 
     def _roi_mgr_redo(self) -> None:
         """Redo last undone ROI operation."""
         if not self.roi_manager.can_redo():
             logger.debug("Redo: no operations to redo")
-            self._set_status("Nothing to redo")
+            self._status_info("Nothing to redo.", timeout_ms=2000, source="roi.redo")
             return
         
         if self.roi_manager.redo():
             logger.info("ROI operation redone")
-            self._set_status("Redone")
+            self._status_success("Redone.", timeout_ms=2000, source="roi.redo")
             self._refresh_roi_manager()
-            self._refresh_image()
+            self._request_ui_refresh("roi-controls")
         else:
             logger.error("Failed to redo ROI operation")
-            self._set_status("Redo failed")
+            self._status_error("Redo failed.", timeout_ms=3000, source="roi.redo")
 
     def _roi_mgr_manage_tags(self) -> None:
         """Open tag management dialog for selected ROI."""
         roi = self._roi_mgr_selected()
         if roi is None:
             logger.warning("Manage tags: no ROI selected")
-            self._set_status("Select an ROI to manage tags")
+            self._status_info(
+                "Select an ROI to manage tags.",
+                timeout_ms=2500,
+                source="roi.tags",
+            )
             return
         
         # Get all available tags
@@ -547,10 +616,18 @@ class RoiControlsMixin:
         def _add_tag():
             tag = tag_input.text().strip()
             if not tag:
-                self._set_status("Tag name cannot be empty")
+                self._status_warning(
+                    "Tag name cannot be empty.",
+                    timeout_ms=2500,
+                    source="roi.tags",
+                )
                 return
             if tag in roi.tags:
-                self._set_status(f"Tag '{tag}' already exists")
+                self._status_info(
+                    f"Tag '{tag}' already exists.",
+                    timeout_ms=2500,
+                    source="roi.tags",
+                )
                 return
             
             cmd = AddTagCommand(self.roi_manager, self.primary_image.id, roi.roi_id, tag)
@@ -561,12 +638,20 @@ class RoiControlsMixin:
                 logger.info(f"Added tag '{tag}' to ROI '{roi.name}'")
                 layout.itemAt(0).widget().setText(f"Current tags: {', '.join(roi.tags)}")
             else:
-                self._set_status(f"Failed to add tag '{tag}'")
+                self._status_error(
+                    f"Failed to add tag '{tag}'.",
+                    timeout_ms=3000,
+                    source="roi.tags",
+                )
         
         def _remove_tag():
             items = tag_list.selectedItems()
             if not items:
-                self._set_status("Select a tag to remove")
+                self._status_info(
+                    "Select a tag to remove.",
+                    timeout_ms=2500,
+                    source="roi.tags",
+                )
                 return
             
             tag = items[0].text()
@@ -577,7 +662,11 @@ class RoiControlsMixin:
                 logger.info(f"Removed tag '{tag}' from ROI '{roi.name}'")
                 layout.itemAt(0).widget().setText(f"Current tags: {', '.join(roi.tags)}")
             else:
-                self._set_status(f"Failed to remove tag '{tag}'")
+                self._status_error(
+                    f"Failed to remove tag '{tag}'.",
+                    timeout_ms=3000,
+                    source="roi.tags",
+                )
         
         add_btn.clicked.connect(_add_tag)
         remove_btn.clicked.connect(_remove_tag)
@@ -590,7 +679,11 @@ class RoiControlsMixin:
         """Filter ROIs by tag."""
         all_tags = self.roi_manager.get_all_tags(self.primary_image.id)
         if not all_tags:
-            self._set_status("No tags available")
+            self._status_info(
+                "No tags available.",
+                timeout_ms=2500,
+                source="roi.tags",
+            )
             return
         
         # Create filter dialog
@@ -622,7 +715,11 @@ class RoiControlsMixin:
             if hasattr(self.roi_manager_widget, 'set_tag_filter'):
                 self.roi_manager_widget.set_tag_filter(selected_tags)
             logger.info(f"Filter ROIs by tags: {selected_tags if selected_tags else 'none (show all)'}")
-            self._set_status(f"Showing ROIs with tags: {', '.join(selected_tags) if selected_tags else 'all'}")
+            self._status_info(
+                f"Showing ROIs with tags: {', '.join(selected_tags) if selected_tags else 'all'}.",
+                timeout_ms=3000,
+                source="roi.tags",
+            )
             dlg.accept()
         
         ok_btn.clicked.connect(_apply_filter)

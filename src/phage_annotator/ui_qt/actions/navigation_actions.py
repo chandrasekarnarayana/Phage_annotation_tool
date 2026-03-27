@@ -11,7 +11,7 @@ class NavigationActionsMixin:
     def _execute_navigation_command(self, command) -> None:
         """Execute a navigation command and refresh undo/redo state."""
         if not self.controller.execute_view_command(command):
-            self._set_status("Navigation target is out of range.")
+            self._status_warning("Navigation target is out of range.", source="navigation")
             return
         if hasattr(self, "t_slider"):
             target_t = int(getattr(self.controller.view_state, "t", self.t_slider.value()))
@@ -26,7 +26,7 @@ class NavigationActionsMixin:
         if hasattr(self, "_update_status"):
             self._update_status()
         else:
-            self._refresh_image()
+            self._request_ui_refresh("navigation-actions")
 
     def _jump_to_frame_dialog(self) -> None:
         """Prompt for a frame index and navigate via command stack."""

@@ -82,6 +82,8 @@ def compute_projections(
 
 def compute_projection(arr: np.ndarray, kind: str, axis: str = "tz") -> np.ndarray:
     """Compute a single projection over the requested axes."""
+    if str(kind).lower() not in {"mean", "std", "min", "max"}:
+        raise ValueError(f"Unsupported projection kind: {kind}")
     return compute_projections(arr, [kind], axis=axis)[kind.lower()]
 
 

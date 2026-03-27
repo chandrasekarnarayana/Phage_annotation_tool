@@ -167,7 +167,11 @@ class QCActionsMixin:
             issue_counts_by_type=issue_counts_by_type,
         )
 
-        self._set_status(f"QC validation complete: {len(self.qc_state.issues)} issue(s).")
+        self._status_info(
+            f"QC validation complete: {len(self.qc_state.issues)} issue(s).",
+            timeout_ms=3000,
+            source="qc.validation",
+        )
         self._update_status()
 
     def _on_qc_issue_status_changed(self, issue_id: str, status: str) -> None:
@@ -189,7 +193,11 @@ class QCActionsMixin:
         dock_qc = getattr(self, "dock_qc_issues", None)
         if dock_qc is not None:
             dock_qc.setWindowTitle(f"QC Issues ({open_count})" if open_count > 0 else "QC Issues")
-        self._set_status(f"QC issue {issue_id} marked {status}.")
+        self._status_success(
+            f"QC issue {issue_id} marked {status}.",
+            timeout_ms=2500,
+            source="qc.issue_status",
+        )
         self._update_status()
 
     def _on_qc_monitor_status_changed(self, message: str) -> None:
@@ -223,7 +231,11 @@ class QCActionsMixin:
         self._ensure_qc_runtime()
         visible = list(self.qc_state.get_visible_issues(respect_filters=True))
         if not visible:
-            self._set_status("No QC issues to review.")
+            self._status_info(
+                "No QC issues to review.",
+                timeout_ms=2500,
+                source="qc.navigate",
+            )
             self._update_status()
             return
         cursor = int(getattr(self, "_qc_issue_cursor", -1))
@@ -236,8 +248,10 @@ class QCActionsMixin:
         t = int(getattr(issue, "location_t", 0) if getattr(issue, "location_t", None) is not None else 0)
         image_id = int(getattr(issue, "image_id", self.current_image_idx))
         self._jump_to_qc_issue(x, y, z, t, image_id)
-        self._set_status(
-            f"QC issue {cursor + 1}/{len(visible)}: {str(getattr(issue, 'issue_type', 'issue'))}."
+        self._status_info(
+            f"QC issue {cursor + 1}/{len(visible)}: {str(getattr(issue, 'issue_type', 'issue'))}.",
+            timeout_ms=2500,
+            source="qc.navigate",
         )
         self._update_status()
 
@@ -273,8 +287,12 @@ class QCActionsMixin:
             else:
                 frame_ax.set_ylim(cy - height / 2.0, cy + height / 2.0)
 
-        self._refresh_image()
-        self._set_status("Jumped to QC issue location.")
+        self._request_ui_refresh("qc-actions", table=True)
+        self._status_info(
+            "Jumped to QC issue location.",
+            timeout_ms=2500,
+            source="qc.jump",
+        )
         self._update_status()
 
     def _export_qc_report(self, export_format: str) -> None:
@@ -319,7 +337,11 @@ class QCActionsMixin:
             ok = QCReportExporter.export_html_report(issues, output_path)
 
         if ok:
-            self._set_status(f"Exported QC report to {output_path}.")
+            self._status_success(
+                f"Exported QC report to {output_path}.",
+                timeout_ms=4000,
+                source="qc.export",
+            )
         else:
             QtWidgets.QMessageBox.critical(
                 self,

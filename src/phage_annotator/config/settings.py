@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Tuple
 
+from phage_annotator.core.rollout import DEFAULT_FEATURE_FLAGS
+
 SUPPORTED_SUFFIXES: Tuple[str, ...] = (".tif", ".tiff", ".ome.tif", ".ome.tiff")
 
 
@@ -70,6 +72,10 @@ class AppConfig:
     enable_fov_prefetch: bool = True  # Enable adjacent FOV prefetch (P7c)
     # P7e: Component-based memory budgeting
     component_budgets: ComponentMemoryBudget = field(default_factory=ComponentMemoryBudget)
+    # Controlled rollout toggles for phased workflow/data migrations.
+    feature_flags: Dict[str, bool] = field(
+        default_factory=lambda: dict(DEFAULT_FEATURE_FLAGS)
+    )
 
 
 DEFAULT_CONFIG = AppConfig()

@@ -14,6 +14,12 @@ if TYPE_CHECKING:
     from phage_annotator.core.annotation import Keypoint
 
 from phage_annotator.session.commands import Command, CommandMemento
+from phage_annotator.session.signal_hub import emit_annotations_changed
+
+
+def _emit_metadata_changed(controller: "SessionController", image_id: int) -> None:
+    """Publish metadata/label edits through the centralized annotation channel."""
+    emit_annotations_changed(controller, image_id=image_id, change_type="modified")
 
 
 class UpdateMetadataCommand(Command):
@@ -63,9 +69,6 @@ class UpdateMetadataCommand(Command):
         # Update metadata
         keypoint.meta[self.field_name] = self.new_value
         
-        # Mark session as dirty
-        self.controller.session_state.dirty = True
-        
         # Store mementos
         self.memento_before = CommandMemento(
             command_type="update_metadata",
@@ -85,7 +88,7 @@ class UpdateMetadataCommand(Command):
                 "new_value": self.new_value,
             },
         )
-        
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def undo(self) -> bool:
@@ -95,7 +98,7 @@ class UpdateMetadataCommand(Command):
             return False
         
         keypoint.meta[self.field_name] = self.old_value
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def redo(self) -> bool:
@@ -105,7 +108,7 @@ class UpdateMetadataCommand(Command):
             return False
         
         keypoint.meta[self.field_name] = self.new_value
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def _find_annotation(self) -> Optional["Keypoint"]:
@@ -114,6 +117,10 @@ class UpdateMetadataCommand(Command):
         for annotation in annotations:
             if annotation.annotation_id == self.annotation_id:
                 return annotation
+        return None
+
+    def emit_change_signals(self) -> None:
+        """Metadata commands publish annotation changes internally."""
         return None
 
 
@@ -159,9 +166,6 @@ class BulkUpdateMetadataCommand(Command):
             # Apply update
             keypoint.meta[field_name] = new_value
         
-        # Mark session as dirty
-        self.controller.session_state.dirty = True
-        
         # Store mementos
         self.memento_before = CommandMemento(
             command_type="bulk_update_metadata",
@@ -173,7 +177,7 @@ class BulkUpdateMetadataCommand(Command):
             image_id=self.image_id,
             data={"updates": len(self.updates)},
         )
-        
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def undo(self) -> bool:
@@ -186,7 +190,7 @@ class BulkUpdateMetadataCommand(Command):
             for field_name, old_value in fields.items():
                 keypoint.meta[field_name] = old_value
         
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def redo(self) -> bool:
@@ -198,7 +202,7 @@ class BulkUpdateMetadataCommand(Command):
             
             keypoint.meta[field_name] = new_value
         
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def _find_annotation(self, annotation_id: str) -> Optional["Keypoint"]:
@@ -207,6 +211,10 @@ class BulkUpdateMetadataCommand(Command):
         for annotation in annotations:
             if annotation.annotation_id == annotation_id:
                 return annotation
+        return None
+
+    def emit_change_signals(self) -> None:
+        """Metadata commands publish annotation changes internally."""
         return None
 
 
@@ -253,9 +261,6 @@ class UpdateLabelCommand(Command):
         # Update label
         keypoint.label = self.new_label
         
-        # Mark session as dirty
-        self.controller.session_state.dirty = True
-        
         # Store mementos
         self.memento_before = CommandMemento(
             command_type="update_label",
@@ -273,7 +278,7 @@ class UpdateLabelCommand(Command):
                 "new_label": self.new_label,
             },
         )
-        
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def undo(self) -> bool:
@@ -283,7 +288,7 @@ class UpdateLabelCommand(Command):
             return False
         
         keypoint.label = self.old_label
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def redo(self) -> bool:
@@ -293,7 +298,7 @@ class UpdateLabelCommand(Command):
             return False
         
         keypoint.label = self.new_label
-        self.controller.session_state.dirty = True
+        _emit_metadata_changed(self.controller, self.image_id)
         return True
     
     def _find_annotation(self) -> Optional["Keypoint"]:
@@ -302,4 +307,8 @@ class UpdateLabelCommand(Command):
         for annotation in annotations:
             if annotation.annotation_id == self.annotation_id:
                 return annotation
+        return None
+
+    def emit_change_signals(self) -> None:
+        """Metadata commands publish annotation changes internally."""
         return None

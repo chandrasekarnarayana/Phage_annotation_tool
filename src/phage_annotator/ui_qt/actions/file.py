@@ -38,7 +38,7 @@ class FileActionsMixin:
             return
 
         self.session_controller.load_images(paths)
-        self._set_status(f"Loaded {len(paths)} image(s)")
+        self._status_success(f"Loaded {len(paths)} image(s)", source="file.open_files")
 
     def _open_folder(self) -> None:
         """Open a folder dialog to discover and load all TIFF images in a folder."""
@@ -52,12 +52,15 @@ class FileActionsMixin:
         tiff_paths = list(folder_path.glob("**/*.tif*"))
 
         if not tiff_paths:
-            self._set_status("No TIFF images found in folder")
+            self._status_warning("No TIFF images found in folder", source="file.open_folder")
             return
 
         tiff_paths.sort()
         self.session_controller.load_images(tiff_paths)
-        self._set_status(f"Loaded {len(tiff_paths)} image(s) from folder")
+        self._status_success(
+            f"Loaded {len(tiff_paths)} image(s) from folder",
+            source="file.open_folder",
+        )
 
     def _recent_limit(self) -> int:
         """Maximum number of recent images to track."""
@@ -119,4 +122,4 @@ class FileActionsMixin:
     def _clear_cache(self) -> None:
         """Clear all cached projections and pyramids from memory."""
         self.session_controller.clear_caches()
-        self._set_status("Cache cleared")
+        self._status_success("Cache cleared", source="file.clear_cache")

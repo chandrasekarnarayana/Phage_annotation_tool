@@ -141,8 +141,12 @@ class DensityControlsMixin:
             self.density_panel.count_total_label.setText(f"Total: {result.count_total:.2f}")
             roi_count = "-" if result.count_roi is None else f"{result.count_roi:.2f}"
             self.density_panel.count_roi_label.setText(f"ROI: {roi_count}")
-            self._set_status(f"Density count: {result.count_total:.2f}")
-            self._refresh_image()
+            self._status_success(
+                f"Density count: {result.count_total:.2f}",
+                timeout_ms=2500,
+                source="density.run",
+            )
+            self._request_ui_refresh("density-controls")
             self.density_panel.run_btn.setEnabled(True)
             self.density_panel.cancel_btn.setEnabled(False)
 
@@ -154,6 +158,8 @@ class DensityControlsMixin:
             on_result=_on_result,
             timeout_sec=900.0,
             retries=2,  # P5.3: Increased from 1 to handle transient errors
+            priority="interactive",
+            replace_key="density-inference",
         )
         self._density_job_id = handle.job_id
         self.density_panel.model_status.setText("Running…")
@@ -210,7 +216,7 @@ class DensityControlsMixin:
         else:
             self._density_overlay = None
             self._density_overlay_extent = None
-        self._refresh_image()
+            self._request_ui_refresh("density-controls")
 
     def _density_overlay_changed(self) -> None:
         if self._density_last_result is None:
@@ -218,7 +224,7 @@ class DensityControlsMixin:
         self._density_overlay_alpha = float(self.density_panel.overlay_alpha.value())
         self._density_overlay_cmap = self.density_panel.overlay_cmap.currentText()
         self._density_contours = self.density_panel.contours_chk.isChecked()
-        self._refresh_image()
+        self._request_ui_refresh("density-controls")
 
     def _density_export_map(self) -> None:
         if self._density_last_result is None:

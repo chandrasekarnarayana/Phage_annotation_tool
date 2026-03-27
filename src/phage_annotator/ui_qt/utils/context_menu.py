@@ -90,18 +90,26 @@ class ContextMenuMixin:
     def _execute_context_command(self, command, success_message: str) -> bool:
         """Execute an annotation context command through controller history."""
         if not self.controller.execute_view_command(command):
-            self._set_status("No annotation found near click.")
+            self._status_warning(
+                "No annotation found near click.",
+                timeout_ms=2500,
+                source="context_menu.execute",
+            )
             return False
 
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         self._refresh_table()
-        self._refresh_image()
+        self._request_ui_refresh("context-menu", table=True)
         self._update_status()
         self._mark_dirty()
         if hasattr(self, "_schedule_qc_validation"):
             self._schedule_qc_validation(self.primary_image.id)
-        self._set_status(success_message)
+        self._status_success(
+            success_message,
+            timeout_ms=2500,
+            source="context_menu.execute",
+        )
         return True
 
     def _edit_annotation_metadata_from_context(

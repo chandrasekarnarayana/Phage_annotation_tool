@@ -5,12 +5,21 @@ from __future__ import annotations
 import time
 from typing import Iterable, Optional
 from phage_annotator.annotation.core import Keypoint
-from phage_annotator.framework import get_event_service
-from phage_annotator.framework.events import AnnotationChangedEvent, CacheInvalidationEvent
+from phage_annotator.session.signal_hub import emit_annotations_changed
 
 
 class SessionAnnotationsMixin:
     """Mixin for annotation mutations and undo/redo helpers."""
+
+    def _assist_context_for_point(self, image_id: int, point: Keypoint) -> dict[str, object]:
+        """Build the local assist context for one committed annotation change."""
+        return {
+            "image_id": int(image_id),
+            "t": int(getattr(point, "t", getattr(self.view_state, "t", 0))),
+            "z": int(getattr(point, "z", getattr(self.view_state, "z", 0))),
+            "roi_id": str(getattr(point, "roi_name", "") or ""),
+            "annotation_space": str(getattr(self.session_state, "annotation_space", "stack")),
+        }
 
     def add_annotation(
         self,
@@ -23,6 +32,13 @@ class SessionAnnotationsMixin:
         label: str,
         scope: str,
         modality_idx: Optional[int] = None,
+        annotation_context: str = "",
+        source: str = "manual",
+        status: str = "active",
+        confidence: Optional[float] = None,
+        roi_name: str = "",
+        notes: str = "",
+        meta: Optional[dict] = None,
     ) -> Keypoint:
         """Add an annotation to the session.
         
@@ -40,15 +56,22 @@ class SessionAnnotationsMixin:
             y=float(y),
             x=float(x),
             label=label,
+            source=str(source or "manual"),
+            meta=dict(meta or {}),
             modality_idx=modality_idx,
+            annotation_context=str(annotation_context or ""),
         )
+        kp.status = str(status or "active")
+        kp.confidence = confidence
+        kp.roi_name = str(roi_name or "")
+        kp.notes = str(notes or "")
         kp.meta["annotator"] = self.session_state.current_user
         kp.meta["timestamp"] = time.time()
         self.session_state.annotations.setdefault(image_id, []).append(kp)
         self.session_state.annotations_loaded[image_id] = True
         self._push_undo({"type": "add_point", "point": kp, "image_id": image_id})
         self.set_dirty(True)
-        self.annotations_changed.emit()
+        emit_annotations_changed(self, image_id=image_id, change_type="added")
         if hasattr(self, "append_audit_event"):
             self.append_audit_event(
                 "annotation_added",
@@ -60,21 +83,20 @@ class SessionAnnotationsMixin:
                 t=kp.t,
                 z=kp.z,
             )
-        
-        # Publish event for service integration
-        try:
-            event_service = get_event_service()
-            event_service.publish(
-                AnnotationChangedEvent(
-                    image_id=image_id,
-                    annotations=self.session_state.annotations.get(image_id, []),
-                    change_type="added"
-                )
+        if hasattr(self, "record_workflow_event"):
+            self.record_workflow_event(
+                "annotation_added",
+                image_id=image_id,
+                source=kp.source,
+                status=kp.status,
             )
-            # Invalidate caches
-            event_service.publish(CacheInvalidationEvent(scope="image", image_id=image_id))
-        except Exception:
-            pass  # Gracefully handle if event service not initialized
+        if hasattr(self, "refresh_provenance_coverage_metrics"):
+            self.refresh_provenance_coverage_metrics()
+        if hasattr(self, "local_truth_update"):
+            context = self._assist_context_for_point(image_id, kp)
+            self.local_truth_update(context, kp)
+            if hasattr(self, "_queue_local_rescore"):
+                self._queue_local_rescore(context)
         
         return kp
 
@@ -95,7 +117,7 @@ class SessionAnnotationsMixin:
             removed += 1
         if removed:
             self.set_dirty(True)
-            self.annotations_changed.emit()            
+            emit_annotations_changed(self, image_id=image_id, change_type="removed")
             if hasattr(self, "append_audit_event"):
                 self.append_audit_event(
                     "annotation_deleted",
@@ -103,19 +125,16 @@ class SessionAnnotationsMixin:
                     count=removed,
                     annotation_ids=[kp.annotation_id for kp in requested_points],
                 )
-            # Publish event for service integration
-            try:
-                event_service = get_event_service()
-                event_service.publish(
-                    AnnotationChangedEvent(
-                        image_id=image_id,
-                        annotations=self.session_state.annotations.get(image_id, []),
-                        change_type="removed"
-                    )
-                )
-                event_service.publish(CacheInvalidationEvent(scope="image", image_id=image_id))
-            except Exception:
-                pass  # Gracefully handle if event service not initialized
+            if hasattr(self, "record_workflow_event"):
+                self.record_workflow_event("annotation_deleted", image_id=image_id, count=removed)
+            if hasattr(self, "refresh_provenance_coverage_metrics"):
+                self.refresh_provenance_coverage_metrics()
+            if hasattr(self, "local_truth_update") and requested_points:
+                context = self._assist_context_for_point(image_id, requested_points[0])
+                for point in requested_points:
+                    self.local_truth_update(self._assist_context_for_point(image_id, point), point)
+                if hasattr(self, "_queue_local_rescore"):
+                    self._queue_local_rescore(context)
         return removed
 
     def update_annotation(self, image_id: int, old: Keypoint, new: Keypoint) -> bool:
@@ -127,7 +146,7 @@ class SessionAnnotationsMixin:
             return False
         pts[idx] = new
         self.set_dirty(True)
-        self.annotations_changed.emit()
+        emit_annotations_changed(self, image_id=image_id, change_type="modified")
         if hasattr(self, "append_audit_event"):
             self.append_audit_event(
                 "annotation_updated",
@@ -136,20 +155,20 @@ class SessionAnnotationsMixin:
                 old_label=old.label,
                 new_label=new.label,
             )
-        
-        # Publish event for service integration
-        try:
-            event_service = get_event_service()
-            event_service.publish(
-                AnnotationChangedEvent(
-                    image_id=image_id,
-                    annotations=self.session_state.annotations.get(image_id, []),
-                    change_type="modified"
-                )
+        if hasattr(self, "record_workflow_event"):
+            self.record_workflow_event(
+                "annotation_updated",
+                image_id=image_id,
+                source=str(getattr(new, "source", "manual")),
+                status=str(getattr(new, "status", "active")),
             )
-            event_service.publish(CacheInvalidationEvent(scope="image", image_id=image_id))
-        except Exception:
-            pass  # Gracefully handle if event service not initialized
+        if hasattr(self, "refresh_provenance_coverage_metrics"):
+            self.refresh_provenance_coverage_metrics()
+        if hasattr(self, "local_truth_update"):
+            self.local_truth_update(self._assist_context_for_point(image_id, old), old)
+            self.local_truth_update(self._assist_context_for_point(image_id, new), new)
+            if hasattr(self, "_queue_local_rescore"):
+                self._queue_local_rescore(self._assist_context_for_point(image_id, new))
         
         return True
 
@@ -181,7 +200,7 @@ class SessionAnnotationsMixin:
         inverse = self._apply_action(action, undo=True)
         if inverse:
             self._redo_stack.append(inverse)
-            self.annotations_changed.emit()
+            emit_annotations_changed(self)
             return True
         self._undo_stack.append(action)
         return False
@@ -204,7 +223,7 @@ class SessionAnnotationsMixin:
         inverse = self._apply_action(action, undo=False)
         if inverse:
             self._undo_stack.append(inverse)
-            self.annotations_changed.emit()
+            emit_annotations_changed(self)
             return True
         self._redo_stack.append(action)
         return False

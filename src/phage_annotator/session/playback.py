@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from phage_annotator.session.signal_hub import emit_playback_changed, emit_state_changed
+
 class SessionPlaybackMixin:
     """Mixin for playback state handlers."""
     def start_playback(self, axis: str) -> None:
@@ -11,25 +13,25 @@ class SessionPlaybackMixin:
         if self.view_state.play_mode == axis:
             return
         self.view_state.play_mode = axis
-        self.playback_changed.emit()
+        emit_playback_changed(self)
 
     def stop_playback(self) -> None:
         """Stop playback mode."""
         if self.view_state.play_mode is None:
             return
         self.view_state.play_mode = None
-        self.playback_changed.emit()
+        emit_playback_changed(self)
 
     def set_loop(self, loop: bool) -> None:
         """Enable/disable playback loop."""
         if self.view_state.loop_playback == loop:
             return
         self.view_state.loop_playback = loop
-        self.playback_changed.emit()
+        emit_playback_changed(self)
 
     def set_fps(self, fps: int) -> None:
         """Set playback FPS."""
         if self.session_state.fps == fps:
             return
         self.session_state.fps = int(fps)
-        self.state_changed.emit()
+        emit_state_changed(self)

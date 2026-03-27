@@ -30,6 +30,7 @@ Thread Safety
 from __future__ import annotations
 
 import pathlib
+from types import MappingProxyType
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
@@ -54,7 +55,7 @@ class StateMixin:
     # --- State proxies (SessionController owns state) -------------------
     @property
     def images(self) -> List["LazyImage"]:
-        return self.controller.session_state.images
+        return list(self.controller.session_state.images)
 
     @images.setter
     def images(self, value: List["LazyImage"]) -> None:
@@ -62,7 +63,7 @@ class StateMixin:
 
     @property
     def labels(self) -> List[str]:
-        return self.controller.session_state.labels
+        return list(self.controller.session_state.labels)
 
     @property
     def current_label(self) -> str:
@@ -74,11 +75,15 @@ class StateMixin:
 
     @property
     def annotations(self) -> Dict[int, List[Keypoint]]:
-        return self.controller.session_state.annotations
+        return MappingProxyType(
+            {int(k): tuple(v) for k, v in self.controller.session_state.annotations.items()}
+        )
 
     @property
     def suggestions(self) -> Dict[int, List[PointSuggestion]]:
-        return self.controller.session_state.suggestions
+        return MappingProxyType(
+            {int(k): tuple(v) for k, v in self.controller.session_state.suggestions.items()}
+        )
 
     @property
     def axis_mode(self) -> Dict[int, str]:
@@ -588,13 +593,20 @@ class StateMixin:
                     return
                 self.proj_cache.put_pyramid(key_result, arr)
                 self._pyramid_jobs.pop(key_result, None)
-                self._refresh_image()
+                self._request_render_refresh("pyramid-job-finished", debounce=True)
 
             def _on_error(err: str) -> None:
                 self._pyramid_jobs.pop(key, None)
                 self._append_log(f"[JOB] Pyramid error\n{err}")
 
-            self.jobs.submit(_job, name=job_name, on_result=_on_result, on_error=_on_error)
+            self.jobs.submit(
+                _job,
+                name=job_name,
+                on_result=_on_result,
+                on_error=_on_error,
+                priority="background",
+                replace_key=job_name,
+            )
         # Fallback: fast subsample while pyramid builds.
         scale = pyramid_level_factor(level)
         return self._downsample(data, scale)
@@ -756,8 +768,14 @@ class StateMixin:
                         def _pyramid_error(err: str, pkey=pyramid_key):
                             self._pyramid_jobs.pop(pkey, None)
                         
-                        self.jobs.submit(_pyramid_job, name=job_name, on_result=_pyramid_result, 
-                                       on_error=_pyramid_error)
+                        self.jobs.submit(
+                            _pyramid_job,
+                            name=job_name,
+                            on_result=_pyramid_result,
+                            on_error=_pyramid_error,
+                            priority="background",
+                            replace_key=job_name,
+                        )
         
         # Now schedule full-res projection job
         if not self.proj_cache.should_compute(int(modality_idx)):
@@ -801,18 +819,9 @@ class StateMixin:
             if not hasattr(self, '_lod_mode_active'):
                 self._lod_mode_active = {}
             self._lod_mode_active[image_id] = False
-            # PHASE 2D FIX: Use debounce timer to trigger refresh asynchronously.
-            # Direct call to _refresh_image() causes recursion: _refresh_image() → _get_projection()
-            # → _request_projection_job() → _on_result() → _refresh_image() → loop.
-            # The debounce timer breaks the recursion by deferring the refresh to the next event loop cycle.
-            if hasattr(self, '_debounce_timer'):
-                try:
-                    self._debounce_timer.start()
-                except RuntimeError:
-                    return
-            else:
-                # Fallback: direct call with guard (shouldn't happen in normal flow)
-                self._refresh_image()
+            # Projection job completions are debounced to avoid re-entering
+            # projection scheduling in the same event-loop turn.
+            self._request_render_refresh("projection-job-finished", debounce=True)
 
         def _on_error(err: str) -> None:
             if job_id_holder["id"] is not None:
@@ -822,7 +831,14 @@ class StateMixin:
                 self.set_panel_visible("logs", True, source="projection_error")
 
         if arr.nbytes >= PROJECTION_ASYNC_BYTES:
-            handle = self.jobs.submit(_job, name=job_name, on_result=_on_result, on_error=_on_error)
+            handle = self.jobs.submit(
+                _job,
+                name=job_name,
+                on_result=_on_result,
+                on_error=_on_error,
+                priority="interactive",
+                replace_key=job_name,
+            )
             job_id_holder["id"] = handle.job_id
             for key in keys:
                 self._projection_jobs[key] = handle.job_id
@@ -966,6 +982,61 @@ class StateMixin:
         return "\n".join(lines) if lines else "Full resolution, no optimizations active"
 
     def _flash_status(self, text: str, ms: int = 1200) -> None:
-        """Show a temporary status message without overwriting the base status."""
-        self._set_status(text)
-        QtCore.QTimer.singleShot(ms, lambda: self._set_status(""))
+        """Show a temporary status message without overwriting derived status."""
+        status_service = getattr(self, "status_service", None)
+        if status_service is None:
+            return
+        from phage_annotator.ui_qt.services.status import StatusMessage
+
+        status_service.post_message(
+            StatusMessage(
+                text=str(text),
+                severity=status_service.infer_severity(text),
+                timeout_ms=int(ms),
+                source="legacy._flash_status",
+                sticky=False,
+                min_visible_ms=min(int(ms), 1200),
+            )
+        )
+
+    def _status_info(self, text: str, *, timeout_ms: int | None = None, source: str = "ui") -> None:
+        """Post an informational status message through the centralized service."""
+        status_service = getattr(self, "status_service", None)
+        if status_service is None:
+            return
+        status_service.info(text, timeout_ms=timeout_ms, source=source)
+
+    def _status_success(self, text: str, *, timeout_ms: int | None = None, source: str = "ui") -> None:
+        """Post a success status message through the centralized service."""
+        status_service = getattr(self, "status_service", None)
+        if status_service is None:
+            return
+        status_service.success(text, timeout_ms=timeout_ms, source=source)
+
+    def _status_warning(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        source: str = "ui",
+        sticky: bool = False,
+    ) -> None:
+        """Post a warning status message through the centralized service."""
+        status_service = getattr(self, "status_service", None)
+        if status_service is None:
+            return
+        status_service.warning(text, timeout_ms=timeout_ms, source=source, sticky=sticky)
+
+    def _status_error(
+        self,
+        text: str,
+        *,
+        timeout_ms: int | None = None,
+        source: str = "ui",
+        sticky: bool = False,
+    ) -> None:
+        """Post an error status message through the centralized service."""
+        status_service = getattr(self, "status_service", None)
+        if status_service is None:
+            return
+        status_service.error(text, timeout_ms=timeout_ms, source=source, sticky=sticky)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import json
+import logging
 import os
 import pathlib
 import time
@@ -20,7 +21,12 @@ from phage_annotator.analysis.suggestion_rules import load_suggestion_rule_confi
 from phage_annotator.analysis.interactive_learning import InteractiveLearningModel
 from phage_annotator.config import SUPPORTED_SUFFIXES
 from phage_annotator.core.annotation import Keypoint, PointSuggestion
+from phage_annotator.session.signal_hub import emit_annotations_changed
 from phage_annotator.ui_qt.assist_state import assist_state_label
+from phage_annotator.ui_qt.actions.assist_context import AssistContextMixin
+from phage_annotator.ui_qt.actions import assist_generation, assist_review, assist_training
+from phage_annotator.ui_qt.actions.assist_strategy import AssistStrategyMixin
+from phage_annotator.ui_qt.actions.standard_workspace import WorkspaceActionsMixin
 from phage_annotator.session.suggestion_commands import (
     AcceptSuggestionCommand,
     AcceptSuggestionsBatchCommand,
@@ -37,7 +43,13 @@ from phage_annotator.ui_qt.rendering.lut_manager import lut_names
 from phage_annotator.io.metadata.reader import MetadataBundle
 
 
+logger = logging.getLogger(__name__)
+
+
 class ActionsMixin(
+    AssistContextMixin,
+    AssistStrategyMixin,
+    WorkspaceActionsMixin,
     NavigationActionsMixin,
     ExportActionsMixin,
     DockActionsMixin,
@@ -46,14 +58,16 @@ class ActionsMixin(
     """Mixin for File/View/Analyze actions and dialogs."""
 
     def _current_annotation_write_context(self) -> tuple[str, str]:
-        """Return normalized write context key (annotation_space, annotate_target)."""
-        space = str(getattr(self.controller.session_state, "annotation_space", "stack")).strip().lower()
-        if space not in ("stack", "projection"):
-            space = "stack"
-        target = str(getattr(self, "annotate_target", "frame")).strip().lower()
-        if target not in ("frame", "mean", "support"):
-            target = "frame"
-        return (space, target)
+        """Return the current write context as (context_key, panel_key)."""
+        context = (
+            dict(self.controller.current_annotation_context() or {})
+            if hasattr(self.controller, "current_annotation_context")
+            else {}
+        )
+        return (
+            str(context.get("context_key", "img:0|panel:frame|space:stack")),
+            str(context.get("panel_key", getattr(self, "annotate_target", "frame"))),
+        )
 
     def _mark_annotation_context_changed(self, reason: str) -> None:
         """Mark write context as changed and requiring explicit confirmation."""
@@ -110,7 +124,11 @@ class ActionsMixin(
         )
         msg.setDefaultButton(QtWidgets.QMessageBox.Cancel)
         if msg.exec() != QtWidgets.QMessageBox.Yes:
-            self._set_status("Write cancelled: context confirmation required.")
+            self._status_warning(
+                "Write cancelled: context confirmation required.",
+                timeout_ms=3000,
+                source="standard.write_context",
+            )
             return False
         self._annotation_write_context_confirmed = current
         self._annotation_write_context_pending = False
@@ -166,11 +184,11 @@ class ActionsMixin(
                 try:
                     self.controller.build_annotation_index(files[0].parent)
                 except Exception:
-                    pass
+                    logger.warning("Failed to build annotation index after opening folder", exc_info=True)
                 self._refresh_annotation_availability()
                 self._refresh_roi_manager()
                 self._refresh_metadata_dock(self.primary_image.id)
-                self._refresh_image()
+                self._request_ui_refresh("standard-actions")
                 self._maybe_autoload_annotations(self.primary_image.id)
 
             self.jobs.submit(
@@ -180,6 +198,8 @@ class ActionsMixin(
                 timeout_sec=300.0,
                 retries=2,
                 retry_delay_sec=1.0,
+                priority="interactive",
+                replace_key="open-folder",
             )
 
     def _reset_confirmations(self) -> None:
@@ -203,23 +223,29 @@ class ActionsMixin(
             self.primary_image.id,
             pixel_size_nm=pixel_size_nm,
             force_image_id=self.primary_image.id,
+            context_panel_key=str(getattr(self, "annotate_target", "frame")),
         )
         meta = self.controller.latest_annotation_meta(self.primary_image.id)
         if meta:
             self._handle_annotation_metadata(self.primary_image.id, meta)
         self._mark_dirty()
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions", table=True)
         self._refresh_table()
 
     def _load_annotations_multi(self) -> None:
         cal = self._get_calibration_state(self.primary_image.id)
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
-        self.controller.load_annotations(self, self.primary_image.id, pixel_size_nm=pixel_size_nm)
+        self.controller.load_annotations(
+            self,
+            self.primary_image.id,
+            pixel_size_nm=pixel_size_nm,
+            context_panel_key=str(getattr(self, "annotate_target", "frame")),
+        )
         meta = self.controller.latest_annotation_meta(self.primary_image.id)
         if meta:
             self._handle_annotation_metadata(self.primary_image.id, meta)
         self._mark_dirty()
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions", table=True)
         self._refresh_table()
 
     def _load_annotations_all(self) -> None:
@@ -275,8 +301,8 @@ class ActionsMixin(
             if meta:
                 self._handle_annotation_metadata(self.primary_image.id, meta)
             self._mark_dirty()
-            self.controller.annotations_changed.emit()
-            self._refresh_image()
+            emit_annotations_changed(self.controller, image_id=self.primary_image.id)
+            self._request_ui_refresh("standard-actions", table=True)
             self._refresh_table()
 
         self.jobs.submit(
@@ -286,6 +312,8 @@ class ActionsMixin(
             timeout_sec=300.0,
             retries=2,
             retry_delay_sec=1.0,
+            priority="interactive",
+            replace_key="load-all-annotations",
         )
 
     def _reload_annotations_current(self) -> None:
@@ -316,7 +344,7 @@ class ActionsMixin(
             self._on_sync_mode_changed()
         if getattr(self, "view_sync", None) is not None:
             self._apply_view_sync_selection()
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")
 
     def _show_about(self) -> None:
         QtWidgets.QMessageBox.information(
@@ -357,47 +385,27 @@ class ActionsMixin(
                 f"- Review queue visible suggestions: {queue_count}\n"
                 "- A/R: accept/reject current suggestion (when suggestions are visible)\n"
                 "- N/P: next/previous uncertain suggestion\n"
-                "- Use right-dock panels: Annotation Table, Review Queue, Why This Suggestion.\n"
+                "- Use right-dock panels: Annotation Table, Review Queue, Suggestion Rationale.\n"
                 "- Use Layouts button near playback for quick presets."
             ),
         )
 
     def _visible_suggestions(self) -> list[PointSuggestion]:
         """Return suggestions visible on active image and T/Z slice."""
-        image_id = self.primary_image.id
-        t_idx = int(self.t_slider.value())
-        z_idx = int(self.z_slider.value())
-        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
-        return [
-            s
-            for s in self.suggestions.get(image_id, [])
-            if int(s.t) in (t_idx, -1) and int(s.z) in (z_idx, -1)
-            and float(getattr(s, "score", getattr(s, "confidence", 0.0))) >= min_score
-        ]
+        return self.controller.get_visible_suggestions(
+            self.primary_image.id,
+            t_index=int(self.t_slider.value()),
+            z_index=int(self.z_slider.value()),
+            min_score=float(getattr(self, "_suggestion_score_threshold", 0.0)),
+        )
 
     def _suggestions_for_current_tz(self) -> list[PointSuggestion]:
         """Return all suggestions for active image and current T/Z, including decided history rows."""
-        image_id = int(self.primary_image.id)
-        t_idx = int(self.t_slider.value())
-        z_idx = int(self.z_slider.value())
-        pending = [
-            s
-            for s in self.suggestions.get(image_id, [])
-            if int(getattr(s, "t", -2)) in (t_idx, -1) and int(getattr(s, "z", -2)) in (z_idx, -1)
-        ]
-        history_rows = [
-            s
-            for s in list(getattr(self.controller.session_state, "suggestion_history", {}).get(image_id, []))
-            if int(getattr(s, "t", -2)) in (t_idx, -1) and int(getattr(s, "z", -2)) in (z_idx, -1)
-        ]
-        seen = {str(getattr(s, "suggestion_id", "")) for s in pending}
-        merged = list(pending)
-        for row in history_rows:
-            sid = str(getattr(row, "suggestion_id", ""))
-            if sid and sid in seen:
-                continue
-            merged.append(row)
-        return merged
+        return self.controller.get_slice_suggestions(
+            int(self.primary_image.id),
+            t_index=int(self.t_slider.value()),
+            z_index=int(self.z_slider.value()),
+        )
 
     def _candidate_suggestion_strategies(self) -> list[str]:
         """Return available suggestion strategies for the current context."""
@@ -512,9 +520,13 @@ class ActionsMixin(
         }
         self._evidence_layer_config = config
         self._active_evidence_preset_name = "custom"
-        self.controller.session_state.evidence_layer_config = dict(config)
-        self._set_status(f"Layer updated: {modality_id} ({role}, visible={visible}).")
-        self._refresh_image()
+        self.controller.set_evidence_layer_config(dict(config))
+        self._status_info(
+            f"Layer updated: {modality_id} ({role}, visible={visible}).",
+            timeout_ms=2500,
+            source="standard.modality_layer",
+        )
+        self._request_ui_refresh("standard-actions")
         self._append_assist_change_log(
             "modality_layer_changed",
             modality_id=str(modality_id),
@@ -532,10 +544,14 @@ class ActionsMixin(
         presets[preset_name] = dict(getattr(self, "_evidence_layer_config", {}) or {})
         self._evidence_layer_presets = presets
         self._active_evidence_preset_name = preset_name
-        self.controller.session_state.evidence_layer_presets = dict(presets)
+        self.controller.set_evidence_layer_presets(dict(presets))
         if getattr(self, "_settings", None) is not None:
             self._settings.setValue("evidenceLayerPresets", json.dumps(presets))
-        self._set_status(f"Saved modality/evidence preset: {preset_name}.")
+        self._status_success(
+            f"Saved modality/evidence preset: {preset_name}.",
+            timeout_ms=3000,
+            source="standard.modality_preset",
+        )
         self._append_assist_change_log("modality_preset_saved", preset=preset_name)
         self._maybe_emit_assist_context_delta("preset_save")
 
@@ -553,14 +569,22 @@ class ActionsMixin(
                 self._evidence_layer_presets = presets
         preset = dict(presets.get(preset_name, {}) or {})
         if not preset:
-            self._set_status(f"No modality/evidence preset named '{preset_name}'.")
+            self._status_warning(
+                f"No modality/evidence preset named '{preset_name}'.",
+                timeout_ms=3000,
+                source="standard.modality_preset",
+            )
             return
         self._evidence_layer_config = preset
         self._active_evidence_preset_name = preset_name
-        self.controller.session_state.evidence_layer_config = dict(preset)
+        self.controller.set_evidence_layer_config(dict(preset))
         self._refresh_modality_layers_panel()
-        self._refresh_image()
-        self._set_status(f"Loaded modality/evidence preset: {preset_name}.")
+        self._request_ui_refresh("standard-actions")
+        self._status_success(
+            f"Loaded modality/evidence preset: {preset_name}.",
+            timeout_ms=3000,
+            source="standard.modality_preset",
+        )
         self._append_assist_change_log("modality_preset_loaded", preset=preset_name)
         self._maybe_emit_assist_context_delta("preset_load")
 
@@ -592,7 +616,11 @@ class ActionsMixin(
                     self.canvas.draw_idle()
             except Exception:
                 pass
-        self._set_status(f"A/B compare: loaded {target}.")
+        self._status_info(
+            f"A/B compare: loaded {target}.",
+            timeout_ms=2500,
+            source="standard.modality_compare",
+        )
         self._append_assist_change_log("modality_preset_compare", preset=target, a=a_name, b=b_name)
 
     def _merge_modal_consensus(
@@ -642,15 +670,22 @@ class ActionsMixin(
                 suggestion_id=seed.suggestion_id,
                 source_model=seed.source_model,
                 source_modality="consensus",
+                supporting_modalities=sorted(bundle.keys()),
+                cross_modality_consistency_score=float(votes / max(1, len(modality_candidates))),
+                control_contradiction_score=0.0,
                 scale_sigma=seed.scale_sigma,
                 psf_radius=seed.psf_radius,
                 roi_id=seed.roi_id,
+                uncertainty_score=seed.uncertainty_score,
+                uncertainty_reason=seed.uncertainty_reason,
+                density_context=dict(getattr(seed, "density_context", {}) or {}),
                 score_components=dict(seed.score_components),
                 status=seed.status,
                 meta=dict(seed.meta),
             )
             combined.meta["features"] = bundle
             combined.meta["consensus_votes"] = int(votes)
+            combined.meta["supporting_modalities"] = list(combined.supporting_modalities)
             merged.append(combined)
         return merged
 
@@ -671,6 +706,9 @@ class ActionsMixin(
         if not frames:
             return []
         strategy_key = str(strategy or "current_view").lower()
+        generation_space = str(
+            getattr(self.controller.session_state, "generation_space", "stack")
+        ).strip().lower()
         roi_id = "active_roi" if self.roi_shape != "none" else None
         roi_shape = str(self.roi_shape)
         roi_rect = tuple(self.roi_rect)
@@ -693,6 +731,36 @@ class ActionsMixin(
                 row.meta.setdefault("features", {})
                 row.meta["features"][modality_id] = dict(row.score_components)
             return rows
+
+        # Projection-space generation changes the evidence basis without
+        # changing the annotation truth path. It stays deterministic for
+        # identical inputs and avoids hidden count-based suppression.
+        if (
+            generation_space == "projection"
+            and "_full_stack_t" in frames
+            and hasattr(model, "predict_from_stack")
+        ):
+            try:
+                rows = model.predict_from_stack(
+                    frames["_full_stack_t"],
+                    image_id=image.id,
+                    image_name=image.name,
+                    label=label,
+                    z_frame=z_idx,
+                    strategy="raw",
+                    roi_id=roi_id,
+                    roi_shape=roi_shape,
+                    roi_rect=roi_rect,
+                    refine_from_stack=False,
+                )
+                for row in rows:
+                    row.source_modality = f"{strategy_key}_projection"
+                    row.meta.setdefault("features", {})
+                    row.meta["generation_space"] = "projection"
+                    row.meta["features"][row.source_modality] = dict(row.score_components)
+                return rows
+            except Exception:
+                pass
 
         # Stack-aware detection: uses full temporal/z stack for enhanced SNR
         if strategy_key in ("stack_aware", "stack-aware"):
@@ -740,24 +808,46 @@ class ActionsMixin(
             rule = getattr(cfg, "semantic_rules", {}).get(strategy_key)
             if rule is None:
                 return seeds
-            filtered = []
             for suggestion in seeds:
                 features = dict(suggestion.meta.get("features", {}))
-                keep = True
+                penalty = 0.0
+                support_modalities = set(getattr(suggestion, "supporting_modalities", []) or [])
                 for modality_id, threshold in dict(rule.positive_modalities).items():
                     peak = float(dict(features.get(modality_id, {})).get("peak", -np.inf))
                     if peak < float(threshold):
-                        keep = False
-                        break
-                if keep:
-                    for modality_id, threshold in dict(rule.negative_modalities).items():
-                        peak = float(dict(features.get(modality_id, {})).get("peak", np.inf))
-                        if peak > float(threshold):
-                            keep = False
-                            break
-                if keep:
-                    filtered.append(suggestion)
-            return filtered
+                        penalty += 0.15
+                    else:
+                        support_modalities.add(str(modality_id))
+                contradiction = 0.0
+                for modality_id, threshold in dict(rule.negative_modalities).items():
+                    peak = float(dict(features.get(modality_id, {})).get("peak", 0.0))
+                    if peak > float(threshold):
+                        contradiction = max(
+                            contradiction,
+                            min(1.0, (peak - float(threshold)) / max(abs(float(threshold)), 1.0)),
+                        )
+                        support_modalities.add(str(modality_id))
+                suggestion.supporting_modalities = sorted(support_modalities)
+                suggestion.control_contradiction_score = float(max(getattr(suggestion, "control_contradiction_score", 0.0) or 0.0, contradiction))
+                suggestion.cross_modality_consistency_score = float(max(0.0, 1.0 - penalty - contradiction))
+                suggestion.score_components["control_contradiction_score"] = float(suggestion.control_contradiction_score)
+                suggestion.score_components["cross_modality_consistency_score"] = float(suggestion.cross_modality_consistency_score)
+                suggestion.meta["supporting_modalities"] = list(suggestion.supporting_modalities)
+                suggestion.meta["control_contradiction_score"] = float(suggestion.control_contradiction_score)
+                suggestion.meta["cross_modality_consistency_score"] = float(suggestion.cross_modality_consistency_score)
+                if contradiction > 0.0:
+                    suggestion.uncertainty_reason = ",".join(
+                        filter(
+                            None,
+                            dict.fromkeys(
+                                [str(getattr(suggestion, "uncertainty_reason", "") or "").strip(), "control_contradiction"]
+                            ),
+                        )
+                    )
+                    suggestion.meta["uncertainty_reason"] = suggestion.uncertainty_reason
+                    suggestion.uncertainty_score = float(max(float(getattr(suggestion, "uncertainty_score", 0.0) or 0.0), min(1.0, contradiction)))
+                    suggestion.meta["uncertainty_score"] = float(suggestion.uncertainty_score)
+            return seeds
 
         # Legacy channel strategies still supported via existing gating.
         seed_id = "current_view" if "current_view" in frames else next(iter(frames.keys()))
@@ -786,7 +876,11 @@ class ActionsMixin(
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Rule config load failed", str(exc))
             return
-        self._set_status(f"Loaded suggestion rule config: {pathlib.Path(path).name}")
+        self._status_success(
+            f"Loaded suggestion rule config: {pathlib.Path(path).name}.",
+            timeout_ms=3000,
+            source="standard.suggestion_rules",
+        )
 
     def _apply_cross_channel_gating(
         self, suggestions: list[PointSuggestion], *, strategy: str, t_idx: int, z_idx: int
@@ -875,17 +969,30 @@ class ActionsMixin(
             )
         except Exception:
             ranked = list(suggestions)
-        ranked.sort(key=lambda s: float(getattr(s, "score", 0.0)), reverse=True)
-        
-        # Apply interactive ML predictions (Weka-inspired)
-        if hasattr(self, "_interactive_learning_model") and self._interactive_learning_model.is_trained:
+        ranked.sort(
+            key=lambda s: (
+                -float(getattr(s, "score", 0.0)),
+                int(getattr(s, "t", 0)),
+                int(getattr(s, "z", 0)),
+                float(getattr(s, "y", 0.0)),
+                float(getattr(s, "x", 0.0)),
+                str(getattr(s, "suggestion_id", "")),
+            )
+        )
+
+        # Apply experimental sidecar predictions only when explicitly enabled.
+        if self._interactive_learning_enabled() and self._interactive_learning_model.is_trained:
             predictions = self._interactive_learning_model.predict(ranked)
             for suggestion, prediction in zip(ranked, predictions):
                 suggestion.meta["ml_prediction"] = prediction["accepted"]
                 suggestion.meta["ml_confidence"] = prediction["confidence"]
                 suggestion.meta["ml_uncertainty"] = prediction["uncertainty"]
                 suggestion.meta["ml_method"] = prediction["method"]
-        
+        else:
+            for suggestion in ranked:
+                for key in ("ml_prediction", "ml_confidence", "ml_uncertainty", "ml_method"):
+                    suggestion.meta.pop(key, None)
+
         return ranked
 
     def _enrich_suggestions_for_training(
@@ -898,7 +1005,8 @@ class ActionsMixin(
             y = float(suggestion.y)
             x = float(suggestion.x)
             min_border = min(x, y, float(w - 1) - x, float(h - 1) - y)
-            nearest = float("inf")
+            nearest_truth = float("inf")
+            nearest_any = float("inf")
             for kp in anns:
                 if int(kp.t) not in (int(suggestion.t), -1):
                     continue
@@ -907,14 +1015,22 @@ class ActionsMixin(
                 dx = float(kp.x) - x
                 dy = float(kp.y) - y
                 dist = float((dx * dx + dy * dy) ** 0.5)
-                if dist < nearest:
-                    nearest = dist
-            if not np.isfinite(nearest):
-                nearest = float(max(h, w))
-            suggestion.meta["distance_to_nearest_accepted"] = float(nearest)
+                nearest_any = min(nearest_any, dist)
+                status = str(getattr(kp, "status", "active") or "active").strip().lower()
+                source = str(getattr(kp, "source", "manual") or "manual").strip().lower()
+                if status in {"rejected", "conflict"} or source in {"suggestion", "proposed"}:
+                    continue
+                nearest_truth = min(nearest_truth, dist)
+            if not np.isfinite(nearest_truth):
+                nearest_truth = float(max(h, w))
+            if not np.isfinite(nearest_any):
+                nearest_any = float(max(h, w))
+            suggestion.meta["distance_to_nearest_accepted"] = float(nearest_truth)
+            suggestion.meta["distance_to_nearest_truth_strict"] = float(nearest_truth)
+            suggestion.meta["distance_to_any_annotation"] = float(nearest_any)
             suggestion.meta["border_proximity"] = float(max(0.0, min_border))
             suggestion.meta["derived_from_accepted_area"] = bool(
-                nearest <= float(getattr(suggestion, "psf_radius", 6.0))
+                nearest_truth <= float(getattr(suggestion, "psf_radius", 6.0))
             )
 
     def _note_annotation_edit(self, image_id: Optional[int] = None) -> None:
@@ -926,415 +1042,21 @@ class ActionsMixin(
             self._annotation_edit_ts_by_image = by_image
         by_image[target_id] = float(time.time())
 
-    def _format_age_short(self, seconds: float) -> str:
-        """Return compact age string for status labels."""
-        age = max(0.0, float(seconds))
-        if age < 60.0:
-            return f"{int(round(age))}s"
-        if age < 3600.0:
-            return f"{int(round(age / 60.0))} min"
-        return f"{age / 3600.0:.1f} h"
-
-    def _suggestion_freshness_state(
-        self,
-        image_id: Optional[int] = None,
-        suggestions: Optional[list[PointSuggestion]] = None,
-    ) -> dict:
-        """Return freshness metadata for pending suggestions on an image."""
-        target_id = int(self.primary_image.id if image_id is None else image_id)
-        rows = (
-            list(self.suggestions.get(target_id, []))
-            if suggestions is None
-            else list(suggestions)
-        )
-        ts_vals = []
-        for row in rows:
-            ts = dict(getattr(row, "meta", {}) or {}).get("generated_at_ts")
-            if ts is None:
-                continue
-            try:
-                ts_vals.append(float(ts))
-            except Exception:
-                continue
-        if not ts_vals:
-            return {
-                "has_suggestions": bool(rows),
-                "has_timestamp": False,
-                "age_seconds": None,
-                "age_text": "n/a",
-                "is_stale": False,
-                "reason": "",
-            }
-        latest_gen_ts = max(ts_vals)
-        age_seconds = max(0.0, float(time.time()) - latest_gen_ts)
-        by_image = getattr(self, "_annotation_edit_ts_by_image", {}) or {}
-        last_edit_ts = float(by_image.get(target_id, 0.0))
-        is_stale = last_edit_ts > latest_gen_ts
-        reason = "Edits happened after suggestion generation." if is_stale else ""
-        return {
-            "has_suggestions": bool(rows),
-            "has_timestamp": True,
-            "age_seconds": age_seconds,
-            "age_text": self._format_age_short(age_seconds),
-            "is_stale": bool(is_stale),
-            "reason": reason,
-        }
-
-    def _effective_assist_context_parts(self, suggestions: Optional[list[PointSuggestion]] = None) -> dict[str, str]:
-        """Return compact effective assist context components for trust-critical display."""
-        projection_txt = "raw"
-        if getattr(self, "projection_selector", None) is not None:
-            try:
-                p_name, p_axis = self.projection_selector.current_selection()
-                if str(p_name).strip().lower() == "raw":
-                    p_name = "source frame"
-                projection_txt = f"{p_name} ({p_axis})"
-            except Exception:
-                projection_txt = "source frame"
-        scope = "stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "slice"
-        target = str(getattr(self, "annotate_target", "frame"))
-        strategy = str(getattr(self, "_suggestion_strategy", "current_view"))
-        preset = str(getattr(self, "_active_evidence_preset_name", "custom"))
-        freshness = self._suggestion_freshness_state(self.primary_image.id, suggestions)
-        stale_txt = "stale" if freshness.get("is_stale", False) else "fresh"
-        return {
-            "strategy": strategy,
-            "preset": preset,
-            "projection": projection_txt,
-            "scope": scope,
-            "target": target,
-            "stale": stale_txt,
-        }
-
-    def _effective_assist_context_line(self, suggestions: Optional[list[PointSuggestion]] = None) -> str:
-        """Build immutable one-line context summary for status/review surfaces."""
-        p = self._effective_assist_context_parts(suggestions)
-        return (
-            f"Strategy={p['strategy']} | Preset={p['preset']} | Projection={p['projection']} | "
-            f"Scope={p['scope']} | Target={p['target']} | State={p['stale']}"
-        )
-
-    def _remember_generation_context(self, suggestions: Optional[list[PointSuggestion]] = None) -> None:
-        """Persist context snapshot at suggestion-generation time for delta notices."""
-        parts = self._effective_assist_context_parts(suggestions)
-        self._last_generation_context_signature = dict(parts)
-        self._last_generation_context_text = self._effective_assist_context_line(suggestions)
-        self._last_assist_context_delta_text = ""
-
-    def _maybe_emit_assist_context_delta(self, source: str) -> None:
-        """Emit concise context-delta hint when effective generation context changed."""
-        last = dict(getattr(self, "_last_generation_context_signature", {}) or {})
-        if not last:
-            return
-        now = self._effective_assist_context_parts()
-        watched_keys = ("strategy", "preset", "projection")
-        changed = [k for k in watched_keys if str(last.get(k, "")) != str(now.get(k, ""))]
-        if not changed:
-            return
-        delta = ", ".join(f"{k}: {last.get(k)} -> {now.get(k)}" for k in changed)
-        text = f"Assist context changed ({source}): {delta}"
-        self._last_assist_context_delta_text = text
-        self._set_status(text)
-        self._append_assist_change_log("context_delta", source=source, delta=delta)
-        self._refresh_assist_warmup_panel()
-
-    def _append_assist_change_log(self, event: str, **details) -> None:
-        """Append assist context log entries for reproducibility and export."""
-        payload = {"event": str(event), "details": dict(details), "ts": float(time.time())}
-        if hasattr(self.controller, "append_audit_event"):
-            self.controller.append_audit_event("assist_change", **payload)
-        if hasattr(self, "_append_log"):
-            self._append_log(f"[ASSIST] {event}: {details}")
-
-    def _sync_status_strategy_selector(self) -> None:
-        """Keep status-bar strategy selector in sync with available/current strategy."""
-        combo = getattr(self, "status_strategy_combo", None)
-        if combo is None:
-            return
-        options = self._candidate_suggestion_strategies()
-        current = str(getattr(self, "_suggestion_strategy", "current_view"))
-        combo.blockSignals(True)
-        combo.clear()
-        for opt in options:
-            combo.addItem(self._strategy_display_label(opt), opt)
-        idx = combo.findData(current)
-        combo.setCurrentIndex(idx if idx >= 0 else 0)
-        combo.blockSignals(False)
-
-    def _strategy_display_label(self, strategy: str) -> str:
-        """Return user-facing label for strategy keys while preserving stable internal ids."""
-        key = str(strategy or "").strip()
-        labels = {
-            "raw": "Source Frame",
-            "current_view": "Current View",
-            "corrected": "Corrected",
-            "mean_projection": "Mean Projection",
-            "evidence_consensus": "Evidence Consensus",
-            "evidence_contradiction": "Evidence Contradiction",
-        }
-        return str(labels.get(key, key.replace("_", " ").title()))
-
-    def _strategy_from_display_label(self, strategy: str) -> str:
-        """Map display labels back to canonical strategy keys."""
-        text = str(strategy or "").strip()
-        if not text:
-            return "current_view"
-        options = self._candidate_suggestion_strategies()
-        if text in options:
-            return text
-        for option in options:
-            if self._strategy_display_label(option).lower() == text.lower():
-                return option
-        return text
-
-    def _set_suggestion_strategy(self, strategy: str, *, source: str = "ui") -> None:
-        """Set suggestion strategy from any UI surface."""
-        selected = self._strategy_from_display_label(str(strategy or "current_view"))
-        strategies = self._candidate_suggestion_strategies()
-        if selected not in strategies:
-            selected = strategies[0] if strategies else "current_view"
-        self._suggestion_strategy = selected
-        self.controller.session_state.suggestion_strategy = self._suggestion_strategy
-        self._sync_status_strategy_selector()
-        self._set_status(
-            f"Suggestion strategy ({source}): {self._strategy_display_label(self._suggestion_strategy)}."
-        )
-        self._append_assist_change_log(
-            "strategy_changed", source=str(source), strategy=self._suggestion_strategy
-        )
-        self._maybe_emit_assist_context_delta("strategy")
-        self._refresh_assist_warmup_panel()
-
-    def _select_suggestion_strategy_dialog(self) -> None:
-        """Choose proposal strategy used by Suggest actions."""
-        strategies = self._candidate_suggestion_strategies()
-        current = str(getattr(self, "_suggestion_strategy", "raw"))
-        idx = strategies.index(current) if current in strategies else 0
-        selected, ok = QtWidgets.QInputDialog.getItem(
-            self,
-            "Suggest Points Using",
-            "Strategy:",
-            strategies,
-            idx,
-            False,
-        )
-        if not ok:
-            return
-        self._set_suggestion_strategy(str(selected), source="dialog")
-
-    def _set_suggestion_score_threshold_dialog(self) -> None:
-        """Set display threshold for proposal score."""
-        current = float(getattr(self, "_suggestion_score_threshold", 0.0))
-        value, ok = QtWidgets.QInputDialog.getDouble(
-            self,
-            "Show Suggestions With Score >= X",
-            "Score threshold (0-1):",
-            current,
-            0.0,
-            1.0,
-            2,
-        )
-        if not ok:
-            return
-        self._suggestion_score_threshold = float(value)
-        self.controller.session_state.suggestion_score_threshold = self._suggestion_score_threshold
-        self._refresh_image()
-        self._set_status(
-            f"Show suggestions with acceptance likelihood (p_accept) >= {self._suggestion_score_threshold:.2f}; generator score is heuristic."
-        )
-        self._refresh_assist_warmup_panel()
-
     def _suggest_points_current_slice(self) -> None:
         """Generate model suggestions for the current slice."""
-        image_data = self._slice_data(self.primary_image)
-        if image_data is None:
-            return
-        image_id = self.primary_image.id
-        t_idx = int(self.t_slider.value())
-        z_idx = int(self.z_slider.value())
-        generated = self._gating_strategy_candidates(
-            image=self.primary_image,
-            t_idx=t_idx,
-            z_idx=z_idx,
-            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
-            label=str(self.current_label),
-        )
-        generated = self._rank_and_calibrate_suggestions(generated)
-        self._enrich_suggestions_for_training(generated, image_data)
-        generated_at = float(time.time())
-        for suggestion in generated:
-            suggestion.meta["generated_at_ts"] = generated_at
-        self.suggestions.setdefault(image_id, []).extend(generated)
-        self.controller.session_state.suggestion_history.setdefault(image_id, []).extend(
-            list(generated)
-        )
-        self.suggestions[image_id].sort(key=lambda s: float(s.score), reverse=True)
-        self.controller.update_suggestion_metrics(generated=len(generated))
-        self.controller.append_audit_event(
-            "suggestions_generated",
-            image_id=image_id,
-            model=getattr(getattr(self, "_suggestion_model", None), "model_name", "unknown"),
-            count=len(generated),
-            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
-        )
-        self._remember_generation_context(generated)
-        ctx_key = self.controller._context_key(
-            suggestion=(generated[0] if generated else PointSuggestion(image_id, self.primary_image.name, t_idx, z_idx, 0, 0, 0.0)),
-            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
-        )
-        _, assist_txt = self.controller.assist_status(
-            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
-            context_key=ctx_key,
-        )
-        self._suggestion_cursor = 0
-        self._refresh_image()
-        self._set_status(f"Generated {len(generated)} ranked suggestion(s). {assist_txt}")
-        self._refresh_assist_warmup_panel()
+        assist_generation.suggest_points_current_slice(self)
 
     def _suggest_points_current_image(self) -> None:
         """Generate suggestions for all T/Z slices in the active image."""
-        image = self.primary_image
-        if image.array is None:
-            return
-        image_id = image.id
-        total = 0
-        t_size = int(image.array.shape[0])
-        z_size = int(image.array.shape[1])
-        for t_idx in range(t_size):
-            for z_idx in range(z_size):
-                slice_data = self._slice_data(image, t_override=t_idx, z_override=z_idx)
-                generated = self._gating_strategy_candidates(
-                    image=image,
-                    t_idx=t_idx,
-                    z_idx=z_idx,
-                    strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
-                    label=str(self.current_label),
-                )
-                generated = self._rank_and_calibrate_suggestions(generated)
-                self._enrich_suggestions_for_training(generated, slice_data)
-                generated_at = float(time.time())
-                for suggestion in generated:
-                    suggestion.meta["generated_at_ts"] = generated_at
-                total += len(generated)
-                self.suggestions.setdefault(image_id, []).extend(generated)
-                self.controller.session_state.suggestion_history.setdefault(image_id, []).extend(
-                    list(generated)
-                )
-        self.suggestions.setdefault(image_id, []).sort(key=lambda s: float(s.score), reverse=True)
-        self.controller.update_suggestion_metrics(generated=total)
-        self.controller.append_audit_event(
-            "suggestions_generated",
-            image_id=image_id,
-            model=getattr(getattr(self, "_suggestion_model", None), "model_name", "unknown"),
-            count=total,
-            scope="all_slices",
-            strategy=str(getattr(self, "_suggestion_strategy", "current_view")),
-        )
-        self._remember_generation_context(self.suggestions.get(image_id, []))
-        self._suggestion_cursor = 0
-        self._refresh_image()
-        self._set_status(f"Generated {total} ranked suggestion(s) for full image.")
-        self._refresh_assist_warmup_panel()
+        assist_generation.suggest_points_current_image(self)
 
     def _accept_visible_suggestions(self) -> None:
         """Accept visible suggestions as one reviewed batch command."""
-        if not self._ensure_annotation_write_context_confirmed("Accept suggestions"):
-            return
-        visible = self._visible_suggestions()
-        if not visible:
-            self._set_status("No visible suggestions to accept.")
-            return
-        freshness = self._suggestion_freshness_state(self.primary_image.id, visible)
-        selected_ids = self._preview_batch_accept_dialog(
-            candidates=list(visible),
-            title="Preview Batch Accept (Visible Suggestions)",
-            description=(
-                "Select visible suggestions to accept. "
-                "This will be applied as one batch undo step."
-            ),
-            stale_override_required=bool(
-                bool(getattr(self, "_disable_bulk_accept_when_stale", True))
-                and freshness.get("is_stale", False)
-            ),
-        )
-        if selected_ids is None:
-            self._set_status("Batch accept cancelled.")
-            return
-        if not selected_ids:
-            self._set_status("Batch accept cancelled (no suggestions selected).")
-            return
-        cmd = AcceptSuggestionsBatchCommand(self.controller, self.primary_image.id, selected_ids)
-        accepted = 0
-        if self.controller.execute_view_command(cmd):
-            accepted = len(selected_ids)
-            self.controller.update_suggestion_metrics(correction_distance=0.0)
-            
-            # Add to interactive learning model (Weka-inspired)
-            if hasattr(self, "_interactive_learning_model"):
-                for suggestion in visible:
-                    if suggestion.suggestion_id in selected_ids:
-                        self._interactive_learning_model.add_example(suggestion, accepted=True)
-            
-            if bool(getattr(self, "_timed_session_active", False)):
-                self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + accepted
-                self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + accepted
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        if accepted:
-            self._note_annotation_edit(self.primary_image.id)
-            self._refresh_table()
-            self._refresh_image()
-            self._schedule_qc_validation(self.primary_image.id)
-        self._set_status(f"Accepted {accepted} suggestion(s).")
-        self._refresh_assist_warmup_panel()
+        assist_generation.accept_visible_suggestions(self)
 
     def _accept_high_confidence_suggestions(self) -> None:
         """Accept all visible green suggestions (calibrated p_accept >= 0.75)."""
-        if not self._ensure_annotation_write_context_confirmed("Accept high-confidence suggestions"):
-            return
-        visible = self._visible_suggestions()
-        candidates = [
-            s
-            for s in visible
-            if bool(dict(getattr(s, "meta", {}) or {}).get("confidence_available", False))
-            and float(dict(getattr(s, "meta", {}) or {}).get("p_accept", 0.0)) >= 0.75
-        ]
-        if not candidates:
-            self._set_status("No high-confidence suggestions to accept.")
-            return
-        freshness = self._suggestion_freshness_state(self.primary_image.id, visible)
-        selected_ids = self._preview_batch_accept_dialog(
-            candidates=candidates,
-            title="Preview Batch Accept (Green Suggestions)",
-            description=(
-                "Select high-confidence suggestions to accept. "
-                "This will be applied as one batch undo step."
-            ),
-            stale_override_required=bool(
-                bool(getattr(self, "_disable_bulk_accept_when_stale", True))
-                and freshness.get("is_stale", False)
-            ),
-        )
-        if selected_ids is None:
-            self._set_status("Batch accept cancelled.")
-            return
-        if not selected_ids:
-            self._set_status("Batch accept cancelled (no suggestions selected).")
-            return
-        cmd = AcceptSuggestionsBatchCommand(self.controller, self.primary_image.id, selected_ids)
-        accepted = 0
-        if self.controller.execute_view_command(cmd):
-            accepted = len(selected_ids)
-            self.controller.update_suggestion_metrics(correction_distance=0.0)
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        if accepted:
-            self._note_annotation_edit(self.primary_image.id)
-            self._refresh_table()
-            self._refresh_image()
-            self._schedule_qc_validation(self.primary_image.id)
-        self._set_status(f"Accepted {accepted} high-confidence suggestion(s).")
-        self._refresh_assist_warmup_panel()
+        assist_generation.accept_high_confidence_suggestions(self)
 
     def _preview_batch_accept_dialog(
         self,
@@ -1348,138 +1070,35 @@ class ActionsMixin(
 
         Returns None when user cancels.
         """
-        if not candidates:
-            return []
-        if stale_override_required and os.environ.get("QT_QPA_PLATFORM", "").lower() == "offscreen":
-            self._set_status("Batch blocked: stale suggestions require one-shot override confirmation.")
-            return []
-        dialog = QtWidgets.QDialog(self)
-        dialog.setWindowTitle(str(title))
-        layout = QtWidgets.QVBoxLayout(dialog)
-        layout.addWidget(QtWidgets.QLabel(str(description)))
-        stale_chk = None
-        if stale_override_required:
-            warn = QtWidgets.QLabel(
-                "Stale detected: annotations changed after suggestion generation.\n"
-                "Regenerate is recommended. To proceed once, acknowledge below."
-            )
-            warn.setStyleSheet("color: #d84315; font-weight: 600;")
-            warn.setWordWrap(True)
-            layout.addWidget(warn)
-            stale_chk = QtWidgets.QCheckBox("Accept stale suggestions for this batch only")
-            stale_chk.setChecked(False)
-            layout.addWidget(stale_chk)
-        table = QtWidgets.QTableWidget(len(candidates), 5, dialog)
-        table.setHorizontalHeaderLabels(
-            ["Use", "x", "y", "generator score", "Acceptance likelihood (p_accept)"]
+        return assist_generation.preview_batch_accept_dialog(
+            self,
+            candidates=candidates,
+            title=title,
+            description=description,
+            stale_override_required=stale_override_required,
         )
-        for row, suggestion in enumerate(candidates):
-            use_item = QtWidgets.QTableWidgetItem()
-            use_item.setFlags(use_item.flags() | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
-            use_item.setCheckState(QtCore.Qt.CheckState.Checked)
-            table.setItem(row, 0, use_item)
-            table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(int(round(float(suggestion.x))))))
-            table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(int(round(float(suggestion.y))))))
-            table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{float(suggestion.score):.2f}"))
-            p_accept = float(dict(getattr(suggestion, "meta", {}) or {}).get("p_accept", 0.0))
-            conf_avail = bool(dict(getattr(suggestion, "meta", {}) or {}).get("confidence_available", False))
-            p_text = f"{p_accept:.2f}" if conf_avail else "heuristic"
-            table.setItem(row, 4, QtWidgets.QTableWidgetItem(p_text))
-        table.resizeColumnsToContents()
-        layout.addWidget(table)
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel,
-            parent=dialog,
-        )
-        layout.addWidget(buttons)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            return None
-        if stale_override_required and (stale_chk is None or not stale_chk.isChecked()):
-            self._set_status("Batch blocked: stale suggestions require one-shot override confirmation.")
-            return []
-        selected_ids: List[str] = []
-        for row, suggestion in enumerate(candidates):
-            item = table.item(row, 0)
-            if item is not None and item.checkState() == QtCore.Qt.CheckState.Checked:
-                selected_ids.append(str(suggestion.suggestion_id))
-        return selected_ids
 
     def _reject_visible_suggestions(self) -> None:
         """Reject all visible suggestions via undoable commands."""
-        visible = self._visible_suggestions()
-        reason_key = "unspecified"
-        rejected = 0
-        for suggestion in list(visible):
-            cmd = RejectSuggestionCommand(
-                self.controller, self.primary_image.id, suggestion.suggestion_id
-            )
-            if self.controller.execute_view_command(cmd):
-                rejected += 1
-                self.controller.update_suggestion_metrics(**{f"reject_reason::{reason_key}": 1})
-                if bool(getattr(self, "_timed_session_active", False)):
-                    self._timed_session_rejects = int(getattr(self, "_timed_session_rejects", 0)) + 1
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        if rejected:
-            self._refresh_image()
-            self.controller.append_audit_event(
-                "suggestions_rejected",
-                image_id=self.primary_image.id,
-                count=rejected,
-                reason=reason_key,
-            )
-        self._set_status(f"Rejected {rejected} suggestion(s).")
-        self._refresh_assist_warmup_panel()
+        assist_generation.reject_visible_suggestions(self)
 
     def _accept_suggestions_in_roi(self) -> None:
         """Accept visible suggestions that are currently inside ROI."""
-        visible = self._visible_suggestions()
-        candidates = [s for s in visible if self._point_in_roi(float(s.x), float(s.y))]
-        accepted = 0
-        for suggestion in list(candidates):
-            cmd = AcceptSuggestionCommand(
-                self.controller, self.primary_image.id, suggestion.suggestion_id
-            )
-            if self.controller.execute_view_command(cmd):
-                accepted += 1
-                self.controller.update_suggestion_metrics(correction_distance=0.0)
-                if bool(getattr(self, "_timed_session_active", False)):
-                    self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
-                    self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        if accepted:
-            self._note_annotation_edit(self.primary_image.id)
-            self._refresh_table()
-            self._refresh_image()
-            self._schedule_qc_validation(self.primary_image.id)
-            self.controller.append_audit_event(
-                "suggestions_accepted_in_roi",
-                image_id=self.primary_image.id,
-                count=accepted,
-            )
-        self._set_status(f"Accepted {accepted} suggestion(s) in ROI.")
-        self._refresh_assist_warmup_panel()
+        assist_generation.accept_suggestions_in_roi(self)
 
     def _clear_suggestions_current_image(self) -> None:
         """Clear all pending suggestions for active image."""
-        cmd = ClearSuggestionsCommand(self.controller, self.primary_image.id)
-        if not self.controller.execute_view_command(cmd):
-            self._set_status("No suggestions to clear.")
-            return
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        self._refresh_image()
-        self._set_status("Cleared suggestions.")
-        self._refresh_assist_warmup_panel()
+        assist_generation.clear_suggestions_current_image(self)
 
     def _batch_correct_suggestions_dialog(self) -> None:
         """Apply a constant (dx, dy) correction to top-N uncertain suggestions."""
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions to batch-correct.")
+            self._status_info(
+                "No visible suggestions to batch-correct.",
+                timeout_ms=2500,
+                source="standard.batch_correct",
+            )
             return
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("Batch Correct Suggestions")
@@ -1518,11 +1137,19 @@ class ActionsMixin(
         """Apply (dx, dy) to first `count` uncertain suggestions and log correction signal."""
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions to batch-correct.")
+            self._status_info(
+                "No visible suggestions to batch-correct.",
+                timeout_ms=2500,
+                source="standard.batch_correct",
+            )
             return
         rows = list(ranked[: max(0, int(count))])
         if not rows:
-            self._set_status("No suggestions selected for batch correction.")
+            self._status_info(
+                "No suggestions selected for batch correction.",
+                timeout_ms=2500,
+                source="standard.batch_correct",
+            )
             return
         moved = 0
         h = int(self.primary_image.array.shape[2]) if getattr(self.primary_image, "array", None) is not None else None
@@ -1555,10 +1182,12 @@ class ActionsMixin(
             dx=float(dx),
             dy=float(dy),
         )
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")
         self._refresh_assist_warmup_panel()
-        self._set_status(
-            f"Batch-corrected {moved} suggestion(s) with dx={dx:.2f}, dy={dy:.2f}."
+        self._status_success(
+            f"Batch-corrected {moved} suggestion(s) with dx={dx:.2f}, dy={dy:.2f}.",
+            timeout_ms=3000,
+            source="standard.batch_correct",
         )
 
     def _apply_review_queue_offset(self, count: int, dx: float, dy: float) -> None:
@@ -1570,7 +1199,11 @@ class ActionsMixin(
         image = self.primary_image
         arr = getattr(image, "array", None)
         if arr is None or getattr(arr, "ndim", 0) < 4:
-            self._set_status("No stack loaded for propagation.")
+            self._status_warning(
+                "No stack loaded for propagation.",
+                timeout_ms=2500,
+                source="standard.propagate",
+            )
             return
         modes = (
             "remaining_t_current_z",
@@ -1609,7 +1242,11 @@ class ActionsMixin(
                         continue
                     targets.append((t, z))
         if not targets:
-            self._set_status("No remaining slices to propagate.")
+            self._status_info(
+                "No remaining slices to propagate.",
+                timeout_ms=2500,
+                source="standard.propagate",
+            )
             return
 
         image_id = int(image.id)
@@ -1643,7 +1280,11 @@ class ActionsMixin(
 
         def _on_result(result):
             if result is None:
-                self._set_status("Suggestion propagation cancelled.")
+                self._status_info(
+                    "Suggestion propagation cancelled.",
+                    timeout_ms=2500,
+                    source="standard.propagate",
+                )
                 return
             generated = list(result)
             for suggestion in generated:
@@ -1653,11 +1294,7 @@ class ActionsMixin(
             generated_at = float(time.time())
             for suggestion in generated:
                 suggestion.meta["generated_at_ts"] = generated_at
-            self.suggestions.setdefault(image_id, []).extend(generated)
-            self.controller.session_state.suggestion_history.setdefault(image_id, []).extend(
-                list(generated)
-            )
-            self.suggestions[image_id].sort(key=lambda s: float(s.score), reverse=True)
+            self.controller.append_generated_suggestions(image_id, generated, sort_pending=True)
             self.controller.update_suggestion_metrics(generated=len(generated))
             self.controller.append_audit_event(
                 "suggestions_propagated_remaining",
@@ -1671,9 +1308,13 @@ class ActionsMixin(
                 first = generated[0]
                 self.t_slider.setValue(max(self.t_slider.minimum(), min(int(first.t), self.t_slider.maximum())))
                 self.z_slider.setValue(max(self.z_slider.minimum(), min(int(first.z), self.z_slider.maximum())))
-            self._refresh_image()
+            self._request_ui_refresh("standard-actions")
             self._refresh_assist_warmup_panel()
-            self._set_status(f"Propagated {len(generated)} suggestions across remaining slices.")
+            self._status_success(
+                f"Propagated {len(generated)} suggestions across remaining slices.",
+                timeout_ms=3500,
+                source="standard.propagate",
+            )
 
         self._submit_analysis_job(
             _job,
@@ -1684,7 +1325,7 @@ class ActionsMixin(
     def _toggle_suggestions_overlay(self, checked: bool) -> None:
         """Toggle suggestion overlay rendering."""
         self._show_suggestion_overlay = bool(checked)
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")
 
     def _visible_suggestions_uncertain_first(self) -> list[PointSuggestion]:
         """Visible suggestions ranked by uncertainty (lowest score first)."""
@@ -1699,294 +1340,23 @@ class ActionsMixin(
 
     def _review_throughput_snapshot(self) -> tuple[str, float]:
         """Return compact throughput text and avg sec/decision for current session."""
-        metrics = dict(getattr(self.controller.session_state, "suggestion_metrics", {}) or {})
-        accepted = int(metrics.get("accepted", 0))
-        rejected = int(metrics.get("rejected", 0))
-        start_ts = getattr(self, "_review_telemetry_started_ts", None)
-        if start_ts is None:
-            self._review_telemetry_started_ts = float(time.time())
-            self._review_telemetry_baseline_accepted = accepted
-            self._review_telemetry_baseline_rejected = rejected
-            return ("Throughput: n/a", 0.0)
-        elapsed_min = max(1e-6, (float(time.time()) - float(start_ts)) / 60.0)
-        d_acc = max(0, accepted - int(getattr(self, "_review_telemetry_baseline_accepted", 0)))
-        d_rej = max(0, rejected - int(getattr(self, "_review_telemetry_baseline_rejected", 0)))
-        total = d_acc + d_rej
-        acc_pm = d_acc / elapsed_min
-        rej_pm = d_rej / elapsed_min
-        sec_per = (float(time.time()) - float(start_ts)) / max(1, total)
-        txt = f"Throughput: A/min {acc_pm:.1f} | R/min {rej_pm:.1f} | s/decision {sec_per:.1f}"
-        return (txt, sec_per)
+        return assist_review.review_throughput_snapshot(self)
 
     def _calibration_sparkline_text(self) -> str:
         """Return tiny reliability sparkline from p_accept bins."""
-        history = getattr(self.controller.session_state, "suggestion_history", {}) or {}
-        rows = []
-        for items in history.values():
-            for row in items:
-                status = str(getattr(row, "status", ""))
-                if status not in ("accepted", "rejected"):
-                    continue
-                meta = dict(getattr(row, "meta", {}) or {})
-                if not bool(meta.get("confidence_available", False)):
-                    continue
-                p_accept = meta.get("p_accept")
-                if p_accept is None:
-                    continue
-                try:
-                    rows.append((float(p_accept), 1 if status == "accepted" else 0))
-                except Exception:
-                    continue
-        if not rows:
-            return "Calibration: -"
-        bins = np.linspace(0.0, 1.0, 6)
-        levels = "▁▂▃▄▅▆▇█"
-        parts = []
-        for i in range(len(bins) - 1):
-            lo, hi = bins[i], bins[i + 1]
-            slice_rows = [v for p, v in rows if (p >= lo and (p < hi or (i == len(bins) - 2 and p <= hi)))]
-            if not slice_rows:
-                parts.append("·")
-                continue
-            rate = float(sum(slice_rows)) / float(len(slice_rows))
-            idx = int(round(rate * (len(levels) - 1)))
-            parts.append(levels[max(0, min(len(levels) - 1, idx))])
-        return f"Calibration: {''.join(parts)}"
+        return assist_review.calibration_sparkline_text(self)
 
     def _review_queue_progress_counts(self) -> tuple[int, int]:
         """Return (processed, total) counts for current image and T/Z context."""
-        image_id = self.primary_image.id
-        t_idx = int(self.t_slider.value())
-        z_idx = int(self.z_slider.value())
-        pending = self._visible_suggestions_uncertain_first()
-        history = list(
-            getattr(self.controller.session_state, "suggestion_history", {}).get(image_id, [])
-        )
-        processed = 0
-        for row in history:
-            if int(getattr(row, "t", -2)) not in (t_idx, -1):
-                continue
-            if int(getattr(row, "z", -2)) not in (z_idx, -1):
-                continue
-            status = str(getattr(row, "status", ""))
-            if status in ("accepted", "rejected"):
-                processed += 1
-        total = int(processed + len(pending))
-        return processed, total
+        return assist_review.review_queue_progress_counts(self)
 
     def _refresh_review_queue_panel(self) -> None:
         """Refresh right-dock assisted review queue details and progress."""
-        panel = getattr(self, "review_queue_panel", None)
-        if panel is None:
-            self._refresh_suggestion_explain_panel(None)
-            return
-        t_idx = int(self.t_slider.value())
-        z_idx = int(self.z_slider.value())
-        ranked = self._visible_suggestions_uncertain_first()
-        if ranked and hasattr(self, "_set_right_dock_mode"):
-            self._set_right_dock_mode("review")
-        panel.header_lbl.setText(f"Review Queue - T={t_idx + 1} Z={z_idx + 1}")
-        panel.context_lbl.setText(f"Effective Assist Context: {self._effective_assist_context_line(ranked)}")
-        delta_txt = str(getattr(self, "_last_assist_context_delta_text", "")).strip()
-        panel.context_delta_lbl.setText(delta_txt)
-        panel.context_delta_lbl.setVisible(bool(delta_txt))
-        panel.remaining_lbl.setText(f"Uncertain remaining: {len(ranked)}")
-        throughput_txt, _sec_per = self._review_throughput_snapshot()
-        panel.telemetry_lbl.setText(throughput_txt)
-        panel.calib_spark_lbl.setText(self._calibration_sparkline_text())
-        if getattr(self, "_settings", None) is not None:
-            show_hint = bool(self._settings.value("firstRunHintReviewQueue", True, type=bool))
-            panel.first_run_hint_lbl.setVisible(show_hint)
-            if show_hint:
-                self._settings.setValue("firstRunHintReviewQueue", False)
-        processed, total = self._review_queue_progress_counts()
-        panel.progress_lbl.setText(f"Progress: {processed} / {total}")
-        pct = int(round(100.0 * float(processed) / max(1, float(total)))) if total > 0 else 0
-        panel.progress_bar.setValue(max(0, min(100, pct)))
-        freshness = self._suggestion_freshness_state(self.primary_image.id, ranked)
-        assist_state = self._canonical_assist_state(ranked)
-        assist_label = assist_state_label(assist_state)
-        need = self._assist_context_need_count(ranked)
-        metrics = dict(getattr(self.controller.session_state, "suggestion_metrics", {}) or {})
-        trained_pos = int(metrics.get("accepted", 0))
-        trained_neg = int(metrics.get("rejected", 0))
-        readiness_txt = (
-            f" (Need {need} more labels in this context)"
-            if assist_state.name == "HEURISTIC" and need > 0
-            else ""
-        )
-        panel.header_lbl.setText(
-            f"Review Queue - T={t_idx + 1} Z={z_idx + 1} | Assist: {assist_label}{readiness_txt} | trained on: {trained_pos} pos / {trained_neg} neg"
-        )
-        self._style_assist_state_label(
-            panel.assist_lbl,
-            assist_state,
-            prefix="Assist state: ",
-            suffix=readiness_txt,
-        )
-
-        if not ranked:
-            panel.coords_lbl.setText("(x=-, y=-)")
-            panel.score_lbl.setText("Acceptance likelihood (p_accept): n/a")
-            panel.stale_lbl.setText("staleness: n/a")
-            panel.details_lbl.setText("No uncertain suggestions on current frame/scope.")
-            panel.accept_btn.setEnabled(False)
-            panel.accept_next_btn.setEnabled(False)
-            panel.reject_btn.setEnabled(False)
-            panel.skip_btn.setEnabled(False)
-            panel.next_uncertain_btn.setEnabled(False)
-            panel.accept_green_btn.setEnabled(False)
-            if hasattr(panel, "set_suggestions"):
-                panel.set_suggestions([], 0)
-            if hasattr(panel, "offset_count_spin"):
-                panel.offset_count_spin.setRange(1, 1)
-                panel.offset_count_spin.setValue(1)
-            if hasattr(panel, "apply_offset_btn"):
-                panel.apply_offset_btn.setEnabled(False)
-            self._refresh_suggestion_explain_panel(None)
-            return
-
-        self._suggestion_cursor = int(
-            max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
-        )
-        current = ranked[self._suggestion_cursor]
-        all_rows = self._suggestions_for_current_tz()
-        state_rank = {"proposed": 0, "accepted": 1, "rejected": 2}
-        all_rows = sorted(
-            all_rows,
-            key=lambda item: (
-                state_rank.get(str(getattr(item, "status", "proposed")).lower(), 3),
-                float(
-                    dict(getattr(item, "meta", {}) or {}).get(
-                        "p_accept", getattr(item, "score", getattr(item, "confidence", 0.0))
-                    )
-                ),
-            ),
-        )
-        current_sid = str(getattr(current, "suggestion_id", ""))
-        selected_row = 0
-        table_rows: list[dict[str, str]] = []
-        for ridx, item in enumerate(all_rows):
-            meta = dict(getattr(item, "meta", {}) or {})
-            p_accept = meta.get("p_accept")
-            status_key = str(getattr(item, "status", "proposed")).lower()
-            if p_accept is None:
-                acceptance_txt = f"heuristic {float(getattr(item, 'score', 0.0)):.2f}"
-                state_txt = "heuristic"
-            else:
-                p_val = float(p_accept)
-                acceptance_txt = f"{p_val:.2f}"
-                if p_val >= 0.75:
-                    state_txt = "high"
-                elif p_val >= 0.5:
-                    state_txt = "medium"
-                else:
-                    state_txt = "low"
-            if status_key == "accepted":
-                state_txt = f"{state_txt}, accepted"
-            elif status_key == "rejected":
-                state_txt = f"{state_txt}, rejected"
-            else:
-                state_txt = f"{state_txt}, proposed"
-            sid = str(getattr(item, "suggestion_id", ""))
-            if sid and sid == current_sid:
-                selected_row = ridx
-            table_rows.append(
-                {
-                    "index": str(ridx + 1),
-                    "x": str(int(round(float(item.x)))),
-                    "y": str(int(round(float(item.y)))),
-                    "t": str(int(item.t) + 1),
-                    "z": str(int(item.z) + 1),
-                    "acceptance": acceptance_txt,
-                    "state": state_txt,
-                    "status": status_key if status_key in {"accepted", "rejected"} else "proposed",
-                    "suggestion_id": sid,
-                }
-            )
-        if hasattr(panel, "set_suggestions"):
-            panel.set_suggestions(table_rows, int(selected_row))
-        p_accept = dict(getattr(current, "meta", {}) or {}).get("p_accept")
-        generated_ts = dict(getattr(current, "meta", {}) or {}).get("generated_at_ts")
-        panel.coords_lbl.setText(f"(x={int(round(float(current.x)))}, y={int(round(float(current.y)))})")
-        if p_accept is None:
-            panel.score_lbl.setText(
-                f"Acceptance likelihood (p_accept): n/a | generator score: {float(current.score):.2f}"
-            )
-            panel.details_lbl.setText("Heuristic-only proposal; review required.")
-        else:
-            p_val = float(p_accept)
-            if p_val >= 0.75:
-                triage = "likely accept"
-            elif p_val >= 0.5:
-                triage = "needs review"
-            else:
-                triage = "unlikely accept"
-            panel.score_lbl.setText(
-                f"Acceptance likelihood (p_accept): {p_val:.2f} ({triage})"
-            )
-            panel.details_lbl.setText(f"Generator score: {float(current.score):.2f}")
-        if freshness.get("is_stale", False):
-            panel.stale_lbl.setText(
-                f"staleness: Stale - regenerate recommended (generated {freshness.get('age_text', 'n/a')} ago)"
-            )
-            panel.stale_lbl.setStyleSheet("color: #d84315; font-weight: 600;")
-        elif generated_ts is None:
-            panel.stale_lbl.setText("staleness: unknown")
-            panel.stale_lbl.setStyleSheet("")
-        else:
-            age_s = max(0.0, float(time.time()) - float(generated_ts))
-            panel.stale_lbl.setText(f"staleness: Suggestions {self._format_age_short(age_s)} old")
-            panel.stale_lbl.setStyleSheet("")
-        panel.accept_btn.setEnabled(True)
-        panel.accept_next_btn.setEnabled(True)
-        panel.reject_btn.setEnabled(True)
-        panel.skip_btn.setEnabled(True)
-        panel.next_uncertain_btn.setEnabled(True)
-        if hasattr(panel, "offset_count_spin"):
-            max_count = max(1, len(ranked))
-            panel.offset_count_spin.setRange(1, max_count)
-            if int(panel.offset_count_spin.value()) > max_count:
-                panel.offset_count_spin.setValue(max_count)
-        if hasattr(panel, "apply_offset_btn"):
-            panel.apply_offset_btn.setEnabled(True)
-        green_count = sum(
-            1
-            for s in ranked
-            if bool(dict(getattr(s, "meta", {}) or {}).get("confidence_available", False))
-            and float(dict(getattr(s, "meta", {}) or {}).get("p_accept", 0.0)) >= 0.75
-        )
-        stale_required = bool(
-            bool(getattr(self, "_disable_bulk_accept_when_stale", True))
-            and freshness.get("is_stale", False)
-        )
-        panel.accept_green_btn.setEnabled(green_count > 0)
-        panel.accept_green_btn.setToolTip(
-            "Accept all green suggestions (acceptance likelihood >= 0.75)."
-            if not stale_required
-            else "Stale suggestions detected: preview dialog will require one-shot override acknowledgement."
-        )
-        panel.accept_green_btn.setText(
-            f"Accept All Green ({green_count})" if green_count > 0 else "Accept All Green"
-        )
-        self._refresh_suggestion_explain_panel(current)
+        assist_review.refresh_review_queue_panel(self)
 
     def _on_review_queue_row_selected(self, row: int) -> None:
         """Handle row selection from suggested-points table."""
-        all_rows = self._suggestions_for_current_tz()
-        if not all_rows:
-            return
-        idx = int(max(0, min(int(row), len(all_rows) - 1)))
-        selected = all_rows[idx]
-        proposed_ranked = self._visible_suggestions_uncertain_first()
-        if proposed_ranked:
-            sid = str(getattr(selected, "suggestion_id", ""))
-            for ridx, item in enumerate(proposed_ranked):
-                if str(getattr(item, "suggestion_id", "")) == sid:
-                    self._suggestion_cursor = ridx
-                    break
-        self._focus_suggestion(selected)
-        self._refresh_review_queue_panel()
+        assist_review.on_review_queue_row_selected(self, row)
 
     def _annotation_exists_for_suggestion(self, image_id: int, suggestion_id: str) -> bool:
         """Return True if an annotation linked to suggestion_id already exists."""
@@ -2000,146 +1370,19 @@ class ActionsMixin(
 
     def _remove_annotation_for_suggestion(self, image_id: int, suggestion_id: str) -> int:
         """Remove annotations linked to suggestion_id and return count removed."""
-        sid = str(suggestion_id)
-        rows = list(getattr(self.controller.session_state, "annotations", {}).get(int(image_id), []))
-        kept = []
-        removed = 0
-        for ann in rows:
-            meta = dict(getattr(ann, "meta", {}) or {})
-            if str(meta.get("suggestion_id", "")) == sid:
-                removed += 1
-                continue
-            kept.append(ann)
-        self.controller.session_state.annotations[int(image_id)] = kept
-        return removed
+        return int(self.controller.remove_annotations_for_suggestion(int(image_id), str(suggestion_id)))
 
     def _append_annotation_from_suggestion(self, suggestion: PointSuggestion) -> None:
         """Create a committed annotation from suggestion if it does not already exist."""
-        if self._annotation_exists_for_suggestion(int(suggestion.image_id), str(suggestion.suggestion_id)):
-            return
-        kp = Keypoint(
-            image_id=int(suggestion.image_id),
-            image_name=str(suggestion.image_name),
-            t=int(suggestion.t),
-            z=int(suggestion.z),
-            y=float(suggestion.y),
-            x=float(suggestion.x),
-            label=str(suggestion.label),
-            source=f"suggested:{str(getattr(suggestion, 'source_model', 'model'))}",
-            meta={
-                "proposal_score": float(getattr(suggestion, "score", 0.0)),
-                "score": float(getattr(suggestion, "score", 0.0)),
-                "suggestion_id": str(suggestion.suggestion_id),
-            },
-        )
-        self.controller.session_state.annotations.setdefault(int(suggestion.image_id), []).append(kp)
+        self.controller.append_annotation_from_suggestion(suggestion)
 
     def _set_selected_suggestion_decision(self, suggestion_id: str, status: str) -> None:
         """Set selected suggestion decision any time: accepted/rejected/proposed."""
-        image_id = int(self.primary_image.id)
-        sid = str(suggestion_id or "").strip()
-        target_status = str(status or "").strip().lower()
-        if not sid or target_status not in {"accepted", "rejected", "proposed"}:
-            return
-        if target_status == "accepted" and not self._ensure_annotation_write_context_confirmed(
-            "Change suggestion decision to accepted"
-        ):
-            return
-
-        pending = self.suggestions.setdefault(image_id, [])
-        history = self.controller.session_state.suggestion_history.setdefault(image_id, [])
-        pending_idx = next((i for i, s in enumerate(pending) if str(getattr(s, "suggestion_id", "")) == sid), None)
-        hist_idx = next((i for i, s in enumerate(history) if str(getattr(s, "suggestion_id", "")) == sid), None)
-        pending_item = pending[pending_idx] if pending_idx is not None else None
-        hist_item = history[hist_idx] if hist_idx is not None else None
-        suggestion = pending_item if pending_item is not None else hist_item
-        if suggestion is None:
-            self._set_status("Suggestion not found for decision update.")
-            return
-        current_status = str(getattr(suggestion, "status", "proposed")).strip().lower()
-        if current_status == target_status:
-            self._set_status(f"Suggestion already {target_status}.")
-            return
-        if (
-            current_status == "accepted"
-            and target_status in {"rejected", "proposed"}
-            and not self._confirm_suggestion_redecision(target_status)
-        ):
-            self._set_status("Decision change cancelled.")
-            return
-
-        if pending_item is not None and target_status == "accepted":
-            cmd = AcceptSuggestionCommand(self.controller, image_id, sid)
-            if not self.controller.execute_view_command(cmd):
-                self._set_status("Could not set accepted for selected suggestion.")
-                return
-        elif pending_item is not None and target_status == "rejected":
-            cmd = RejectSuggestionCommand(self.controller, image_id, sid)
-            if not self.controller.execute_view_command(cmd):
-                self._set_status("Could not set rejected for selected suggestion.")
-                return
-        else:
-            # History/in-place recategorization
-            if target_status == "accepted":
-                if pending_idx is not None:
-                    pending.pop(pending_idx)
-                if hist_idx is None:
-                    history.append(suggestion)
-                    hist_idx = len(history) - 1
-                history[hist_idx].status = "accepted"
-                self._append_annotation_from_suggestion(history[hist_idx])
-            elif target_status == "rejected":
-                if pending_idx is not None:
-                    pending.pop(pending_idx)
-                if hist_idx is None:
-                    history.append(suggestion)
-                    hist_idx = len(history) - 1
-                history[hist_idx].status = "rejected"
-                self._remove_annotation_for_suggestion(image_id, sid)
-            elif target_status == "proposed":
-                self._remove_annotation_for_suggestion(image_id, sid)
-                if hist_idx is not None:
-                    proposal = history.pop(hist_idx)
-                else:
-                    proposal = suggestion
-                    if pending_idx is not None:
-                        pending.pop(pending_idx)
-                proposal.status = "proposed"
-                if all(str(getattr(s, "suggestion_id", "")) != sid for s in pending):
-                    pending.append(proposal)
-
-            self.controller.session_state.dirty = True
-            self.controller.annotations_changed.emit()
-            if hasattr(self.controller, "append_audit_event"):
-                self.controller.append_audit_event(
-                    "suggestion_decision_changed",
-                    image_id=int(image_id),
-                    suggestion_id=sid,
-                    status=target_status,
-                )
-
-        self.undo_act.setEnabled(self.controller.can_undo())
-        self.redo_act.setEnabled(self.controller.can_redo())
-        self._note_annotation_edit(image_id)
-        self._refresh_table()
-        self._refresh_image()
-        self._schedule_qc_validation(image_id)
-        self._refresh_assist_warmup_panel()
-        self._set_status(f"Suggestion decision set to {target_status}.")
+        assist_review.set_selected_suggestion_decision(self, suggestion_id, status)
 
     def _confirm_suggestion_redecision(self, target_status: str) -> bool:
         """Confirm destructive re-decision from accepted to non-accepted state."""
-        msg = QtWidgets.QMessageBox(self)
-        msg.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        msg.setWindowTitle("Confirm Decision Change")
-        msg.setText("This suggestion is already accepted.")
-        msg.setInformativeText(
-            "Changing it will remove the linked committed annotation.\n"
-            f"Continue and set status to {str(target_status)}?"
-        )
-        msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.Cancel)
-        msg.setDefaultButton(QtWidgets.QMessageBox.StandardButton.Cancel)
-        return msg.exec() == QtWidgets.QMessageBox.StandardButton.Yes
+        return assist_review.confirm_suggestion_redecision(self, target_status)
 
     def _refresh_suggestion_explain_panel(self, suggestion: PointSuggestion | None) -> None:
         """Refresh 'Why was this suggested?' panel for the current suggestion."""
@@ -2148,10 +1391,16 @@ class ActionsMixin(
             return
         if suggestion is None:
             panel.coords_lbl.setText("(x=-, y=-, t=-, z=-)")
+            panel.class_lbl.setText("class: n/a")
             panel.score_lbl.setText("generator score: n/a")
             panel.calib_lbl.setText("Acceptance likelihood (p_accept): n/a")
+            panel.uncertainty_lbl.setText("uncertainty: n/a")
             panel.nn_lbl.setText("nearest accepted distance: n/a")
+            panel.label_match_lbl.setText("label match: n/a")
+            panel.context_lbl.setText("confidence mode: heuristic")
             panel.stale_lbl.setText("staleness: n/a")
+            panel.modality_lbl.setText("modality evidence: n/a")
+            panel.control_lbl.setText("control contradiction: n/a")
             panel.components_txt.setPlainText("No suggestion selected.")
             panel.patch_lbl.setText("No suggestion selected.")
             panel.patch_lbl.setPixmap(QtGui.QPixmap())
@@ -2173,12 +1422,24 @@ class ActionsMixin(
             f"(x={int(round(float(suggestion.x)))}, y={int(round(float(suggestion.y)))}, "
             f"t={int(suggestion.t)}, z={int(suggestion.z)})"
         )
+        panel.class_lbl.setText(
+            f"class: {str(meta.get('candidate_class', 'new')).replace('_', ' ')} | status: {str(getattr(suggestion, 'status', 'proposed'))}"
+        )
         panel.score_lbl.setText(f"generator score: {float(getattr(suggestion, 'score', 0.0)):.3f}")
         p_accept = meta.get("p_accept")
+        uncertainty_score = getattr(suggestion, "uncertainty_score", meta.get("uncertainty_score"))
+        uncertainty_reason = str(getattr(suggestion, "uncertainty_reason", meta.get("uncertainty_reason", "")) or "")
         if p_accept is None:
             panel.calib_lbl.setText("Acceptance likelihood (p_accept): n/a (heuristic-only)")
+            panel.context_lbl.setText("confidence mode: heuristic")
         else:
             panel.calib_lbl.setText(f"Acceptance likelihood (p_accept): {float(p_accept):.3f}")
+            panel.context_lbl.setText("confidence mode: calibrated")
+        if uncertainty_score is None:
+            panel.uncertainty_lbl.setText("uncertainty: n/a")
+        else:
+            detail = f" ({uncertainty_reason.replace(',', ', ')})" if uncertainty_reason else ""
+            panel.uncertainty_lbl.setText(f"uncertainty: {float(uncertainty_score):.3f}{detail}")
         panel.calib_lbl.setToolTip(
             "Acceptance likelihood (p_accept) predicts your acceptance behavior, "
             "not ground-truth correctness."
@@ -2189,15 +1450,45 @@ class ActionsMixin(
             if nn is None
             else f"nearest accepted distance: {float(nn):.2f}px"
         )
+        nearest_same = meta.get("nearest_same_label_px")
+        nearest_other = meta.get("nearest_other_label_px")
+        if nearest_same is not None and (nearest_other is None or float(nearest_same) <= float(nearest_other)):
+            panel.label_match_lbl.setText("label match: nearest truth has same label")
+        elif nearest_other is not None:
+            panel.label_match_lbl.setText("label match: nearest truth has different label")
+        else:
+            panel.label_match_lbl.setText("label match: n/a")
         ts = meta.get("generated_at_ts")
         if ts is None:
             panel.stale_lbl.setText("staleness: unknown")
         else:
             age_s = max(0.0, float(time.time()) - float(ts))
             panel.stale_lbl.setText(f"staleness: {age_s:.1f}s")
+        support_modalities = list(getattr(suggestion, "supporting_modalities", []) or meta.get("supporting_modalities", []) or [])
+        if support_modalities:
+            panel.modality_lbl.setText(
+                "modality evidence: "
+                f"{', '.join(str(v) for v in support_modalities)} | "
+                f"consistency={float(getattr(suggestion, 'cross_modality_consistency_score', meta.get('cross_modality_consistency_score', 1.0)) or 0.0):.2f}"
+            )
+        else:
+            panel.modality_lbl.setText("modality evidence: single-modality / unavailable")
+        contradiction = getattr(suggestion, "control_contradiction_score", meta.get("control_contradiction_score"))
+        panel.control_lbl.setText(
+            "control contradiction: n/a"
+            if contradiction is None
+            else f"control contradiction: {float(contradiction):.2f}"
+        )
         comp = dict(getattr(suggestion, "score_components", {}) or {})
-        if comp:
+        if comp or meta:
             lines = [f"{k}: {float(v):.4f}" for k, v in sorted(comp.items()) if isinstance(v, (int, float))]
+            for key in ("local_density", "distance_to_recent_reject", "distance_to_nearest_accepted", "uncertainty_score", "control_contradiction_score", "cross_modality_consistency_score"):
+                if key in meta:
+                    lines.append(f"{key}: {float(meta[key]):.4f}")
+            density_context = dict(getattr(suggestion, "density_context", {}) or meta.get("density_context", {}) or {})
+            for key, value in sorted(density_context.items()):
+                if isinstance(value, (int, float)):
+                    lines.append(f"density.{key}: {float(value):.4f}")
             panel.components_txt.setPlainText("\n".join(lines) if lines else str(comp))
         else:
             panel.components_txt.setPlainText("No score components available.")
@@ -2357,12 +1648,16 @@ class ActionsMixin(
                 half = zoom_px / 2.0
                 frame_ax.set_xlim(x - half, x + half)
                 frame_ax.set_ylim(y + half, y - half)
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")
 
     def _focus_current_uncertain_suggestion(self) -> None:
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             self._refresh_review_queue_panel()
             return
         self._suggestion_cursor = int(
@@ -2370,15 +1665,21 @@ class ActionsMixin(
         )
         current = ranked[self._suggestion_cursor]
         self._focus_suggestion(current)
-        self._set_status(
-            f"Suggestion {self._suggestion_cursor + 1}/{len(ranked)} score={float(current.score):.3f}"
+        self._status_info(
+            f"Suggestion {self._suggestion_cursor + 1}/{len(ranked)} score={float(current.score):.3f}",
+            timeout_ms=2500,
+            source="standard.suggestion_focus",
         )
         self._refresh_review_queue_panel()
 
     def _next_uncertain_suggestion(self) -> None:
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             self._refresh_review_queue_panel()
             return
         self._suggestion_cursor = (int(getattr(self, "_suggestion_cursor", 0)) + 1) % len(ranked)
@@ -2387,7 +1688,11 @@ class ActionsMixin(
     def _prev_uncertain_suggestion(self) -> None:
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             self._refresh_review_queue_panel()
             return
         self._suggestion_cursor = (int(getattr(self, "_suggestion_cursor", 0)) - 1) % len(ranked)
@@ -2398,24 +1703,33 @@ class ActionsMixin(
             return
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             return
         self._suggestion_cursor = int(
             max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
         )
         current = ranked[self._suggestion_cursor]
-        
-        # Add to interactive learning model (Weka-inspired)
-        if hasattr(self, "_interactive_learning_model"):
+        if not self._ensure_suggestion_accept_allowed(
+            current,
+            action_label="Accept current suggestion",
+            source="standard.suggestion_focus",
+        ):
+            return
+
+        if self._interactive_learning_enabled():
             self._interactive_learning_model.add_example(current, accepted=True)
-        
+
         cmd = AcceptSuggestionCommand(self.controller, self.primary_image.id, current.suggestion_id)
         if self.controller.execute_view_command(cmd):
             self._note_annotation_edit(self.primary_image.id)
             self.undo_act.setEnabled(self.controller.can_undo())
             self.redo_act.setEnabled(self.controller.can_redo())
             self._refresh_table()
-            self._refresh_image()
+            self._request_ui_refresh("standard-actions")
             self._schedule_qc_validation(self.primary_image.id)
             if bool(getattr(self, "_timed_session_active", False)):
                 self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
@@ -2429,7 +1743,11 @@ class ActionsMixin(
             return
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             return
         self._accept_current_uncertain_suggestion()
         self._next_uncertain_suggestion()
@@ -2437,22 +1755,25 @@ class ActionsMixin(
     def _reject_current_uncertain_suggestion(self) -> None:
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             return
         self._suggestion_cursor = int(
             max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
         )
         current = ranked[self._suggestion_cursor]
-        
-        # Add to interactive learning model (Weka-inspired)
-        if hasattr(self, "_interactive_learning_model"):
+
+        if self._interactive_learning_enabled():
             self._interactive_learning_model.add_example(current, accepted=False)
-        
+
         cmd = RejectSuggestionCommand(self.controller, self.primary_image.id, current.suggestion_id)
         if self.controller.execute_view_command(cmd):
             self.undo_act.setEnabled(self.controller.can_undo())
             self.redo_act.setEnabled(self.controller.can_redo())
-            self._refresh_image()
+            self._request_ui_refresh("standard-actions")
             if bool(getattr(self, "_timed_session_active", False)):
                 self._timed_session_rejects = int(getattr(self, "_timed_session_rejects", 0)) + 1
             self._refresh_assist_warmup_panel()
@@ -2462,7 +1783,11 @@ class ActionsMixin(
         """Show a small snap-view patch around the current uncertain suggestion."""
         ranked = self._visible_suggestions_uncertain_first()
         if not ranked:
-            self._set_status("No visible suggestions above threshold.")
+            self._status_info(
+                "No visible suggestions above threshold.",
+                timeout_ms=2500,
+                source="standard.suggestion_focus",
+            )
             return
         self._suggestion_cursor = int(
             max(0, min(int(getattr(self, "_suggestion_cursor", 0)), len(ranked) - 1))
@@ -2650,7 +1975,7 @@ class ActionsMixin(
                     suggestion = all_suggestions[row]
                     self.t_slider.setValue(int(suggestion.t))
                     self.z_slider.setValue(int(suggestion.z))
-                    self._refresh_image()
+                    self._request_ui_refresh("standard-actions")
                     dlg.accept()
         
         def export_to_csv():
@@ -2682,121 +2007,27 @@ class ActionsMixin(
 
     def _on_suggestion_auto_retrain_changed(self, checked: bool) -> None:
         """Enable/disable periodic ranker retraining from labels."""
-        self.controller.set_suggestion_retrain_config(enabled=bool(checked))
-        self._settings.setValue("suggestionAutoRetrainEnabled", bool(checked))
-        self._set_status(
-            "Auto-retrain enabled." if bool(checked) else "Auto-retrain disabled."
-        )
-        self._update_status()
+        assist_training.on_suggestion_auto_retrain_changed(self, checked)
 
     def _on_suggestion_min_labels_changed(self, value: int) -> None:
         """Set minimum labeled samples required before auto-retrain."""
-        min_labels = int(max(1, value))
-        self.controller.set_suggestion_retrain_config(min_labels=min_labels)
-        self._settings.setValue("suggestionAutoRetrainMinLabels", min_labels)
-        self._set_status(f"Auto-retrain min labels set to {min_labels}.")
-        self._update_status()
+        assist_training.on_suggestion_min_labels_changed(self, value)
 
     def _train_suggestion_ranker_now(self) -> None:
         """Force immediate ranker training from current labeled history."""
-        ok = self.controller.train_suggestion_ranker_now()
-        if ok:
-            self._set_status("Suggestion ranker trained.")
-        else:
-            self._set_status("Not enough labeled suggestions to train ranker.")
-        self._refresh_assist_warmup_panel()
-        self._update_status()
+        assist_training.train_suggestion_ranker_now(self)
 
     def _show_calibration_visualizer(self) -> None:
         """Plot reliability-style p_accept calibration bins from reviewed suggestions."""
-        if getattr(self, "_settings", None) is not None and bool(
-            self._settings.value("firstRunHintCalibration", True, type=bool)
-        ):
-            QtWidgets.QMessageBox.information(
-                self,
-                "Calibration Hint",
-                "Calibration compares acceptance likelihood bins to observed acceptance.\n"
-                "Use it to validate whether p_accept is reliable for this dataset.",
-            )
-            self._settings.setValue("firstRunHintCalibration", False)
-        rows = []
-        history = getattr(self.controller.session_state, "suggestion_history", {}) or {}
-        for items in history.values():
-            for row in items:
-                status = str(getattr(row, "status", ""))
-                if status not in ("accepted", "rejected"):
-                    continue
-                meta = dict(getattr(row, "meta", {}) or {})
-                if not bool(meta.get("confidence_available", False)):
-                    continue
-                p_accept = meta.get("p_accept")
-                if p_accept is None:
-                    continue
-                try:
-                    rows.append((float(p_accept), 1 if status == "accepted" else 0))
-                except Exception:
-                    continue
-        if not rows:
-            QtWidgets.QMessageBox.information(
-                self,
-                "Calibration Visualizer",
-                "No reviewed suggestions with calibrated p_accept are available yet.",
-            )
-            return
-
-        bins = np.linspace(0.0, 1.0, 11)
-        centers = (bins[:-1] + bins[1:]) * 0.5
-        counts = np.zeros(len(centers), dtype=int)
-        acc_sum = np.zeros(len(centers), dtype=float)
-        for p_accept, accepted in rows:
-            idx = int(np.clip(np.digitize([p_accept], bins, right=False)[0] - 1, 0, len(centers) - 1))
-            counts[idx] += 1
-            acc_sum[idx] += float(accepted)
-        rates = np.divide(acc_sum, np.maximum(1, counts), where=np.ones_like(acc_sum, dtype=bool))
-
-        dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle("Calibration Visualizer (Acceptance Likelihood)")
-        layout = QtWidgets.QVBoxLayout(dlg)
-
-        fig = plt.Figure(figsize=(6.5, 4.8), dpi=100)
-        canvas = FigureCanvasQTAgg(fig)
-        ax = fig.add_subplot(111)
-        ax.plot([0, 1], [0, 1], "--", color="#9e9e9e", linewidth=1.2, label="Ideal")
-        mask = counts > 0
-        ax.plot(centers[mask], rates[mask], "o-", color="#2e7d32", label="Observed acceptance rate")
-        for idx in np.where(mask)[0]:
-            ax.annotate(str(int(counts[idx])), (centers[idx], rates[idx]), textcoords="offset points", xytext=(0, 6), ha="center", fontsize=8)
-        ax.set_xlim(0.0, 1.0)
-        ax.set_ylim(0.0, 1.0)
-        ax.set_xlabel("Acceptance likelihood (p_accept) bin")
-        ax.set_ylabel("Observed acceptance rate")
-        ax.set_title("Calibration by p_accept bins")
-        ax.grid(alpha=0.25)
-        ax.legend(loc="lower right")
-        fig.tight_layout()
-
-        summary = QtWidgets.QLabel(
-            f"Samples: {len(rows)} reviewed suggestions "
-            f"(accepted={sum(v for _, v in rows)}, rejected={len(rows) - sum(v for _, v in rows)})"
-        )
-        summary.setWordWrap(True)
-        layout.addWidget(summary)
-        layout.addWidget(canvas)
-
-        close_btn = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close, parent=dlg)
-        close_btn.rejected.connect(dlg.reject)
-        close_btn.accepted.connect(dlg.accept)
-        layout.addWidget(close_btn)
-        dlg.resize(760, 560)
-        dlg.exec()
+        assist_training.show_calibration_visualizer(self)
 
     def _show_interactive_learning_stats(self) -> None:
         """Show statistics and status of the interactive learning model (Weka-inspired)."""
-        if not hasattr(self, "_interactive_learning_model"):
+        if not self._interactive_learning_enabled():
             QtWidgets.QMessageBox.information(
                 self,
                 "Interactive Learning",
-                "Interactive learning model not available.",
+                "Interactive learning is disabled. Enable the experimental sidecar in Assist settings first.",
             )
             return
         
@@ -2853,7 +2084,11 @@ class ActionsMixin(
             train_btn = QtWidgets.QPushButton("🎓 Train Now")
             def train_now():
                 model.train()
-                self._set_status(f"✅ Interactive learning model trained with {stats['n_examples']} examples (~100ms).")
+                self._status_success(
+                    f"Interactive learning model trained with {stats['n_examples']} examples.",
+                    timeout_ms=3500,
+                    source="standard.interactive_learning",
+                )
                 dlg.accept()
                 self._show_interactive_learning_stats()  # Reopen with updated stats
             train_btn.clicked.connect(train_now)
@@ -2869,7 +2104,7 @@ class ActionsMixin(
 
     def _save_interactive_learning_model(self) -> None:
         """Save the interactive learning model to a file."""
-        if not hasattr(self, "_interactive_learning_model"):
+        if not self._interactive_learning_enabled():
             return
         
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -2884,7 +2119,11 @@ class ActionsMixin(
         
         try:
             self._interactive_learning_model.save(path)
-            self._set_status(f"Interactive learning model saved to {path}")
+            self._status_success(
+                f"Interactive learning model saved to {path}.",
+                timeout_ms=3500,
+                source="standard.interactive_learning",
+            )
             QtWidgets.QMessageBox.information(
                 self,
                 "Model Saved",
@@ -2899,7 +2138,7 @@ class ActionsMixin(
 
     def _load_interactive_learning_model(self) -> None:
         """Load an interactive learning model from a file."""
-        if not hasattr(self, "_interactive_learning_model"):
+        if not self._interactive_learning_enabled():
             return
         
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -2916,9 +2155,11 @@ class ActionsMixin(
             loaded_model = InteractiveLearningModel.load(path)
             self._interactive_learning_model = loaded_model
             stats = loaded_model.get_statistics()
-            self._set_status(
+            self._status_success(
                 f"Interactive learning model loaded: {stats['n_examples']} examples, "
-                f"{'trained' if loaded_model.is_trained else 'not trained'}"
+                f"{'trained' if loaded_model.is_trained else 'not trained'}.",
+                timeout_ms=3500,
+                source="standard.interactive_learning",
             )
             QtWidgets.QMessageBox.information(
                 self,
@@ -2929,7 +2170,7 @@ class ActionsMixin(
             )
             # Refresh predictions with new model
             if self.primary_image is not None:
-                self._refresh_image()
+                self._request_ui_refresh("standard-actions")
         except Exception as e:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -2939,9 +2180,18 @@ class ActionsMixin(
 
     def _reset_interactive_learning_model(self) -> None:
         """Reset the interactive learning model (clear all training examples)."""
-        if not hasattr(self, "_interactive_learning_model"):
+        if not self.controller.feature_enabled("interactive_learning_experimental", False):
             return
-        
+
+        if not hasattr(self, "_interactive_learning_model"):
+            self._interactive_learning_model = InteractiveLearningModel()
+            self._status_info(
+                "Interactive learning model initialized.",
+                timeout_ms=3000,
+                source="standard.interactive_learning",
+            )
+            return
+
         reply = QtWidgets.QMessageBox.question(
             self,
             "Reset Interactive Learning Model",
@@ -2961,7 +2211,11 @@ class ActionsMixin(
                 min_examples_to_train=old_model.min_examples_to_train,
                 confidence_threshold=old_model.confidence_threshold,
             )
-            self._set_status("Interactive learning model reset.")
+            self._status_info(
+                "Interactive learning model reset.",
+                timeout_ms=3000,
+                source="standard.interactive_learning",
+            )
             QtWidgets.QMessageBox.information(
                 self,
                 "Model Reset",
@@ -2975,12 +2229,16 @@ class ActionsMixin(
         space = str(value or "stack").strip().lower()
         if space not in ("stack", "projection"):
             space = "stack"
-        self.controller.session_state.annotation_space = space
+        self.controller.set_annotation_space_value(space)
         if old_space != space:
             self._mark_annotation_context_changed(
                 f"annotation space changed ({old_space} -> {space})"
             )
-        self._set_status(f"Annotation space: {space}.")
+        self._status_info(
+            f"Annotation space: {space}.",
+            timeout_ms=2500,
+            source="standard.annotation_space",
+        )
         self._refresh_assist_warmup_panel()
         self._update_status()
 
@@ -3002,18 +2260,107 @@ class ActionsMixin(
         self._settings.setValue(
             "assistMinLabelsPerContext", int(self.assist_min_context_spin.value())
         )
-        self._set_status("Assist minima updated.")
+        self._status_info(
+            "Assist minima updated.",
+            timeout_ms=2500,
+            source="standard.assist_minima",
+        )
         self._refresh_assist_warmup_panel()
         self._update_status()
 
     def _on_qc_auto_show_changed(self, checked: bool) -> None:
         """Enable/disable automatically showing QC panel when issues are found."""
         self._settings.setValue("qcAutoShowOnIssues", bool(checked))
-        self._set_status(
+        self._status_info(
             "QC panel auto-show enabled."
             if bool(checked)
-            else "QC panel auto-show disabled."
+            else "QC panel auto-show disabled.",
+            timeout_ms=2500,
+            source="standard.qc_auto_show",
         )
+
+    def _on_generation_space_changed(self, value: str) -> None:
+        """Switch assist generation evidence between stack and projection space."""
+        old_space = str(getattr(self.controller.session_state, "generation_space", "stack")).strip().lower()
+        space = str(value or "stack").strip().lower()
+        if space not in ("stack", "projection"):
+            space = "stack"
+        self.controller.set_generation_space_value(space)
+        self._settings.setValue("assistGenerationSpace", space)
+        if old_space != space:
+            self._mark_annotation_context_changed(
+                f"assist generation space changed ({old_space} -> {space})"
+            )
+        self._status_info(
+            f"Assist generation space: {space}.",
+            timeout_ms=2500,
+            source="standard.generation_space",
+        )
+        self._refresh_assist_warmup_panel()
+        self._update_status()
+
+    def _on_disable_bulk_accept_when_stale_changed(self, checked: bool) -> None:
+        """Persist stale accept guard policy for review/batch actions."""
+        self._disable_bulk_accept_when_stale = bool(checked)
+        self.controller.set_disable_bulk_accept_when_stale_value(bool(checked))
+        self._settings.setValue("disableBulkAcceptWhenStale", bool(checked))
+        self._status_info(
+            "Stale accept guard enabled."
+            if bool(checked)
+            else "Stale accept guard disabled.",
+            timeout_ms=2500,
+            source="standard.stale_guard",
+        )
+
+    def _on_interactive_learning_experimental_changed(self, checked: bool) -> None:
+        """Enable/disable the experimental interactive-learning sidecar."""
+        enabled = bool(checked)
+        self.controller.set_feature_flag("interactive_learning_experimental", enabled)
+        self._settings.setValue("assistInteractiveLearningExperimental", enabled)
+        if enabled and not hasattr(self, "_interactive_learning_model"):
+            self._reset_interactive_learning_model()
+        elif not enabled and hasattr(self, "_interactive_learning_model"):
+            delattr(self, "_interactive_learning_model")
+        self._status_info(
+            "Experimental interactive learning enabled."
+            if enabled
+            else "Experimental interactive learning disabled.",
+            timeout_ms=2500,
+            source="standard.interactive_learning",
+        )
+        self._request_ui_refresh("standard-actions")
+
+    def _interactive_learning_enabled(self) -> bool:
+        """Return whether the experimental interactive-learning sidecar is active."""
+        return bool(
+            self.controller.feature_enabled("interactive_learning_experimental", False)
+            and hasattr(self, "_interactive_learning_model")
+        )
+
+    def _ensure_suggestion_accept_allowed(
+        self,
+        suggestion: PointSuggestion | None,
+        *,
+        action_label: str,
+        source: str,
+    ) -> bool:
+        """Enforce stale-suggestion accept protection for all single-item accept paths."""
+        if suggestion is None:
+            return False
+        if not bool(getattr(self, "_disable_bulk_accept_when_stale", True)):
+            return True
+        freshness = self._suggestion_freshness_state(
+            self.primary_image.id,
+            suggestions=[suggestion],
+        )
+        if not freshness.get("is_stale", False):
+            return True
+        self._status_warning(
+            f"{action_label} blocked: suggestion is stale. Regenerate or use the batch preview override.",
+            timeout_ms=5000,
+            source=source,
+        )
+        return False
 
     def _start_assist_warmup(self) -> None:
         """Guide early balanced accept/reject triage to bootstrap learned assist."""
@@ -3021,7 +2368,11 @@ class ActionsMixin(
         self._focus_current_uncertain_suggestion()
         visible = self._visible_suggestions_uncertain_first()
         if not visible:
-            self._set_status("Warmup: generate suggestions first.")
+            self._status_info(
+                "Warmup: generate suggestions first.",
+                timeout_ms=2500,
+                source="standard.warmup",
+            )
             return
         annotation_space = str(getattr(self.controller.session_state, "annotation_space", "stack"))
         context_key = self.controller._context_key(
@@ -3032,9 +2383,11 @@ class ActionsMixin(
             annotation_space=annotation_space,
             context_key=context_key,
         )
-        self._set_status(
+        self._status_info(
             "Warmup mode: use N/P to move, A accept, R reject. "
-            f"Need +{b['need_pos']} positives, +{b['need_neg']} negatives, +{b['need_context']} context labels."
+            f"Need +{b['need_pos']} positives, +{b['need_neg']} negatives, +{b['need_context']} context labels.",
+            timeout_ms=5000,
+            source="standard.warmup",
         )
 
     def _start_timed_annotation_session(self, assisted: bool) -> None:
@@ -3047,12 +2400,20 @@ class ActionsMixin(
         self._timed_session_points = 0
         self._timed_session_correction_time = 0.0
         mode = "with assist" if assisted else "without assist"
-        self._set_status(f"Timed annotation session started ({mode}).")
+        self._status_info(
+            f"Timed annotation session started ({mode}).",
+            timeout_ms=3000,
+            source="standard.timed_session",
+        )
 
     def _stop_timed_annotation_session(self) -> None:
         """Stop timed benchmark session and report metrics."""
         if not bool(getattr(self, "_timed_session_active", False)):
-            self._set_status("No active timed session.")
+            self._status_info(
+                "No active timed session.",
+                timeout_ms=2500,
+                source="standard.timed_session",
+            )
             return
         elapsed = max(1e-6, time.time() - float(getattr(self, "_timed_session_started_at", time.time())))
         points = int(getattr(self, "_timed_session_points", 0))
@@ -3095,7 +2456,11 @@ class ActionsMixin(
         """Set review state on selected annotations."""
         selected = self._selected_table_keypoints()
         if not selected:
-            self._set_status("Select one or more annotations first.")
+            self._status_info(
+                "Select one or more annotations first.",
+                timeout_ms=2500,
+                source="standard.annotation_selection",
+            )
             return
         updated = 0
         now_ts = time.time()
@@ -3125,14 +2490,22 @@ class ActionsMixin(
                 "review_state_updated", state=state, count=updated
             )
             self._refresh_table()
-            self._refresh_image()
-        self._set_status(f"Updated review state for {updated} annotation(s).")
+            self._request_ui_refresh("standard-actions")
+        self._status_success(
+            f"Updated review state for {updated} annotation(s).",
+            timeout_ms=3000,
+            source="standard.review_state",
+        )
 
     def _assign_selected_annotations_dialog(self) -> None:
         """Set assignee for selected annotations."""
         selected = self._selected_table_keypoints()
         if not selected:
-            self._set_status("Select one or more annotations first.")
+            self._status_info(
+                "Select one or more annotations first.",
+                timeout_ms=2500,
+                source="standard.annotation_selection",
+            )
             return
         assignee, ok = QtWidgets.QInputDialog.getText(
             self,
@@ -3168,8 +2541,12 @@ class ActionsMixin(
                 "assignee_updated", assignee=assignee, count=updated
             )
             self._refresh_table()
-            self._refresh_image()
-        self._set_status(f"Assigned {updated} annotation(s) to '{assignee}'.")
+            self._request_ui_refresh("standard-actions")
+        self._status_success(
+            f"Assigned {updated} annotation(s) to '{assignee}'.",
+            timeout_ms=3000,
+            source="standard.assignee",
+        )
 
     def _set_current_user_dialog(self) -> None:
         """Set current local user identity for review/audit actions."""
@@ -3178,9 +2555,13 @@ class ActionsMixin(
         if not ok:
             return
         user = user.strip() or "local_user"
-        self.controller.session_state.current_user = user
+        self.controller.set_current_user_value(user)
         self.controller.append_audit_event("current_user_changed", user=user)
-        self._set_status(f"Current user set to '{user}'.")
+        self._status_info(
+            f"Current user set to '{user}'.",
+            timeout_ms=2500,
+            source="standard.current_user",
+        )
 
     def _set_review_queue_filter(self, mode: str) -> None:
         """Switch annotation table queue filter mode."""
@@ -3198,8 +2579,13 @@ class ActionsMixin(
             action.setChecked(key == self._review_queue_filter)
             action.blockSignals(False)
         self._refresh_table()
-        self._refresh_image()
-        self._set_status(f"Review queue: {self._review_queue_filter}.")
+        self._refresh_review_queue_panel()
+        self._request_ui_refresh("standard-actions")
+        self._status_info(
+            f"Review queue: {self._review_queue_filter}.",
+            timeout_ms=2500,
+            source="standard.review_queue",
+        )
 
     def _show_profile_dialog(self) -> None:
         """Open a dialog showing line profiles (vertical, horizontal, diagonals) raw vs corrected."""
@@ -3526,9 +2912,13 @@ class ActionsMixin(
             self._evict_image_cache(img)
         gc.collect()
         debug_log(f"Cleared cached data for {cleared} images")
-        self._set_status(f"Cleared cached image data for {cleared} images.")
+        self._status_success(
+            f"Cleared cached image data for {cleared} images.",
+            timeout_ms=3000,
+            source="standard.clear_cache",
+        )
         # Will lazily reload the active images after purge.
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")
 
     def _show_smlm_panel(self) -> None:
         """Show the SMLM parameter panel."""
@@ -3579,364 +2969,12 @@ class ActionsMixin(
         self.support_image_idx = 0
         if hasattr(self, "_refresh_lazy_modality_table"):
             self._refresh_lazy_modality_table()
-        self._set_status("Cleared FOV list; kept current image.")
+        self._status_info(
+            "Cleared FOV list; kept current image.",
+            timeout_ms=3000,
+            source="standard.clear_fov",
+        )
         self.roi_manager.rois_by_image = {0: self.roi_manager.list_rois(keep_idx)}
         self.roi_manager.set_active(self.roi_manager.active_roi_id)
         self._refresh_roi_manager()
-        self._refresh_image()
-
-    def _recent_limit(self) -> int:
-        return int(self._settings.value("keepRecentImages", 10, type=int))
-
-    def _load_recent_images(self) -> List[str]:
-        recent = self._settings.value("recentImages", [], type=list)
-        recent_list = [str(p) for p in recent] if recent else []
-        self.controller.set_recent_images(recent_list)
-        return recent_list
-
-    def _save_recent_images(self, recent: List[str]) -> None:
-        self._settings.setValue("recentImages", recent)
-        self.controller.set_recent_images(recent)
-
-    def _add_recent_images(self, paths: List[pathlib.Path]) -> None:
-        recent = self._load_recent_images()
-        for p in paths:
-            p_str = str(p)
-            if p_str in recent:
-                recent.remove(p_str)
-            recent.insert(0, p_str)
-        limit = self._recent_limit()
-        recent = recent[:limit]
-        self._save_recent_images(recent)
-        self._populate_recent_menu()
-
-    def _populate_recent_menu(self) -> None:
-        self.recent_menu.clear()
-        recent = self._load_recent_images()
-        for path in recent:
-            act = self.recent_menu.addAction(path)
-            act.triggered.connect(lambda _checked, p=path: self._open_recent_image(p))
-        if recent:
-            self.recent_menu.addSeparator()
-        self.recent_menu.addAction(self.recent_clear_act)
-
-    def _clear_recent_images(self) -> None:
-        self._save_recent_images([])
-        self._populate_recent_menu()
-
-    def _open_recent_image(self, path: str) -> None:
-        p = pathlib.Path(path)
-        if not p.exists():
-            QtWidgets.QMessageBox.warning(self, "File not found", f"{path} does not exist.")
-            self._clear_recent_images()
-            return
-        self._open_files_from_paths([p])
-
-    def _open_files_from_paths(self, paths: List[pathlib.Path]) -> None:
-        self.stop_playback_t()
-        self._cancel_all_jobs()
-        self._bump_job_generation()
-        self._add_recent_images(paths)
-        self._last_folder = paths[0].parent
-        self.roi_manager.rois_by_image.clear()
-        new_images = []
-        for p in paths:
-            meta = read_metadata(p)
-            new_images.append(meta)
-        self.controller.add_images(new_images)
-        for meta in new_images:
-            self.fov_list.addItem(meta.name)
-            self.primary_combo.addItem(meta.name)
-            self.support_combo.addItem(meta.name)
-            self.roi_manager.rois_by_image[meta.id] = []
-        self._refresh_annotation_availability()
-        self._refresh_roi_manager()
-        self._refresh_metadata_dock(self.primary_image.id)
-        self._refresh_image()
-        
-        # Phase ζ: Update modality selectors in analysis panels
-        self._update_analysis_panel_modalities()
-
-    def _refresh_annotation_availability(self) -> None:
-        if self.fov_list is None:
-            return
-        icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView)
-        for idx, img in enumerate(self.images):
-            item = self.fov_list.item(idx)
-            if item is None:
-                continue
-            if self.controller.annotations_available(img.id):
-                item.setIcon(icon)
-                item.setToolTip("Annotations available")
-            else:
-                item.setIcon(QtGui.QIcon())
-                item.setToolTip("")
-
-    def _maybe_autoload_annotations(self, image_id: int) -> None:
-        if not self._settings.value("autoLoadAnnotations", True, type=bool):
-            return
-        if self.controller.annotations_are_loaded(image_id):
-            return
-        if not self.controller.annotation_entries_for_image(image_id):
-            # Attempt sidecar scan in the image folder (CSV/JSON) if index is empty.
-            img = next((m for m in getattr(self, "images", []) if int(getattr(m, "id", -1)) == int(image_id)), None)
-            if img is not None:
-                try:
-                    self.controller.build_annotation_index(pathlib.Path(str(getattr(img, "path", ""))).parent)
-                except Exception:
-                    pass
-        if not self.controller.annotation_entries_for_image(image_id):
-            return
-        cal = self._get_calibration_state(image_id)
-        pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
-        self._start_annotation_load_job(image_id, replace=False, pixel_size_nm=pixel_size_nm)
-
-    def _start_annotation_load_job(
-        self, image_id: int, *, replace: bool, pixel_size_nm: Optional[float]
-    ) -> None:
-        existing = self._annotation_job_tokens.get(image_id)
-        if existing is not None:
-            existing.cancel()
-
-        def _worker(progress, cancel):
-            paths = [entry.path for entry in self.controller.annotation_entries_for_image(image_id)]
-            points, imports = self.controller._parse_annotations_from_paths(
-                paths,
-                image_id=image_id,
-                pixel_size_nm=pixel_size_nm,
-                force_image_id=image_id,
-            )
-            return (points, imports)
-
-        def _on_result(result):
-            if result is None:
-                return
-            points, imports = result
-            self.controller._record_annotation_imports(imports)
-            if replace:
-                self.controller.replace_annotations(image_id, points)
-            else:
-                self.controller.merge_annotations(image_id, points)
-            meta = None
-            for target_id, entry in imports:
-                if target_id == image_id:
-                    meta = entry.get("meta")
-                    if isinstance(meta, dict) and meta:
-                        break
-            if meta:
-                self._handle_annotation_metadata(image_id, meta)
-            self._mark_dirty()
-            self.controller.annotations_changed.emit()
-            if image_id == self.primary_image.id:
-                self._refresh_image()
-                self._refresh_table()
-            try:
-                # Brief user feedback on completion
-                self.statusBar().showMessage("Annotations loaded.", 3000)
-            except Exception:
-                pass
-
-        def _on_error(err: str) -> None:
-            try:
-                self.statusBar().showMessage("Annotation load error (see Logs)", 4000)
-            except Exception:
-                pass
-            self._append_log(f"[Annotations] Load error for image id={image_id}\n{err}")
-
-        try:
-            self.statusBar().showMessage("Loading annotations…", 2000)
-        except Exception:
-            pass
-        handle = self.jobs.submit(
-            _worker,
-            name="Load annotations",
-            on_result=_on_result,
-            on_error=_on_error,
-            timeout_sec=300.0,
-            retries=2,
-            retry_delay_sec=1.0,
-        )
-        self._annotation_job_tokens[image_id] = handle.cancel_token
-        self._annotation_job_ids[image_id] = handle.job_id
-
-    def _on_metadata_dock_visibility(self, visible: bool) -> None:
-        if not visible:
-            return
-        self._load_full_metadata()
-
-    def _refresh_metadata_dock(self, image_id: int) -> None:
-        if getattr(self, "metadata_widget", None) is None:
-            return
-        summary = self.controller.get_metadata_summary(image_id)
-        bundle = MetadataBundle(
-            summary=summary,
-            tiff_tags={},
-            ome_xml=None,
-            ome_parsed=None,
-            micromanager=None,
-            vendor_private={},
-        )
-        self.metadata_widget.set_bundle(bundle)
-        if self.dock_metadata is not None and self.dock_metadata.isVisible():
-            self._load_full_metadata()
-
-    def _load_full_metadata(self) -> None:
-        if getattr(self, "metadata_widget", None) is None:
-            return
-        image_id = self.primary_image.id
-        bundle = self.controller.load_metadata_bundle(image_id)
-        self.metadata_widget.set_bundle(bundle)
-
-    def _handle_annotation_metadata(self, image_id: int, meta: dict) -> None:
-        self._pending_annotation_meta = meta
-        self._pending_annotation_meta_image_id = image_id
-        self._show_annotation_meta_banner(image_id, meta)
-        if self._settings.value("applyAnnotationMetaOnLoad", False, type=bool):
-            self._apply_annotation_metadata(keep_banner=True)
-
-    def _show_annotation_meta_banner(self, image_id: int, meta: dict) -> None:
-        if not hasattr(self, "annotation_meta_widget") or self.annotation_meta_widget is None:
-            return
-        image_name = self.images[image_id].name if 0 <= image_id < len(self.images) else "image"
-        self.annotation_meta_label.setText(f"Metadata detected for {image_name}.")
-        self.annotation_meta_widget.setVisible(True)
-
-    def _dismiss_annotation_meta_banner(self) -> None:
-        if hasattr(self, "annotation_meta_widget") and self.annotation_meta_widget is not None:
-            self.annotation_meta_widget.setVisible(False)
-        self._pending_annotation_meta = None
-        self._pending_annotation_meta_image_id = None
-
-    def _apply_annotation_metadata(self, keep_banner: bool = False) -> None:
-        meta = self._pending_annotation_meta
-        image_id = self._pending_annotation_meta_image_id
-        if not meta or image_id is None:
-            return
-        active_primary = self.primary_image.id
-        roi = meta.get("roi")
-        if isinstance(roi, dict) and image_id == active_primary:
-            shape = roi.get("shape", "box")
-            rect = roi.get("rect")
-            if rect and len(rect) == 4:
-                rect = tuple(float(v) for v in rect)
-                self.controller.set_roi(rect, shape=str(shape))
-                self.roi_rect = rect
-                self.roi_shape = str(shape)
-            elif shape == "circle":
-                center = roi.get("center")
-                radius = roi.get("radius")
-                if center and radius is not None:
-                    cx, cy = center
-                    rect = (
-                        float(cx - radius),
-                        float(cy - radius),
-                        float(radius * 2),
-                        float(radius * 2),
-                    )
-                    self.controller.set_roi(rect, shape="circle")
-                    self.roi_rect = rect
-                    self.roi_shape = "circle"
-        crop = meta.get("crop")
-        if crop and len(crop) == 4 and image_id == active_primary:
-            self.crop_rect = tuple(float(v) for v in crop)
-            self.controller.set_crop(self.crop_rect)
-            self._sync_crop_controls()
-        if image_id == active_primary and roi is not None:
-            self._sync_roi_controls()
-        display = meta.get("display")
-        if isinstance(display, dict):
-            non_active_mapping = None
-            win = display.get("win")
-            if isinstance(win, dict) and "min" in win and "max" in win:
-                if image_id == active_primary:
-                    self.controller.set_display_mapping(
-                        float(win["min"]), float(win["max"]), display.get("gamma")
-                    )
-                else:
-                    non_active_mapping = self.controller.display_mapping.mapping_for(
-                        image_id, "frame"
-                    )
-                    non_active_mapping.set_window(float(win["min"]), float(win["max"]))
-            else:
-                pct = display.get("pct")
-                if (
-                    isinstance(pct, dict)
-                    and self.primary_image.array is not None
-                    and image_id == active_primary
-                ):
-                    try:
-                        low = float(pct.get("low", 2.0))
-                        high = float(pct.get("high", 98.0))
-                        data = self._slice_data(self.primary_image)
-                        vmin = float(np.percentile(data, low))
-                        vmax = float(np.percentile(data, high))
-                        self.controller.set_display_mapping(vmin, vmax, display.get("gamma"))
-                    except (TypeError, ValueError):
-                        pass
-            gamma = display.get("gamma")
-            if gamma is not None:
-                try:
-                    if image_id == active_primary:
-                        self.controller.set_gamma(float(gamma))
-                    else:
-                        if non_active_mapping is None:
-                            non_active_mapping = self.controller.display_mapping.mapping_for(
-                                image_id, "frame"
-                            )
-                        non_active_mapping.gamma = float(gamma)
-                except (TypeError, ValueError):
-                    pass
-            mode = display.get("mode")
-            if isinstance(mode, str):
-                if image_id == active_primary:
-                    mapping = self.controller.display_mapping.mapping_for(image_id, "frame")
-                    mapping.mode = mode
-                    self.controller.set_display_for_image(image_id, "frame", mapping)
-                else:
-                    if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(
-                            image_id, "frame"
-                        )
-                    non_active_mapping.mode = mode
-            lut = display.get("lut")
-            if isinstance(lut, str) and lut in lut_names():
-                if image_id == active_primary:
-                    self.controller.set_lut(lut_names().index(lut))
-                else:
-                    if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(
-                            image_id, "frame"
-                        )
-                    non_active_mapping.lut = lut_names().index(lut)
-            elif isinstance(lut, int):
-                if image_id == active_primary:
-                    self.controller.set_lut(lut)
-                else:
-                    if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(
-                            image_id, "frame"
-                        )
-                    non_active_mapping.lut = lut
-            invert = display.get("invert")
-            if invert is not None:
-                if image_id == active_primary:
-                    self.controller.set_invert(bool(invert))
-                else:
-                    if non_active_mapping is None:
-                        non_active_mapping = self.controller.display_mapping.mapping_for(
-                            image_id, "frame"
-                        )
-                    non_active_mapping.invert = bool(invert)
-            if non_active_mapping is not None and image_id != active_primary:
-                self.controller.set_display_for_image(image_id, "frame", non_active_mapping)
-        axis = meta.get("axis")
-        if isinstance(axis, str):
-            self.controller.set_axis_interpretation(image_id, axis)
-            if image_id == active_primary and hasattr(self, "axis_mode_combo"):
-                self.axis_mode_combo.setCurrentText(axis)
-        if keep_banner:
-            if hasattr(self, "annotation_meta_label"):
-                self.annotation_meta_label.setText("Metadata applied.")
-        else:
-            self._dismiss_annotation_meta_banner()
-        self._refresh_image()
+        self._request_ui_refresh("standard-actions")

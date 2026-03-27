@@ -10,18 +10,31 @@ from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
 
 def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     """Build menus, actions, and shortcuts for the main window."""
+    def _describe(action: QtWidgets.QAction, status_tip: str, *, whats_this: str | None = None) -> None:
+        tip = str(status_tip or "").strip()
+        action.setStatusTip(tip)
+        action.setToolTip(tip)
+        action.setProperty("baseStatusTip", tip)
+        action.setProperty("baseToolTip", tip)
+        if whats_this:
+            action.setWhatsThis(str(whats_this).strip())
+
     menubar = self.menuBar()
     file_menu = menubar.addMenu("&File")
-    open_files_act = file_menu.addAction("Open files…")
-    open_folder_act = file_menu.addAction("Open folder…")
-    load_ann_current_act = file_menu.addAction("Load annotations for current image…")
-    load_ann_multi_act = file_menu.addAction("Load annotations for multiple files…")
-    load_ann_all_act = file_menu.addAction("Load all annotations now")
-    save_proj_act = file_menu.addAction("Save project…")
-    load_proj_act = file_menu.addAction("Load project…")
+    import_menu = file_menu.addMenu("Import")
+    self.open_files_act = import_menu.addAction("Open files…")
+    self.open_folder_act = import_menu.addAction("Open folder…")
+    annotations_menu = file_menu.addMenu("Annotations")
+    self.load_ann_current_act = annotations_menu.addAction("Load annotations for current image…")
+    self.load_ann_multi_act = annotations_menu.addAction("Load annotations for multiple files…")
+    self.load_ann_all_act = annotations_menu.addAction("Load all annotations now")
+    project_menu = file_menu.addMenu("Project")
+    self.save_proj_act = project_menu.addAction("Save project…")
+    self.load_proj_act = project_menu.addAction("Load project…")
     self.recent_menu = file_menu.addMenu("Open Recent")
     self.recent_clear_act = self.recent_menu.addAction("Clear Recent")
-    prefs_act = file_menu.addAction("Preferences…")
+    file_menu.addSeparator()
+    self.prefs_act = file_menu.addAction("Preferences…")
     file_menu.addSeparator()
     exit_act = file_menu.addAction("Exit")
 
@@ -31,16 +44,18 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.undo_act.setEnabled(False)
     self.redo_act.setEnabled(False)
     annotate_menu.addSeparator()
-    self.jump_to_frame_act = annotate_menu.addAction("Jump to Frame...")
-    self.jump_to_z_act = annotate_menu.addAction("Jump to Z Slice...")
+    navigate_menu = annotate_menu.addMenu("Navigate")
+    self.jump_to_frame_act = navigate_menu.addAction("Jump to Frame...")
+    self.jump_to_z_act = navigate_menu.addAction("Jump to Z Slice...")
     self.copy_display_act = annotate_menu.addAction("Copy Display Settings…")
     self.measure_act = annotate_menu.addAction("Measure (Results)")
     reload_ann_act = annotate_menu.addAction("Reload annotations for current image")
     annotate_menu.addSeparator()
-    self.clear_roi_act = annotate_menu.addAction("Clear ROI")
-    self.copy_roi_to_all_act = annotate_menu.addAction("Copy ROI to all images")
-    self.save_roi_template_act = annotate_menu.addAction("Save ROI as template")
-    self.apply_roi_template_act = annotate_menu.addAction("Apply ROI template…")
+    roi_menu = annotate_menu.addMenu("ROI")
+    self.clear_roi_act = roi_menu.addAction("Clear ROI")
+    self.copy_roi_to_all_act = roi_menu.addAction("Copy ROI to all images")
+    self.save_roi_template_act = roi_menu.addAction("Save ROI as template")
+    self.apply_roi_template_act = roi_menu.addAction("Apply ROI template…")
 
     assist_menu = menubar.addMenu("&Assist")
     self.suggest_points_act = assist_menu.addAction("Suggest Points")
@@ -80,13 +95,14 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.assign_selected_act = review_menu.addAction("Assign Selected…")
     self.show_reviewer_analytics_act = review_menu.addAction("Show Reviewer Analytics…")
     review_menu.addSeparator()
-    self.queue_all_act = review_menu.addAction("Queue: All")
+    queue_menu = review_menu.addMenu("Queue Filter")
+    self.queue_all_act = queue_menu.addAction("All")
     self.queue_all_act.setCheckable(True)
-    self.queue_my_act = review_menu.addAction("Queue: My Queue")
+    self.queue_my_act = queue_menu.addAction("My Queue")
     self.queue_my_act.setCheckable(True)
-    self.queue_needs_review_act = review_menu.addAction("Queue: Needs Review")
+    self.queue_needs_review_act = queue_menu.addAction("Needs Review")
     self.queue_needs_review_act.setCheckable(True)
-    self.queue_blocked_qc_act = review_menu.addAction("Queue: Blocked By QC")
+    self.queue_blocked_qc_act = queue_menu.addAction("Blocked By QC")
     self.queue_blocked_qc_act.setCheckable(True)
     self.queue_all_act.setChecked(True)
     review_menu.addSeparator()
@@ -95,33 +111,35 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.review_context_pack_act = review_menu.addAction("Toggle Review Context Pack")
 
     export_menu = menubar.addMenu("&Export")
-    save_csv_act = export_menu.addAction("Save annotations (CSV)")
-    save_json_act = export_menu.addAction("Save annotations (JSON)")
-    export_standard_act = export_menu.addAction("Standard Formats")
-    export_view_act = export_menu.addAction("Export View…")
+    annotation_export_menu = export_menu.addMenu("Annotations")
+    self.save_csv_act = annotation_export_menu.addAction("Save annotations (CSV)")
+    self.save_json_act = annotation_export_menu.addAction("Save annotations (JSON)")
+    export_standard_act = annotation_export_menu.addAction("Standard Formats")
+    export_menu.addSeparator()
+    self.export_view_act = export_menu.addAction("Export View…")
 
-    layout_menu = menubar.addMenu("&Layout")
-    dock_panels_menu = layout_menu.addMenu("Panels")
-    self.advanced_panels_act = layout_menu.addAction("Advanced Panels…")
-    self.open_panel_policy_act = layout_menu.addAction("Panel Auto-Open & Pinning…")
-    self.toggle_profile_act = layout_menu.addAction("Toggle Line Profile")
+    view_menu = menubar.addMenu("&View")
+    dock_panels_menu = view_menu.addMenu("Panels")
+    self.advanced_panels_act = view_menu.addAction("Advanced Panels…")
+    self.open_panel_policy_act = view_menu.addAction("Panel Auto-Open & Pinning…")
+    self.toggle_profile_act = view_menu.addAction("Toggle Line Profile")
     self.toggle_profile_act.setCheckable(True)
     self.toggle_profile_act.setChecked(True)
-    self.toggle_hist_act = layout_menu.addAction("Toggle Histogram")
+    self.toggle_hist_act = view_menu.addAction("Toggle Histogram")
     self.toggle_hist_act.setCheckable(True)
     self.toggle_hist_act.setChecked(True)
-    self.toggle_left_act = layout_menu.addAction("Toggle Left Pane")
+    self.toggle_left_act = view_menu.addAction("Toggle Left Sidebar")
     self.toggle_left_act.setCheckable(True)
     self.toggle_left_act.setChecked(True)
-    self.toggle_settings_act = layout_menu.addAction("Toggle Settings")
+    self.toggle_settings_act = view_menu.addAction("Toggle Preferences")
     self.toggle_settings_act.setCheckable(True)
     self.toggle_settings_act.setChecked(True)
-    self.toggle_overlay_act = layout_menu.addAction("Show Overlay")
+    self.toggle_overlay_act = view_menu.addAction("Show Overlay")
     self.toggle_overlay_act.setCheckable(True)
     self.toggle_overlay_act.setChecked(True)
     self.overlay_act = self.toggle_overlay_act
     self.view_overlay_act = self.toggle_overlay_act
-    layouts_menu = layout_menu.addMenu("Layouts")
+    layouts_menu = view_menu.addMenu("Layouts")
     self.save_layout_act = layouts_menu.addAction("Save Current Layout As…")
     self.undo_layout_change_act = layouts_menu.addAction("Undo Layout Change")
     self.undo_layout_change_act.setEnabled(False)
@@ -131,24 +149,26 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.layout_preset_analyze_act = layouts_menu.addAction("Preset: Analyze")
     self.layout_preset_assist_expert_act = layouts_menu.addAction("Preset: Assist Expert")
     self.layout_preset_minimal_act = layouts_menu.addAction("Preset: Minimal")
-    self.focus_canvas_mode_act = layout_menu.addAction("Focus Canvas Mode")
+    self.focus_canvas_mode_act = view_menu.addAction("Focus Canvas Mode")
     self.focus_canvas_mode_act.setCheckable(True)
     self.focus_canvas_mode_act.setChecked(False)
     self.focus_canvas_mode_act.setShortcut("F")
-    self.preset_default_act = layout_menu.addAction("Default (Legacy Shortcut)")
-    self.preset_default_act.setVisible(False)
-    self.preset_annotate_act = layout_menu.addAction("Annotate (Legacy Shortcut)")
-    self.preset_annotate_act.setVisible(False)
-    self.preset_analyze_act = layout_menu.addAction("Analyze (Legacy Shortcut)")
-    self.preset_analyze_act.setVisible(False)
-    self.preset_minimal_act = layout_menu.addAction("Minimal (Legacy Shortcut)")
-    self.preset_minimal_act.setVisible(False)
-    self.save_layout_default_act = layout_menu.addAction("Save Layout as Default")
-    self.reset_layout_act = layout_menu.addAction("Reset Layout")
-    self.link_zoom_act = layout_menu.addAction("Link Zoom/Pan")
+    # Keep legacy layout preset actions registered for command/shortcut flows
+    # without surfacing them in the visible menu tree.
+    self.preset_default_act = QtWidgets.QAction("Default Layout Preset", self)
+    self.preset_annotate_act = QtWidgets.QAction("Annotate Layout Preset", self)
+    self.preset_analyze_act = QtWidgets.QAction("Analyze Layout Preset", self)
+    self.preset_minimal_act = QtWidgets.QAction("Minimal Layout Preset", self)
+    self.addAction(self.preset_default_act)
+    self.addAction(self.preset_annotate_act)
+    self.addAction(self.preset_analyze_act)
+    self.addAction(self.preset_minimal_act)
+    self.save_layout_default_act = view_menu.addAction("Save Layout as Default")
+    self.reset_layout_act = view_menu.addAction("Reset Layout")
+    self.link_zoom_act = view_menu.addAction("Link Zoom/Pan")
     self.link_zoom_act.setCheckable(True)
     self.link_zoom_act.setChecked(True)
-    panels_menu = layout_menu.addMenu("Image Panels")
+    panels_menu = view_menu.addMenu("Image Panels")
     self.panel_actions = {}
     for key, label in [
         ("frame", "Show Frame"),
@@ -161,17 +181,17 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         act.setChecked(True)
         act.toggled.connect(lambda checked, k=key: self._on_panel_toggle(k, checked))
         self.panel_actions[key] = act
-    overlays_menu = layout_menu.addMenu("SMLM Overlays")
+    overlays_menu = view_menu.addMenu("SMLM Overlays")
     self.show_smlm_points_act = overlays_menu.addAction("Localization Points")
     self.show_smlm_points_act.setCheckable(True)
     self.show_smlm_points_act.setChecked(True)
     self.show_smlm_sr_act = overlays_menu.addAction("SR Image Overlay")
     self.show_smlm_sr_act.setCheckable(True)
     self.show_smlm_sr_act.setChecked(True)
-    self.show_roi_handles_act = layout_menu.addAction("Show ROI Handles")
+    self.show_roi_handles_act = view_menu.addAction("Show ROI Handles")
     self.show_roi_handles_act.setCheckable(True)
     self.show_roi_handles_act.setChecked(True)
-    self.show_recorder_act = layout_menu.addAction("Show Recorder")
+    self.show_recorder_act = view_menu.addAction("Show Recorder")
     self.show_recorder_act.setCheckable(True)
     self.show_recorder_act.setChecked(False)
     advanced_menu = menubar.addMenu("&Advanced")
@@ -200,29 +220,28 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.toggle_logs_act.setCheckable(True)
     self.toggle_logs_act.setChecked(False)
     self.command_palette_act = QtWidgets.QAction("Command Palette", self)
-    self.command_palette_act.triggered.connect(self._show_command_palette)
     self.addAction(self.command_palette_act)
+    help_menu.addAction(self.command_palette_act)
     self.reset_view_act = QtWidgets.QAction("Reset View", self)
-    self.reset_view_act.triggered.connect(self.reset_all_view)
     self.addAction(self.reset_view_act)
     self._dev_demo_job_act = QtWidgets.QAction("Dev: Demo Job", self)
     self._dev_demo_job_act.triggered.connect(self._run_demo_job)
     self.addAction(self._dev_demo_job_act)
 
     actions = {
-        "open_files": open_files_act,
-        "open_folder": open_folder_act,
-        "load_ann_current": load_ann_current_act,
-        "load_ann_multi": load_ann_multi_act,
-        "load_ann_all": load_ann_all_act,
+        "open_files": self.open_files_act,
+        "open_folder": self.open_folder_act,
+        "load_ann_current": self.load_ann_current_act,
+        "load_ann_multi": self.load_ann_multi_act,
+        "load_ann_all": self.load_ann_all_act,
         "reload_ann": reload_ann_act,
-        "save_csv": save_csv_act,
-        "save_json": save_json_act,
+        "save_csv": self.save_csv_act,
+        "save_json": self.save_json_act,
         "export_standard": export_standard_act,
-        "export_view": export_view_act,
-        "save_proj": save_proj_act,
-        "load_proj": load_proj_act,
-        "prefs": prefs_act,
+        "export_view": self.export_view_act,
+        "save_proj": self.save_proj_act,
+        "load_proj": self.load_proj_act,
+        "prefs": self.prefs_act,
         "exit": exit_act,
         "about": about_act,
         "shortcuts": shortcuts_act,
@@ -273,6 +292,69 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "jump_to_frame": self.jump_to_frame_act,
         "jump_to_z": self.jump_to_z_act,
         "context_help": self.context_help_act,
+        "reset_view": self.reset_view_act,
     }
+    _describe(
+        self.open_files_act,
+        "Open one or more image files into the current session",
+        whats_this="Use this first when starting manual work on a small set of images.",
+    )
+    _describe(
+        self.open_folder_act,
+        "Load all supported images from a folder",
+        whats_this="Use this when your experiment is organized as a folder of related microscopy images.",
+    )
+    _describe(self.load_ann_current_act, "Load annotations linked to the current image or context")
+    _describe(self.save_proj_act, "Save the current workspace, views, and linked resources")
+    _describe(self.load_proj_act, "Load a saved project workspace")
+    _describe(
+        self.prefs_act,
+        "Open preferences and advanced panel behavior settings",
+        whats_this="Preferences contains startup defaults, caching, panel behavior, and advanced workflow settings.",
+    )
+    _describe(self.undo_act, "Undo the last annotation or view command")
+    _describe(self.redo_act, "Redo the last undone command")
+    _describe(self.jump_to_frame_act, "Jump directly to a time frame")
+    _describe(self.jump_to_z_act, "Jump directly to a Z slice")
+    _describe(self.measure_act, "Measure the current annotations and send results to the results panel")
+    _describe(self.clear_roi_act, "Clear the current ROI selection")
+    _describe(self.suggest_points_act, "Generate suggestions for the current slice")
+    _describe(self.suggest_points_image_act, "Generate suggestions across all slices in the current image")
+    _describe(self.accept_visible_suggestions_act, "Accept currently visible suggestions")
+    _describe(self.reject_visible_suggestions_act, "Reject currently visible suggestions")
+    _describe(self.qc_validate_act, "Run quality-control validation for loaded annotations")
+    _describe(self.save_csv_act, "Write the active annotation context to CSV")
+    _describe(self.save_json_act, "Write the active annotation context to JSON")
+    _describe(self.export_view_act, "Export the current rendered view with overlays")
+    _describe(
+        self.advanced_panels_act,
+        "Open the full dock and panel manager",
+        whats_this="Use the panel manager if you cannot find a dock or want to re-open a hidden analysis panel.",
+    )
+    _describe(self.open_panel_policy_act, "Choose which panels auto-open and remain pinned")
+    _describe(self.toggle_left_act, "Show or hide the left workflow sidebar")
+    _describe(self.toggle_settings_act, "Show or hide preferences and settings")
+    _describe(self.link_zoom_act, "Link zoom and pan across synchronized image panels")
+    _describe(self.reset_view_act, "Reset the canvas view to the default zoom and pan")
+    _describe(self.toggle_logs_act, "Show or hide the diagnostics dock")
+    _describe(
+        self.command_palette_act,
+        "Open the command palette for actions and panels",
+        whats_this="The command palette is the fastest way to discover actions, panels, and commands by name.",
+    )
+    _describe(
+        shortcuts_act,
+        "Show the keyboard shortcuts reference",
+        whats_this="Open a reference table of the current keyboard shortcuts used in the application.",
+    )
+    _describe(
+        self.context_help_act,
+        "Show contextual help for the current workflow area",
+        whats_this="Use contextual help when you want a quick explanation of the current panel or workflow without leaving the app.",
+    )
+    _describe(self.layout_preset_annotate_act, "Switch to the annotation-focused layout")
+    _describe(self.layout_preset_analyze_act, "Switch to the analysis-focused layout")
+    _describe(self.layout_preset_assist_expert_act, "Switch to the assist and review layout")
+
     apply_menu_shortcuts(self)
     return actions, dock_panels_menu

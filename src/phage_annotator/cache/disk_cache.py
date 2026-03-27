@@ -61,6 +61,7 @@ class DiskCacheConfig:
     zstd_level_std: int = 8   # Std projections less redundancy
     zstd_level_float32: int = 10
     zstd_level_uint8: int = 6  # Uint8 less effective compression
+    max_pending_saves: int = 8
     
     def __post_init__(self):
         if self.cache_dir is None:
@@ -277,6 +278,22 @@ class DiskCache:
             return False
         
         try:
+            with self._lock:
+                self._reap_completed_saves_locked()
+                if len(self._pending_saves) >= max(1, int(self.config.max_pending_saves)):
+                    logger.debug("Disk cache save skipped: pending queue saturated")
+                    self.stats = DiskCacheStats(
+                        saves=self.stats.saves,
+                        loads=self.stats.loads,
+                        hits=self.stats.hits,
+                        misses=self.stats.misses,
+                        bytes_saved=self.stats.bytes_saved,
+                        bytes_loaded=self.stats.bytes_loaded,
+                        current_size_bytes=self.stats.current_size_bytes,
+                        async_pending=len(self._pending_saves),
+                    )
+                    return False
+
             # Serialize array
             serialized = pickle.dumps(data)
             
@@ -301,6 +318,7 @@ class DiskCache:
                 self._async_save_impl,
                 filename, key, compressed, len(serialized), len(compressed)
             )
+            future.add_done_callback(lambda _future, fname=filename: self._on_save_done(fname))
             
             with self._lock:
                 self._pending_saves[filename] = future
@@ -359,6 +377,28 @@ class DiskCache:
                 self._index.pop(filename, None)
                 if filename in self._lru_order:
                     self._lru_order.remove(filename)
+
+    def _on_save_done(self, filename: str) -> None:
+        """Release completed future bookkeeping for async disk saves."""
+        with self._lock:
+            self._pending_saves.pop(filename, None)
+            self.stats = DiskCacheStats(
+                saves=self.stats.saves,
+                loads=self.stats.loads,
+                hits=self.stats.hits,
+                misses=self.stats.misses,
+                bytes_saved=self.stats.bytes_saved,
+                bytes_loaded=self.stats.bytes_loaded,
+                current_size_bytes=self.stats.current_size_bytes,
+                async_pending=len(self._pending_saves),
+            )
+
+    def _reap_completed_saves_locked(self) -> None:
+        """Remove completed save futures while holding the cache lock."""
+        for filename, future in list(self._pending_saves.items()):
+            if not future.done():
+                continue
+            self._pending_saves.pop(filename, None)
     
     def load(self, key: tuple, lazy: bool = False) -> Optional[np.ndarray | CompressedBuffer]:
         """Load array from disk cache with decompression (P7b).

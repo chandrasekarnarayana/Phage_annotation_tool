@@ -44,6 +44,34 @@ def test_roi_manager_copy_and_template_workflow() -> None:
     assert _summary(manager, 3).names == ["default-box"]
 
 
+def test_roi_manager_new_ids_start_at_one() -> None:
+    """Generated ROI IDs should start at 1 and increment without skipping."""
+    manager = RoiManager()
+
+    assert manager._new_roi_id() == 1
+    assert manager._new_roi_id() == 2
+
+
+def test_roi_manager_circle_template_workflow_preserves_circle_points() -> None:
+    """Circle templates should preserve center/rim geometry when applied."""
+    manager = RoiManager()
+    source_roi = Roi(
+        roi_id=1,
+        name="cell-circle",
+        roi_type="circle",
+        points=[(20.0, 30.0), (28.0, 30.0)],
+    )
+    manager.add_roi(image_id=0, roi=source_roi)
+
+    manager.save_roi_template("default-circle", source_roi)
+    applied = manager.apply_template_to_image("default-circle", image_id=4)
+
+    assert applied is True
+    applied_roi = manager.list_rois(4)[0]
+    assert applied_roi.roi_type == "circle"
+    assert applied_roi.points == [(20.0, 30.0), (28.0, 30.0)]
+
+
 def test_roi_manager_json_roundtrip(tmp_path: Path) -> None:
     """ROI JSON helpers should roundtrip IDs, points, and visibility."""
     rois = [

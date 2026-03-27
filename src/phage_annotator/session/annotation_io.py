@@ -21,6 +21,7 @@ from phage_annotator.io.readers.annotations import (
     parse_legacy_csv,
     parse_thunderstorm_csv,
 )
+from phage_annotator.session.signal_hub import emit_annotations_changed
 
 
 class SessionAnnotationIOMixin:
@@ -80,6 +81,7 @@ class SessionAnnotationIOMixin:
         pixel_size_nm: Optional[float] = None,
         *,
         force_image_id: Optional[int] = None,
+        context_panel_key: Optional[str] = None,
     ) -> None:
         paths, _ = QtWidgets.QFileDialog.getOpenFileNames(
             parent,
@@ -95,18 +97,28 @@ class SessionAnnotationIOMixin:
                 image_id=image_id,
                 pixel_size_nm=pixel_size_nm,
                 force_image_id=force_image_id,
+                context_panel_key=context_panel_key,
             )
         except Exception as exc:
             QtWidgets.QMessageBox.critical(parent, "Load failed", str(exc))
             return
         self._record_annotation_imports(imports)
+        if hasattr(self, "record_workflow_event"):
+            self.record_workflow_event(
+                "annotations_imported",
+                image_id=image_id,
+                count=len(merged),
+                file_count=len(paths),
+            )
         by_image: Dict[int, List[Keypoint]] = {}
         for kp in merged:
             by_image.setdefault(kp.image_id, []).append(kp)
         for target_id, points in by_image.items():
             self.merge_annotations(target_id, points)
         self.set_dirty(True)
-        self.annotations_changed.emit()
+        emit_annotations_changed(self)
+        if hasattr(self, "refresh_provenance_coverage_metrics"):
+            self.refresh_provenance_coverage_metrics()
 
     def _parse_annotations_from_paths(
         self,
@@ -115,11 +127,20 @@ class SessionAnnotationIOMixin:
         image_id: int,
         pixel_size_nm: Optional[float],
         force_image_id: Optional[int] = None,
+        context_panel_key: Optional[str] = None,
     ) -> Tuple[List[Keypoint], List[Tuple[int, Dict[str, object]]]]:
         name_map = {img.name: img.id for img in self.session_state.images}
         merged: List[Keypoint] = []
         imports: List[Tuple[int, Dict[str, object]]] = []
         effective_pixel_size_nm = self._resolve_import_pixel_size_nm(pixel_size_nm)
+        context_key = ""
+        if context_panel_key and hasattr(self, "annotation_context_key_for_panel"):
+            context_key = str(
+                self.annotation_context_key_for_panel(
+                    str(context_panel_key),
+                    annotation_space=str(getattr(self.session_state, "annotation_space", "stack")),
+                )
+            )
         for path in paths:
             file_meta: Dict[str, object] = {}
             fmt = "other"
@@ -146,11 +167,14 @@ class SessionAnnotationIOMixin:
                 if force_image_id is not None:
                     kp.image_id = force_image_id
                     kp.image_name = self.session_state.images[force_image_id].name
+                    kp.annotation_context = context_key
                 elif kp.image_name in name_map:
                     kp.image_id = name_map[kp.image_name]
                 else:
                     kp.image_id = image_id
                     kp.image_name = self.session_state.images[image_id].name
+                    if context_key:
+                        kp.annotation_context = context_key
                 if not kp.image_key:
                     kp.image_key = kp.image_name
                 kp.meta.setdefault("import_file", str(path.resolve()))

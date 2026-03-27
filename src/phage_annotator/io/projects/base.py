@@ -101,6 +101,9 @@ def save_project(
     for img in images:
         image_path = Path(img.path)
         ann_path = image_path.with_suffix(".annotations.json")
+        include_provenance = bool(
+            dict(settings or {}).get("feature_flags", {}).get("annotation_provenance_schema", False)
+        )
         ann_meta = {
             "tool": "PhageAnnotator",
             "schema": "annotation_export.v1",
@@ -120,7 +123,12 @@ def save_project(
             },
             "project_context": {"source": "project_save"},
         }
-        save_keypoints_json(annotations.get(img.id, []), ann_path, meta=ann_meta)
+        save_keypoints_json(
+            annotations.get(img.id, []),
+            ann_path,
+            meta=ann_meta,
+            include_provenance=include_provenance,
+        )
         images_payload.append(
             {
                 "path": str(image_path.resolve()),

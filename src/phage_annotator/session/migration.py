@@ -49,8 +49,10 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     # Import here to avoid circular dependency
     from phage_annotator.session.modality import ModalityManager
     
-    # Create an empty modality manager (no forced base modalities).
-    manager = ModalityManager()
+    primary_id = int(getattr(session_state, "active_primary_id", 0))
+    support_id = int(getattr(session_state, "active_support_id", primary_id))
+    support_arg = support_id if support_id != primary_id else None
+    manager = ModalityManager.create_from_primary_support(primary_id, support_arg)
     
     session_state.modality_manager = manager
     session_state.migration_version = 1

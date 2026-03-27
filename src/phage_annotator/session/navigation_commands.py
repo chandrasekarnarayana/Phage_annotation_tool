@@ -97,6 +97,10 @@ class JumpToFrameCommand(Command):
         self.controller.set_t(self.target_t)
         return True
 
+    def emit_change_signals(self) -> None:
+        """`set_t` already emits typed view notifications."""
+        return None
+
 
 class JumpToZCommand(Command):
     """Command to jump to a specific Z slice (depth index).
@@ -180,3 +184,7 @@ class JumpToZCommand(Command):
         
         self.controller.set_z(self.target_z)
         return True
+
+    def emit_change_signals(self) -> None:
+        """`set_z` already emits typed view notifications."""
+        return None

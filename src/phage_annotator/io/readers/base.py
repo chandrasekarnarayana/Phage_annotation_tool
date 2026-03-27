@@ -245,6 +245,9 @@ def load_images(paths: Iterable[Path]) -> List[ImageMeta]:
     """
     metas: List[ImageMeta] = []
     for idx, p in enumerate(paths):
+        if isinstance(p, (tuple, list)) and p:
+            p = p[0]
+        p = Path(p)
         axes = None
         try:
             with tif.TiffFile(str(p)) as tf:

@@ -9,4 +9,18 @@ This package contains Qt-aware wrappers for framework services:
 These enable the framework services to work seamlessly with Qt's event loop.
 """
 
-__all__ = []
+from phage_annotator.ui_qt.services.status import (
+    ActivityStatus,
+    ManagedStatusBar,
+    StatusMessage,
+    StatusModel,
+    StatusService,
+)
+
+__all__ = [
+    "ActivityStatus",
+    "ManagedStatusBar",
+    "StatusMessage",
+    "StatusModel",
+    "StatusService",
+]

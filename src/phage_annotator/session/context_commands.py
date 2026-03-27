@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from phage_annotator.core.annotation import Keypoint
 from phage_annotator.session.commands import Command, CommandMemento
+from phage_annotator.session.signal_hub import emit_annotations_changed
 from phage_annotator.utils.hit_testing import HitTester, LocalMaxSnapper
 
 
@@ -27,10 +28,7 @@ def _coerce_index(value, default: int = 0) -> int:
 
 def _emit_annotations_changed(controller: "SessionController") -> None:
     """Notify listeners that annotation data changed."""
-    controller.session_state.dirty = True
-    signal = getattr(controller, "annotations_changed", None)
-    if signal is not None:
-        signal.emit()
+    emit_annotations_changed(controller)
 
 
 def _annotation_to_snapshot(annotation: Keypoint) -> dict:
@@ -207,6 +205,10 @@ class DeleteNearestCommand(Command):
         _emit_annotations_changed(self.controller)
         return True
 
+    def emit_change_signals(self) -> None:
+        """Context commands publish annotation changes internally."""
+        return None
+
 
 class MarkUncertainCommand(Command):
     """Command to mark nearest annotation as uncertain."""
@@ -312,6 +314,10 @@ class MarkUncertainCommand(Command):
                 return True
         return False
 
+    def emit_change_signals(self) -> None:
+        """Context commands publish annotation changes internally."""
+        return None
+
 
 class EditNearestMetadataCommand(Command):
     """Command to update label/metadata on the nearest annotation."""
@@ -416,6 +422,10 @@ class EditNearestMetadataCommand(Command):
                 _emit_annotations_changed(self.controller)
                 return True
         return False
+
+    def emit_change_signals(self) -> None:
+        """Context commands publish annotation changes internally."""
+        return None
 
 
 class SnapToLocalMaxCommand(Command):
@@ -551,3 +561,7 @@ class SnapToLocalMaxCommand(Command):
                 _emit_annotations_changed(self.controller)
                 return True
         return False
+
+    def emit_change_signals(self) -> None:
+        """Context commands publish annotation changes internally."""
+        return None

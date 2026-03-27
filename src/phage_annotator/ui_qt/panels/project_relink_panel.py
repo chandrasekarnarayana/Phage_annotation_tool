@@ -69,8 +69,12 @@ class ProjectRelinkPanel(QtWidgets.QWidget):
         relinked = list(report.get("relinked", []) or [])
         unresolved = list(report.get("unresolved", []) or [])
         loaded = int(report.get("loaded_count", 0))
+        partial = bool(report.get("partial_load", False))
+        skipped = int(report.get("skipped_count", len(report.get("missing", []) or [])))
         self.summary_lbl.setText(
-            f"Loaded {loaded} image(s). Relinked: {len(relinked)} | Unresolved: {len(unresolved)}"
+            f"Loaded {loaded} image(s). "
+            f"{'Partial load active. ' if partial else ''}"
+            f"Relinked: {len(relinked)} | Unresolved: {len(unresolved)} | Skipped: {skipped}"
         )
         self.relinked_list.clear()
         self.relinked_list.addItems([str(v) for v in relinked])

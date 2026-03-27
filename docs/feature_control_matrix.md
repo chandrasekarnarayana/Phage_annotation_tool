@@ -392,9 +392,6 @@ This matrix enumerates user-facing controls and their wiring based on code inspe
 - **Gap #3**: P7e tracking invisible → Fixed: Added component memory display to performance panel (F-225/F-226)
 
 **Remaining (Future P6+)**:
-- Complete widget objectName for remaining gui_*.py files (~10-15 files, estimated 200+ widgets)
-- Error reporting improvements (clickable stack traces, severity filtering)
-- Cache eviction telemetry at 90% threshold with user warning
-- Project load error handling with partial load support
-- Job queue visualization with dependency tracking
-- Advanced job cancellation with selective/dependent cancellation
+- Complete widget `objectName` coverage for remaining gui-facing files
+- Dependency-aware cascading cancellation policies beyond the current selective queue controls
+- Broader diagnostics polish beyond the current clickable traceback view and severity-filtered logs

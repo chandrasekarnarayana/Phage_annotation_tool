@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import tempfile
 import unittest
+from concurrent.futures import Future
 
 import numpy as np
 
@@ -196,6 +197,16 @@ class TestDiskCache(unittest.TestCase):
         self.assertEqual(self.cache.stats.saves, 1)
         self.assertEqual(self.cache.stats.hits, 1)
         self.assertEqual(self.cache.stats.loads, 1)
+
+    def test_completed_pending_save_is_cleaned_up(self):
+        """Completed async save futures should not accumulate indefinitely."""
+        future = Future()
+        future.set_result(None)
+        self.cache._pending_saves["done"] = future
+
+        self.cache._reap_completed_saves_locked()
+
+        self.assertNotIn("done", self.cache._pending_saves)
 
 
 @unittest.skipIf(

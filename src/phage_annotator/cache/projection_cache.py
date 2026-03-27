@@ -391,16 +391,24 @@ class ProjectionCache:
         return total_bytes, total_bytes // (1024 * 1024)
 
     def should_compute(self, modality_idx: int) -> bool:
-        """Decide whether to schedule full-res projection computation."""
+        """Decide whether to schedule full-res projection computation.
+
+        The decision is intentionally conservative under pressure so background
+        rendering work stays bounded automatically on weaker machines.
+        """
         if self._max_bytes <= 0:
             return False
-        percent = (self._total_bytes / self._max_bytes * 100) if self._max_bytes else 0
-        if percent >= 90:
+        usage_ratio = (self._total_bytes / self._max_bytes) if self._max_bytes else 0.0
+        if usage_ratio >= 0.90:
+            return False
+        if self._telemetry.is_thrashing():
             return False
         per_modality_budget = self._max_bytes // self._modality_count
         modality_bytes = self._modality_bytes_main.get(modality_idx, 0) + self._modality_bytes_pyramid.get(
             modality_idx, 0
         )
+        if usage_ratio >= 0.75 and modality_bytes > 0:
+            return False
         return modality_bytes <= per_modality_budget
 
     def _modality_overages(self) -> dict[int, int]:

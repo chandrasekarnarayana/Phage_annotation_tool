@@ -128,9 +128,11 @@ class ModalityPlaybackManager(QtCore.QObject):
         Parameters
         ----------
         modality_indices : set[int] or None
-            Modalities to include in synchronized playback. None/empty means all.
+            Modalities to include in synchronized playback.
+            `None` means all registered modalities. An empty set means no
+            synchronized playback targets are currently eligible.
         """
-        self._sync_group = set(modality_indices) if modality_indices else None
+        self._sync_group = None if modality_indices is None else set(modality_indices)
         if self._mode == PlaybackMode.SEQUENTIAL:
             self._sequential_queue = sorted(
                 self._sync_group if self._sync_group is not None else self._states.keys()

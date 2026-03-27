@@ -15,6 +15,7 @@ This is the canonical index for tracked project documentation.
 - `docs/reports/`: reviewer-facing reports and evaluations.
 - `docs/_internal/`: internal notes, migration guides, and archived runtime-adjacent material.
 - `docs/_generated/`: generated artifacts only (non-authored outputs).
+- `docs/_internal/CHANGE_MONITORING_LOG.md`: active migration change-tracking log.
 
 ## Reports
 
@@ -27,6 +28,8 @@ Current tracked report set includes:
 - `docs/reports/Reproducibility_and_Validation.md`
 - `docs/reports/Testing_Strategy.md`
 - `docs/reports/THUNDERSTORM_JAR_INTEGRATION_STATUS.md`
+- `docs/reports/ASSIST_ANNOTATION_VALIDATION_SUMMARY.md`
+- `docs/reports/RETRAINING_AND_STACK_OPTIMIZATION_SUMMARY.md`
 
 ## Archive Policy
 

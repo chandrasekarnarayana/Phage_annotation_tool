@@ -6,6 +6,7 @@ to the session's channel display settings and rendering pipeline.
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, List, Optional
 
 from matplotlib.backends.qt_compat import QtCore
@@ -15,6 +16,8 @@ from phage_annotator.data.channel_display import (
     ChannelDisplayState,
     MultiChannelDisplaySettings,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ChannelPanelIntegration(QtCore.QObject):
@@ -29,19 +32,20 @@ class ChannelPanelIntegration(QtCore.QObject):
     # Signals for session observers
     channel_settings_changed = QtCore.pyqtSignal(MultiChannelDisplaySettings)
     
-    def __init__(self, session_state, canvas_refresh_callback=None):
+    def __init__(self, controller, refresh_request_callback=None):
         """Initialize channel panel integration.
         
         Parameters
         ----------
-        session_state : SessionState
-            The session state to update on channel changes.
-        canvas_refresh_callback : callable, optional
-            Function to call when rendering needs refresh.
+        controller : SessionController
+            Controller used to persist channel-display state.
+        refresh_request_callback : callable, optional
+            Optional queued refresh requester. This should schedule a coalesced
+            GUI refresh rather than calling renderer refresh directly.
         """
         super().__init__()
-        self.session_state = session_state
-        self.canvas_refresh = canvas_refresh_callback
+        self.controller = controller
+        self.refresh_request = refresh_request_callback
         self._channel_settings: Optional[MultiChannelDisplaySettings] = None
     
     def initialize_from_session(self, channel_count: int) -> MultiChannelDisplaySettings:
@@ -59,12 +63,12 @@ class ChannelPanelIntegration(QtCore.QObject):
         """
         # Try to restore from session
         if (
-            self.session_state.channel_display_settings
-            and isinstance(self.session_state.channel_display_settings, dict)
+            self.controller.session_state.channel_display_settings
+            and isinstance(self.controller.session_state.channel_display_settings, dict)
         ):
             try:
                 self._channel_settings = MultiChannelDisplaySettings.from_dict(
-                    self.session_state.channel_display_settings
+                    self.controller.session_state.channel_display_settings
                 )
                 if self._channel_settings.channel_count == channel_count:
                     return self._channel_settings
@@ -155,20 +159,21 @@ class ChannelPanelIntegration(QtCore.QObject):
             return
         
         # Save to session state
-        self.session_state.channel_display_settings = (
+        self.controller.set_channel_display_settings_value(
             self._channel_settings.to_dict()
         )
-        self.session_state.dirty = True
         
         # Emit signal for observers
         self.channel_settings_changed.emit(self._channel_settings)
         
-        # Trigger renderer refresh if callback provided
-        if self.canvas_refresh is not None:
+        # Display changes should normally flow through controller.display_changed.
+        # If a caller provides an explicit refresh requester, require it to be
+        # a queued refresh path rather than a direct canvas redraw.
+        if self.refresh_request is not None:
             try:
-                self.canvas_refresh()
-            except Exception as e:
-                print(f"Error refreshing canvas: {e}")
+                self.refresh_request()
+            except Exception:
+                logger.warning("Failed to request queued refresh after channel settings update", exc_info=True)
     
     def get_channel_settings(self) -> Optional[MultiChannelDisplaySettings]:
         """Get current channel display settings.

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import html
+import logging
 import pathlib
+import re
 from typing import List, Optional
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -27,6 +30,9 @@ from phage_annotator.ui_qt.widgets.table_legacy import ResultsTableWidget
 from phage_annotator.ui_qt.widgets.orthoview import OrthoViewWidget
 from phage_annotator.ui_qt.widgets.slider_panel_double import SliderPanelDouble
 from phage_annotator.ui_qt.panels.smlm import SmlmPanel
+from phage_annotator.ui_qt.services.status import ManagedStatusBar
+
+logger = logging.getLogger(__name__)
 
 
 PANEL_TAB_GROUPS = {
@@ -79,12 +85,10 @@ def _is_user_intent_reason(reason: str) -> bool:
 
 
 def _show_status_message(self, text: str, timeout_ms: int = 3500) -> None:
-    try:
-        bar = self.statusBar()
-    except Exception:
-        bar = None
-    if bar is not None:
-        bar.showMessage(str(text), int(timeout_ms))
+    status_service = getattr(self, "status_service", None)
+    if status_service is not None:
+        status_service.info(str(text), timeout_ms=int(timeout_ms), source="ui_docks")
+    return
 
 
 def _hide_auto_open_toast(self) -> None:
@@ -93,22 +97,22 @@ def _hide_auto_open_toast(self) -> None:
         try:
             frame.hide()
         except Exception:
-            pass
+            logger.debug("Failed to hide auto-open toast frame", exc_info=True)
         try:
             frame.deleteLater()
         except Exception:
-            pass
+            logger.debug("Failed to delete auto-open toast frame", exc_info=True)
     self._auto_open_toast_frame = None
     timer = getattr(self, "_auto_open_toast_timer", None)
     if timer is not None:
         try:
             timer.stop()
         except Exception:
-            pass
+            logger.debug("Failed to stop auto-open toast timer", exc_info=True)
         try:
             timer.deleteLater()
         except Exception:
-            pass
+            logger.debug("Failed to delete auto-open toast timer", exc_info=True)
     self._auto_open_toast_timer = None
 
 
@@ -610,6 +614,7 @@ def _apply_panel_constraints(self, dock: QtWidgets.QDockWidget, spec: PanelSpec)
         "annotations",
         "review_queue",
         "suggestion_explain",
+        "qc_issues",
         "advanced_analysis",
         "modality_layers",
         "status_details",
@@ -876,11 +881,11 @@ def build_panel_registry(self) -> List[PanelSpec]:
         ),
         PanelSpec(
             id="suggestion_explain",
-            title="Why This Suggestion?",
+            title="Suggestion Rationale",
             default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_suggestion_explain_widget,
-            toggle_action_text="Why This Suggestion?",
+            toggle_action_text="Suggestion Rationale",
             bucket="inspect",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
@@ -920,11 +925,11 @@ def build_panel_registry(self) -> List[PanelSpec]:
         ),
         PanelSpec(
             id="advanced_analysis",
-            title="Advanced Analysis",
+            title="Analysis",
             default_area=QtCore.Qt.RightDockWidgetArea,
             default_visible=False,
             widget_factory=self._make_advanced_analysis_widget,
-            toggle_action_text="Advanced Analysis",
+            toggle_action_text="Analysis",
             bucket="inspect",
             constraints=PanelConstraints(
                 allowed_areas=(QtCore.Qt.RightDockWidgetArea,),
@@ -1180,7 +1185,7 @@ def wire_dock_action(
             checkbox.setChecked(visible)
             checkbox.blockSignals(False)
             try:
-                self._refresh_image()
+                self._request_ui_refresh("ui-docks")
             except RuntimeError:
                 return
 
@@ -1211,6 +1216,18 @@ def make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
 def make_status_details_widget(self) -> QtWidgets.QWidget:
     widget = StatusDetailsPanel(parent=self)
     self.status_details_panel = widget
+    if getattr(self, "status_service", None) is not None:
+        self.status_service.bind_widgets(
+            context_label=self.status_context_lbl,
+            state_label=self.status_state_lbl,
+            metric_label=self.status_metric_lbl,
+            progress_label=self.progress_label,
+            progress_bar=self.progress_bar,
+            progress_cancel_btn=self.progress_cancel_btn,
+            progress_cancel_all_btn=self.progress_cancel_all_btn,
+            details_panel=widget,
+            log_status_label=getattr(self, "status_logs_lbl", None),
+        )
     return widget
 
 
@@ -1455,9 +1472,21 @@ def make_logs_widget(self) -> QtWidgets.QWidget:
     logs_layout = QtWidgets.QVBoxLayout(logs_widget)
     logs_layout.setContentsMargins(8, 8, 8, 8)
     logs_layout.setSpacing(6)
-    # Status label is initialized during UI setup; guard prevents startup-order issues.
-    if self.status is not None:
-        logs_layout.addWidget(self.status)
+    # Mirror compact status text here without stealing the bottom-bar widget.
+    self.status_logs_lbl = QtWidgets.QLabel("Ready")
+    logs_layout.addWidget(self.status_logs_lbl)
+    if getattr(self, "status_service", None) is not None:
+        self.status_service.bind_widgets(
+            context_label=self.status_context_lbl,
+            state_label=self.status_state_lbl,
+            metric_label=self.status_metric_lbl,
+            progress_label=self.progress_label,
+            progress_bar=self.progress_bar,
+            progress_cancel_btn=self.progress_cancel_btn,
+            progress_cancel_all_btn=self.progress_cancel_all_btn,
+            details_panel=getattr(self, "status_details_panel", None),
+            log_status_label=self.status_logs_lbl,
+        )
     # Header row: cache stats + filter + actions
     header_row = QtWidgets.QHBoxLayout()
     self.cache_stats_label = QtWidgets.QLabel("Cache: 0 MB | Items: 0")
@@ -1487,21 +1516,105 @@ def make_logs_widget(self) -> QtWidgets.QWidget:
     header_row.addWidget(save_btn)
     header_row.addWidget(clear_btn)
     logs_layout.addLayout(header_row)
-    self.log_view = QtWidgets.QPlainTextEdit()
-    self.log_view.setReadOnly(True)
-    self.log_view.setMaximumBlockCount(1000)
-    self.log_view.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
-    logs_layout.addWidget(self.log_view)
+    split = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+    self.log_list = QtWidgets.QListWidget()
+    self.log_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+    self.log_list.setAlternatingRowColors(True)
+    self.log_list.setUniformItemSizes(True)
+    split.addWidget(self.log_list)
+    self.log_view = QtWidgets.QTextBrowser()
+    self.log_view.setOpenExternalLinks(False)
+    self.log_view.setOpenLinks(False)
+    split.addWidget(self.log_view)
+    split.setStretchFactor(0, 3)
+    split.setStretchFactor(1, 2)
+    logs_layout.addWidget(split)
 
     # Store full logs for filtering
     self._all_logs = []
-    
+
+    def _normalize_log_entry(entry) -> dict[str, str]:
+        if isinstance(entry, dict):
+            return {
+                "timestamp": str(entry.get("timestamp", "--:--:--")),
+                "severity": str(entry.get("severity", "INFO")).upper(),
+                "category": str(entry.get("category", "General")),
+                "summary": str(entry.get("summary", "")),
+                "details": str(entry.get("details", entry.get("summary", ""))),
+            }
+        text = str(entry)
+        upper = text.upper()
+        severity = "ERROR" if ("[EXCEPTION]" in upper or "ERROR" in upper) else "WARNING" if "WARNING" in upper else "INFO"
+        category = "General"
+        if text.startswith("[") and "]" in text:
+            category = text[1 : text.index("]")] or "General"
+        return {
+            "timestamp": "--:--:--",
+            "severity": severity,
+            "category": category,
+            "summary": text.splitlines()[0] if text.splitlines() else text,
+            "details": text,
+        }
+
+    def _entry_label(entry: dict[str, str]) -> str:
+        return (
+            f"[{entry['timestamp']}] [{entry['severity']}] "
+            f"[{entry['category']}] {entry['summary']}"
+        ).rstrip()
+
+    def _selected_entry_details() -> None:
+        item = self.log_list.currentItem()
+        if item is None:
+            self.log_view.clear()
+            return
+        payload = item.data(QtCore.Qt.ItemDataRole.UserRole) or {}
+        entry = _normalize_log_entry(payload)
+        details = entry["details"] or entry["summary"]
+        self.log_view.setHtml(_entry_details_html(entry, details))
+
+    def _traceback_to_html(text: str) -> str:
+        lines: list[str] = []
+        pattern = re.compile(r'File "([^"]+)", line (\d+)')
+        for raw_line in str(text).splitlines():
+            escaped = html.escape(raw_line)
+            match = pattern.search(raw_line)
+            if match:
+                path, line_no = match.groups()
+                url = QtCore.QUrl.fromLocalFile(path)
+                url.setFragment(f"L{line_no}")
+                escaped = pattern.sub(
+                    lambda _m: (
+                        f'File "<a href="{html.escape(url.toString())}">{html.escape(path)}</a>", '
+                        f"line {html.escape(line_no)}"
+                    ),
+                    escaped,
+                )
+            lines.append(escaped)
+        return "<br>".join(lines)
+
+    def _entry_details_html(entry: dict[str, str], details: str) -> str:
+        header = html.escape(_entry_label(entry))
+        body = _traceback_to_html(details)
+        return f"<pre>{header}\n\n{body}</pre>"
+
+    def _open_log_link(url: QtCore.QUrl) -> None:
+        QtGui.QDesktopServices.openUrl(url)
+
     # Wire actions
     def _copy_logs() -> None:
+        item = self.log_list.currentItem()
+        if item is not None:
+            payload = item.data(QtCore.Qt.ItemDataRole.UserRole) or {}
+            entry = _normalize_log_entry(payload)
+            QtWidgets.QApplication.clipboard().setText(
+                f"{_entry_label(entry)}\n\n{entry['details']}".rstrip()
+            )
+            return
         QtWidgets.QApplication.clipboard().setText(self.log_view.toPlainText())
     
     def _clear_logs() -> None:
         self.log_view.clear()
+        self.log_list.clear()
         self._all_logs.clear()
 
     def _save_logs() -> None:
@@ -1512,28 +1625,44 @@ def make_logs_widget(self) -> QtWidgets.QWidget:
             return
         try:
             with open(path, "w", encoding="utf-8") as f:
-                f.write(self.log_view.toPlainText())
+                lines = []
+                for row in self._all_logs:
+                    entry = _normalize_log_entry(row)
+                    lines.append(f"{_entry_label(entry)}\n{entry['details']}".rstrip())
+                f.write("\n\n".join(lines))
         except Exception as exc:
             QtWidgets.QMessageBox.critical(self, "Save Logs failed", str(exc))
-    
-    def _filter_logs() -> None:
-        """Filter logs based on selected severity level."""
+
+    def _refresh_log_view() -> None:
+        """Rebuild the visible log list based on the active severity filter."""
         level = self.log_level_combo.currentText()
+        self.log_list.clear()
         self.log_view.clear()
-        
-        if level == "ALL":
-            for log_entry in self._all_logs:
-                self.log_view.appendPlainText(log_entry)
-        else:
-            # Filter by level keyword
-            for log_entry in self._all_logs:
-                if f"[{level}]" in log_entry or (level == "ERROR" and "[EXCEPTION]" in log_entry):
-                    self.log_view.appendPlainText(log_entry)
+        visible_entries = []
+        for row in self._all_logs:
+            entry = _normalize_log_entry(row)
+            if level != "ALL" and entry["severity"] != level:
+                continue
+            visible_entries.append(entry)
+        for entry in visible_entries:
+            item = QtWidgets.QListWidgetItem(_entry_label(entry))
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, entry)
+            if entry["severity"] == "ERROR":
+                item.setForeground(QtGui.QColor("#c92a2a"))
+            elif entry["severity"] == "WARNING":
+                item.setForeground(QtGui.QColor("#e67700"))
+            self.log_list.addItem(item)
+        if self.log_list.count() > 0:
+            self.log_list.setCurrentRow(self.log_list.count() - 1)
+            _selected_entry_details()
 
     copy_btn.clicked.connect(_copy_logs)
     save_btn.clicked.connect(_save_logs)
     clear_btn.clicked.connect(_clear_logs)
-    self.log_level_combo.currentTextChanged.connect(_filter_logs)
+    self.log_level_combo.currentTextChanged.connect(_refresh_log_view)
+    self.log_list.currentItemChanged.connect(lambda *_args: _selected_entry_details())
+    self.log_view.anchorClicked.connect(_open_log_link)
+    self._refresh_log_view = _refresh_log_view
     return logs_widget
 
 
@@ -1564,6 +1693,11 @@ def make_qc_issues_widget(self) -> QtWidgets.QWidget:
 def setup_status_bar(self) -> None:
     """Initialize status-bar widgets (progress, buffer stats, and tool status)."""
     status_bar = self.statusBar()
+    if not isinstance(status_bar, ManagedStatusBar):
+        status_bar = ManagedStatusBar(self)
+        self.setStatusBar(status_bar)
+    if getattr(self, "status_service", None) is not None:
+        status_bar.attach_status_service(self.status_service)
     status_bar.setSizeGripEnabled(True)
     indicator = getattr(self, "_status_indicator_bar", None)
     if indicator is not None:
@@ -1579,64 +1713,44 @@ def setup_status_bar(self) -> None:
         "QStatusBar { border-top: 2px solid #b8b8b8; background: #f5f5f5; padding: 2px; }"
     )
 
-    # QLabel used by docks as the shared status text widget.
-    self.status = QtWidgets.QLabel("", status_bar)
-    self.status.setMinimumWidth(180)
-    status_bar.addWidget(self.status, stretch=0)
-    self.status_runtime_lbl = QtWidgets.QLabel(
-        "Points: 0 | ROI: n/a | Density: n/a | FPS: 30",
-        status_bar,
+    # Compact three-zone status bar: context, state/activity, and metric/alert.
+    self.status_context_lbl = QtWidgets.QLabel("-", status_bar)
+    self.status_context_lbl.setMinimumWidth(280)
+    self.status_context_lbl.setToolTip("Current dataset, frame position, tool, and label.")
+    status_bar.addWidget(self.status_context_lbl, stretch=1)
+    self.status_state_lbl = QtWidgets.QLabel("Ready", status_bar)
+    self.status_state_lbl.setMinimumWidth(220)
+    self.status_state_lbl.setStyleSheet(
+        "QLabel[statusSeverity='error'] { color: #b71c1c; font-weight: 600; }"
+        "QLabel[statusSeverity='warning'] { color: #ef6c00; font-weight: 600; }"
+        "QLabel[statusSeverity='activity'] { color: #1565c0; font-weight: 600; }"
+        "QLabel[statusSeverity='advisory'] { color: #6a1b9a; font-weight: 600; }"
+        "QLabel[statusSeverity='success'] { color: #2e7d32; font-weight: 600; }"
     )
-    self.status_runtime_lbl.setVisible(False)
-    status_bar.addPermanentWidget(self.status_runtime_lbl)
-
-    # Permanent operational state widgets (single source of truth).
-    self.status_dataset_lbl = QtWidgets.QLabel("Dataset: -", status_bar)
-    self.status_tz_lbl = QtWidgets.QLabel("T: -/- | Z: -/-", status_bar)
-    self.status_points_lbl = QtWidgets.QLabel("Points: 0", status_bar)
-    self.status_roi_area_lbl = QtWidgets.QLabel("ROI area: -", status_bar)
-    self.status_density_lbl = QtWidgets.QLabel("Density: -", status_bar)
-    self.status_fps_lbl = QtWidgets.QLabel("FPS: 30", status_bar)
-    self.status_label_lbl = QtWidgets.QLabel("Label: -", status_bar)
-    self.status_scope_lbl = QtWidgets.QLabel("Scope: Slice", status_bar)
-    self.status_target_lbl = QtWidgets.QLabel("Target: Frame", status_bar)
-    self.status_modality_combo = QtWidgets.QComboBox(status_bar)
+    status_bar.addWidget(self.status_state_lbl, stretch=0)
+    self.status_metric_lbl = QtWidgets.QLabel("", status_bar)
+    self.status_metric_lbl.setMinimumWidth(200)
+    self.status_metric_lbl.setAlignment(
+        QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+    )
+    self.status_metric_lbl.setVisible(False)
+    status_bar.addPermanentWidget(self.status_metric_lbl)
+    # Legacy alias retained during migration for code that expects self.status.
+    self.status = self.status_state_lbl
+    # Transitional assist/modality controls are kept off the status bar so the
+    # compact bottom strip remains the only status UX. They still exist as
+    # integration points for other modules until those flows are moved to a
+    # dedicated controls surface.
+    self._status_control_host = QtWidgets.QWidget(self)
+    self._status_control_host.setVisible(False)
+    self.status_modality_combo = QtWidgets.QComboBox(self._status_control_host)
     self.status_modality_combo.setMinimumContentsLength(16)
-    self.status_context_lock_lbl = QtWidgets.QLabel("Write Context: Locked", status_bar)
-    self.status_effective_context_lbl = QtWidgets.QLabel("Effective Assist Context: -", status_bar)
-    self.status_assist_lbl = QtWidgets.QLabel("Assist: Off", status_bar)
-    self.status_suggestion_fresh_lbl = QtWidgets.QLabel("Suggestions: n/a", status_bar)
-    self.status_qc_lbl = QtWidgets.QLabel("QC: 0 warnings", status_bar)
-    self.status_results_lbl = QtWidgets.QLabel("Results: empty", status_bar)
-    self.status_strategy_combo = QtWidgets.QComboBox(status_bar)
+    self.status_strategy_combo = QtWidgets.QComboBox(self._status_control_host)
     self.status_strategy_combo.setMinimumContentsLength(14)
-    self.status_assist_mode_btn = QtWidgets.QToolButton(status_bar)
+    self.status_assist_mode_btn = QtWidgets.QToolButton(self._status_control_host)
     self.status_assist_mode_btn.setCheckable(True)
     self.status_assist_mode_btn.setText("Assist Mode: Off")
-    # Keep status bar transient-first: no always-on permanent info strip widgets.
-    # Detailed operational context is available via status-details panel/actions.
-    # Secondary state stays available for logic/tooltips but is hidden from the
-    # default status bar strip to reduce visual crowding.
-    for widget in (
-        self.status_dataset_lbl,
-        self.status_tz_lbl,
-        self.status_label_lbl,
-        self.status_scope_lbl,
-        self.status_target_lbl,
-        self.status_points_lbl,
-        self.status_roi_area_lbl,
-        self.status_density_lbl,
-        self.status_fps_lbl,
-        self.status_context_lock_lbl,
-        self.status_effective_context_lbl,
-        self.status_assist_lbl,
-        self.status_suggestion_fresh_lbl,
-        self.status_qc_lbl,
-        self.status_results_lbl,
-        self.status_modality_combo,
-        self.status_strategy_combo,
-        self.status_assist_mode_btn,
-    ):
+    for widget in (self.status_modality_combo, self.status_strategy_combo, self.status_assist_mode_btn):
         widget.setVisible(False)
     
     self.progress_label = QtWidgets.QLabel("Working:")
@@ -1677,3 +1791,15 @@ def setup_status_bar(self) -> None:
     meta_layout.addWidget(self.annotation_meta_close_btn)
     self.annotation_meta_widget.setVisible(False)
     status_bar.addWidget(self.annotation_meta_widget)
+    if getattr(self, "status_service", None) is not None:
+        self.status_service.bind_widgets(
+            context_label=self.status_context_lbl,
+            state_label=self.status_state_lbl,
+            metric_label=self.status_metric_lbl,
+            progress_label=self.progress_label,
+            progress_bar=self.progress_bar,
+            progress_cancel_btn=self.progress_cancel_btn,
+            progress_cancel_all_btn=self.progress_cancel_all_btn,
+            details_panel=getattr(self, "status_details_panel", None),
+            log_status_label=getattr(self, "status_logs_lbl", None),
+        )

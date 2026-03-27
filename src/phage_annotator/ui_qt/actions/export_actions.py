@@ -128,7 +128,11 @@ class ExportActionsMixin:
             preset=preset,
             files=outputs,
         )
-        self._set_status(f"Exported {len(outputs)} output(s) to {root_output}.")
+        self._status_success(
+            f"Exported {len(outputs)} output(s) to {root_output}.",
+            timeout_ms=4000,
+            source="export.standard_bundle",
+        )
 
     def _show_reviewer_analytics_dialog(self) -> None:
         """Display per-user metrics and QC trend from audit history."""
@@ -209,7 +213,11 @@ class ExportActionsMixin:
                 json.dumps(payload, indent=2),
                 encoding="utf-8",
             )
-            self._set_status(f"Reviewer analytics exported to {path}.")
+            self._status_success(
+                f"Reviewer analytics exported to {path}.",
+                timeout_ms=4000,
+                source="export.reviewer_analytics",
+            )
 
         export_btn.clicked.connect(_export)
         close_btn.clicked.connect(dlg.accept)

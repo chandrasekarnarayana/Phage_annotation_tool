@@ -75,7 +75,7 @@ class PlaybackMixin:
         # Heavy refresh once to ensure artists/vmin/vmax exist.
         frame_ax = self._playback_target_axis()
         if self.im_frame is None or frame_ax is None or self._axis_scale(frame_ax) != 1.0:
-            self._refresh_image()
+            self._request_render_refresh("playback-start", debounce=True)
         self._playback_mode = True
         self.play_mode = "t"
         if fps is not None:

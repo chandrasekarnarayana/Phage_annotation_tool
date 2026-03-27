@@ -95,6 +95,8 @@ class ResultsControlsMixin:
             timeout_sec=300.0,
             retries=1,
             retry_delay_sec=0.5,
+            priority="interactive",
+            replace_key="roi-measure-t",
         )
 
     def _results_job(self, progress, cancel_token) -> int | None:

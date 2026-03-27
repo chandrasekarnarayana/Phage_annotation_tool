@@ -45,7 +45,7 @@ class ThresholdControlsMixin:
         if not values.preview:
             self._threshold_preview_mask = None
             self._threshold_preview_extent = None
-            self._refresh_image()
+            self._request_ui_refresh("threshold-controls")
             return
 
         image = self._threshold_source_image(values.target)
@@ -84,11 +84,13 @@ class ThresholdControlsMixin:
         self._threshold_preview_extent = (0, mask.shape[1], mask.shape[0], 0)
         self._threshold_mask_full = self._threshold_to_full_mask(mask, crop_offset, image.shape)
         self._threshold_settings = values.__dict__
-        self.controller.session_state.threshold_settings = dict(self._threshold_settings)
-        self.controller.session_state.threshold_configs_by_image[self.primary_image.id] = dict(self._threshold_settings)
+        self.controller.set_threshold_preview_settings(
+            self.primary_image.id,
+            dict(self._threshold_settings),
+        )
         self._append_log(self._threshold_log_message(values, self._threshold_auto_value))
         self.recorder.record("threshold_preview", self._threshold_settings)
-        self._refresh_image()
+        self._request_ui_refresh("threshold-controls")
 
     def _threshold_auto(self) -> None:
         if self.threshold_panel is None:
@@ -139,7 +141,14 @@ class ThresholdControlsMixin:
             self.threshold_panel.status_label.setText("Auto threshold failed.")
             self._append_log(f"[Threshold] Error\n{err}")
 
-        handle = self.jobs.submit(_job, name="Threshold Auto", on_result=_on_result, on_error=_on_error)
+        handle = self.jobs.submit(
+            _job,
+            name="Threshold Auto",
+            on_result=_on_result,
+            on_error=_on_error,
+            priority="interactive",
+            replace_key="threshold-auto",
+        )
         self._threshold_job_id = handle.job_id
         self.threshold_panel.status_label.setText(f"Computing {values.method}…")
 
@@ -226,25 +235,31 @@ class ThresholdControlsMixin:
 
     def _threshold_create_mask(self) -> None:
         if self._threshold_mask_full is None:
-            self._set_status("No threshold mask to save.")
+            self._status_warning("No threshold mask to save.", source="threshold.create_mask")
             return
         image_id = self.primary_image.id
         # Phase 7: Store read-only view to avoid 8MB copy per mask
         # Operations like `mask & roi_mask` will create new arrays as needed
         from phage_annotator.utils import readonly_view
-        self.controller.session_state.threshold_masks[image_id] = {
-            "t": int(self.t_slider.value()),
-            "z": int(self.z_slider.value()),
-            "mask": readonly_view(self._threshold_mask_full),
-        }
-        self._set_status("Threshold mask stored for current slice.")
+        self.controller.store_threshold_mask(
+            image_id,
+            {
+                "t": int(self.t_slider.value()),
+                "z": int(self.z_slider.value()),
+                "mask": readonly_view(self._threshold_mask_full),
+            },
+        )
+        self._status_success(
+            "Threshold mask stored for current slice.",
+            source="threshold.create_mask",
+        )
         if self.threshold_panel is not None:
             self._append_log(self._threshold_log_message(self.threshold_panel.values(), self._threshold_auto_value))
             self.recorder.record("threshold_create_mask", self._threshold_settings)
 
     def _threshold_create_roi(self) -> None:
         if self._threshold_mask_full is None:
-            self._set_status("No threshold mask to convert.")
+            self._status_warning("No threshold mask to convert.", source="threshold.create_roi")
             return
         mask = self._threshold_mask_full
         try:
@@ -254,14 +269,14 @@ class ThresholdControlsMixin:
         if ndi is None:
             ys, xs = np.nonzero(mask)
             if ys.size == 0:
-                self._set_status("Mask empty.")
+                self._status_warning("Mask empty.", source="threshold.create_roi")
                 return
             x0, x1 = xs.min(), xs.max()
             y0, y1 = ys.min(), ys.max()
         else:
             labeled, n = ndi.label(mask)
             if n == 0:
-                self._set_status("Mask empty.")
+                self._status_warning("Mask empty.", source="threshold.create_roi")
                 return
             sizes = ndi.sum(mask, labeled, range(1, n + 1))
             idx = int(np.argmax(sizes)) + 1
@@ -273,7 +288,7 @@ class ThresholdControlsMixin:
         self.roi_shape = "box"
         self.roi_rect = rect
         self._sync_roi_controls()
-        self._refresh_image()
+        self._request_ui_refresh("threshold-controls")
 
     def _threshold_analyze_particles(self) -> None:
         self._show_analyze_particles_panel()
@@ -282,7 +297,7 @@ class ThresholdControlsMixin:
         if self.threshold_panel is None:
             return
         if self._threshold_preview_mask is None:
-            self._set_status("No threshold preview to apply.")
+            self._status_warning("No threshold preview to apply.", source="threshold.apply")
             return
         # P1.4: Confirmation with "Don't show again" toggle stored in settings
         if self._settings.value("confirmApplyThreshold", True, type=bool):
@@ -317,10 +332,10 @@ class ThresholdControlsMixin:
         self._threshold_preview_extent = None
         self._sr_overlay = None
         self._sr_overlay_extent = None
-        self._set_status("Binary mask applied to view.")
+        self._status_success("Binary mask applied to view.", source="threshold.apply")
         self.recorder.record("threshold_apply", self._threshold_settings)
         self._append_log(self._threshold_log_message(self.threshold_panel.values(), self._threshold_auto_value))
-        self._refresh_image()
+        self._request_ui_refresh("threshold-controls")
 
     def _run_analyze_particles(self) -> None:
         if self.particles_panel is None:
@@ -347,7 +362,7 @@ class ThresholdControlsMixin:
             include_holes=values.include_holes,
             watershed_split=values.watershed_split,
         )
-        self.controller.session_state.particles_configs_by_image[self.primary_image.id] = values.__dict__
+        self.controller.set_particles_config(self.primary_image.id, dict(values.__dict__))
 
         if values.scope == "Current slice":
             if mask_entry.get("t") != int(self.t_slider.value()) or mask_entry.get("z") != int(
@@ -464,7 +479,14 @@ class ThresholdControlsMixin:
             self.particles_panel.status_label.setText("Analyze failed.")
             self._append_log(f"[Particles] Error\n{err}")
 
-        handle = self.jobs.submit(_job, name="Analyze Particles", on_result=_on_result, on_error=_on_error)
+        handle = self.jobs.submit(
+            _job,
+            name="Analyze Particles",
+            on_result=_on_result,
+            on_error=_on_error,
+            priority="interactive",
+            replace_key="analyze-particles",
+        )
         self._particles_job_id = handle.job_id
         self.particles_panel.status_label.setText("Running…")
 
@@ -520,7 +542,7 @@ class ThresholdControlsMixin:
                 self._particles_overlays.append(
                     ("ellipse", ((x - off_x) / scale, (y - off_y) / scale, w / scale, h / scale), color, selected)
                 )
-        self._refresh_image()
+        self._request_ui_refresh("threshold-controls")
 
     def _export_particles_csv(self) -> None:
         if not self._particles_results:
@@ -575,7 +597,7 @@ class ThresholdControlsMixin:
         self.roi_shape = "box"
         self.roi_rect = rect
         self._sync_roi_controls()
-        self._refresh_image()
+        self._request_ui_refresh("threshold-controls")
 
     def _offset_particle(self, particle, dx: int, dy: int):
         bbox = particle.bbox

@@ -232,7 +232,7 @@ class PreferencesControlsMixin:
                     self.pyramid_levels_spin.setValue(self.pyramid_max_levels)
             if preset_combo.currentText() != "Default":
                 self.apply_preset(preset_combo.currentText())
-            self._refresh_image()
+            self._request_ui_refresh("preferences", metadata=True)
             dlg.accept()
 
         buttons.accepted.connect(_apply)
@@ -282,7 +282,7 @@ class PreferencesControlsMixin:
         self.pixel_size_um_per_px = float(val)
         self._settings.setValue("defaultPixelSizeUmPerPx", self.pixel_size_um_per_px)
         self._update_status()
-        self._refresh_image()
+        self._request_ui_refresh("preferences")
 
     def _on_cache_budget_change(self, val: int) -> None:
         self._settings.setValue("cacheMaxMB", int(val))
@@ -292,7 +292,7 @@ class PreferencesControlsMixin:
     def _on_downsample_factor_change(self, val: int) -> None:
         self.downsample_factor = max(1, int(val))
         self._settings.setValue("downsampleFactor", self.downsample_factor)
-        self._refresh_image()
+        self._request_ui_refresh("preferences")
 
     def _on_downsample_toggle(self) -> None:
         self.downsample_images = self.downsample_images_chk.isChecked()
@@ -301,19 +301,19 @@ class PreferencesControlsMixin:
         self._settings.setValue("downsampleImages", self.downsample_images)
         self._settings.setValue("downsampleHist", self.downsample_hist)
         self._settings.setValue("downsampleProfile", self.downsample_profile)
-        self._refresh_image()
+        self._request_ui_refresh("preferences")
 
     def _on_pyramid_toggle(self) -> None:
         self.pyramid_enabled = self.pyramid_chk.isChecked()
         self._settings.setValue("pyramidEnabled", self.pyramid_enabled)
         self._last_render_level = 0
-        self._refresh_image()
+        self._request_ui_refresh("preferences")
 
     def _on_pyramid_levels_change(self, val: int) -> None:
         self.pyramid_max_levels = max(1, int(val))
         self._settings.setValue("pyramidMaxLevels", self.pyramid_max_levels)
         self._last_render_level = min(self._last_render_level, self.pyramid_max_levels)
-        self._refresh_image()
+        self._request_ui_refresh("preferences")
 
     def _on_scalebar_change(self) -> None:
         self.scale_bar_enabled = self.scalebar_chk.isChecked()
@@ -332,4 +332,4 @@ class PreferencesControlsMixin:
         self._settings.setValue(
             "scaleBarIncludeInExport", self.scale_bar_include_in_export
         )
-        self._refresh_image()
+        self._request_ui_refresh("preferences")

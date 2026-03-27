@@ -9,6 +9,7 @@ import numpy as np
 from phage_annotator.io.data.calibration import CalibrationState, resolve_calibration
 from phage_annotator.io import read_metadata_bundle
 from phage_annotator.core.session_state import ImageState
+from phage_annotator.session.signal_hub import emit_annotations_changed, emit_state_changed
 
 if TYPE_CHECKING:
     from phage_annotator.data.models import LazyImage
@@ -49,7 +50,7 @@ class SessionImageMixin:
     def refresh_image_state(self, img: "LazyImage") -> None:
         """Rebuild ImageState metadata after loading or axis changes."""
         self.session_state.image_states[img.id] = self._build_image_state(img)
-        self.state_changed.emit()
+        emit_state_changed(self)
 
     def get_metadata_summary(self, image_id: int) -> dict:
         """Return cached metadata summary for an image."""
@@ -91,8 +92,8 @@ class SessionImageMixin:
         self.session_state.image_states = {img.id: self._build_image_state(img) for img in images}
         self.session_state.active_primary_id = 0
         self.session_state.active_support_id = 0 if len(images) == 1 else 1
-        self.state_changed.emit()
-        self.annotations_changed.emit()
+        emit_state_changed(self)
+        emit_annotations_changed(self)
 
     def add_images(self, images: List["LazyImage"]) -> None:
         """Append images to the session and initialize empty annotations."""
@@ -105,8 +106,8 @@ class SessionImageMixin:
             self.session_state.annotations[img.id] = []
             self.session_state.annotations_loaded[img.id] = False
             self.session_state.image_states[img.id] = self._build_image_state(img)
-        self.state_changed.emit()
-        self.annotations_changed.emit()
+        emit_state_changed(self)
+        emit_annotations_changed(self)
 
     def retain_single_image(self, keep_idx: int) -> None:
         """Keep only the selected image and its annotations."""
@@ -123,8 +124,8 @@ class SessionImageMixin:
         self.session_state.image_states = {0: self._build_image_state(keep_img)}
         self.session_state.active_primary_id = 0
         self.session_state.active_support_id = 0
-        self.state_changed.emit()
-        self.annotations_changed.emit()
+        emit_state_changed(self)
+        emit_annotations_changed(self)
 
     def set_primary(self, index: int) -> None:
         """Set the active primary image index."""
@@ -133,7 +134,7 @@ class SessionImageMixin:
         if self.session_state.active_primary_id == index:
             return
         self.session_state.active_primary_id = index
-        self.state_changed.emit()
+        emit_state_changed(self)
 
     def set_support(self, index: int) -> None:
         """Set the active support image index."""
@@ -142,7 +143,7 @@ class SessionImageMixin:
         if self.session_state.active_support_id == index:
             return
         self.session_state.active_support_id = index
-        self.state_changed.emit()
+        emit_state_changed(self)
 
     def set_axis_interpretation(self, image_id: int, mode: str) -> None:
         """Set 3D axis interpretation for a specific image."""
@@ -175,4 +176,4 @@ class SessionImageMixin:
                 memmap_flag=state.memmap_flag,
                 metadata_summary=state.metadata_summary,
             )
-        self.state_changed.emit()
+        emit_state_changed(self)

@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from matplotlib.backends.qt_compat import QtWidgets
 
+from phage_annotator.core.session_state import ViewState
 from phage_annotator.data.display_mapping import DisplayMapping
 import phage_annotator.session.project as project_module
 from phage_annotator.session.project import SessionProjectMixin
@@ -38,6 +39,8 @@ class _Harness(SessionProjectMixin):
         self.rois_by_image: dict[int, list[Any]] = {}
         self.state_changed = _Emitter()
         self.annotations_changed = _Emitter()
+        self.display_changed = _Emitter()
+        self.view_state = ViewState()
         self.session_state = SimpleNamespace(
             images=[],
             annotations={},
@@ -86,7 +89,7 @@ class _Harness(SessionProjectMixin):
             density_device="auto",
             density_target_panel="frame",
         )
-        self._lut_set = 0
+        self._lut_set = None
         self._dirty = False
 
     def _build_image_state(self, img: Any) -> Any:
@@ -142,6 +145,10 @@ def test_project_load_partial_missing_images_warns_and_succeeds(tmp_path: Path, 
     assert len(harness.session_state.images) == 1
     assert harness.session_state.images[0].path == present
     assert warnings, "Expected missing-image warning during partial project load."
+    report = dict(getattr(harness.session_state, "project_relink_report", {}) or {})
+    assert report.get("partial_load") is True
+    assert report.get("loaded_count") == 1
+    assert report.get("skipped_count") == 1
 
 
 def test_project_load_clamps_active_indices_after_partial_load(
@@ -218,6 +225,66 @@ def test_project_load_fails_when_all_images_missing(tmp_path: Path, monkeypatch:
 
     assert ok is False
     assert critical_calls
+    report = dict(getattr(harness.session_state, "project_relink_report", {}) or {})
+    assert report.get("partial_load") is False
+    assert report.get("loaded_count") == 0
+
+
+def test_project_load_prefers_workspace_snapshot_display_mapping_over_legacy_lut(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Workspace snapshot display mapping should win over legacy LUT fallback."""
+    present = tmp_path / "present.tif"
+    present.write_bytes(b"fake")
+    project_path = tmp_path / "session.phageproj"
+    project_path.write_text("{}", encoding="utf-8")
+
+    def _fake_loader(_path: Path):
+        return (
+            [
+                {"path": str(present), "display_mapping": {}},
+            ],
+            {
+                "last_fov_index": 0,
+                "last_support_index": 0,
+                "lut": 0,
+                "workspace_snapshot": {
+                    "session_workspace": {
+                        "active_primary_id": 0,
+                        "display_mapping_frame": {
+                            "min": 5.0,
+                            "max": 15.0,
+                            "gamma": 1.3,
+                            "lut": 2,
+                            "invert": True,
+                        },
+                    }
+                },
+            },
+            {},
+            {},
+            {},
+            {},
+            {},
+            None,
+            None,
+        )
+
+    monkeypatch.setattr(project_module, "load_project", _fake_loader)
+    monkeypatch.setattr(QtWidgets.QMessageBox, "warning", staticmethod(lambda *_args, **_kwargs: None))
+    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", staticmethod(lambda *_args, **_kwargs: None))
+
+    harness = _Harness()
+    ok = harness.load_project(None, project_path, _mock_read_metadata)
+
+    assert ok is True
+    mapping = harness.display_mapping.mapping_for(0, "frame")
+    assert mapping.min_val == 5.0
+    assert mapping.max_val == 15.0
+    assert mapping.gamma == 1.3
+    assert mapping.lut == 2
+    assert mapping.invert is True
+    assert harness._lut_set is None
     assert "Load failed" in critical_calls[0][0]
 
 

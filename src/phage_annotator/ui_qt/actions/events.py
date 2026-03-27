@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import logging
+
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.ui_qt.assist_state import assist_state_label
 from phage_annotator.ui_qt.actions.keyboard_events import KeyboardEventsMixin
+
+logger = logging.getLogger(__name__)
 
 
 class EventsMixin(KeyboardEventsMixin):
     """Mixin for Qt/matplotlib event handlers and interaction state."""
 
     def _bind_events(self) -> None:
+        """Bind widget, controller, and application events.
+
+        UI events remain thin and route mutations through controller/state
+        services whenever possible. Expensive refresh work is queued on the
+        Qt loop to avoid one widget interaction starving the rest of the GUI.
+        """
         self.canvas.mpl_connect("button_press_event", self._on_click)
         self.canvas.mpl_connect("key_press_event", self._on_key)
         self.canvas.mpl_connect("button_press_event", self._on_mouse_press)
@@ -25,21 +35,15 @@ class EventsMixin(KeyboardEventsMixin):
             self.support_combo.currentIndexChanged.connect(self._set_support_combo)
         if getattr(self, "lazy_modality_table", None) is not None:
             self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
-        if getattr(self, "lazy_add_raw_btn", None) is not None:
-            self.lazy_add_raw_btn.pressed.connect(lambda: self._add_lazy_modality_view("raw"))
-            self.lazy_add_mean_btn.pressed.connect(lambda: self._add_lazy_modality_view("mean"))
-            self.lazy_add_std_btn.pressed.connect(lambda: self._add_lazy_modality_view("std"))
-            if getattr(self, "lazy_add_median_btn", None) is not None:
-                self.lazy_add_median_btn.pressed.connect(lambda: self._add_lazy_modality_view("median"))
-            if getattr(self, "lazy_add_min_btn", None) is not None:
-                self.lazy_add_min_btn.pressed.connect(lambda: self._add_lazy_modality_view("min"))
-            if getattr(self, "lazy_add_max_btn", None) is not None:
-                self.lazy_add_max_btn.pressed.connect(lambda: self._add_lazy_modality_view("max"))
+        if getattr(self, "lazy_open_btn", None) is not None:
+            self.lazy_open_btn.pressed.connect(self._open_lazy_loader_dialog)
             self.lazy_remove_btn.pressed.connect(self._remove_selected_lazy_modality_view)
         if getattr(self, "lazy_auto_update_chk", None) is not None:
             self.lazy_auto_update_chk.toggled.connect(self._on_lazy_auto_update_toggled)
         if getattr(self, "lazy_apply_btn", None) is not None:
             self.lazy_apply_btn.pressed.connect(self._apply_lazy_pending_updates)
+        if getattr(self, "controller", None) is not None:
+            self._bind_controller_signals()
         self.play_t_btn.clicked.connect(lambda: self._toggle_play("t"))
         self.play_z_btn.clicked.connect(lambda: self._toggle_play("z"))
         self.t_minus_button.clicked.connect(lambda: self._step_slider(self.t_slider, -1))
@@ -147,8 +151,23 @@ class EventsMixin(KeyboardEventsMixin):
         self.annot_table.itemSelectionChanged.connect(self._on_table_selection)
         self.annot_table.itemChanged.connect(self._on_table_item_changed)
         self.filter_current_chk.stateChanged.connect(lambda _state: self._refresh_table())
+        if hasattr(self, "annotation_table_mode_combo"):
+            self.annotation_table_mode_combo.currentIndexChanged.connect(lambda _idx: self._refresh_table())
+            self.annotation_table_source_filter.currentIndexChanged.connect(lambda _idx: self._refresh_table())
+            self.annotation_table_status_filter.currentIndexChanged.connect(lambda _idx: self._refresh_table())
+            self.annotation_table_candidate_filter.currentIndexChanged.connect(lambda _idx: self._refresh_table())
+            self.annotation_table_roi_filter.currentIndexChanged.connect(lambda _idx: self._refresh_table())
         if hasattr(self, "auto_follow_table_chk"):
             self.auto_follow_table_chk.stateChanged.connect(self._on_auto_follow_table_changed)
+        if getattr(self, "review_queue_panel", None) is not None:
+            self.review_queue_panel.filter_combo.currentIndexChanged.connect(
+                lambda _idx: self._set_review_queue_filter(
+                    str(self.review_queue_panel.filter_combo.currentData() or "all")
+                )
+            )
+            self.review_queue_panel.sort_combo.currentIndexChanged.connect(
+                lambda _idx: self._refresh_review_queue_panel()
+            )
         self.show_ann_master_chk.stateChanged.connect(self._on_show_annotations_master_changed)
         self.clear_fovs_btn.clicked.connect(self._clear_fov_list)
         if self.roi_manager_widget is not None:
@@ -183,6 +202,7 @@ class EventsMixin(KeyboardEventsMixin):
             sw.export_csv_btn.clicked.connect(self._export_smlm_csv)
             sw.export_h5_btn.clicked.connect(self._export_smlm_hdf5)
             sw.add_ann_btn.clicked.connect(self._smlm_to_annotations)
+            sw.show_points_chk.toggled.connect(self._toggle_smlm_points_from_panel)
             sw.lock_profile_btn.clicked.connect(self._lock_current_smlm_profile)
             sw.export_runbook_btn.clicked.connect(self._export_smlm_runbook)
             sw.repro_mode_chk.toggled.connect(self._on_smlm_runbook_toggled)
@@ -230,6 +250,25 @@ class EventsMixin(KeyboardEventsMixin):
             pp.show_labels_chk.stateChanged.connect(self._particles_refresh_overlay)
         self._bind_application_events()
 
+    def _bind_controller_signals(self) -> None:
+        """Bind immediate Qt controller signals used for GUI synchronization."""
+        self.controller.annotations_changed.connect(
+            lambda: self._request_ui_refresh("controller-annotations", table=True, image=True, status=True)
+        )
+        self.controller.view_changed.connect(self._on_controller_view_changed)
+        self.controller.state_changed.connect(
+            lambda: (
+                self._schedule_lazy_panel_sync("controller-state"),
+                self._request_ui_refresh("controller-state", image=False, table=False, status=True, metadata=True),
+            )
+        )
+        self.controller.display_changed.connect(
+            lambda: (
+                self._schedule_lazy_panel_sync("controller-display"),
+                self._request_ui_refresh("controller-display", image=True, status=True),
+            )
+        )
+
     def _bind_application_events(self) -> None:
         """Subscribe to application-level events from the event bus.
         
@@ -246,23 +285,13 @@ class EventsMixin(KeyboardEventsMixin):
             
             event_service = get_event_service()
             
-            # When annotations change, refresh the annotation table and overlay
-            event_service.subscribe(
-                AnnotationChangedEvent,
-                lambda evt: self._on_annotations_changed_event(evt),
+            subscriptions = (
+                (AnnotationChangedEvent, self._on_annotations_changed_event),
+                (ViewStateChangedEvent, self._on_view_state_changed_event),
+                (CacheInvalidationEvent, self._on_cache_invalidation_event),
             )
-            
-            # When view state changes (T, Z, crop), refresh rendering
-            event_service.subscribe(
-                ViewStateChangedEvent,
-                lambda evt: self._on_view_state_changed_event(evt),
-            )
-            
-            # When cache is invalidated, clear relevant caches
-            event_service.subscribe(
-                CacheInvalidationEvent,
-                lambda evt: self._on_cache_invalidation_event(evt),
-            )
+            for event_type, handler in subscriptions:
+                event_service.subscribe(event_type, handler)
         except (ImportError, AttributeError, RuntimeError):
             # Event service not available or not initialized; continue gracefully
             pass
@@ -278,15 +307,18 @@ class EventsMixin(KeyboardEventsMixin):
     def _on_annotations_changed_event(self, event) -> None:
         """Handle annotation changes from event bus."""
         try:
-            # Refresh annotation table to show latest annotations
-            if hasattr(self, '_refresh_table'):
-                self._refresh_table()
-            # Refresh rendering to show/hide annotation overlay
-            if hasattr(self, '_refresh_image'):
-                self._refresh_image()
+            self._request_ui_refresh("annotations-event", table=True, image=True, status=True)
         except Exception:
-            # Silently ignore errors in event handling
-            pass
+            logger.warning("Failed to handle AnnotationChangedEvent", exc_info=True)
+
+    def _on_controller_view_changed(self) -> None:
+        """Handle controller view changes with a lightweight path for linked zoom sync."""
+        hint = str(getattr(self, "_controller_view_refresh_hint", "") or "").strip().lower()
+        self._controller_view_refresh_hint = None
+        if hint == "view_sync":
+            self._request_ui_refresh("controller-view-sync", image=False, status=True)
+            return
+        self._request_ui_refresh("controller-view", image=True, status=True)
 
     def _on_view_state_changed_event(self, event) -> None:
         """Handle view state changes from event bus."""
@@ -309,11 +341,15 @@ class EventsMixin(KeyboardEventsMixin):
                         self.z_slider.setValue(clamped)
                         return
 
-            if hasattr(self, "_refresh_image") and not getattr(self, "_suppress_refresh", False):
-                self._refresh_image()
+            if change_type == "view_sync":
+                if not getattr(self, "_suppress_refresh", False):
+                    self._request_ui_refresh("view-sync-event", status=True)
+                return
+
+            if not getattr(self, "_suppress_refresh", False):
+                self._request_ui_refresh("view-state-event", image=True, status=True)
         except Exception:
-            # Silently ignore errors in event handling
-            pass
+            logger.warning("Failed to handle ViewStateChangedEvent", exc_info=True)
 
     def _on_cache_invalidation_event(self, event) -> None:
         """Handle cache invalidation from event bus."""
@@ -328,8 +364,7 @@ class EventsMixin(KeyboardEventsMixin):
                 elif scope == 'global' or scope == 'all':
                     self.proj_cache.clear()
         except Exception:
-            # Silently ignore errors in event handling
-            pass
+            logger.warning("Failed to handle CacheInvalidationEvent", exc_info=True)
 
     def _bind_axis_callbacks(self) -> None:
         """Bind zoom callbacks for current axes to keep zoom synced."""
@@ -351,7 +386,7 @@ class EventsMixin(KeyboardEventsMixin):
                 continue
             ax.set_xlim(auto=True)
             ax.set_ylim(auto=True)
-        self._refresh_image()
+        self._request_ui_refresh("events-reset-view")
 
     def reset_contrast(self) -> None:
         """Reset vmin/vmax to default percentiles of the primary image."""
@@ -367,7 +402,7 @@ class EventsMixin(KeyboardEventsMixin):
         self.vmax_slider.setValue(95)
         self.vmin_label.setText(f"vmin: {mapping.min_val:.3f}")
         self.vmax_label.setText(f"vmax: {mapping.max_val:.3f}")
-        self._refresh_image()
+        self._request_ui_refresh("events-reset-contrast")
 
     def reset_all_view(self) -> None:
         """Reset zoom and contrast (ImageJ-like reset)."""
@@ -381,14 +416,14 @@ class EventsMixin(KeyboardEventsMixin):
     def _end_interaction(self) -> None:
         """Exit interactive mode and render full-resolution state."""
         self._interactive = False
-        self._refresh_image()
+        self._request_render_refresh("events-end-interaction", debounce=True)
 
     def _schedule_refresh(self) -> None:
         """Debounce refreshes during interactive input to avoid UI stalls."""
         if self._interactive:
             self._debounce_timer.start()
         else:
-            self._refresh_image()
+            self._request_ui_refresh("events-schedule-refresh")
 
     def _on_t_slider_pressed(self) -> None:
         """Pause prefetch to allow a user-initiated seek during playback."""
@@ -425,6 +460,16 @@ class EventsMixin(KeyboardEventsMixin):
             return
         if self._interactive:
             return
+        if (
+            getattr(event, "button", None) == 1
+            and getattr(event, "inaxes", None) in self._get_image_axes()
+            and getattr(event, "xdata", None) is not None
+            and getattr(event, "ydata", None) is not None
+        ):
+            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
+            if hasattr(self, "_start_assist_refine_drag") and self._start_assist_refine_drag(event.inaxes, fx, fy):
+                self._start_interaction()
+                return
         self._start_interaction()
 
     def _on_mouse_release(self, event) -> None:
@@ -432,12 +477,36 @@ class EventsMixin(KeyboardEventsMixin):
             return
         if not self._interactive:
             return
+        if (
+            getattr(event, "button", None) == 1
+            and getattr(event, "inaxes", None) in self._get_image_axes()
+            and getattr(event, "xdata", None) is not None
+            and getattr(event, "ydata", None) is not None
+            and hasattr(self, "_finish_assist_refine_drag")
+        ):
+            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
+            if self._finish_assist_refine_drag(event.inaxes, fx, fy):
+                self._end_interaction()
+                return
+        if hasattr(self, "_cancel_assist_refine_drag"):
+            self._cancel_assist_refine_drag()
         self._end_interaction()
 
     def _on_mouse_move(self, event) -> None:
         if self._toolbar_navigation_active():
             QtWidgets.QToolTip.hideText()
             return
+        if (
+            self._interactive
+            and getattr(event, "inaxes", None) in self._get_image_axes()
+            and getattr(event, "xdata", None) is not None
+            and getattr(event, "ydata", None) is not None
+            and hasattr(self, "_update_assist_refine_drag")
+        ):
+            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
+            if self._update_assist_refine_drag(event.inaxes, fx, fy):
+                QtWidgets.QToolTip.hideText()
+                return
         if self._interactive:
             QtWidgets.QToolTip.hideText()
             self._schedule_refresh()

@@ -38,8 +38,11 @@ class KeyboardEventsMixin:
 
     def _suggestion_shortcut_noop_hint(self) -> None:
         """Show a subtle hint when suggestion shortcuts are used out of context."""
-        if hasattr(self, "_set_status"):
-            self._set_status("No suggestions to review on current view.")
+        self._status_info(
+            "No suggestions to review on current view.",
+            timeout_ms=2000,
+            source="keyboard",
+        )
 
     def _keyboard_registry_ok(self) -> bool:
         return len(detect_conflicts(all_shortcuts())) == 0
@@ -69,6 +72,9 @@ class KeyboardEventsMixin:
         key = event.key()
         mods = event.modifiers()
         if key == QtCore.Qt.Key_Z and mods == QtCore.Qt.KeyboardModifier.ControlModifier:
+            if hasattr(self, "_lazy_loader_focus_active") and self._lazy_loader_focus_active():
+                if hasattr(self, "_undo_lazy_loader_removal") and self._undo_lazy_loader_removal():
+                    return
             if hasattr(self, "undo_last_action"):
                 self.undo_last_action()
             return
@@ -86,8 +92,11 @@ class KeyboardEventsMixin:
             if 0 <= idx < len(buttons):
                 buttons[idx].setChecked(True)
                 self.current_label = buttons[idx].text()
-                if hasattr(self, "_set_status"):
-                    self._set_status(f"Active label: {self.current_label}")
+                self._status_info(
+                    f"Active label: {self.current_label}",
+                    timeout_ms=2000,
+                    source="keyboard",
+                )
                 if hasattr(self, "_update_status"):
                     self._update_status()
                 return
@@ -177,6 +186,6 @@ class KeyboardEventsMixin:
             self.current_cmap_idx = (self.current_cmap_idx + 1) % len(self.colormaps)
             if self.lut_combo is not None:
                 self.lut_combo.setCurrentIndex(self.current_cmap_idx)
-            self._refresh_image()
+            self._request_ui_refresh("keyboard-events")
         else:
             self._dispatch_base_key_press(event)

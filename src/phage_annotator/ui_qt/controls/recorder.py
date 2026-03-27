@@ -23,4 +23,8 @@ class RecorderControlsMixin:
             QtWidgets.QMessageBox.warning(self, "Recorder", "Save the project before saving the recorder log.")
             return
         path = self.recorder.save_to_project(self._project_path)
-        self._set_status(f"Saved recorder log to {path}")
+        self._status_success(
+            f"Saved recorder log to {path}",
+            timeout_ms=3000,
+            source="recorder.save",
+        )

@@ -9,12 +9,24 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.figure import Figure
 
 from phage_annotator.ui_qt.utils import ui_actions, ui_docks
+from phage_annotator.ui_qt.utils.ui_setup_registry import UiSetupRegistryMixin
+from phage_annotator.ui_qt.utils.ui_setup_assist import build_assist_controls
+from phage_annotator.ui_qt.utils.ui_setup_canvas import (
+    build_annotation_table_panel,
+    build_canvas_workspace,
+)
+from phage_annotator.ui_qt.utils.ui_setup_panels import (
+    build_panel_policy_controls,
+    refresh_panel_policy_controls,
+)
+from phage_annotator.ui_qt.utils.ui_setup_workspace import build_modality_loader_section
 from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
 from phage_annotator.ui_qt.utils.constants import DEFAULT_PLAYBACK_FPS
 from phage_annotator.ui_qt.panels.registry_legacy import PanelSpec
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, cmap_for, lut_names
 from phage_annotator.ui_qt.panels.performance import PerformancePanel
 from phage_annotator.rendering.mpl import Renderer
+from phage_annotator.ui_qt.models.lazy_loader import LAZY_LOADER_TREE_HEADER
 from phage_annotator.ui_qt.widgets.modality_canvas import ModalityCanvasManager
 
 try:
@@ -29,7 +41,7 @@ DISABLE_DIAGNOSTICS = True
 DISABLE_SHORTCUTS = False
 
 
-class UiSetupMixin:
+class UiSetupMixin(UiSetupRegistryMixin):
     """Mixin containing UI construction and dock wiring."""
 
     def _setup_ui(self) -> None:
@@ -182,228 +194,14 @@ class UiSetupMixin:
         primary_box.addWidget(self.primary_combo)
         primary_box.addWidget(QtWidgets.QLabel("Modality 2"))
         primary_box.addWidget(self.support_combo)
-        # Legacy primary/support selectors remain available for internal wiring,
-        # but the visible control surface is now the lazy modality table only.
+        # Primary/support selectors remain available for internal wiring and the
+        # Prepare workflow page, but stay out of the default canvas strip.
         self.primary_combo.setVisible(False)
         self.support_combo.setVisible(False)
-        modality_group = QtWidgets.QGroupBox("Modalities / Views")
-        modality_layout = QtWidgets.QVBoxLayout(modality_group)
-        modality_layout.setContentsMargins(6, 6, 6, 6)
-        modality_layout.setSpacing(6)
-        self.lazy_modality_table = QtWidgets.QTableWidget(0, 9)
-        self.lazy_modality_table.setHorizontalHeaderLabels(
-            ["Visible", "Pts", "Name", "Source", "View", "Sync Group", "C", "Z", "P"]
-        )
-        model = self.lazy_modality_table.model()
-        model.setHeaderData(
-            1, QtCore.Qt.Orientation.Horizontal, "Show annotation points on this panel", QtCore.Qt.ItemDataRole.ToolTipRole
-        )
-        model.setHeaderData(
-            6, QtCore.Qt.Orientation.Horizontal, "Contrast sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
-        )
-        model.setHeaderData(
-            7, QtCore.Qt.Orientation.Horizontal, "Zoom/Pan sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
-        )
-        model.setHeaderData(
-            8, QtCore.Qt.Orientation.Horizontal, "Playback sync toggle (group-wide)", QtCore.Qt.ItemDataRole.ToolTipRole
-        )
-        self.lazy_modality_table.verticalHeader().setVisible(False)
-        self.lazy_modality_table.horizontalHeader().setStretchLastSection(True)
-        self.lazy_modality_table.setSelectionBehavior(
-            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.lazy_modality_table.setEditTriggers(
-            QtWidgets.QAbstractItemView.EditTrigger.DoubleClicked
-            | QtWidgets.QAbstractItemView.EditTrigger.EditKeyPressed
-        )
-        modality_layout.addWidget(self.lazy_modality_table)
-        controls_row = QtWidgets.QHBoxLayout()
-        self.lazy_add_raw_btn = QtWidgets.QPushButton("Add Modality")
-        self.lazy_add_mean_btn = QtWidgets.QPushButton("Add Mean View")
-        self.lazy_add_std_btn = QtWidgets.QPushButton("Add Std View")
-        self.lazy_remove_btn = QtWidgets.QPushButton("Remove")
-        self.lazy_auto_update_chk = QtWidgets.QCheckBox("Auto Update")
-        # Default to immediate canvas reflection; user can toggle off for batch editing.
-        self.lazy_auto_update_chk.setChecked(True)
-        self.lazy_apply_btn = QtWidgets.QPushButton("Update Canvas")
-        self.lazy_apply_btn.setEnabled(False)
-        controls_row.addWidget(self.lazy_add_raw_btn)
-        controls_row.addWidget(self.lazy_add_mean_btn)
-        controls_row.addWidget(self.lazy_add_std_btn)
-        controls_row.addWidget(self.lazy_remove_btn)
-        controls_row.addStretch(1)
-        controls_row.addWidget(self.lazy_auto_update_chk)
-        controls_row.addWidget(self.lazy_apply_btn)
-        modality_layout.addLayout(controls_row)
-        explore_layout.addWidget(modality_group)
+        build_modality_loader_section(self, explore_layout)
 
-        # Annotation table (own dock)
-        self.annot_table = QtWidgets.QTableWidget(0, 7)
-        self.annot_table.setStyleSheet(
-            "QTableWidget { border: 1px solid #d0d0d0; alternate-background-color: #f8f8f8; }"
-            "QTableWidget::item { padding: 2px; border-right: 1px solid #e8e8e8; }"
-        )
-        self.annot_table.setHorizontalHeaderLabels(["ID", "Scope", "T", "Z", "Y", "X", "Label"])
-        self.annot_table.setSelectionBehavior(
-            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self.annot_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
-        self.annot_table.setSortingEnabled(True)
-        self.annot_table.setAlternatingRowColors(True)
-        self.filter_current_chk = QtWidgets.QCheckBox("Show current slice only")
-        self.auto_follow_table_chk = QtWidgets.QCheckBox("Auto-follow T/Z")
-        self.auto_follow_table_chk.setChecked(
-            bool(self._settings.value("annotationTableAutoFollow", True, type=bool))
-        )
-        if self.auto_follow_table_chk.isChecked():
-            self.filter_current_chk.setChecked(True)
-        self.annotation_table_panel = QtWidgets.QWidget()
-        self.annotation_table_panel.setStyleSheet(
-            "QWidget { border: 1px solid #d8d8d8; border-radius: 3px; background: #fafafa; }"
-        )
-        annot_layout = QtWidgets.QVBoxLayout(self.annotation_table_panel)
-        annot_layout.setContentsMargins(8, 8, 8, 8)
-        annot_layout.setSpacing(8)
-        self.review_queue_hint_lbl = None
-        table_filter_row = QtWidgets.QHBoxLayout()
-        table_filter_row.addWidget(self.filter_current_chk)
-        table_filter_row.addWidget(self.auto_follow_table_chk)
-        table_filter_row.addStretch(1)
-        annot_layout.addLayout(table_filter_row)
-        annot_layout.addWidget(self.annot_table)
-
-        # Figure area
-        fig_container = QtWidgets.QWidget()
-        fig_container.setStyleSheet(
-            "QWidget { border: 1px solid #c0c0c0; border-radius: 4px; background: #ffffff; }"
-        )
-        fig_layout = QtWidgets.QVBoxLayout(fig_container)
-        fig_layout.setContentsMargins(8, 8, 8, 8)
-        fig_layout.setSpacing(6)
-        self.modality_canvas = ModalityCanvasManager(parent=self)
-        self.figure = self.modality_canvas.figure
-        self.ax_frame = None
-        self.ax_mean = None
-        self.ax_comp = None
-        self.ax_support = None
-        self.ax_std = None
-        self.ax_line = None
-        self.ax_hist = None
-        self.canvas = self.modality_canvas.canvas
-        if self.canvas is not None:
-            self.canvas.setSizePolicy(
-                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
-            )
-            self.canvas.updateGeometry()
-        self.toolbar = NavigationToolbar2QT(self.canvas, self) if self.canvas is not None else None
-        if self.toolbar is not None:
-            fig_layout.addWidget(self.toolbar)
-        self.evidence_strip_lbl = QtWidgets.QLabel("Evidence: view=Frame | projection=Raw | modalities=default")
-        self.evidence_strip_lbl.setStyleSheet(
-            "QLabel { background: #eef3f8; color: #1d3557; padding: 4px 8px; border-radius: 4px; }"
-        )
-        fig_layout.addWidget(self.evidence_strip_lbl)
-        fig_layout.addWidget(self.modality_canvas, stretch=1)
-        fallback_cmaps = [cmap_for(spec, False) for spec in LUTS]
-        self.renderer = Renderer(self.figure, self.canvas, fallback_cmaps)
-        self.renderer.set_roi_callback(self._on_roi_interactor_change)
-
-        # Playback bar (compact bottom controls)
-        playback_bar = QtWidgets.QWidget()
-        playback_bar.setStyleSheet(
-            "QWidget { border-top: 2px solid #b8b8b8; background: #f9f9f9; border-radius: 3px; }"
-        )
-        playback_layout = QtWidgets.QGridLayout(playback_bar)
-        playback_layout.setContentsMargins(6, 6, 6, 6)
-        playback_layout.setSpacing(6)
-
-        # Primary controls bar
-        self.t_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self.t_slider_label = QtWidgets.QLabel("T: 1")
-        self.t_slider.setSingleStep(1)
-        self.t_minus_button = QtWidgets.QPushButton("-")
-        self.t_plus_button = QtWidgets.QPushButton("+")
-        self.t_minus_button.setToolTip("Previous time frame")
-        self.t_plus_button.setToolTip("Next time frame")
-        t_slider_box = QtWidgets.QHBoxLayout()
-        t_slider_box.addWidget(self.t_minus_button)
-        t_slider_box.addWidget(self.t_slider, stretch=1)
-        t_slider_box.addWidget(self.t_plus_button)
-        self.play_t_btn = QtWidgets.QPushButton("Play T")
-        self.z_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self.z_slider_label = QtWidgets.QLabel("Z: 1")
-        self.z_slider.setSingleStep(1)
-        self.z_minus_button = QtWidgets.QPushButton("-")
-        self.z_plus_button = QtWidgets.QPushButton("+")
-        self.z_minus_button.setToolTip("Previous Z plane")
-        self.z_plus_button.setToolTip("Next Z plane")
-        z_slider_box = QtWidgets.QHBoxLayout()
-        z_slider_box.addWidget(self.z_minus_button)
-        z_slider_box.addWidget(self.z_slider, stretch=1)
-        z_slider_box.addWidget(self.z_plus_button)
-        self.play_z_btn = QtWidgets.QPushButton("Play Z")
-        self.speed_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(1, DEFAULT_PLAYBACK_FPS)
-        self.speed_slider.setValue(DEFAULT_PLAYBACK_FPS)
-        self.speed_slider.setSingleStep(1)
-        self.speed_minus_button = QtWidgets.QPushButton("-")
-        self.speed_plus_button = QtWidgets.QPushButton("+")
-        self.speed_minus_button.setToolTip("Slow down playback")
-        self.speed_plus_button.setToolTip("Speed up playback")
-        speed_slider_box = QtWidgets.QHBoxLayout()
-        speed_slider_box.addWidget(self.speed_minus_button)
-        speed_slider_box.addWidget(self.speed_slider, stretch=1)
-        speed_slider_box.addWidget(self.speed_plus_button)
-        self.loop_chk = QtWidgets.QCheckBox("Loop")
-        playback_layout.addWidget(QtWidgets.QLabel("Time"), 0, 0)
-        playback_layout.addWidget(self.t_slider_label, 0, 1)
-        playback_layout.addLayout(t_slider_box, 0, 2)
-        playback_layout.addWidget(self.play_t_btn, 0, 3)
-        playback_layout.addWidget(QtWidgets.QLabel("Depth"), 1, 0)
-        playback_layout.addWidget(self.z_slider_label, 1, 1)
-        playback_layout.addLayout(z_slider_box, 1, 2)
-        playback_layout.addWidget(self.play_z_btn, 1, 3)
-        playback_layout.addWidget(QtWidgets.QLabel("Speed (fps)"), 2, 0)
-        playback_layout.addLayout(speed_slider_box, 2, 2)
-        playback_layout.addWidget(self.loop_chk, 2, 3)
-        self.fps_label = QtWidgets.QLabel(f"FPS: {self.speed_slider.value()}")
-        playback_layout.addWidget(self.fps_label, 2, 1)
-        self.sync_target_live_lbl = QtWidgets.QLabel("Sync target: Manual group")
-        self.sync_target_live_lbl.setStyleSheet("color: #455a64; font-style: italic;")
-        playback_layout.addWidget(self.sync_target_live_lbl, 3, 0, 1, 4)
-        self.sync_target_mode_combo = QtWidgets.QComboBox()
-        self.sync_target_mode_combo.addItem("Manual group", "manual")
-        self.sync_target_mode_combo.addItem("Active canvas group", "active")
-        self.sync_target_mode_combo.setCurrentIndex(0)
-        self.sync_target_mode_combo.setToolTip("Choose how sync target group is selected.")
-        self.sync_key_combo = QtWidgets.QComboBox()
-        self.sync_key_combo.addItem("Group 1", "1")
-        self.sync_key_combo.setEnabled(True)
-        self.sync_key_combo.setToolTip("Select numeric Sync Group key from Lazy Loading.")
-        # Fix dropdown text visibility on hover
-        self.sync_key_combo.setStyleSheet("""
-            QComboBox {
-                color: #000000;
-                background-color: #ffffff;
-            }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-            }
-            QComboBox QAbstractItemView {
-                color: #000000;
-                background-color: #ffffff;
-                selection-background-color: #0078d7;
-                selection-color: #ffffff;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                color: #ffffff;
-                background-color: #0078d7;
-            }
-        """)
-        playback_layout.addWidget(QtWidgets.QLabel("Sync Target"), 4, 0)
-        playback_layout.addWidget(self.sync_target_mode_combo, 4, 1)
-        playback_layout.addWidget(self.sync_key_combo, 4, 2, 1, 2)
+        build_annotation_table_panel(self)
+        fig_container, playback_bar = build_canvas_workspace(self)
 
         self.playback_mode_combo = QtWidgets.QComboBox()
         self.playback_mode_combo.addItems(["Synchronized", "Independent", "Sequential"])
@@ -784,95 +582,7 @@ class UiSetupMixin:
         adv_layout.addWidget(self.apply_display_btn, r, 0, 1, 2)
         r += 1
 
-        # Assisted annotation ranker controls.
-        self.suggestion_auto_retrain_chk = QtWidgets.QCheckBox(
-            "Auto-retrain proposal ranker"
-        )
-        self.suggestion_auto_retrain_chk.setChecked(
-            bool(self.controller.session_state.suggestion_auto_retrain_enabled)
-        )
-        adv_layout.addWidget(self.suggestion_auto_retrain_chk, r, 0, 1, 2)
-        r += 1
-
-        self.suggestion_min_labels_spin = QtWidgets.QSpinBox()
-        self.suggestion_min_labels_spin.setRange(5, 5000)
-        self.suggestion_min_labels_spin.setValue(
-            int(self.controller.session_state.suggestion_auto_retrain_min_labels)
-        )
-        adv_layout.addWidget(QtWidgets.QLabel("Min labels for retrain"), r, 0)
-        adv_layout.addWidget(self.suggestion_min_labels_spin, r, 1)
-        r += 1
-
-        self.suggestion_train_now_btn = QtWidgets.QPushButton("Train Ranker Now")
-        adv_layout.addWidget(self.suggestion_train_now_btn, r, 0, 1, 2)
-        r += 1
-
-        self.annotation_space_combo = QtWidgets.QComboBox()
-        self.annotation_space_combo.addItems(["stack", "projection"])
-        self.annotation_space_combo.setCurrentText(
-            str(getattr(self.controller.session_state, "annotation_space", "stack"))
-        )
-        adv_layout.addWidget(QtWidgets.QLabel("Annotation space"), r, 0)
-        adv_layout.addWidget(self.annotation_space_combo, r, 1)
-        r += 1
-
-        self.assist_min_total_spin = QtWidgets.QSpinBox()
-        self.assist_min_total_spin.setRange(1, 5000)
-        self.assist_min_total_spin.setValue(
-            int(getattr(self.controller.session_state, "assist_min_total_labels", 30))
-        )
-        self.assist_min_positive_spin = QtWidgets.QSpinBox()
-        self.assist_min_positive_spin.setRange(1, 5000)
-        self.assist_min_positive_spin.setValue(
-            int(getattr(self.controller.session_state, "assist_min_positive_labels", 15))
-        )
-        self.assist_min_negative_spin = QtWidgets.QSpinBox()
-        self.assist_min_negative_spin.setRange(1, 5000)
-        self.assist_min_negative_spin.setValue(
-            int(getattr(self.controller.session_state, "assist_min_negative_labels", 15))
-        )
-        self.assist_min_context_spin = QtWidgets.QSpinBox()
-        self.assist_min_context_spin.setRange(1, 5000)
-        self.assist_min_context_spin.setValue(
-            int(getattr(self.controller.session_state, "assist_min_labels_per_context", 10))
-        )
-        self.qc_auto_show_chk = QtWidgets.QCheckBox("Auto-show QC panel on issues")
-        self.qc_auto_show_chk.setChecked(
-            bool(self._settings.value("qcAutoShowOnIssues", True, type=bool))
-        )
-        adv_layout.addWidget(QtWidgets.QLabel("Assist min total labels"), r, 0)
-        adv_layout.addWidget(self.assist_min_total_spin, r, 1)
-        r += 1
-        adv_layout.addWidget(QtWidgets.QLabel("Assist min positive labels"), r, 0)
-        adv_layout.addWidget(self.assist_min_positive_spin, r, 1)
-        r += 1
-        adv_layout.addWidget(QtWidgets.QLabel("Assist min negative labels"), r, 0)
-        adv_layout.addWidget(self.assist_min_negative_spin, r, 1)
-        r += 1
-        adv_layout.addWidget(QtWidgets.QLabel("Assist min labels/context"), r, 0)
-        adv_layout.addWidget(self.assist_min_context_spin, r, 1)
-        r += 1
-        adv_layout.addWidget(self.qc_auto_show_chk, r, 0, 1, 2)
-        r += 1
-
-        warmup_group = QtWidgets.QGroupBox("Assist Warmup Progress")
-        warmup_layout = QtWidgets.QGridLayout(warmup_group)
-        self.assist_warmup_status_lbl = QtWidgets.QLabel("Assist: Unavailable")
-        self.assist_warmup_counts_lbl = QtWidgets.QLabel("Labels total/+/-: 0/0/0")
-        self.assist_warmup_need_lbl = QtWidgets.QLabel("Need +0 total, +0 positive, +0 negative")
-        self.assist_warmup_context_lbl = QtWidgets.QLabel("Context labels: 0 (need +0)")
-        self.assist_warmup_queue_lbl = QtWidgets.QLabel("Visible uncertain queue: 0")
-        self.assist_warmup_next_btn = QtWidgets.QPushButton("Jump Next Uncertain")
-        self.assist_warmup_refresh_btn = QtWidgets.QPushButton("Refresh")
-        warmup_layout.addWidget(self.assist_warmup_status_lbl, 0, 0, 1, 2)
-        warmup_layout.addWidget(self.assist_warmup_counts_lbl, 1, 0, 1, 2)
-        warmup_layout.addWidget(self.assist_warmup_need_lbl, 2, 0, 1, 2)
-        warmup_layout.addWidget(self.assist_warmup_context_lbl, 3, 0, 1, 2)
-        warmup_layout.addWidget(self.assist_warmup_queue_lbl, 4, 0, 1, 2)
-        warmup_layout.addWidget(self.assist_warmup_next_btn, 5, 0)
-        warmup_layout.addWidget(self.assist_warmup_refresh_btn, 5, 1)
-        adv_layout.addWidget(warmup_group, r, 0, 1, 4)
-        r += 1
+        r = build_assist_controls(self, adv_layout, r)
         self._advanced_layout_row = r
 
         self.settings_advanced_container.setLayout(adv_container_layout)
@@ -1133,6 +843,13 @@ class UiSetupMixin:
         )
         self.suggestion_train_now_btn.clicked.connect(self._train_suggestion_ranker_now)
         self.annotation_space_combo.currentTextChanged.connect(self._on_annotation_space_changed)
+        self.generation_space_combo.currentTextChanged.connect(self._on_generation_space_changed)
+        self.disable_bulk_accept_when_stale_chk.toggled.connect(
+            self._on_disable_bulk_accept_when_stale_changed
+        )
+        self.interactive_learning_experimental_chk.toggled.connect(
+            self._on_interactive_learning_experimental_changed
+        )
         self.assist_min_total_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_positive_spin.valueChanged.connect(self._on_assist_minima_changed)
         self.assist_min_negative_spin.valueChanged.connect(self._on_assist_minima_changed)
@@ -1240,6 +957,8 @@ class UiSetupMixin:
         self._update_qc_button_highlight(0)
         self._refresh_panel_policy_controls()
         self._refresh_assist_warmup_panel()
+        if hasattr(self, "_refresh_lazy_loader_tree"):
+            self._refresh_lazy_loader_tree()
         if hasattr(self, "_refresh_lazy_modality_table"):
             self._refresh_lazy_modality_table()
         if hasattr(self, "advanced_open_explain_btn"):
@@ -1308,14 +1027,17 @@ class UiSetupMixin:
             return
         self._settings.setValue("firstRunWelcomeShown", True)
         # Non-blocking onboarding: status message instead of modal popup.
-        if hasattr(self, "_set_status"):
-            self._set_status(
-                "Welcome: A/R/N/P review suggestions | Check status bar | Layout menu has presets"
-            )
-        else:
-            self.statusBar().showMessage(
+        if hasattr(self, "_status_info"):
+            self._status_info(
                 "Welcome: A/R/N/P review suggestions | Check status bar | Layout menu has presets",
-                8000,
+                timeout_ms=8000,
+                source="setup.first_run",
+            )
+        elif hasattr(self, "_status_info"):
+            self._status_info(
+                "Welcome: A/R/N/P review suggestions | Check status bar | Layout menu has presets",
+                timeout_ms=8000,
+                source="setup.first_run",
             )
 
     def _init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
@@ -1335,8 +1057,10 @@ class UiSetupMixin:
             self.channel_integration = None
             return
         self.channel_integration = ChannelPanelIntegration(
-            self.controller.session_state,
-            canvas_refresh_callback=self._refresh_image,
+            self.controller,
+            refresh_request_callback=lambda: self._request_ui_refresh(
+                "channel-integration", image=True, status=True
+            ),
         )
         panel.channel_visibility_changed.connect(
             self.channel_integration.on_channel_visibility_changed
@@ -1372,7 +1096,7 @@ class UiSetupMixin:
             return
         panel.setEnabled(True)
         settings = integration.initialize_from_session(channel_count)
-        self.controller.session_state.channel_display_settings = settings.to_dict()
+        self.controller.set_channel_display_settings_value(settings.to_dict())
         panel.set_channel_settings(settings)
         should_show = (
             hidden_for_single
@@ -1390,212 +1114,6 @@ class UiSetupMixin:
                 pass
             self._channel_panel_autoshown = True
             self._channel_panel_hidden_for_single_channel = False
-
-    def _build_panel_registry(self) -> List[PanelSpec]:
-        return ui_docks.build_panel_registry(self)
-
-    def _apply_panel_defaults(self) -> None:
-        ui_docks.apply_panel_defaults(self)
-
-    def _create_dock(
-        self, name: str, title: str, widget: QtWidgets.QWidget
-    ) -> QtWidgets.QDockWidget:
-        return ui_docks.create_dock(self, name, title, widget)
-
-    def _wire_dock_action(
-        self,
-        dock: QtWidgets.QDockWidget,
-        action: QtWidgets.QAction,
-        checkbox: Optional[QtWidgets.QCheckBox] = None,
-    ) -> None:
-        ui_docks.wire_dock_action(self, dock, action, checkbox)
-
-    def get_dock(self, panel_id: str) -> Optional[QtWidgets.QDockWidget]:
-        return ui_docks.get_dock(self, panel_id)
-
-    def open_panel(self, panel_id: str, *, reason: str = "user") -> Optional[QtWidgets.QDockWidget]:
-        return ui_docks.open_panel(self, panel_id, reason=reason)
-
-    def is_panel_auto_open_enabled(self, panel_id: str) -> bool:
-        return ui_docks.is_panel_auto_open_enabled(self, panel_id)
-
-    def set_panel_auto_open_enabled(self, panel_id: str, enabled: bool) -> None:
-        ui_docks.set_panel_auto_open_enabled(self, panel_id, enabled)
-
-    def is_panel_auto_open_enabled_for_trigger(self, panel_id: str, trigger: str) -> bool:
-        return ui_docks.is_panel_auto_open_enabled_for_trigger(self, panel_id, trigger)
-
-    def set_panel_auto_open_enabled_for_trigger(
-        self, panel_id: str, trigger: str, enabled: bool
-    ) -> None:
-        ui_docks.set_panel_auto_open_enabled_for_trigger(self, panel_id, trigger, enabled)
-
-    def is_panel_pinned(self, panel_id: str) -> bool:
-        return ui_docks.is_panel_pinned(self, panel_id)
-
-    def set_panel_pinned(self, panel_id: str, pinned: bool) -> None:
-        ui_docks.set_panel_pinned(self, panel_id, pinned)
-
-    def get_panel_opened_by(self, panel_id: str) -> str:
-        return ui_docks.get_panel_opened_by(self, panel_id)
-
-    def _init_panel_policy_controls(self) -> None:
-        """Build per-panel auto-open and pin controls in Preferences."""
-        if getattr(self, "advanced_layout", None) is None:
-            return
-        if getattr(self, "panel_policy_group", None) is not None:
-            return
-
-        group = QtWidgets.QGroupBox("Panel Auto-Open & Pinning")
-        group.setCheckable(False)
-        layout = QtWidgets.QGridLayout(group)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(6)
-        layout.addWidget(QtWidgets.QLabel("Panel"), 0, 0)
-        layout.addWidget(QtWidgets.QLabel("Auto-open"), 0, 1)
-        layout.addWidget(QtWidgets.QLabel("Pinned"), 0, 2)
-
-        self.panel_policy_auto_checks = {}
-        self.panel_policy_pin_checks = {}
-        self.panel_policy_open_btns = {}
-        row = 1
-        for spec in list(getattr(self, "panel_specs", []) or []):
-            panel_id = str(spec.id)
-            title = str(spec.title)
-            label = QtWidgets.QLabel(title)
-            auto_chk = QtWidgets.QCheckBox()
-            pin_chk = QtWidgets.QCheckBox()
-            open_btn = QtWidgets.QPushButton("Open")
-            open_btn.setMaximumWidth(56)
-            open_btn.clicked.connect(
-                lambda _checked=False, pid=panel_id: self.open_panel(pid, reason="panel_policy")
-            )
-            auto_chk.toggled.connect(
-                lambda checked, pid=panel_id: self.set_panel_auto_open_enabled(pid, bool(checked))
-            )
-            pin_chk.toggled.connect(
-                lambda checked, pid=panel_id: self.set_panel_pinned(pid, bool(checked))
-            )
-            layout.addWidget(label, row, 0)
-            layout.addWidget(auto_chk, row, 1)
-            layout.addWidget(pin_chk, row, 2)
-            layout.addWidget(open_btn, row, 3)
-            self.panel_policy_auto_checks[panel_id] = auto_chk
-            self.panel_policy_pin_checks[panel_id] = pin_chk
-            self.panel_policy_open_btns[panel_id] = open_btn
-            row += 1
-
-        reset_btn = QtWidgets.QPushButton("Reset Auto-Open Defaults")
-        reset_btn.clicked.connect(self._reset_panel_auto_open_defaults)
-        layout.addWidget(reset_btn, row, 0, 1, 2)
-        self.panel_policy_reset_btn = reset_btn
-        self.panel_policy_group = group
-        self.advanced_layout.addWidget(group, self._advanced_layout_row, 0, 1, 4)
-        self._advanced_layout_row += 1
-
-    def _refresh_panel_policy_controls(self) -> None:
-        """Sync panel policy checkboxes with persisted/current policy state."""
-        if hasattr(ui_docks, "refresh_panel_policy_actions"):
-            try:
-                ui_docks.refresh_panel_policy_actions(self)
-            except Exception:
-                pass
-        for panel_id, chk in dict(getattr(self, "panel_policy_auto_checks", {}) or {}).items():
-            desired = bool(self.is_panel_auto_open_enabled(panel_id))
-            if chk.isChecked() != desired:
-                chk.blockSignals(True)
-                chk.setChecked(desired)
-                chk.blockSignals(False)
-        for panel_id, chk in dict(getattr(self, "panel_policy_pin_checks", {}) or {}).items():
-            desired = bool(self.is_panel_pinned(panel_id))
-            if chk.isChecked() != desired:
-                chk.blockSignals(True)
-                chk.setChecked(desired)
-                chk.blockSignals(False)
-
-    def _reset_panel_auto_open_defaults(self) -> None:
-        """Reset all panel auto-open toggles to enabled defaults."""
-        for spec in list(getattr(self, "panel_specs", []) or []):
-            self.set_panel_auto_open_enabled(str(spec.id), True)
-        self._refresh_panel_policy_controls()
-
-    def _make_sidebar_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_sidebar_widget(self)
-
-    def _make_annotations_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_annotations_widget(self)
-
-    def _make_review_queue_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_review_queue_widget(self)
-
-    def _make_suggestion_explain_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_suggestion_explain_widget(self)
-
-    def _make_status_details_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_status_details_widget(self)
-
-    def _make_project_relink_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_project_relink_widget(self)
-
-    def _make_advanced_analysis_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_advanced_analysis_widget(self)
-
-    def _make_roi_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_roi_widget(self)
-
-    def _make_roi_manager_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_roi_manager_widget(self)
-
-    def _make_results_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_results_widget(self)
-
-    def _make_recorder_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_recorder_widget(self)
-
-    def _make_hist_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_hist_widget(self)
-
-    def _make_profile_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_profile_widget(self)
-
-    def _make_orthoview_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_orthoview_widget(self)
-
-    def _make_smlm_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_smlm_widget(self)
-
-    def _make_threshold_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_threshold_widget(self)
-
-    def _make_particles_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_particles_widget(self)
-
-    def _make_density_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_density_widget(self)
-
-    def _make_modality_layers_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_modality_layers_widget(self)
-
-    def _make_channel_controls_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_channel_controls_widget(self)
-
-    def _make_logs_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_logs_widget(self)
-
-    def _make_metadata_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_metadata_widget(self)
-
-    def _make_performance_widget(self) -> QtWidgets.QWidget:
-        """Create the performance monitoring panel (P5.1)."""
-        panel = PerformancePanel(parent=self)
-        panel.set_cache(self.proj_cache)
-        panel.set_ring_buffer(self._playback_ring)
-        self.performance_panel = panel
-        return panel
-
-    def _make_qc_issues_widget(self) -> QtWidgets.QWidget:
-        return ui_docks.make_qc_issues_widget(self)
 
     def _build_sidebar_pages(
         self, display_group: QtWidgets.QGroupBox

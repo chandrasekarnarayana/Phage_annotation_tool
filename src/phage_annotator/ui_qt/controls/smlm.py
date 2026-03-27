@@ -97,10 +97,18 @@ class SmlmControlsMixin:
         if report.ok:
             if hasattr(self.smlm_panel.thunder, "clear_fixit_card"):
                 self.smlm_panel.thunder.clear_fixit_card()
-            self._set_status("SMLM preflight passed.")
+            self._status_success(
+                "SMLM preflight passed.",
+                timeout_ms=2500,
+                source="smlm.preflight",
+            )
         else:
             self._show_smlm_preflight_fixit(report.exit_code, summary)
-            self._set_status("SMLM preflight failed; review checklist.")
+            self._status_warning(
+                "SMLM preflight failed; review checklist.",
+                sticky=True,
+                source="smlm.preflight",
+            )
             QtWidgets.QMessageBox.warning(self, "SMLM Preflight", summary)
 
     def _show_smlm_preflight_fixit(self, exit_code: int, summary: str) -> None:
@@ -215,9 +223,11 @@ class SmlmControlsMixin:
 
     def _sync_runbook_state_to_session(self) -> None:
         state = self._get_runbook_state()
-        self.controller.session_state.smlm_runbook_enabled = bool(state.enabled)
-        self.controller.session_state.smlm_runbook_locked_profiles = dict(state.locked_profiles)
-        self.controller.session_state.smlm_runbook_provenance = list(state.provenance_events)
+        self.controller.set_smlm_runbook_state(
+            enabled=bool(state.enabled),
+            locked_profiles=dict(state.locked_profiles),
+            provenance=list(state.provenance_events),
+        )
 
     def _run_smlm(self) -> None:
         if self.smlm_panel is None:
@@ -422,6 +432,8 @@ class SmlmControlsMixin:
             thunder.progress.setValue(100)
             thunder.run_btn.setEnabled(True)
             thunder.cancel_btn.setEnabled(False)
+            if hasattr(thunder, "set_localizations"):
+                thunder.set_localizations(locs)
             self._append_log(
                 f"[SMLM] ThunderSTORM backend={bridge_config.backend} "
                 f"job={self._smlm_job_id} frames={frames} detections={len(locs)}"
@@ -442,12 +454,14 @@ class SmlmControlsMixin:
                 },
             )
             self._sync_runbook_state_to_session()
-            self._refresh_image()
+            self._request_ui_refresh("smlm-controls")
 
         def _on_error(err: str) -> None:
             thunder.status_label.setText("Error (see Logs).")
             thunder.run_btn.setEnabled(True)
             thunder.cancel_btn.setEnabled(False)
+            if hasattr(thunder, "clear_localizations"):
+                thunder.clear_localizations()
             self._append_log(f"[SMLM] Error\n{err}")
             report_text = self._build_smlm_debug_report(
                 bridge_config,
@@ -476,6 +490,8 @@ class SmlmControlsMixin:
             on_progress=_on_progress,
             timeout_sec=600.0,
             retries=2,  # P5.3: Increased from 1 to handle transient errors
+            priority="interactive",
+            replace_key="smlm-roi",
         )
         self._smlm_job_id = handle.job_id
         thunder.progress.setValue(0)
@@ -681,7 +697,11 @@ class SmlmControlsMixin:
             return
         if fallback_btn is not None and clicked is fallback_btn and self.smlm_panel is not None:
             self.smlm_panel.thunder.backend_combo.setCurrentText("internal")
-            self._set_status("Retrying SMLM with internal backend.")
+            self._status_info(
+                "Retrying SMLM with internal backend.",
+                timeout_ms=3000,
+                source="smlm.retry",
+            )
             self._run_smlm()
 
     def _cancel_smlm(self) -> None:
@@ -694,42 +714,69 @@ class SmlmControlsMixin:
             thunder.status_label.setText("Cancelling…")
             thunder.cancel_btn.setEnabled(False)
             thunder.run_btn.setEnabled(True)
+            if hasattr(thunder, "clear_localizations"):
+                thunder.clear_localizations()
+
+    def _toggle_smlm_points_from_panel(self, checked: bool) -> None:
+        self.show_smlm_points = bool(checked)
+        if getattr(self, "show_smlm_points_act", None) is not None:
+            self.show_smlm_points_act.blockSignals(True)
+            self.show_smlm_points_act.setChecked(bool(checked))
+            self.show_smlm_points_act.blockSignals(False)
+        self._request_ui_refresh("smlm-controls")
 
     def _export_smlm_csv(self) -> None:
         if not self._smlm_results:
             if self.smlm_panel is not None:
                 self.smlm_panel.thunder.status_label.setText("No SMLM results to export.")
             return
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Export SMLM CSV", "", "CSV Files (*.csv)")
+        settings = getattr(self, "_settings", None)
+        default_dir = ""
+        if settings is not None:
+            default_dir = str(settings.value("smlmLastExportDir", "", type=str) or "")
+        if not default_dir:
+            default_dir = str(pathlib.Path.cwd())
+        default_name = f"thunderstorm_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export SMLM CSV",
+            str(pathlib.Path(default_dir) / default_name),
+            "CSV Files (*.csv)",
+        )
         if not path:
             return
-        with open(path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "frame_index",
-                    "x_px",
-                    "y_px",
-                    "sigma_px",
-                    "photons",
-                    "background",
-                    "uncertainty_px",
-                    "label",
-                ]
-            )
-            for loc in self._smlm_results:
+        if self.smlm_panel is not None:
+            self.smlm_panel.thunder.export_localizations_csv(path)
+        else:
+            with open(path, "w", newline="") as f:
+                writer = csv.writer(f)
                 writer.writerow(
                     [
-                        loc.frame_index,
-                        f"{loc.x_px:.4f}",
-                        f"{loc.y_px:.4f}",
-                        f"{loc.sigma_px:.4f}",
-                        f"{loc.photons:.4f}",
-                        f"{loc.background:.4f}",
-                        f"{loc.uncertainty_px:.4f}",
-                        loc.label or "",
+                        "frame_index",
+                        "x_px",
+                        "y_px",
+                        "sigma_px",
+                        "photons",
+                        "background",
+                        "uncertainty_px",
+                        "label",
                     ]
                 )
+                for loc in self._smlm_results:
+                    writer.writerow(
+                        [
+                            loc.frame_index,
+                            f"{loc.x_px:.4f}",
+                            f"{loc.y_px:.4f}",
+                            f"{loc.sigma_px:.4f}",
+                            f"{loc.photons:.4f}",
+                            f"{loc.background:.4f}",
+                            f"{loc.uncertainty_px:.4f}",
+                            loc.label or "",
+                        ]
+                    )
+        if settings is not None:
+            settings.setValue("smlmLastExportDir", str(pathlib.Path(path).parent))
         if self.smlm_panel is not None:
             self.smlm_panel.thunder.status_label.setText(f"Exported CSV: {path}")
 
@@ -775,8 +822,13 @@ class SmlmControlsMixin:
             if not self._ensure_annotation_write_context_confirmed("Import SMLM localizations"):
                 return
         image_id = self.primary_image.id
+        locs_to_add = list(self._smlm_results)
+        if self.smlm_panel is not None:
+            selected = self.smlm_panel.thunder.selected_localizations()
+            if selected:
+                locs_to_add = selected
         self._block_table = True
-        for loc in self._smlm_results:
+        for loc in locs_to_add:
             self.controller.add_annotation(
                 image_id=image_id,
                 image_name=self.primary_image.name,
@@ -788,10 +840,12 @@ class SmlmControlsMixin:
                 scope=self.annotation_scope,
             )
         self._block_table = False
-        self._refresh_image()
+        self._request_ui_refresh("smlm-controls", table=True)
         self._mark_dirty()
         if self.smlm_panel is not None:
-            self.smlm_panel.thunder.status_label.setText("Added to annotations.")
+            self.smlm_panel.thunder.status_label.setText(
+                f"Added {len(locs_to_add)} localization(s) to annotations."
+            )
 
     def _browse_deepstorm_model(self) -> None:
         if self.smlm_panel is None:
@@ -962,7 +1016,7 @@ class SmlmControlsMixin:
             self._append_log(
                 f"[SMLM] Deep-STORM job={self._deepstorm_job_id} frames={frames} detections={len(locs)}"
             )
-            self._refresh_image()
+            self._request_ui_refresh("smlm-controls")
 
         def _on_error(err: str) -> None:
             deep.status_label.setText("Error (see Logs).")
@@ -983,6 +1037,8 @@ class SmlmControlsMixin:
             on_progress=_on_progress,
             timeout_sec=900.0,
             retries=2,  # P5.3: Increased from 1 to handle transient errors
+            priority="interactive",
+            replace_key="deepstorm-roi",
         )
         self._deepstorm_job_id = handle.job_id
         deep.progress.setValue(0)
@@ -1061,7 +1117,7 @@ class SmlmControlsMixin:
                 scope=self.annotation_scope,
             )
         self._block_table = False
-        self._refresh_image()
+        self._request_ui_refresh("smlm-controls", table=True)
         self._mark_dirty()
         if self.smlm_panel is not None:
             self.smlm_panel.deep.status_label.setText("Added to annotations.")
@@ -1135,7 +1191,7 @@ class SmlmControlsMixin:
         }
         self._smlm_run_history.append(entry)
         self._last_smlm_run = entry
-        self.controller.session_state.smlm_runs = list(self._smlm_run_history)
+        self.controller.set_smlm_runs_value(list(self._smlm_run_history))
 
     def _hash_file(self, path: str) -> Optional[str]:
         if not path:
@@ -1156,7 +1212,11 @@ class SmlmControlsMixin:
 
     def _rerun_last_smlm(self) -> None:
         if not self._last_smlm_run:
-            self._set_status("No SMLM run to re-run.")
+            self._status_info(
+                "No SMLM run to re-run.",
+                timeout_ms=2500,
+                source="smlm.rerun",
+            )
             return
         method = self._last_smlm_run.get("method")
         params = self._last_smlm_run.get("params", {})
@@ -1213,7 +1273,11 @@ class SmlmControlsMixin:
             },
         )
         self._sync_runbook_state_to_session()
-        self._set_status("Runbook profile locked for ThunderSTORM.")
+        self._status_success(
+            "Runbook profile locked for ThunderSTORM.",
+            timeout_ms=3000,
+            source="smlm.runbook.lock",
+        )
         self.smlm_panel.thunder.status_label.setText("Runbook profile locked.")
 
     def _export_smlm_runbook(self) -> None:
@@ -1235,19 +1299,27 @@ class SmlmControlsMixin:
             },
         )
         self._sync_runbook_state_to_session()
-        self._set_status(f"Exported runbook to {out}")
+        self._status_success(
+            f"Exported runbook to {out}",
+            timeout_ms=4000,
+            source="smlm.runbook.export",
+        )
         if self.smlm_panel is not None:
             self.smlm_panel.thunder.status_label.setText(f"Runbook exported: {out.name}")
 
     def _toggle_smlm_points(self) -> None:
         if getattr(self, "show_smlm_points_act", None) is not None:
             self.show_smlm_points = self.show_smlm_points_act.isChecked()
-            self._refresh_image()
+            if self.smlm_panel is not None and hasattr(self.smlm_panel.thunder, "show_points_chk"):
+                self.smlm_panel.thunder.show_points_chk.blockSignals(True)
+                self.smlm_panel.thunder.show_points_chk.setChecked(bool(self.show_smlm_points))
+                self.smlm_panel.thunder.show_points_chk.blockSignals(False)
+            self._request_ui_refresh("smlm-controls")
 
     def _toggle_smlm_sr(self) -> None:
         if getattr(self, "show_smlm_sr_act", None) is not None:
             self.show_sr_overlay = self.show_smlm_sr_act.isChecked()
-            self._refresh_image()
+            self._request_ui_refresh("smlm-controls")
 
     def _build_plugin_parameters(self, params: SmlmParams) -> dict:
         """Map current SMLM parameters into plugin manifest parameter names."""
@@ -1276,6 +1348,8 @@ class SmlmControlsMixin:
             payload={"enabled": bool(checked)},
         )
         self._sync_runbook_state_to_session()
-        self._set_status(
-            "SMLM runbook mode enabled." if checked else "SMLM runbook mode disabled."
+        self._status_info(
+            "SMLM runbook mode enabled." if checked else "SMLM runbook mode disabled.",
+            timeout_ms=2500,
+            source="smlm.runbook.toggle",
         )

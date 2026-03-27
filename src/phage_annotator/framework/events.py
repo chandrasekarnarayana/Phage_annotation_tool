@@ -82,6 +82,8 @@ class ViewStateChangedEvent(ApplicationEvent):
         New ROI rectangle (if change_type == "roi")
     crop_rect : tuple, optional
         New crop rectangle (if change_type == "crop")
+    viewport : dict, optional
+        Viewport metadata for canvas-only sync operations such as linked zoom/pan.
     """
 
     change_type: str
@@ -89,6 +91,7 @@ class ViewStateChangedEvent(ApplicationEvent):
     z_index: Optional[int] = None
     roi_rect: Optional[tuple] = None
     crop_rect: Optional[tuple] = None
+    viewport: Optional[Dict[str, Any]] = None
 
     def __init__(
         self,
@@ -97,6 +100,7 @@ class ViewStateChangedEvent(ApplicationEvent):
         z_index: Optional[int] = None,
         roi_rect: Optional[tuple] = None,
         crop_rect: Optional[tuple] = None,
+        viewport: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
         self.change_type = change_type
@@ -104,6 +108,7 @@ class ViewStateChangedEvent(ApplicationEvent):
         self.z_index = z_index
         self.roi_rect = roi_rect
         self.crop_rect = crop_rect
+        self.viewport = dict(viewport or {}) if viewport else None
 
 
 @dataclass

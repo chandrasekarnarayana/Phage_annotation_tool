@@ -255,7 +255,7 @@ def generate_dummy_image(
     seed: int | None = None,
     shot_noise_strength: float = 1.0,
     stray_pixel_fraction: float = 2e-5,
-) -> tuple[Path, Path]:
+) -> DummyImageArtifacts:
     """Create a dummy TIFF/OME-TIFF image on disk for testing or demo.
 
     The "t" mode produces a larger 20-frame 1200x1200 time stack with Gaussian spots
@@ -278,8 +278,9 @@ def generate_dummy_image(
     
     Returns
     -------
-    tuple[Path, Path]
-        Tuple of (image_path, annotation_csv_path)
+    DummyImageArtifacts
+        Tuple-like wrapper of (image_path, annotation_csv_path) that also acts
+        like the image path for backward compatibility.
     """
     # Use system time as seed if not provided
     if seed is None:
@@ -361,7 +362,7 @@ def generate_dummy_image(
         writer.writeheader()
         writer.writerows(all_spots)
     
-    return path, csv_path
+    return DummyImageArtifacts(path, csv_path)
 
 
 def run_demo(
@@ -401,3 +402,34 @@ def run_demo(
     print(f"✓ Generated annotations: {csv_path}")
     print(f"  Annotation file contains spot coordinates and properties")
     run_gui([img_path])
+class DummyImageArtifacts(tuple):
+    """Backward-compatible return wrapper for generated demo assets.
+
+    Acts like ``(image_path, annotation_csv_path)`` for unpacking while also
+    behaving like the image path for older callers that pass the return value
+    directly into loaders.
+    """
+
+    def __new__(cls, image_path: Path, annotation_csv_path: Path):
+        return super().__new__(cls, (image_path, annotation_csv_path))
+
+    @property
+    def image_path(self) -> Path:
+        return self[0]
+
+    @property
+    def annotation_csv_path(self) -> Path:
+        return self[1]
+
+    @property
+    def name(self) -> str:
+        return self.image_path.name
+
+    def __fspath__(self) -> str:
+        return str(self.image_path)
+
+    def __str__(self) -> str:
+        return str(self.image_path)
+
+    def __getattr__(self, attr: str):
+        return getattr(self.image_path, attr)

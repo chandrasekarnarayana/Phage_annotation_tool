@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 try:
-    from matplotlib.backends.qt_compat import QtCore, QtWidgets
+    from matplotlib.backends.qt_compat import QtCore, QtWidgets, QtGui
 except ImportError:  # pragma: no cover - exercised in headless CI/test envs
     class _MissingQtWidgets:
         def __getattr__(self, name: str) -> object:
@@ -16,6 +16,7 @@ except ImportError:  # pragma: no cover - exercised in headless CI/test envs
 
     QtWidgets = _MissingQtWidgets()
     QtCore = _MissingQtWidgets()
+    QtGui = _MissingQtWidgets()
 
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.tools import Tool
@@ -25,10 +26,37 @@ from phage_annotator.ui_qt.assist_state import (
     assist_state_label,
     infer_assist_state,
 )
+from phage_annotator.ui_qt.services.status import StatusText
+from phage_annotator.ui_qt.services.status_derived import (
+    DerivedStatusSnapshot,
+    build_status_snapshot,
+)
 
 
 class TableStatusMixin:
     """Mixin for annotation table and status rendering."""
+
+    _ANNOT_TABLE_HEADERS = [
+        "ID",
+        "Label",
+        "T",
+        "Z",
+        "X",
+        "Y",
+        "Source",
+        "Status",
+        "Confidence",
+        "Candidate Class",
+        "ROI",
+        "Notes",
+        "Actions",
+    ]
+
+    def _annotation_table_truth_columns_enabled(self) -> bool:
+        controller = getattr(self, "controller", None)
+        if controller is None or not hasattr(controller, "feature_enabled"):
+            return False
+        return bool(controller.feature_enabled("annotation_table_truth_columns", False))
 
     def _refresh_table(self) -> None:
         """Refresh table rows and keep selection focused for current T/Z when enabled."""
@@ -36,6 +64,123 @@ class TableStatusMixin:
         self._focus_table_current_slice_row()
         if hasattr(self, "_refresh_review_queue_panel"):
             self._refresh_review_queue_panel()
+
+    def _annotation_table_mode(self) -> str:
+        combo = getattr(self, "annotation_table_mode_combo", None)
+        return str(combo.currentData() or "truth") if combo is not None else "truth"
+
+    def _table_filter_value(self, attr: str) -> str:
+        combo = getattr(self, attr, None)
+        return str(combo.currentData() or "all") if combo is not None else "all"
+
+    def _suggestion_for_table_row(self, row: int):
+        if row < 0:
+            return None
+        id_item = self.annot_table.item(int(row), 0)
+        if id_item is None:
+            return None
+        payload = id_item.data(QtCore.Qt.ItemDataRole.UserRole) or {}
+        if not isinstance(payload, dict) or payload.get("kind") != "suggestion":
+            return None
+        suggestion_id = str(payload.get("id", ""))
+        for suggestion in self._suggestions_for_current_tz():
+            if str(getattr(suggestion, "suggestion_id", "")) == suggestion_id:
+                return suggestion
+        return None
+
+    def _annotation_row_payload(self, kp: Keypoint) -> dict:
+        meta = dict(getattr(kp, "meta", {}) or {})
+        return {
+            "kind": "annotation",
+            "id": str(kp.annotation_id),
+            "label": str(kp.label),
+            "t": int(kp.t),
+            "z": int(kp.z),
+            "x": float(kp.x),
+            "y": float(kp.y),
+            "source": str(getattr(kp, "source", "manual")),
+            "status": str(getattr(kp, "status", "active")),
+            "confidence": getattr(kp, "confidence", None),
+            "candidate_class": str(meta.get("candidate_class", "")),
+            "roi": str(getattr(kp, "roi_name", "") or ""),
+            "notes": str(getattr(kp, "notes", "") or ""),
+            "object": kp,
+        }
+
+    def _suggestion_row_payload(self, suggestion) -> dict:
+        meta = dict(getattr(suggestion, "meta", {}) or {})
+        source_model = str(getattr(suggestion, "source_model", "assist"))
+        source_modality = str(getattr(suggestion, "source_modality", "raw"))
+        return {
+            "kind": "suggestion",
+            "id": str(getattr(suggestion, "suggestion_id", "")),
+            "label": str(getattr(suggestion, "label", "")),
+            "t": int(getattr(suggestion, "t", -1)),
+            "z": int(getattr(suggestion, "z", -1)),
+            "x": float(getattr(suggestion, "x", 0.0)),
+            "y": float(getattr(suggestion, "y", 0.0)),
+            "source": f"assist:{source_model}:{source_modality}",
+            "status": str(getattr(suggestion, "status", "proposed")),
+            "confidence": meta.get("p_accept", getattr(suggestion, "score", None)),
+            "candidate_class": str(meta.get("candidate_class", "new")),
+            "roi": str(getattr(suggestion, "roi_id", "") or ""),
+            "notes": str(meta.get("notes", "") or ""),
+            "object": suggestion,
+        }
+
+    def _apply_annotation_table_filters(self, rows: List[dict]) -> List[dict]:
+        source_filter = self._table_filter_value("annotation_table_source_filter")
+        status_filter = self._table_filter_value("annotation_table_status_filter")
+        candidate_filter = self._table_filter_value("annotation_table_candidate_filter")
+        roi_filter = self._table_filter_value("annotation_table_roi_filter")
+        if self.filter_current_chk.isChecked():
+            t = int(self.t_slider.value())
+            z = int(self.z_slider.value())
+            rows = [row for row in rows if int(row["t"]) in (t, -1) and int(row["z"]) in (z, -1)]
+        if source_filter != "all":
+            rows = [row for row in rows if str(row["source"]) == source_filter]
+        if status_filter != "all":
+            rows = [row for row in rows if str(row["status"]) == status_filter]
+        if candidate_filter != "all":
+            rows = [row for row in rows if str(row["candidate_class"] or "") == candidate_filter]
+        if roi_filter == "current_frame":
+            t = int(self.t_slider.value())
+            z = int(self.z_slider.value())
+            rows = [row for row in rows if int(row["t"]) in (t, -1) and int(row["z"]) in (z, -1)]
+        elif roi_filter != "all":
+            rows = [row for row in rows if str(row["roi"] or "") == roi_filter]
+        return rows
+
+    def _refresh_annotation_table_filters(self, rows: List[dict]) -> None:
+        combos = [
+            ("annotation_table_source_filter", "All sources", lambda row: str(row["source"] or "")),
+            ("annotation_table_status_filter", "All status", lambda row: str(row["status"] or "")),
+            ("annotation_table_candidate_filter", "All classes", lambda row: str(row["candidate_class"] or "")),
+            ("annotation_table_roi_filter", "All ROI / frame", lambda row: str(row["roi"] or "")),
+        ]
+        for attr, label, getter in combos:
+            combo = getattr(self, attr, None)
+            if combo is None:
+                continue
+            current = str(combo.currentData() or "all")
+            values = sorted({getter(row) for row in rows if getter(row)})
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(label, "all")
+            if attr == "annotation_table_roi_filter":
+                combo.addItem("Current frame", "current_frame")
+            for value in values:
+                combo.addItem(value, value)
+            idx = max(0, combo.findData(current))
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
+
+    def _current_table_rows(self) -> List[dict]:
+        rows = [self._annotation_row_payload(kp) for kp in self._current_keypoints()]
+        if self._annotation_table_mode() == "review":
+            rows.extend(self._suggestion_row_payload(s) for s in self._suggestions_for_current_tz())
+        self._refresh_annotation_table_filters(rows)
+        return self._apply_annotation_table_filters(rows)
 
     def _canonical_assist_state(self, suggestions: Optional[List[object]] = None) -> AssistState:
         """Resolve assist-state from one canonical inference path."""
@@ -111,8 +256,13 @@ class TableStatusMixin:
         log_alerts = 0
         all_logs = list(getattr(self, "_all_logs", []) or [])
         for row in all_logs[-200:]:
-            txt = str(row).upper()
-            if "ERROR" in txt or "WARNING" in txt or "[EXCEPTION]" in txt:
+            if isinstance(row, dict):
+                level = str(row.get("severity", "")).upper()
+                txt = f"{row.get('summary', '')}\n{row.get('details', '')}".upper()
+            else:
+                level = ""
+                txt = str(row).upper()
+            if level in {"ERROR", "WARNING"} or "ERROR" in txt or "WARNING" in txt or "[EXCEPTION]" in txt:
                 log_alerts += 1
         return qc_count, results_rows, log_alerts
 
@@ -166,33 +316,97 @@ class TableStatusMixin:
 
     def _populate_table(self) -> None:
         """Populate the table from current keypoints."""
-        pts = self._current_keypoints()
-        self._table_rows = list(pts)
+        rows = self._current_table_rows()
+        self._table_rows = list(rows)
+        expected_columns = len(self._ANNOT_TABLE_HEADERS)
+        if self.annot_table.columnCount() != expected_columns:
+            self.annot_table.setColumnCount(expected_columns)
+            self.annot_table.setHorizontalHeaderLabels(self._ANNOT_TABLE_HEADERS)
         sorting = bool(self.annot_table.isSortingEnabled())
         if sorting:
             self.annot_table.setSortingEnabled(False)
         self.annot_table.blockSignals(True)
-        self.annot_table.setRowCount(len(pts))
-        for row, kp in enumerate(pts):
-            ann_id = str(kp.annotation_id)
-            id_item = QtWidgets.QTableWidgetItem(ann_id[:8])
-            id_item.setData(QtCore.Qt.ItemDataRole.UserRole, ann_id)
-            id_item.setFlags(id_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
-            scope = "stack" if int(kp.t) == -1 and int(kp.z) == -1 else "slice"
-            scope_item = QtWidgets.QTableWidgetItem(scope)
-            scope_item.setData(QtCore.Qt.ItemDataRole.UserRole, ann_id)
-            scope_item.setFlags(scope_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
-            self.annot_table.setItem(row, 0, id_item)
-            self.annot_table.setItem(row, 1, scope_item)
-            self.annot_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(kp.t)))
-            self.annot_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(kp.z)))
-            self.annot_table.setItem(row, 4, QtWidgets.QTableWidgetItem(f"{kp.y:.2f}"))
-            self.annot_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{kp.x:.2f}"))
-            self.annot_table.setItem(row, 6, QtWidgets.QTableWidgetItem(kp.label))
+        self.annot_table.setRowCount(len(rows))
+        for row_idx, row in enumerate(rows):
+            id_item = QtWidgets.QTableWidgetItem(str(row["id"])[:8])
+            id_item.setData(QtCore.Qt.ItemDataRole.UserRole, {"kind": row["kind"], "id": row["id"]})
+            if row["kind"] != "annotation":
+                id_item.setFlags(id_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+            self.annot_table.setItem(row_idx, 0, id_item)
+            values = [
+                str(row["label"]),
+                str(row["t"]),
+                str(row["z"]),
+                f"{float(row['x']):.2f}",
+                f"{float(row['y']):.2f}",
+                str(row["source"]),
+                str(row["status"]),
+                "" if row["confidence"] in (None, "") else f"{float(row['confidence']):.4f}",
+                str(row["candidate_class"] or ""),
+                str(row["roi"] or ""),
+                str(row["notes"] or ""),
+            ]
+            for col_idx, value in enumerate(values, start=1):
+                item = QtWidgets.QTableWidgetItem(value)
+                if row["kind"] != "annotation" or col_idx in (6, 8):
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                if row["kind"] == "suggestion":
+                    self._style_suggestion_table_item(item, row)
+                self.annot_table.setItem(row_idx, col_idx, item)
+            self._set_annotation_table_actions(row_idx, row)
         self.annot_table.blockSignals(False)
         self.annot_table.resizeColumnsToContents()
         if sorting:
             self.annot_table.setSortingEnabled(True)
+
+    def _style_suggestion_table_item(self, item: "QtWidgets.QTableWidgetItem", row: dict) -> None:
+        candidate_class = str(row.get("candidate_class", "")).strip().lower()
+        status = str(row.get("status", "")).strip().lower()
+        if status == "rejected":
+            item.setForeground(QtCore.Qt.GlobalColor.gray)
+        elif status == "accepted":
+            item.setForeground(QtGui.QColor("#1565c0")) if hasattr(QtWidgets, "QTableWidget") else None
+        elif candidate_class == "conflict":
+            item.setBackground(QtGui.QColor("#ffebee"))
+        elif candidate_class == "near_existing":
+            item.setBackground(QtGui.QColor("#fff3e0"))
+        else:
+            item.setBackground(QtGui.QColor("#f5f5f5"))
+
+    def _set_annotation_table_actions(self, row_idx: int, row: dict) -> None:
+        widget = QtWidgets.QWidget(self.annot_table)
+        layout = QtWidgets.QHBoxLayout(widget)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(2)
+        if row["kind"] == "suggestion":
+            accept_btn = QtWidgets.QToolButton(widget)
+            accept_btn.setText("✓")
+            accept_btn.setToolTip("Accept suggestion")
+            reject_btn = QtWidgets.QToolButton(widget)
+            reject_btn.setText("✕")
+            reject_btn.setToolTip("Reject suggestion")
+            jump_btn = QtWidgets.QToolButton(widget)
+            jump_btn.setText("◎")
+            jump_btn.setToolTip("Jump to suggestion")
+            refine_btn = QtWidgets.QToolButton(widget)
+            refine_btn.setText("↔")
+            refine_btn.setToolTip("Accept and refine")
+            suggestion_id = str(row["id"])
+            accept_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._set_selected_suggestion_decision(sid, "accepted"))
+            reject_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._set_selected_suggestion_decision(sid, "rejected"))
+            jump_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._jump_to_table_suggestion(sid))
+            refine_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._accept_and_refine_suggestion(sid))
+            for btn in (accept_btn, reject_btn, jump_btn, refine_btn):
+                layout.addWidget(btn)
+        else:
+            jump_btn = QtWidgets.QToolButton(widget)
+            jump_btn.setText("◎")
+            jump_btn.setToolTip("Jump to annotation")
+            annotation_id = str(row["id"])
+            jump_btn.clicked.connect(lambda _checked=False, aid=annotation_id: self._jump_to_table_annotation(aid))
+            layout.addWidget(jump_btn)
+        layout.addStretch(1)
+        self.annot_table.setCellWidget(row_idx, 12, widget)
 
     def _keypoint_for_table_row(self, row: int) -> Optional[Keypoint]:
         """Resolve a keypoint from the currently visible table row using annotation id."""
@@ -201,9 +415,10 @@ class TableStatusMixin:
         id_item = self.annot_table.item(int(row), 0)
         if id_item is None:
             return None
-        ann_id = str(id_item.data(QtCore.Qt.ItemDataRole.UserRole) or "").strip()
-        if not ann_id:
+        payload = id_item.data(QtCore.Qt.ItemDataRole.UserRole) or {}
+        if not isinstance(payload, dict) or payload.get("kind") != "annotation":
             return None
+        ann_id = str(payload.get("id", "")).strip()
         for kp in self.annotations.get(self.primary_image.id, []):
             if str(kp.annotation_id) == ann_id:
                 return kp
@@ -255,8 +470,14 @@ class TableStatusMixin:
                 kp = self._keypoint_for_table_row(idx.row())
                 if kp is not None:
                     selected_ids.add(str(kp.annotation_id))
+                else:
+                    suggestion = self._suggestion_for_table_row(idx.row())
+                    if suggestion is not None:
+                        self._selected_suggestion_id = str(getattr(suggestion, "suggestion_id", ""))
+                        self._focus_suggestion(suggestion)
+                        self._refresh_suggestion_explain_panel(suggestion)
         self._selected_annotation_ids = selected_ids
-        self._refresh_image()
+        self._request_ui_refresh("table-status", table=True)
 
     def _on_table_item_changed(self, item: "QtWidgets.QTableWidgetItem") -> None:
         if self._block_table:
@@ -268,31 +489,49 @@ class TableStatusMixin:
             return
         text = item.text()
         try:
-            if col == 2:
-                new_kp = Keypoint(kp.image_id, kp.image_name, int(text), kp.z, kp.y, kp.x, kp.label)
+            new_meta = dict(kp.meta)
+            new_kp = Keypoint(
+                kp.image_id,
+                kp.image_name,
+                kp.t,
+                kp.z,
+                kp.y,
+                kp.x,
+                kp.label,
+                source=str(getattr(kp, "source", "manual")),
+                meta=new_meta,
+                modality_idx=kp.modality_idx,
+                annotation_context=getattr(kp, "annotation_context", ""),
+            )
+            new_kp.annotation_id = kp.annotation_id
+            if col == 1:
+                new_kp.label = text
+            elif col == 2:
+                new_kp.t = int(text)
             elif col == 3:
-                new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, int(text), kp.y, kp.x, kp.label)
+                new_kp.z = int(text)
             elif col == 4:
-                new_kp = Keypoint(
-                    kp.image_id, kp.image_name, kp.t, kp.z, float(text), kp.x, kp.label
-                )
+                new_kp.x = float(text)
             elif col == 5:
-                new_kp = Keypoint(
-                    kp.image_id, kp.image_name, kp.t, kp.z, kp.y, float(text), kp.label
-                )
+                new_kp.y = float(text)
             elif col == 6:
-                new_kp = Keypoint(kp.image_id, kp.image_name, kp.t, kp.z, kp.y, kp.x, text)
+                new_kp.source = str(text or "manual")
+            elif col == 7:
+                new_kp.status = str(text or "active")
+            elif col == 8:
+                new_kp.confidence = None if not str(text).strip() else float(text)
+            elif col == 10:
+                new_kp.roi_name = str(text)
+            elif col == 11:
+                new_kp.notes = str(text)
             else:
                 return
         except ValueError:
             return
-        new_kp.annotation_id = kp.annotation_id
-        new_kp.meta = dict(kp.meta)
-        new_kp.modality_idx = kp.modality_idx
-        self.controller.update_annotation(self.primary_image.id, kp, new_kp)
+        self.controller.update_annotation(kp.image_id, kp, new_kp)
         self._mark_dirty()
         self._refresh_table()
-        self._refresh_image()
+        self._request_ui_refresh("table-status", table=True)
 
     def _delete_selected_annotations(self) -> None:
         """Delete selected annotations with confirmation (P3.3)."""
@@ -320,197 +559,73 @@ class TableStatusMixin:
             )
             if reply != QtWidgets.QMessageBox.StandardButton.Yes:
                 return
-        self.controller.delete_annotations(self.primary_image.id, removed)
+        by_image = {}
+        for kp in removed:
+            by_image.setdefault(int(kp.image_id), []).append(kp)
+        for image_id, rows in by_image.items():
+            self.controller.delete_annotations(int(image_id), rows)
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
-        self._refresh_image()
+        self._request_ui_refresh("table-status", table=True)
         self._update_status()
         self._mark_dirty()
 
     def _update_status(self) -> None:
-        total = sum(len(v) for v in self.annotations.values())
-        current = len(
-            [kp for kp in self._current_keypoints() if kp.t == self.t_slider.value() or kp.t == -1]
-        )
-        dataset_name = str(getattr(self.primary_image, "name", "unknown"))
-        array = getattr(self.primary_image, "array", None)
-        t_total = int(array.shape[0]) if array is not None and getattr(array, "ndim", 0) >= 1 else int(self.t_slider.maximum() + 1)
-        z_total = int(array.shape[1]) if array is not None and getattr(array, "ndim", 0) >= 2 else int(self.z_slider.maximum() + 1)
-        frame_txt = f"T: {int(self.t_slider.value()) + 1}/{max(1, t_total)} | Z: {int(self.z_slider.value()) + 1}/{max(1, z_total)}"
-        annotation_space = str(
-            getattr(getattr(self, "controller", None).session_state, "annotation_space", "stack")
-            if getattr(self, "controller", None) is not None
-            else "stack"
-        )
-        modality_txt = f"Modality {int(getattr(self, '_active_modality_idx', -1))}"
-        manager = getattr(getattr(self, "controller", None).session_state, "modality_manager", None) if getattr(self, "controller", None) is not None else None
-        if manager is not None:
-            try:
-                for modality in manager.get_all_modalities():
-                    if int(modality.image_id) == int(self.primary_image.id):
-                        modality_txt = str(modality.display_name)
-                        break
-            except Exception:
-                pass
+        """Build one derived status snapshot and let the presenter render it."""
+        snapshot = self._build_status_snapshot()
+        self._apply_menu_action_state(snapshot)
+        self._apply_legacy_status_snapshot(snapshot)
+        status_service = getattr(self, "status_service", None)
+        if status_service is not None:
+            throttle_ms = 120 if bool(getattr(self, "_playback_mode", False) or getattr(self, "_interactive", False)) else 0
+            status_service.set_derived_status(snapshot.model, throttle_ms=throttle_ms)
+        if hasattr(self, "_refresh_review_qc_page_summary"):
+            self._refresh_review_qc_page_summary()
+        if hasattr(self, "_refresh_advanced_page_summary"):
+            self._refresh_advanced_page_summary()
+        self._update_bottom_task_panels()
+        if self.tool_label is not None and self.tool_router is not None:
+            self.tool_label.setText(f"Tool: {self._tool_label(self.tool_router.tool)}")
+        if self.cache_stats_label is not None:
+            self.cache_stats_label.setText(
+                f"Cache: {snapshot.cache_mb} MB | Items: {snapshot.cache_items}"
+            )
+        self._update_buffer_stats()
 
-        # Calculate view density (visible area inside ROI)
-        pts_view, view_area_um2 = self._view_density_stats()
-        view_density = (pts_view / view_area_um2) if view_area_um2 > 0 else 0.0
-        
-        # Calculate total ROI statistics
-        pts_roi_total, roi_total_area_um2 = self._roi_total_stats()
-        roi_total_density = (pts_roi_total / roi_total_area_um2) if roi_total_area_um2 > 0 else 0.0
-        
-        cache_mb, cache_items = self.proj_cache.stats()
-        
-        # Collect diagnostic flags
-        diag_flags = []
-        render_scales = getattr(self, "_render_scales", {}) or {}
-        scale = max(render_scales.values()) if render_scales else 1
-        if scale > 1:
-            diag_flags.append(f"Downsample x{scale}")
-        
-        # Check for memory pressure / spatial downsampling on loaded image
-        if self.primary_image.downsampled:
-            diag_flags.append(f"Spatial 2x downsampled (memory)")
-        
-        lod_active = getattr(self, "_lod_mode_active", {})
-        if lod_active.get(self.primary_image.id, False):
-            diag_flags.append("LOD")
-        if getattr(self.primary_image.array, "filename", None) is not None:
-            diag_flags.append("Memmap")
-        
-        assist_state = self._canonical_assist_state()
-        jobs_txt = ""
-        if getattr(self, "jobs", None) is not None:
+    def _build_status_snapshot(self) -> DerivedStatusSnapshot:
+        """Build a structured status snapshot from current GUI/session state."""
+        return build_status_snapshot(self)
+
+    def _apply_menu_action_state(self, snapshot: DerivedStatusSnapshot) -> None:
+        """Keep menu actions aligned with the current derived session/view state."""
+        for attr, enabled in dict(getattr(snapshot, "action_enabled", {}) or {}).items():
+            action = getattr(self, attr, None)
+            if action is None:
+                continue
             try:
-                job_count = int(self.jobs.active_job_count())
-                if job_count > 0:
-                    jobs_txt = f" | Jobs: {job_count} ({getattr(self, '_active_job_name', 'running')})"
+                action.setEnabled(bool(enabled))
+                base_tip = str(action.property("baseStatusTip") or action.statusTip() or "").strip()
+                base_tooltip = str(action.property("baseToolTip") or action.toolTip() or "").strip()
+                disabled_reason = str(
+                    dict(getattr(snapshot, "action_disabled_reason", {}) or {}).get(attr, "")
+                ).strip()
+                if enabled:
+                    if base_tip:
+                        action.setStatusTip(base_tip)
+                    if base_tooltip:
+                        action.setToolTip(base_tooltip)
                 else:
-                    jobs_txt = " | Jobs: idle"
+                    reason = disabled_reason or "This action is not available in the current context."
+                    if base_tip:
+                        action.setStatusTip(f"{base_tip} Disabled: {reason}")
+                    else:
+                        action.setStatusTip(reason)
+                    action.setToolTip(reason)
             except Exception:
-                pass
-        autosave_enabled = bool(
-            getattr(self, "_settings", None).value("autosaveRecoveryEnabled", True, type=bool)
-            if getattr(self, "_settings", None) is not None
-            else True
-        )
-        autosave_txt = "Autosave: off"
-        if autosave_enabled:
-            if getattr(self, "_last_autosave_timestamp", None):
-                autosave_txt = "Autosave: recent"
-            else:
-                autosave_txt = "Autosave: on"
-        scope_state = "Stack" if str(getattr(self, "annotation_scope", "current")) == "all" else "Slice"
-        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        default_target = (
-            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
-        )
-        target_key = str(getattr(self, "annotate_target", default_target))
-        target_state = str(getattr(panel_map.get(target_key), "display_name", target_key.title()))
-        qc_warnings = 0
-        qc_errors = 0
-        qc_state = getattr(self, "qc_state", None)
-        if qc_state is not None:
-            for issue in getattr(qc_state, "issues", []):
-                sev = str(getattr(getattr(issue, "severity", None), "value", "")).lower()
-                if sev == "warning":
-                    qc_warnings += 1
-                elif sev == "error":
-                    qc_errors += 1
-        qc_total = qc_warnings + qc_errors
-        qc_label = "QC: no issues" if qc_total == 0 else f"QC: {qc_warnings} warnings"
-        if qc_errors > 0:
-            qc_label += f", {qc_errors} errors"
+                continue
 
-        # Permanent status widgets are the primary operational state display.
-        if getattr(self, "status_dataset_lbl", None) is not None:
-            self.status_dataset_lbl.setText(f"Dataset: {dataset_name}")
-        if getattr(self, "status_label_lbl", None) is not None:
-            self.status_label_lbl.setText(f"Label: {self.current_label}")
-        if getattr(self, "status_tz_lbl", None) is not None:
-            self.status_tz_lbl.setText(frame_txt)
-        if getattr(self, "status_points_lbl", None) is not None:
-            self.status_points_lbl.setText(f"Points ({target_state}): {current}")
-        
-        # Update ROI and density labels with comprehensive statistics
-        roi_active = self.roi_shape != "none" and self.roi_rect[2] > 0 and self.roi_rect[3] > 0
-        
-        if getattr(self, "status_roi_area_lbl", None) is not None:
-            if roi_active and roi_total_area_um2 > 0:
-                # Show both view area (inside ROI) and total ROI area
-                self.status_roi_area_lbl.setText(
-                    f"View∩ROI: {view_area_um2:.2f} μm² | Total ROI: {roi_total_area_um2:.2f} μm²"
-                )
-            elif view_area_um2 > 0:
-                self.status_roi_area_lbl.setText(f"View area: {view_area_um2:.2f} μm²")
-            else:
-                self.status_roi_area_lbl.setText("ROI area: n/a")
-        
-        if getattr(self, "status_density_lbl", None) is not None:
-            if roi_active and roi_total_area_um2 > 0:
-                # Show both view density and total ROI density
-                self.status_density_lbl.setText(
-                    f"View: {pts_view} pts ({view_density:.3f}/μm²) | ROI: {pts_roi_total} pts ({roi_total_density:.3f}/μm²)"
-                )
-            elif view_area_um2 > 0:
-                self.status_density_lbl.setText(f"Density: {view_density:.3f}/μm² ({pts_view} pts)")
-            else:
-                self.status_density_lbl.setText("Density: n/a")
-        
-        if getattr(self, "status_fps_lbl", None) is not None:
-            self.status_fps_lbl.setText(f"FPS: {int(self.speed_slider.value())}")
-        
-        status_runtime_lbl = getattr(self, "status_runtime_lbl", None)
-        if status_runtime_lbl is not None:
-            if roi_active and roi_total_area_um2 > 0:
-                # Show comprehensive ROI statistics
-                status_runtime_lbl.setText(
-                    f"View: {pts_view} pts, {view_area_um2:.2f} μm², {view_density:.3f}/μm² | "
-                    f"ROI Total: {pts_roi_total} pts, {roi_total_area_um2:.2f} μm², {roi_total_density:.3f}/μm² | "
-                    f"FPS: {int(self.speed_slider.value())}"
-                )
-            elif view_area_um2 > 0:
-                status_runtime_lbl.setText(
-                    f"View: {pts_view} pts, {view_area_um2:.2f} μm², {view_density:.3f}/μm² | "
-                    f"FPS: {int(self.speed_slider.value())}"
-                )
-            else:
-                status_runtime_lbl.setText(
-                    f"Points: {current} | FPS: {int(self.speed_slider.value())}"
-                )
-        
-        # Keep these legacy metric labels hidden; detailed metrics are rendered
-        # via status-runtime text and status-details panel, not floating labels.
-        annotate_tool_active = False
-        for attr in ("status_points_lbl", "status_roi_area_lbl", "status_density_lbl", "status_fps_lbl"):
-            widget = getattr(self, attr, None)
-            if widget is not None:
-                # Hide tooltip when hiding widget
-                if not annotate_tool_active:
-                    try:
-                        from matplotlib.backends.qt_compat import QtWidgets
-                        QtWidgets.QToolTip.hideText()
-                    except Exception:
-                        pass
-                widget.setVisible(annotate_tool_active)
-        if status_runtime_lbl is not None:
-            if not annotate_tool_active:
-                try:
-                    from matplotlib.backends.qt_compat import QtWidgets
-                    QtWidgets.QToolTip.hideText()
-                except Exception:
-                    pass
-            status_runtime_lbl.setVisible(annotate_tool_active)
-        if getattr(self, "status_scope_lbl", None) is not None:
-            self.status_scope_lbl.setText(f"Scope: {scope_state}")
-            if str(getattr(self, "annotation_scope", "current")) == "all":
-                self.status_scope_lbl.setStyleSheet("color: #ef6c00; font-weight: 600;")
-            else:
-                self.status_scope_lbl.setStyleSheet("")
-        if getattr(self, "status_target_lbl", None) is not None:
-            self.status_target_lbl.setText(f"Target: {target_state}")
+    def _apply_legacy_status_snapshot(self, snapshot: DerivedStatusSnapshot) -> None:
+        """Update compatibility widgets from the unified status snapshot."""
         status_modality_combo = getattr(self, "status_modality_combo", None)
         if status_modality_combo is not None and getattr(self, "primary_combo", None) is not None:
             status_modality_combo.blockSignals(True)
@@ -520,106 +635,35 @@ class TableStatusMixin:
             if 0 <= int(getattr(self, "current_image_idx", 0)) < status_modality_combo.count():
                 status_modality_combo.setCurrentIndex(int(self.current_image_idx))
             status_modality_combo.setToolTip(
-                f"Active modality/view source: {modality_txt}. "
+                f"Active modality/view source: {snapshot.modality_txt}. "
                 "Use this selector to switch annotation/suggestion source."
             )
             status_modality_combo.blockSignals(False)
-        if getattr(self, "status_context_lock_lbl", None) is not None:
-            pending = bool(
-                hasattr(self, "_is_annotation_context_guard_pending")
-                and self._is_annotation_context_guard_pending()
-            )
-            if pending:
-                self.status_context_lock_lbl.setText("Write Context: Pending Confirm")
-                self.status_context_lock_lbl.setStyleSheet("color: #e65100; font-weight: 600;")
-            else:
-                self.status_context_lock_lbl.setText("Write Context: Locked")
-                self.status_context_lock_lbl.setStyleSheet("")
-        if getattr(self, "status_effective_context_lbl", None) is not None:
-            context_line = (
-                self._effective_assist_context_line()
-                if hasattr(self, "_effective_assist_context_line")
-                else "-"
-            )
-            self.status_effective_context_lbl.setText(
-                f"Effective Assist Context: {context_line}"
-            )
-        need = self._assist_context_need_count()
-        suffix = f" (Need {need} more labels in this context)" if assist_state == AssistState.HEURISTIC and need > 0 else ""
-        self._style_assist_state_label(
-            getattr(self, "status_assist_lbl", None),
-            assist_state,
-            suffix=suffix,
-        )
+        assist_state = snapshot.assist_state
+        need = snapshot.assist_need
         state_name = str(getattr(assist_state, "name", ""))
         prev_state = getattr(self, "_last_assist_state_name", None)
         if prev_state is None:
             self._last_assist_state_name = state_name
         elif prev_state != state_name:
             self._last_assist_state_name = state_name
-            transition_txt = (
-                f"Assist state transitioned: {prev_state.lower()} -> {state_name.lower()}."
-            )
-            self._set_status(transition_txt)
+            transition_txt = f"Assist state transitioned: {prev_state.lower()} -> {state_name.lower()}."
+            self._status_info(transition_txt, timeout_ms=2500, source="assist.transition")
             if getattr(self, "canvas", None) is not None:
                 try:
-                    from matplotlib.backends.qt_compat import QtCore, QtWidgets
-                    QtWidgets.QToolTip.showText(
-                        self.canvas.mapToGlobal(QtCore.QPoint(16, 16)),
-                        transition_txt,
-                        self.canvas,
-                    )
+                    QtWidgets.QToolTip.showText(self.canvas.mapToGlobal(QtCore.QPoint(16, 16)), transition_txt, self.canvas)
                 except Exception:
                     pass
-        readiness = (
-            f"Assist readiness: heuristic-only, need {need} more labels in this context."
-            if assist_state == AssistState.HEURISTIC and need > 0
-            else f"Assist readiness: {assist_state_label(assist_state)}."
-        )
-        for attr in (
-            "suggest_points_act",
-            "suggest_points_image_act",
-            "accept_visible_suggestions_act",
-            "accept_green_suggestions_act",
-            "train_ranker_now_act",
-        ):
+        readiness = f"Assist readiness: heuristic-only, need {need} more labels in this context." if assist_state == AssistState.HEURISTIC and need > 0 else f"Assist readiness: {assist_state_label(assist_state)}."
+        for attr in ("suggest_points_act", "suggest_points_image_act", "accept_visible_suggestions_act", "accept_green_suggestions_act", "train_ranker_now_act"):
             action = getattr(self, attr, None)
             if action is not None:
                 action.setToolTip(readiness)
                 action.setStatusTip(readiness)
-        if getattr(self, "status_qc_lbl", None) is not None:
-            self.status_qc_lbl.setText(qc_label)
-        if getattr(self, "status_results_lbl", None) is not None:
-            _, results_rows, _ = self._bottom_task_counts()
-            self.status_results_lbl.setText(
-                "Results: empty" if results_rows <= 0 else f"Results: {results_rows} rows"
-            )
-        freshness = (
-            self._suggestion_freshness_state(self.primary_image.id)
-            if hasattr(self, "_suggestion_freshness_state")
-            else {"has_suggestions": False, "age_text": "n/a", "is_stale": False}
-        )
-        if getattr(self, "status_suggestion_fresh_lbl", None) is not None:
-            if not freshness.get("has_suggestions", False):
-                self.status_suggestion_fresh_lbl.setText("Suggestions: n/a")
-                self.status_suggestion_fresh_lbl.setStyleSheet("")
-            elif freshness.get("is_stale", False):
-                self.status_suggestion_fresh_lbl.setText(
-                    f"Suggestions: {freshness.get('age_text', 'n/a')} old (Stale)"
-                )
-                self.status_suggestion_fresh_lbl.setStyleSheet("color: #d84315; font-weight: 600;")
-            else:
-                self.status_suggestion_fresh_lbl.setText(
-                    f"Suggestions: {freshness.get('age_text', 'n/a')} old"
-                )
-                self.status_suggestion_fresh_lbl.setStyleSheet("")
         for act_name in ("accept_visible_suggestions_act", "accept_green_suggestions_act"):
             act = getattr(self, act_name, None)
-            if act is not None:
-                if freshness.get("is_stale", False):
-                    act.setToolTip(
-                        "Stale suggestions detected: preview dialog will require one-shot override acknowledgement."
-                    )
+            if act is not None and snapshot.freshness.get("is_stale", False):
+                act.setToolTip("Stale suggestions detected: preview dialog will require one-shot override acknowledgement.")
         if getattr(self, "evidence_strip_lbl", None) is not None:
             projection_txt = "raw"
             if getattr(self, "projection_selector", None) is not None:
@@ -631,81 +675,11 @@ class TableStatusMixin:
                 except Exception:
                     projection_txt = "source frame"
             modality_count = len(getattr(self, "_panel_modality_map", {}) or {})
-            target_key = str(getattr(self, "annotate_target", default_target))
-            target_txt = str(getattr(panel_map.get(target_key), "display_name", target_key))
             self.evidence_strip_lbl.setText(
-                f"Evidence: modality={modality_txt} | target={target_txt} | projection={projection_txt} | mapped modalities={modality_count}"
+                f"Evidence: modality={snapshot.modality_txt} | "
+                f"target={snapshot.target_state} | projection={projection_txt} | "
+                f"mapped modalities={modality_count}"
             )
-
-        status_details = getattr(self, "status_details_panel", None)
-        if status_details is not None:
-            try:
-                status_details.dataset_lbl.setText(dataset_name)
-                status_details.tz_lbl.setText(frame_txt)
-                status_details.scope_lbl.setText(scope_state)
-                status_details.target_lbl.setText(target_state)
-                status_details.modality_lbl.setText(modality_txt)
-                status_details.label_lbl.setText(str(self.current_label))
-                status_details.assist_lbl.setText(
-                    f"{assist_state_label(assist_state)}"
-                    + (f" (Need {need} more labels)" if assist_state == AssistState.HEURISTIC and need > 0 else "")
-                )
-                status_details.context_lbl.setText(
-                    self._effective_assist_context_line()
-                    if hasattr(self, "_effective_assist_context_line")
-                    else "-"
-                )
-                status_details.suggestions_lbl.setText(
-                    self.status_suggestion_fresh_lbl.text()
-                    if getattr(self, "status_suggestion_fresh_lbl", None) is not None
-                    else "n/a"
-                )
-                status_details.qc_lbl.setText(qc_label)
-                status_details.results_lbl.setText(
-                    self.status_results_lbl.text()
-                    if getattr(self, "status_results_lbl", None) is not None
-                    else "Results: n/a"
-                )
-                status_details.points_lbl.setText(f"Slice {current} | Total {total}")
-                status_details.roi_area_lbl.setText(
-                    f"{area_um2:.2f} um^2" if area_um2 > 0 else "n/a"
-                )
-                status_details.density_lbl.setText(
-                    f"{density:.3f} /um^2" if area_um2 > 0 else "n/a"
-                )
-                status_details.fps_lbl.setText(f"{int(self.speed_slider.value())} fps")
-                status_details.autosave_lbl.setText(autosave_txt.replace("Autosave: ", ""))
-                status_details.cache_lbl.setText(f"{cache_mb} MB | {cache_items} items")
-                status_details.jobs_lbl.setText(jobs_txt.replace(" | Jobs: ", "") if jobs_txt else "idle")
-                status_details.diag_lbl.setText("; ".join(diag_flags) if diag_flags else "none")
-            except Exception:
-                pass
-
-        tool_name = "Annotate"
-        try:
-            if getattr(self, "tool_router", None) is not None:
-                tool_name = self._tool_label(self.tool_router.tool)
-        except Exception:
-            pass
-        self._status_base = "Ready"
-        self._render_status()
-        self._update_bottom_task_panels()
-        if self.tool_label is not None and self.tool_router is not None:
-            self.tool_label.setText(f"Tool: {self._tool_label(self.tool_router.tool)}")
-        if self.cache_stats_label is not None:
-            self.cache_stats_label.setText(f"Cache: {cache_mb} MB | Items: {cache_items}")
-        self._update_buffer_stats()
-
-    def _set_status(self, text: str) -> None:
-        """Set a transient status message; base status persists during playback."""
-        self._status_extra = text
-        self._render_status()
-
-    def _render_status(self) -> None:
-        if self._status_extra:
-            self.status.setText(f"{self._status_base} | {self._status_extra}")
-        else:
-            self.status.setText(self._status_base)
 
     def _tool_label(self, tool: Tool) -> str:
         labels = {
@@ -875,7 +849,12 @@ class TableStatusMixin:
         return (x - cx) ** 2 + (y - cy) ** 2 <= r**2
 
     def _current_keypoints(self) -> List[Keypoint]:
-        pts = self.annotations.get(self.primary_image.id, [])
+        target = str(getattr(self, "annotate_target", "frame")).strip().lower() or "frame"
+        if hasattr(getattr(self, "controller", None), "annotations_for_panel"):
+            pts = list(self.controller.annotations_for_panel(target))
+        else:
+            primary_id = int(getattr(getattr(self, "primary_image", None), "id", 0))
+            pts = list(getattr(self, "annotations", {}).get(primary_id, []))
         if self.filter_current_chk.isChecked():
             t = self.t_slider.value()
             z = self.z_slider.value()
@@ -900,15 +879,36 @@ class TableStatusMixin:
             )
             pts = [kp for kp in pts if kp.annotation_id in affected_ids]
         
-        # Phase ζ: Filter by current modality_idx if enabled
-        if hasattr(self, '_filter_by_modality') and self._filter_by_modality:
-            # Get current modality idx (from modality manager or primary image)
-            current_modality_idx = self._get_current_modality_idx()
-            if current_modality_idx is not None:
-                from phage_annotator.core.multi_modality import filter_by_modality
-                pts = filter_by_modality(pts, current_modality_idx, show_all=True)
-        
         return pts
+
+    def _jump_to_table_suggestion(self, suggestion_id: str) -> None:
+        for suggestion in self._suggestions_for_current_tz():
+            if str(getattr(suggestion, "suggestion_id", "")) == str(suggestion_id):
+                self._selected_suggestion_id = str(suggestion_id)
+                self._focus_suggestion(suggestion)
+                self._refresh_suggestion_explain_panel(suggestion)
+                self._request_ui_refresh("table-jump-suggestion", image=True, table=True)
+                return
+
+    def _jump_to_table_annotation(self, annotation_id: str) -> None:
+        for kp in self.annotations.get(self.primary_image.id, []):
+            if str(getattr(kp, "annotation_id", "")) != str(annotation_id):
+                continue
+            if hasattr(self, "t_slider") and int(kp.t) >= 0:
+                self.t_slider.setValue(max(self.t_slider.minimum(), min(int(kp.t), self.t_slider.maximum())))
+            if hasattr(self, "z_slider") and int(kp.z) >= 0:
+                self.z_slider.setValue(max(self.z_slider.minimum(), min(int(kp.z), self.z_slider.maximum())))
+            self._selected_annotation_ids = {str(annotation_id)}
+            self._request_ui_refresh("table-jump-annotation", image=True, table=True)
+            return
+
+    def _accept_and_refine_suggestion(self, suggestion_id: str) -> None:
+        self._set_selected_suggestion_decision(suggestion_id, "accepted")
+        self._assist_refine_pending_annotation_id = str(suggestion_id)
+        self._status_info(
+            "Accepted suggestion. Click a refined position on the canvas to adjust it.",
+            source="assist.table.refine",
+        )
     
     def _get_current_modality_idx(self) -> Optional[int]:
         """Get the modality index for the currently displayed image."""

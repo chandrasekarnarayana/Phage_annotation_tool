@@ -51,8 +51,9 @@ class RoiManager:
 
     def _new_roi_id(self) -> int:
         """Generate next unique ROI ID."""
+        roi_id = self._next_roi_id
         self._next_roi_id += 1
-        return self._next_roi_id
+        return roi_id
     
     def execute_command(self, command) -> bool:
         """Execute a command and add to undo stack."""

@@ -63,6 +63,7 @@ class PerformancePanel(QtWidgets.QWidget):
         self._update_timer: Optional[QtCore.QTimer] = None
         self._memory_pressure_active = False  # P3a: Track memory pressure state
         self._last_prefetch_disabled = False  # P3b: Track prefetch mitigation
+        self._cache_pressure_active = False
         
         self._init_ui()
         self._setup_update_timer()
@@ -102,9 +103,15 @@ class PerformancePanel(QtWidgets.QWidget):
         layout.addWidget(self.warnings_label)
 
         # Refresh button
+        actions_row = QtWidgets.QHBoxLayout()
         refresh_btn = QtWidgets.QPushButton("Force Refresh")
         refresh_btn.clicked.connect(self._update_metrics)
-        layout.addWidget(refresh_btn)
+        actions_row.addWidget(refresh_btn)
+        self.clear_cache_btn = QtWidgets.QPushButton("Clear Cache")
+        self.clear_cache_btn.clicked.connect(self._clear_projection_cache)
+        actions_row.addWidget(self.clear_cache_btn)
+        actions_row.addStretch(1)
+        layout.addLayout(actions_row)
 
         layout.addStretch()
         self.setLayout(layout)
@@ -190,6 +197,39 @@ class PerformancePanel(QtWidgets.QWidget):
         self.jobs_processed_label = QtWidgets.QLabel("0")
         self.jobs_processed_label.setStyleSheet("font-family: monospace;")
         layout.addWidget(self.jobs_processed_label, 2, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Pending queue:"), 3, 0)
+        self.jobs_pending_label = QtWidgets.QLabel("0 / 0")
+        self.jobs_pending_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.jobs_pending_label, 3, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Blocked:"), 4, 0)
+        self.jobs_blocked_label = QtWidgets.QLabel("0")
+        self.jobs_blocked_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.jobs_blocked_label, 4, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Queue state:"), 5, 0)
+        self.jobs_queue_summary_label = QtWidgets.QLabel("Idle")
+        self.jobs_queue_summary_label.setWordWrap(True)
+        self.jobs_queue_summary_label.setStyleSheet("font-family: monospace;")
+        layout.addWidget(self.jobs_queue_summary_label, 5, 1)
+
+        layout.addWidget(QtWidgets.QLabel("Queue detail:"), 6, 0)
+        self.jobs_queue_list = QtWidgets.QListWidget()
+        self.jobs_queue_list.setMaximumHeight(120)
+        layout.addWidget(self.jobs_queue_list, 6, 1)
+
+        actions_row = QtWidgets.QHBoxLayout()
+        self.jobs_cancel_queued_btn = QtWidgets.QPushButton("Cancel Queued")
+        self.jobs_cancel_queued_btn.setToolTip("Cancel queued jobs that have not started yet.")
+        self.jobs_cancel_queued_btn.clicked.connect(self._cancel_queued_jobs)
+        actions_row.addWidget(self.jobs_cancel_queued_btn)
+        self.jobs_cancel_blocked_btn = QtWidgets.QPushButton("Cancel Blocked")
+        self.jobs_cancel_blocked_btn.setToolTip("Cancel queued jobs currently waiting on dependencies.")
+        self.jobs_cancel_blocked_btn.clicked.connect(self._cancel_blocked_jobs)
+        actions_row.addWidget(self.jobs_cancel_blocked_btn)
+        actions_row.addStretch(1)
+        layout.addLayout(actions_row, 7, 0, 1, 2)
 
         return group
 
@@ -383,6 +423,7 @@ class PerformancePanel(QtWidgets.QWidget):
         # Progress bar
         percent = int((mb_used / mb_budget * 100)) if mb_budget > 0 else 0
         self.cache_progress.setValue(min(100, percent))
+        self._cache_pressure_active = bool(percent >= 90)
 
         # Color code by usage
         if percent >= 90:
@@ -400,18 +441,48 @@ class PerformancePanel(QtWidgets.QWidget):
         if not self.main_window:
             return
 
-        # Get active job count from job manager
         active_count = 0
         processed_count = 0
-        if hasattr(self.main_window, "jobs"):
-            jobs = self.main_window.jobs
-            if hasattr(jobs, "total_submitted"):
-                processed_count = jobs.total_submitted
-            if hasattr(jobs, "_active_tasks"):
-                active_count = len(jobs._active_tasks)
+        pending_count = 0
+        blocked_count = 0
+        pending_capacity = 0
+        queue_summary = "Idle"
+        if hasattr(self.main_window, "jobs") and hasattr(self.main_window.jobs, "queue_snapshot"):
+            telemetry = self.main_window.jobs.queue_snapshot()
+            active_count = telemetry.active_count
+            processed_count = telemetry.total_submitted
+            pending_count = telemetry.pending_count
+            blocked_count = telemetry.blocked_count
+            pending_capacity = telemetry.max_pending_jobs
+            if telemetry.pending:
+                head = telemetry.pending[0]
+                if head.state == "blocked" and head.blocked_by:
+                    queue_summary = (
+                        f"{head.name} waiting on {', '.join(head.blocked_by[:2])}"
+                    )
+                else:
+                    queue_summary = f"{head.name} queued"
+            elif telemetry.running:
+                queue_summary = f"{telemetry.running[0].name} running"
+            self.jobs_queue_list.clear()
+            for job in telemetry.running:
+                self.jobs_queue_list.addItem(f"RUN  {job.name}")
+            for job in telemetry.pending:
+                if job.blocked_by:
+                    dep_text = ", ".join(job.blocked_by[:2])
+                    self.jobs_queue_list.addItem(f"WAIT {job.name} <- {dep_text}")
+                else:
+                    self.jobs_queue_list.addItem(f"QUEUE {job.name}")
+        else:
+            self.jobs_queue_list.clear()
 
         self.jobs_active_label.setText(str(active_count))
         self.jobs_processed_label.setText(str(processed_count))
+        self.jobs_pending_label.setText(f"{pending_count} / {pending_capacity}")
+        self.jobs_blocked_label.setText(str(blocked_count))
+        self.jobs_queue_summary_label.setText(queue_summary)
+        self.jobs_cancel_queued_btn.setEnabled(pending_count > 0)
+        self.jobs_cancel_blocked_btn.setEnabled(blocked_count > 0)
 
         # Prefetch queue depth (estimate from controller)
         prefetch_queue = 0
@@ -565,15 +636,31 @@ class PerformancePanel(QtWidgets.QWidget):
             mb_budget = int(self.cache._max_bytes / (1024 * 1024))
             percent = (mb_used / mb_budget * 100) if mb_budget > 0 else 0
             if percent >= 90:
-                warnings.append(f"⚠ Cache at {percent:.0f}% of budget")
+                telemetry = self.cache.telemetry()
+                warnings.append(
+                    f"⚠ Cache at {percent:.0f}% of budget "
+                    f"({mb_used}/{mb_budget} MB, evictions: {telemetry.evictions})"
+                )
 
         # Jobs warning
         if self.main_window and hasattr(self.main_window, "jobs"):
-            active_count = 0
-            if hasattr(self.main_window.jobs, "_active_tasks"):
-                active_count = len(self.main_window.jobs._active_tasks)
+            telemetry = None
+            if hasattr(self.main_window.jobs, "queue_snapshot"):
+                telemetry = self.main_window.jobs.queue_snapshot()
+            active_count = int(getattr(telemetry, "active_count", 0))
+            pending_count = int(getattr(telemetry, "pending_count", 0))
+            pending_capacity = max(1, int(getattr(telemetry, "max_pending_jobs", 1)))
             if active_count >= 5:
                 warnings.append(f"⚠ {active_count} jobs running (potential slowdown)")
+            if pending_count >= pending_capacity:
+                warnings.append(
+                    f"⚠ Job queue saturated ({pending_count}/{pending_capacity}); "
+                    "consider cancelling stale background work"
+                )
+            elif int(getattr(telemetry, "blocked_count", 0)) > 0:
+                warnings.append(
+                    f"⚠ {int(getattr(telemetry, 'blocked_count', 0))} queued jobs waiting on dependencies"
+                )
 
         # Memory pressure warning (P3a)
         if HAS_PSUTIL and self._memory_pressure_active:
@@ -592,8 +679,60 @@ class PerformancePanel(QtWidgets.QWidget):
             self.warnings_label.setText("\n".join(warnings))
             self.warnings_label.setStyleSheet("color: #ff6b6b; font-weight: bold;")
 
+    def _clear_projection_cache(self) -> None:
+        """Clear projection cache and surface the action through existing UI feedback."""
+        if not self.cache:
+            return
+        try:
+            self.cache.clear()
+            self.cache.telemetry().reset()
+        except Exception as exc:
+            logger.debug(f"Error clearing projection cache: {exc}")
+            return
+        self._cache_pressure_active = False
+        self._update_metrics()
+        if self.main_window is not None and hasattr(self.main_window, "_status_success"):
+            try:
+                self.main_window._status_success(
+                    "Projection cache cleared.",
+                    timeout_ms=3000,
+                    source="performance.clear_cache",
+                )
+            except Exception:
+                pass
+
     def reset_telemetry(self) -> None:
         """Reset cache telemetry counters."""
         if self.cache:
             self.cache.telemetry().reset()
             self._update_cache_metrics()
+
+    def _cancel_queued_jobs(self) -> None:
+        if not self.main_window or not hasattr(self.main_window, "jobs"):
+            return
+        cancelled = self.main_window.jobs.cancel_matching(include_running=False)
+        self._update_metrics()
+        if cancelled and hasattr(self.main_window, "_status_info"):
+            self.main_window._status_info(
+                f"Cancelled {len(cancelled)} queued jobs.",
+                timeout_ms=3000,
+                source="performance.cancel_queued",
+            )
+
+    def _cancel_blocked_jobs(self) -> None:
+        if not self.main_window or not hasattr(self.main_window, "jobs"):
+            return
+        telemetry = self.main_window.jobs.queue_snapshot()
+        cancelled = []
+        for job in telemetry.pending:
+            if job.state != "blocked":
+                continue
+            if self.main_window.jobs.cancel(job.job_id):
+                cancelled.append(job.job_id)
+        self._update_metrics()
+        if cancelled and hasattr(self.main_window, "_status_info"):
+            self.main_window._status_info(
+                f"Cancelled {len(cancelled)} dependency-blocked jobs.",
+                timeout_ms=3000,
+                source="performance.cancel_blocked",
+            )

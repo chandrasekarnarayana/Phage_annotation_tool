@@ -15,6 +15,58 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-clipped))
 
 
+def calibration_bins(
+    probabilities: np.ndarray,
+    labels: np.ndarray,
+    *,
+    n_bins: int = 8,
+) -> list[dict[str, float]]:
+    """Return reliability-style bin summaries for calibration monitoring."""
+    probs = np.asarray(probabilities, dtype=np.float64).reshape(-1)
+    y = np.asarray(labels, dtype=np.float64).reshape(-1)
+    if probs.size == 0 or y.size == 0 or probs.size != y.size:
+        return []
+    edges = np.linspace(0.0, 1.0, int(max(2, n_bins)) + 1, dtype=np.float64)
+    rows: list[dict[str, float]] = []
+    for idx in range(len(edges) - 1):
+        lo = float(edges[idx])
+        hi = float(edges[idx + 1])
+        if idx == len(edges) - 2:
+            mask = (probs >= lo) & (probs <= hi)
+        else:
+            mask = (probs >= lo) & (probs < hi)
+        if not np.any(mask):
+            rows.append({"bin_lo": lo, "bin_hi": hi, "count": 0.0, "mean_pred": 0.0, "empirical": 0.0, "gap": 0.0})
+            continue
+        mean_pred = float(np.mean(probs[mask]))
+        empirical = float(np.mean(y[mask]))
+        rows.append(
+            {
+                "bin_lo": lo,
+                "bin_hi": hi,
+                "count": float(np.sum(mask)),
+                "mean_pred": mean_pred,
+                "empirical": empirical,
+                "gap": float(abs(mean_pred - empirical)),
+            }
+        )
+    return rows
+
+
+def expected_calibration_error(
+    probabilities: np.ndarray,
+    labels: np.ndarray,
+    *,
+    n_bins: int = 8,
+) -> float:
+    """Compute expected calibration error from reliability-style bins."""
+    bins = calibration_bins(probabilities, labels, n_bins=n_bins)
+    total = float(sum(row["count"] for row in bins))
+    if total <= 0.0:
+        return 0.0
+    return float(sum((row["count"] / total) * row["gap"] for row in bins))
+
+
 FEATURE_NAMES = (
     "score",
     "peak",
@@ -26,8 +78,20 @@ FEATURE_NAMES = (
     "residual_fit",
     "log_response",
     "distance_to_nearest_accepted",
+    "distance_to_recent_reject",
     "border_proximity",
     "local_background",
+    "local_density",
+    "spatial_quality",
+    "nn_dist_1",
+    "nn_dist_2",
+    "nn_dist_3",
+    "stack_snr",
+    "stack_contrast",
+    "temporal_persistence",
+    "cross_modality_consistency_score",
+    "control_contradiction_score",
+    "uncertainty_score",
     "strategy_raw",
     "strategy_corrected",
     "strategy_consensus",
@@ -55,8 +119,32 @@ def feature_vector_from_suggestion(suggestion: PointSuggestion) -> np.ndarray:
             float(comp.get("residual_fit", 1.0)),
             float(comp.get("log_response", 0.0)),
             float(getattr(suggestion, "meta", {}).get("distance_to_nearest_accepted", 0.0)),
+            float(getattr(suggestion, "meta", {}).get("distance_to_recent_reject", 0.0)),
             float(getattr(suggestion, "meta", {}).get("border_proximity", 0.0)),
             float(comp.get("local_background", 0.0)),
+            float(getattr(suggestion, "meta", {}).get("local_density", comp.get("local_density", 0.0))),
+            float(comp.get("spatial_quality", 1.0)),
+            float(comp.get("nn_dist_1", 0.0)),
+            float(comp.get("nn_dist_2", 0.0)),
+            float(comp.get("nn_dist_3", 0.0)),
+            float(comp.get("stack_snr", 0.0)),
+            float(comp.get("stack_contrast", 0.0)),
+            float(comp.get("temporal_persistence", 0.0)),
+            float(
+                getattr(suggestion, "cross_modality_consistency_score", None)
+                if getattr(suggestion, "cross_modality_consistency_score", None) is not None
+                else comp.get("cross_modality_consistency_score", 1.0)
+            ),
+            float(
+                getattr(suggestion, "control_contradiction_score", None)
+                if getattr(suggestion, "control_contradiction_score", None) is not None
+                else comp.get("control_contradiction_score", 0.0)
+            ),
+            float(
+                getattr(suggestion, "uncertainty_score", None)
+                if getattr(suggestion, "uncertainty_score", None) is not None
+                else getattr(suggestion, "meta", {}).get("uncertainty_score", 0.0)
+            ),
             is_raw,
             is_corrected,
             is_consensus,
@@ -77,6 +165,9 @@ class LightweightSuggestionRanker:
     calibrator_a: float = 1.0
     calibrator_b: float = 0.0
     trained_samples: int = 0
+    calibration_ece: float = 0.0
+    calibration_brier: float = 0.0
+    calibration_bins_payload: list[dict[str, float]] = field(default_factory=list)
 
     def fit(
         self,
@@ -143,6 +234,10 @@ class LightweightSuggestionRanker:
             c -= 0.05 * grad_c
         self.calibrator_a = a
         self.calibrator_b = c
+        calibrated = self.predict_p_accept(x)
+        self.calibration_ece = float(expected_calibration_error(calibrated, y, n_bins=8))
+        self.calibration_brier = float(np.mean((calibrated - y) ** 2))
+        self.calibration_bins_payload = calibration_bins(calibrated, y, n_bins=8)
 
     def predict_logits(self, features: np.ndarray) -> np.ndarray:
         x = np.asarray(features, dtype=np.float64)
@@ -170,6 +265,7 @@ class LightweightSuggestionRanker:
             p_accept = float(probs[idx])
             suggestion.meta["p_accept"] = p_accept
             suggestion.meta["confidence"] = p_accept
+            suggestion.meta["confidence_available"] = True
             suggestion.score = p_accept
         return out
 
@@ -182,6 +278,9 @@ class LightweightSuggestionRanker:
             "calibrator_a": float(self.calibrator_a),
             "calibrator_b": float(self.calibrator_b),
             "trained_samples": int(self.trained_samples),
+            "calibration_ece": float(self.calibration_ece),
+            "calibration_brier": float(self.calibration_brier),
+            "calibration_bins_payload": list(self.calibration_bins_payload),
             "feature_names": list(FEATURE_NAMES),
         }
 
@@ -204,6 +303,11 @@ class LightweightSuggestionRanker:
         ranker.calibrator_a = float(payload.get("calibrator_a", 1.0))
         ranker.calibrator_b = float(payload.get("calibrator_b", 0.0))
         ranker.trained_samples = int(payload.get("trained_samples", 0))
+        ranker.calibration_ece = float(payload.get("calibration_ece", 0.0))
+        ranker.calibration_brier = float(payload.get("calibration_brier", 0.0))
+        bins = payload.get("calibration_bins_payload")
+        if isinstance(bins, list):
+            ranker.calibration_bins_payload = [dict(row) for row in bins if isinstance(row, dict)]
         return ranker
 
 

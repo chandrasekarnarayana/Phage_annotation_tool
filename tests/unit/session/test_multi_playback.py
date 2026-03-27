@@ -172,6 +172,18 @@ class TestModalityPlaybackManager:
         
         assert playback_manager._states[0].is_playing is True
         assert playback_manager._states[1].is_playing is True
+
+    def test_empty_sync_group_does_not_fallback_to_all_modalities(self, playback_manager):
+        """An explicitly empty selected group should not start playback on every modality."""
+        playback_manager.register_modality(0, "TIRF", 100)
+        playback_manager.register_modality(1, "Confocal", 100)
+        playback_manager.set_mode(PlaybackMode.SYNCHRONIZED)
+        playback_manager.set_sync_group(set())
+
+        playback_manager.start_playback()
+
+        assert playback_manager._states[0].is_playing is False
+        assert playback_manager._states[1].is_playing is False
     
     def test_stop_playback(self, playback_manager, qtbot):
         """Test stopping playback."""

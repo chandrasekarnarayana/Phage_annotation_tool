@@ -121,17 +121,20 @@ def test_right_dock_mode_contract(qtbot, tmp_path):
 
     win._set_right_dock_mode("annotate")
     qtbot.wait(30)
-    assert win.dock_review_queue.isVisible(), "Review queue handle should remain available in annotate mode"
-    assert not win.dock_annotations.isVisible()
+    assert win.dock_annotations.isVisible(), "Annotation table should be primary in annotate mode"
+    assert not win.dock_review_queue.isVisible()
     assert not win.dock_suggestion_explain.isVisible()
 
     win._set_right_dock_mode("review")
     qtbot.wait(30)
     assert win.dock_review_queue.isVisible()
+    assert win.dock_qc_issues.isVisible()
 
     win._set_right_dock_mode("inspect")
     qtbot.wait(30)
     assert win.dock_suggestion_explain.isVisible()
+    assert win.dock_review_queue.isVisible()
+    assert win.dock_status_details.isVisible()
 
 
 @pytest.mark.gui
@@ -268,7 +271,7 @@ def test_reset_layout_action_fires_once(qtbot, tmp_path):
 
 @pytest.mark.gui
 def test_open_training_controls_routes_to_preferences(qtbot, tmp_path):
-    """Open Training Controls should route to Preferences and focus training controls."""
+    """Open Training Controls should route to Export / Settings and focus training controls."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -287,9 +290,9 @@ def test_open_training_controls_routes_to_preferences(qtbot, tmp_path):
     win.advanced_open_training_btn.click()
     qtbot.wait(80)
 
-    pref_idx = win._sidebar_action_index_for_label("Preferences")
-    assert pref_idx >= 0, "Preferences sidebar action not found"
-    assert win.sidebar_actions[pref_idx].isChecked(), "Preferences page should be active"
+    pref_idx = win._sidebar_action_index_for_label("Export / Settings")
+    assert pref_idx >= 0, "Export / Settings sidebar action not found"
+    assert win.sidebar_actions[pref_idx].isChecked(), "Export / Settings page should be active"
     assert win.settings_advanced_container.isVisible(), "Advanced settings container should be visible"
     assert win.advanced_group.isChecked(), "Advanced group should be expanded"
     assert win.suggestion_auto_retrain_chk.hasFocus(), "First training control should receive focus"
@@ -478,7 +481,7 @@ def test_stale_suggestions_require_one_shot_override_and_show_badge(qtbot, tmp_p
 
     assert win.accept_visible_suggestions_act.isEnabled()
     assert win.accept_green_suggestions_act.isEnabled()
-    assert "Stale" in win.status_suggestion_fresh_lbl.text()
+    assert "Stale" in win.status_details_panel.suggestions_lbl.text()
     assert getattr(win.review_queue_panel, "stale_lbl", None) is not None
     assert "regenerate recommended" in win.review_queue_panel.stale_lbl.text().lower()
 
@@ -490,6 +493,210 @@ def test_stale_suggestions_require_one_shot_override_and_show_badge(qtbot, tmp_p
         stale_override_required=True,
     )
     assert selected == [], "Stale batch should be blocked without explicit override acknowledgement"
+
+
+@pytest.mark.gui
+def test_stale_current_accept_is_blocked(qtbot, tmp_path):
+    """Single current-suggestion accept should be blocked when stale guard is enabled."""
+    pytest.importorskip("PyQt5")
+    import time
+    from phage_annotator.core.annotation import PointSuggestion
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_stale_current_accept.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    image_id = int(win.primary_image.id)
+    ts = float(time.time()) - 120.0
+    row = PointSuggestion(
+        image_id=image_id,
+        image_name=str(win.primary_image.name),
+        t=int(win.t_slider.value()),
+        z=int(win.z_slider.value()),
+        y=20.0,
+        x=20.0,
+        score=0.9,
+        label=str(win.current_label),
+        suggestion_id="stale-current-1",
+    )
+    row.meta["generated_at_ts"] = ts
+    win.suggestions[image_id] = [row]
+    win._annotation_edit_ts_by_image[image_id] = ts + 5.0
+    win._disable_bulk_accept_when_stale = True
+
+    before = len(win.annotations.get(image_id, []))
+    win._accept_current_uncertain_suggestion()
+    qtbot.wait(20)
+
+    assert len(win.annotations.get(image_id, [])) == before
+    assert len(win.suggestions.get(image_id, [])) == 1
+
+
+@pytest.mark.gui
+def test_stale_review_accept_is_blocked(qtbot, tmp_path):
+    """Review-panel accept should be blocked when the selected suggestion is stale."""
+    pytest.importorskip("PyQt5")
+    import time
+    from phage_annotator.core.annotation import PointSuggestion
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_stale_review_accept.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    image_id = int(win.primary_image.id)
+    ts = float(time.time()) - 120.0
+    row = PointSuggestion(
+        image_id=image_id,
+        image_name=str(win.primary_image.name),
+        t=int(win.t_slider.value()),
+        z=int(win.z_slider.value()),
+        y=22.0,
+        x=22.0,
+        score=0.9,
+        label=str(win.current_label),
+        suggestion_id="stale-review-1",
+    )
+    row.meta["generated_at_ts"] = ts
+    win.suggestions[image_id] = [row]
+    win._annotation_edit_ts_by_image[image_id] = ts + 5.0
+    win._disable_bulk_accept_when_stale = True
+
+    before = len(win.annotations.get(image_id, []))
+    win._set_selected_suggestion_decision(row.suggestion_id, "accepted")
+    qtbot.wait(20)
+
+    assert len(win.annotations.get(image_id, [])) == before
+    assert len(win.suggestions.get(image_id, [])) == 1
+
+
+@pytest.mark.gui
+def test_stale_roi_accept_is_blocked_and_reports_count(qtbot, tmp_path):
+    """ROI accept should block stale suggestions and report the blocked count."""
+    pytest.importorskip("PyQt5")
+    import time
+    from phage_annotator.core.annotation import PointSuggestion
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_stale_roi_accept.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    image_id = int(win.primary_image.id)
+    ts = float(time.time()) - 120.0
+    row = PointSuggestion(
+        image_id=image_id,
+        image_name=str(win.primary_image.name),
+        t=int(win.t_slider.value()),
+        z=int(win.z_slider.value()),
+        y=24.0,
+        x=24.0,
+        score=0.9,
+        label=str(win.current_label),
+        suggestion_id="stale-roi-1",
+    )
+    row.meta["generated_at_ts"] = ts
+    win.suggestions[image_id] = [row]
+    win._annotation_edit_ts_by_image[image_id] = ts + 5.0
+    win._disable_bulk_accept_when_stale = True
+    win.roi_shape = "box"
+    win.roi_rect = (10.0, 10.0, 30.0, 30.0)
+
+    before = len(win.annotations.get(image_id, []))
+    win._accept_suggestions_in_roi()
+    qtbot.wait(20)
+
+    assert len(win.annotations.get(image_id, [])) == before
+    assert len(win.suggestions.get(image_id, [])) == 1
+    assert "blocked" in win.statusBar().currentMessage().lower()
+
+
+@pytest.mark.gui
+def test_interactive_learning_flag_controls_metadata_path(qtbot, tmp_path):
+    """Experimental sidecar metadata should appear only while the feature flag is enabled."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.core.annotation import PointSuggestion
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_interactive_learning_flag.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    suggestion = PointSuggestion(
+        image_id=int(win.primary_image.id),
+        image_name=str(win.primary_image.name),
+        t=0,
+        z=0,
+        y=12.0,
+        x=12.0,
+        score=0.7,
+        label=str(win.current_label),
+        suggestion_id="ml-flag-1",
+    )
+    suggestion.meta["ml_prediction"] = True
+    suggestion.meta["ml_confidence"] = 0.95
+    ranked = win._rank_and_calibrate_suggestions([suggestion])
+    assert ranked[0].meta.get("ml_prediction") is None
+
+    win._on_interactive_learning_experimental_changed(True)
+    assert win.controller.feature_enabled("interactive_learning_experimental", False) is True
+    assert hasattr(win, "_interactive_learning_model")
+    win._interactive_learning_model.is_trained = True
+    win._interactive_learning_model.predict = lambda rows: [
+        {
+            "accepted": True,
+            "confidence": 0.88,
+            "uncertainty": 0.12,
+            "method": "interactive",
+        }
+        for _ in rows
+    ]
+    enabled_row = PointSuggestion(
+        image_id=int(win.primary_image.id),
+        image_name=str(win.primary_image.name),
+        t=0,
+        z=0,
+        y=14.0,
+        x=14.0,
+        score=0.65,
+        label=str(win.current_label),
+        suggestion_id="ml-flag-2",
+    )
+    enabled_ranked = win._rank_and_calibrate_suggestions([enabled_row])
+    assert enabled_ranked[0].meta.get("ml_prediction") is True
+    assert enabled_ranked[0].meta.get("ml_confidence") == 0.88
+
+    win._on_interactive_learning_experimental_changed(False)
+    assert win.controller.feature_enabled("interactive_learning_experimental", False) is False
+    disabled_row = PointSuggestion(
+        image_id=int(win.primary_image.id),
+        image_name=str(win.primary_image.name),
+        t=0,
+        z=0,
+        y=16.0,
+        x=16.0,
+        score=0.62,
+        label=str(win.current_label),
+        suggestion_id="ml-flag-3",
+    )
+    disabled_row.meta["ml_prediction"] = True
+    disabled_row.meta["ml_confidence"] = 0.99
+    disabled_ranked = win._rank_and_calibrate_suggestions([disabled_row])
+    assert disabled_ranked[0].meta.get("ml_prediction") is None
+    assert disabled_ranked[0].meta.get("ml_confidence") is None
 
 
 @pytest.mark.gui
@@ -513,12 +720,11 @@ def test_effective_assist_context_line_mirrors_status_and_queue(qtbot, tmp_path)
     win._update_status()
     qtbot.wait(40)
 
-    status_txt = win.status_effective_context_lbl.text()
+    status_txt = win.status_details_panel.context_lbl.text()
     queue_txt = win.review_queue_panel.context_lbl.text()
-    assert status_txt.startswith("Effective Assist Context: ")
-    assert queue_txt.startswith("Effective Assist Context: ")
     assert "Strategy=" in status_txt and "Preset=" in status_txt
-    assert status_txt == queue_txt
+    assert queue_txt.startswith("Effective Assist Context: ")
+    assert f"Effective Assist Context: {status_txt}" == queue_txt
 
 
 @pytest.mark.gui
@@ -846,14 +1052,18 @@ def test_right_sidebar_rail_icons_toggle_exclusive_panels(qtbot, tmp_path):
     qtbot.waitExposed(win)
 
     queue_act = win.findChild(QtWidgets.QAction, "right_sidebar_queue_toggle")
+    qc_act = win.findChild(QtWidgets.QAction, "right_sidebar_qc_toggle")
     table_act = win.findChild(QtWidgets.QAction, "right_sidebar_table_toggle")
     status_act = win.findChild(QtWidgets.QAction, "right_sidebar_status_toggle")
     assert queue_act is not None
+    assert qc_act is not None
     assert table_act is not None
     assert status_act is not None
+    assert win.findChild(QtWidgets.QAction, "right_sidebar_relink_toggle") is None
 
     win.set_panel_visible("review_queue", False, source="test")
     win.set_panel_visible("annotations", False, source="test")
+    win.set_panel_visible("qc_issues", False, source="test")
     win.set_panel_visible("status_details", False, source="test")
     qtbot.wait(30)
 
@@ -870,10 +1080,15 @@ def test_right_sidebar_rail_icons_toggle_exclusive_panels(qtbot, tmp_path):
     qtbot.wait(30)
     assert win.dock_annotations.isVisible()
 
+    qc_act.trigger()
+    qtbot.wait(30)
+    assert win.dock_qc_issues.isVisible()
+    assert not win.dock_annotations.isVisible()
+
     status_act.trigger()
     qtbot.wait(30)
     assert win.dock_status_details.isVisible()
-    assert not win.dock_annotations.isVisible()
+    assert not win.dock_qc_issues.isVisible()
 
 
 @pytest.mark.gui
@@ -893,6 +1108,7 @@ def test_right_sidebar_panels_are_not_tabified(qtbot, tmp_path):
         getattr(win, "dock_annotations", None),
         getattr(win, "dock_review_queue", None),
         getattr(win, "dock_suggestion_explain", None),
+        getattr(win, "dock_qc_issues", None),
         getattr(win, "dock_modality_layers", None),
         getattr(win, "dock_advanced_analysis", None),
         getattr(win, "dock_status_details", None),
@@ -939,7 +1155,7 @@ def test_left_sidebar_mode_switch_collapses_previous_context_docks(qtbot, tmp_pa
     win.show()
     qtbot.waitExposed(win)
 
-    analyze_idx = win._sidebar_action_index_for_label("Analyze")
+    analyze_idx = win._sidebar_action_index_for_label("Measurements")
     annotate_idx = win._sidebar_action_index_for_label("Annotate")
     if analyze_idx < 0 or annotate_idx < 0:
         pytest.skip("Sidebar mode labels unavailable")
@@ -952,6 +1168,157 @@ def test_left_sidebar_mode_switch_collapses_previous_context_docks(qtbot, tmp_pa
     win._set_sidebar_mode(annotate_idx)
     qtbot.wait(30)
     assert not win.panel_docks["roi"].isVisible()
+
+
+@pytest.mark.gui
+def test_sidebar_workflow_pages_apply_supporting_dock_defaults(qtbot, tmp_path):
+    """Workflow pages should surface their intended supporting docks by default."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_sidebar_workflow_defaults.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    review_idx = win._sidebar_action_index_for_label("Review / QC")
+    advanced_idx = win._sidebar_action_index_for_label("Advanced")
+    prepare_idx = win._sidebar_action_index_for_label("Prepare")
+    if review_idx < 0 or advanced_idx < 0 or prepare_idx < 0:
+        pytest.skip("Workflow sidebar labels unavailable")
+
+    win._set_sidebar_mode(review_idx)
+    qtbot.wait(30)
+    assert win.dock_review_queue.isVisible(), "Review / QC should surface the review queue"
+    assert win.dock_qc_issues.isVisible(), "Review / QC should surface QC issues"
+
+    win._set_sidebar_mode(advanced_idx)
+    qtbot.wait(30)
+    assert win.panel_docks["advanced_analysis"].isVisible(), "Advanced should surface advanced analysis"
+    assert win.panel_docks["results"].isVisible(), "Advanced should surface results"
+
+    win._set_sidebar_mode(prepare_idx)
+    qtbot.wait(30)
+    assert win.panel_docks["modality_layers"].isVisible(), "Prepare should surface modality layers"
+
+
+@pytest.mark.gui
+def test_prepare_page_exposes_setup_context_and_live_summaries(qtbot, tmp_path):
+    """Prepare page should expose reference selectors and live setup summaries."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_prepare_page_setup_context.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    prepare_idx = win._sidebar_action_index_for_label("Prepare")
+    if prepare_idx < 0:
+        pytest.skip("Prepare sidebar label unavailable")
+
+    win._set_sidebar_mode(prepare_idx)
+    qtbot.wait(30)
+
+    assert win.primary_combo.isVisible(), "Prepare should expose the primary/reference selectors"
+    assert win.support_combo.isVisible(), "Prepare should expose the primary/reference selectors"
+    assert hasattr(win, "prepare_reference_summary_lbl")
+    assert hasattr(win, "prepare_sync_target_lbl")
+    assert hasattr(win, "prepare_sync_contract_lbl")
+    assert hasattr(win, "prepare_sync_panels_lbl")
+    assert hasattr(win, "prepare_roi_summary_lbl")
+    assert win.prepare_reference_summary_lbl.text().startswith("Reference views:")
+    assert win.prepare_sync_target_lbl.text().startswith("Sync target:")
+    assert win.prepare_sync_contract_lbl.text().startswith("Sync contract:")
+    assert win.prepare_sync_panels_lbl.text().startswith("Sync panels:")
+    assert win.prepare_roi_summary_lbl.text().startswith("ROI:")
+
+
+@pytest.mark.gui
+def test_review_qc_page_exposes_workflow_summary_and_actions(qtbot, tmp_path):
+    """Review / QC page should present one merged review workflow surface."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_review_qc_page_workflow.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    review_idx = win._sidebar_action_index_for_label("Review / QC")
+    if review_idx < 0:
+        pytest.skip("Review / QC sidebar label unavailable")
+
+    win._set_sidebar_mode(review_idx)
+    qtbot.wait(30)
+
+    assert hasattr(win, "review_qc_context_summary_lbl")
+    assert hasattr(win, "review_qc_summary_lbl")
+    assert hasattr(win, "review_qc_freshness_lbl")
+    assert hasattr(win, "review_qc_qc_summary_lbl")
+    assert win.review_qc_context_summary_lbl.text().startswith("Assist context:")
+    assert win.review_qc_summary_lbl.text().startswith("Current truth and review load:")
+    assert win.review_qc_freshness_lbl.text().startswith("Suggestion freshness:")
+    assert win.review_qc_qc_summary_lbl.text().startswith("QC summary:")
+
+
+@pytest.mark.gui
+def test_advanced_page_exposes_power_workflow_summary_and_sections(qtbot, tmp_path):
+    """Advanced page should expose one coherent power-tools workflow surface."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_advanced_page_power_workflow.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    advanced_idx = win._sidebar_action_index_for_label("Advanced")
+    if advanced_idx < 0:
+        pytest.skip("Advanced sidebar label unavailable")
+
+    win._set_sidebar_mode(advanced_idx)
+    qtbot.wait(30)
+
+    assert hasattr(win, "advanced_pipeline_summary_lbl")
+    assert hasattr(win, "advanced_analysis_summary_lbl")
+    assert hasattr(win, "advanced_plugins_summary_lbl")
+    assert win.advanced_pipeline_summary_lbl.text().startswith("Power-tool pipeline:")
+    assert win.advanced_analysis_summary_lbl.text().startswith("Analysis readiness:")
+    assert win.advanced_plugins_summary_lbl.text().startswith("Plugin and SMLM state:")
+
+
+@pytest.mark.gui
+def test_sidebar_collapses_to_five_workflow_pages(qtbot, tmp_path):
+    """The workflow sidebar should expose the consolidated 5-page taxonomy."""
+    pytest.importorskip("PyQt5")
+    from phage_annotator.demo import generate_dummy_image
+    from phage_annotator.ui_qt.main_window import create_app
+
+    path = generate_dummy_image(tmp_path / "test_sidebar_five_pages.tif", mode="2d")
+    win = create_app([path])
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+
+    labels = [str(act.text()) for act in getattr(win, "sidebar_actions", []) or []]
+    assert labels == [
+        "Prepare",
+        "Annotate",
+        "Review / QC",
+        "Advanced",
+        "Export / Settings",
+    ]
+    assert win._sidebar_action_index_for_label("Preferences") == -1
+    assert win._sidebar_action_index_for_label("Measurements") == -1
 
 
 @pytest.mark.gui

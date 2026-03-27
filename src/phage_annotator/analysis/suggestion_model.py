@@ -52,7 +52,7 @@ class LocalPeakSuggestionModel:
     """
 
     min_distance_px: int = 6
-    max_points: int | None = None  # None = use quality/spatial filtering only
+    max_points: int | None = None  # Backward-compatible API only; generation is no longer capped.
     threshold_quantile: float = 0.995
     anisotropic_radius_x: float | None = None
     anisotropic_radius_y: float | None = None
@@ -70,7 +70,7 @@ class LocalPeakSuggestionModel:
     # Adaptive thresholding parameters
     score_drop_percentile: float = 0.10  # Percentile of score drops to consider significant (0.10 = top 10%)
     min_relative_score_drop: float = 0.03  # Minimum relative score drop to consider (3%)
-    expected_count_hint: int | None = 100  # Optional: expected spot count for guidance (None = purely adaptive, 100 = typical phage)
+    expected_count_hint: int | None = 100  # Preserved for compatibility; no longer used to cap/filter proposals.
     expected_count_tolerance: float = 0.5  # Tolerance around hint (50% = ±50%)
     
     # Performance
@@ -557,9 +557,15 @@ class LocalPeakSuggestionModel:
                             label=str(label),
                             source_model=self.model_name,
                             source_modality=source_modality,
+                            supporting_modalities=[],
+                            cross_modality_consistency_score=1.0,
+                            control_contradiction_score=0.0,
                             scale_sigma=float(self.scale_sigma),
                             psf_radius=float(self.min_distance_px),
                             roi_id=roi_id,
+                            uncertainty_score=None,
+                            uncertainty_reason="",
+                            density_context={},
                             score_components={
                                 # **Core intensity features (6)**
                                 "peak": float(peak_score),
@@ -618,6 +624,8 @@ class LocalPeakSuggestionModel:
                                 
                                 # **Entropy (1)**
                                 "local_entropy": float(local_entropy),
+                                "cross_modality_consistency_score": 1.0,
+                                "control_contradiction_score": 0.0,
                             },
                             meta={
                                 "raw_peak": float(center),
@@ -667,22 +675,28 @@ class LocalPeakSuggestionModel:
                 base_score *= 0.8  # 20% penalty for low quality
             
             suggestion.score = float(base_score)
+            uncertainty_score, uncertainty_reason = self._uncertainty_from_components(comp)
+            suggestion.uncertainty_score = float(uncertainty_score)
+            suggestion.uncertainty_reason = str(uncertainty_reason)
+            suggestion.meta["uncertainty_score"] = float(uncertainty_score)
+            suggestion.meta["uncertainty_reason"] = str(uncertainty_reason)
         
         return [row[1] for row in rows]
 
-    def _spatial_filtering(self, candidates: list[PointSuggestion], arr_shape: tuple[int, int]) -> list[PointSuggestion]:
-        """Filter candidates using spatial statistics to reduce false positives.
-        
-        This is experiment-agnostic and adapts to image properties:
-        - Nearest neighbor distance analysis (1st, 2nd, 3rd neighbors)
-        - Local density checks
-        - Spatial uniformity assessment
-        - Adaptive score-based thresholding (NO hardcoded spot count assumptions)
-        
-        Features added to candidates for downstream ML:
-        - nn_dist_1, nn_dist_2, nn_dist_3: Distances to nearest 3 neighbors
-        - local_density: Number of neighbors within search radius
-        - spatial_quality: Quality score based on spatial distribution
+    def _spatial_filtering(
+        self,
+        candidates: list[PointSuggestion],
+        arr_shape: tuple[int, int],
+        *,
+        roi_shape: str = "none",
+        roi_rect: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+    ) -> list[PointSuggestion]:
+        """Enrich candidates with density/spatial evidence without suppressing them.
+
+        Spatial context is scientifically informative, but it should not be used
+        to hide real structure. This layer adds density, spacing, and crowding
+        evidence to each proposal and adjusts score only as a soft probabilistic
+        prior. The candidate set itself remains intact.
         """
         if not candidates or not self.enable_spatial_filtering:
             return candidates
@@ -718,10 +732,8 @@ class LocalPeakSuggestionModel:
             dists = np.sqrt(np.sum((coords - coords[i:i+1]) ** 2, axis=1))
             local_density[i] = np.sum(dists < search_radius) - 1  # Exclude self
         
-        # 4. Calculate spatial quality score for each point (tunable parameters)
-        # Expected density based on image area and spot count
-        h, w = arr_shape
-        area = h * w
+        # 4. Calculate spatial quality score for each point (soft evidence only)
+        area = self._roi_area(arr_shape, roi_shape, roi_rect)
         expected_density = n / area * (np.pi * search_radius ** 2)
         
         spatial_quality = np.ones(n)
@@ -738,10 +750,10 @@ class LocalPeakSuggestionModel:
         typical_mask = (nn_distances_1 >= median_nn * 0.7) & (nn_distances_1 <= median_nn * 1.5)
         spatial_quality[typical_mask] *= self.spatial_typical_bonus
         
-        # 5. Update scores with spatial quality and add features for ML
-        adjusted_scores = scores * spatial_quality
-        
-        # Add spatial features to candidates for downstream ML models
+        # 5. Update scores with spatial quality and add features for downstream ML.
+        # Density and spacing affect confidence, not candidate inclusion.
+        adjusted_scores = np.clip(scores * spatial_quality, 0.0, 1.0)
+
         for i, candidate in enumerate(candidates):
             candidate.score_components['nn_dist_1'] = float(nn_distances_1[i])
             candidate.score_components['nn_dist_2'] = float(nn_distances_2[i])
@@ -750,69 +762,30 @@ class LocalPeakSuggestionModel:
             candidate.score_components['spatial_quality'] = float(spatial_quality[i])
             candidate.score_components['expected_density'] = float(expected_density)
             candidate.score_components['median_nn'] = float(median_nn)
-        
-        # 6. TRULY adaptive thresholding with optional expected count hint
-        # Strategy: Find natural break in score distribution, optionally guided by expected count
-        sorted_idx = np.argsort(adjusted_scores)[::-1]
-        sorted_scores = adjusted_scores[sorted_idx]
-        
-        if len(sorted_scores) > 20:
-            # Calculate relative score drops (gradient)
-            diffs = np.abs(np.diff(sorted_scores))
-            relative_drops = diffs / (sorted_scores[:-1] + 1e-10)
-            
-            # Find significant drops (top percentile of all drops)
-            drop_threshold = np.percentile(relative_drops, (1.0 - self.score_drop_percentile) * 100)
-            significant_drops = np.where(relative_drops > max(drop_threshold, self.min_relative_score_drop))[0]
-            
-            # If expected_count_hint provided, search near that range first
-            if self.expected_count_hint is not None and self.expected_count_hint > 0:
-                hint_min = int(self.expected_count_hint * (1.0 - self.expected_count_tolerance))
-                hint_max = int(self.expected_count_hint * (1.0 + self.expected_count_tolerance))
-                
-                # Find drops within the hinted range
-                drops_in_range = significant_drops[(significant_drops >= hint_min) & (significant_drops <= hint_max)]
-                
-                if len(drops_in_range) > 0:
-                    # Use first significant drop within expected range
-                    cutoff_idx = drops_in_range[0]
-                elif len(significant_drops) > 0:
-                    # No drop in range: use closest drop to hint
-                    closest_drop = significant_drops[np.argmin(np.abs(significant_drops - self.expected_count_hint))]
-                    cutoff_idx = closest_drop
-                else:
-                    # No drops at all: use hint directly
-                    cutoff_idx = min(self.expected_count_hint, len(sorted_scores) - 1)
-                
-                cutoff_idx = min(cutoff_idx + 2, len(sorted_scores) - 1)
-                adaptive_threshold = sorted_scores[cutoff_idx]
-                
-            elif len(significant_drops) > 0:
-                # No hint: use FIRST significant drop (purely adaptive)
-                cutoff_idx = significant_drops[0]
-                cutoff_idx = min(cutoff_idx + 2, len(sorted_scores) - 1)
-                adaptive_threshold = sorted_scores[cutoff_idx]
-            else:
-                # No clear break and no hint: use robust statistical filtering
-                score_median = np.median(sorted_scores)
-                mad = np.median(np.abs(sorted_scores - score_median))
-                adaptive_threshold = max(
-                    score_median - 2.0 * 1.4826 * mad,  # Robust outlier detection
-                    np.percentile(sorted_scores, 40)  # Or keep top 60%
-                )
-        else:
-            # Few candidates: keep top 70%
-            adaptive_threshold = np.percentile(sorted_scores, 30)
-        
-        # 7. Filter: keep high-quality spatial points
-        filtered = []
-        for i, candidate in enumerate(candidates):
-            if adjusted_scores[i] >= adaptive_threshold:
-                # Update score with spatial quality
-                candidate.score = float(adjusted_scores[i])
-                filtered.append(candidate)
-        
-        return filtered
+            candidate.density_context = {
+                "local_density": float(local_density[i]),
+                "expected_density": float(expected_density),
+                "median_nn": float(median_nn),
+                "nn_dist_1": float(nn_distances_1[i]),
+                "nn_dist_2": float(nn_distances_2[i]),
+                "nn_dist_3": float(nn_distances_3[i]),
+                "roi_area": float(area),
+                "search_radius": float(search_radius),
+            }
+            crowding_ratio = float(local_density[i] / max(expected_density, 1e-8))
+            uncertainty_score, uncertainty_reason = self._uncertainty_from_components(
+                candidate.score_components,
+            )
+            if crowding_ratio > 1.0 and "dense_region_ambiguity" not in uncertainty_reason:
+                uncertainty_reason = ",".join(filter(None, [uncertainty_reason, "dense_region_ambiguity"]))
+            candidate.uncertainty_score = float(max(uncertainty_score, min(1.0, crowding_ratio / 4.0)))
+            candidate.uncertainty_reason = str(uncertainty_reason)
+            candidate.meta["uncertainty_score"] = float(candidate.uncertainty_score)
+            candidate.meta["uncertainty_reason"] = str(candidate.uncertainty_reason)
+            candidate.meta["density_context"] = dict(candidate.density_context)
+            candidate.score = float(adjusted_scores[i])
+
+        return candidates
 
     def _nms(self, candidates: list[PointSuggestion]) -> list[PointSuggestion]:
         """Non-maximum suppression with intermediate limit for performance."""
@@ -821,7 +794,7 @@ class LocalPeakSuggestionModel:
         if radius_x <= 0 or radius_y <= 0:
             return list(candidates)
         picked: list[PointSuggestion] = []
-        for suggestion in sorted(candidates, key=lambda s: float(s.score), reverse=True):
+        for suggestion in sorted(candidates, key=self._stable_sort_key):
             keep = True
             for prev in picked:
                 dx = (float(prev.x) - float(suggestion.x)) / radius_x
@@ -831,9 +804,6 @@ class LocalPeakSuggestionModel:
                     break
             if keep:
                 picked.append(suggestion)
-            # Intermediate limit for performance (spatial filtering will refine further)
-            if len(picked) >= self.nms_intermediate_limit:
-                break
         return picked
 
     @staticmethod
@@ -946,6 +916,58 @@ class LocalPeakSuggestionModel:
         
         return peak_mean, snr, contrast, peak_std
 
+    @staticmethod
+    def _stable_sort_key(suggestion: PointSuggestion) -> tuple[float, int, int, float, float, str]:
+        """Deterministic ordering for reproducible proposal sets."""
+        return (
+            -float(getattr(suggestion, "score", 0.0)),
+            int(getattr(suggestion, "t", 0)),
+            int(getattr(suggestion, "z", 0)),
+            float(getattr(suggestion, "y", 0.0)),
+            float(getattr(suggestion, "x", 0.0)),
+            str(getattr(suggestion, "suggestion_id", "")),
+        )
+
+    @staticmethod
+    def _roi_area(arr_shape: tuple[int, int], roi_shape: str, roi_rect: tuple[float, float, float, float]) -> float:
+        """Estimate effective ROI area for density normalization."""
+        height, width = arr_shape
+        if roi_shape == "box":
+            _, _, w, h = roi_rect
+            return max(1.0, float(w) * float(h))
+        if roi_shape == "circle":
+            _, _, r, _ = roi_rect
+            return max(1.0, float(np.pi) * float(r) * float(r))
+        return max(1.0, float(height) * float(width))
+
+    @staticmethod
+    def _uncertainty_from_components(components: dict[str, float], *, candidate_class: str = "") -> tuple[float, str]:
+        """Summarize uncertainty without discarding scientific evidence."""
+        reasons: list[str] = []
+        low_signal = float(components.get("snr", 0.0)) < float(components.get("image_snr_threshold", 1.5))
+        if low_signal:
+            reasons.append("low_signal")
+        if float(components.get("spatial_quality", 1.0)) < 0.9:
+            reasons.append("dense_region_ambiguity")
+        if float(components.get("control_contradiction_score", 0.0)) > 0.25:
+            reasons.append("control_contradiction")
+        if float(components.get("cross_modality_consistency_score", 1.0)) < 0.5:
+            reasons.append("modality_disagreement")
+        if candidate_class == "conflict":
+            reasons.append("conflict_with_existing_annotation")
+        uncertainty_score = min(
+            1.0,
+            max(
+                0.0,
+                0.35 * (1.0 - min(1.0, float(components.get("snr", 0.0)) / 6.0))
+                + 0.35 * (1.0 - min(1.0, float(components.get("spatial_quality", 1.0))))
+                + 0.15 * min(1.0, float(components.get("control_contradiction_score", 0.0)))
+                + 0.15 * (1.0 - min(1.0, float(components.get("cross_modality_consistency_score", 1.0)))),
+            ),
+        )
+        reason = ",".join(dict.fromkeys(reasons))
+        return float(uncertainty_score), reason
+
     def predict_from_stack(
         self,
         image_stack: np.ndarray,
@@ -1030,27 +1052,30 @@ class LocalPeakSuggestionModel:
         if not raw_candidates:
             return raw_candidates
         
-        # OPTIMIZATION: Disabled slow per-candidate refinement (O(N_candidates × N_frames))
-        # Old approach read stack[t,y,x] for each of 280 candidates across 20 frames = 5,600 reads
-        # This caused 30-120s slowdown with NO quality improvement (F1 0.67 vs 0.73 for mean)
-        # 
-        # New approach: Return mean-projection detections (already optimal)
-        # If stack refinement needed in future, process per Z-slice not per-candidate
-        # See STACK_DETECTION_OPTIMIZATION.md for detailed analysis
-        
-        # Apply spatial filtering to remove false positives
-        spatial_filtered = self._spatial_filtering(raw_candidates, mean_projection.shape)
-        
-        # Sort by refined score
+        if refine_from_stack:
+            for suggestion in raw_candidates:
+                amp, stack_snr, stack_contrast, stack_std = self._extract_stack_features(
+                    stack,
+                    float(suggestion.y),
+                    float(suggestion.x),
+                )
+                suggestion.score_components["stack_amplitude"] = float(amp)
+                suggestion.score_components["stack_snr"] = float(stack_snr)
+                suggestion.score_components["stack_contrast"] = float(stack_contrast)
+                suggestion.score_components["stack_std"] = float(stack_std)
+                suggestion.score_components["temporal_persistence"] = float(max(0.0, min(1.0, amp / (amp + stack_std + 1e-8))))
+
+        spatial_filtered = self._spatial_filtering(
+            raw_candidates,
+            mean_projection.shape,
+            roi_shape=roi_shape,
+            roi_rect=roi_rect,
+        )
+
         ranked = sorted(
             [s for s in spatial_filtered if float(s.score) >= float(threshold_min_score)],
-            key=lambda s: float(s.score),
-            reverse=True,
+            key=self._stable_sort_key,
         )
-        
-        # Apply max_points limit only if specified (backward compatibility)
-        if self.max_points is not None and self.max_points > 0:
-            return ranked[: int(self.max_points)]
         return ranked
 
     def predict(
@@ -1107,17 +1132,17 @@ class LocalPeakSuggestionModel:
             selected = raw_candidates
         nms_selected = self._nms(selected)
         
-        # Apply spatial filtering to remove false positives
-        spatial_filtered = self._spatial_filtering(nms_selected, arr.shape)
+        spatial_filtered = self._spatial_filtering(
+            nms_selected,
+            arr.shape,
+            roi_shape=roi_shape,
+            roi_rect=roi_rect,
+        )
         
         ranked = sorted(
             [s for s in spatial_filtered if float(s.score) >= float(threshold_min_score)],
-            key=lambda s: float(s.score),
-            reverse=True,
+            key=self._stable_sort_key,
         )
-        # Apply max_points limit only if specified
-        if self.max_points is not None and self.max_points > 0:
-            return ranked[: int(self.max_points)]
         return ranked
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import pathlib
 import re
 from datetime import datetime
@@ -11,6 +12,11 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.analysis.core import compute_projection
+from phage_annotator.core.workspace_snapshot import (
+    build_workspace_snapshot,
+    extract_ui_workspace_state,
+    workspace_layer_registry,
+)
 from phage_annotator.io.metadata.annotation import format_tokens
 from phage_annotator.data.display_mapping import build_norm
 from phage_annotator.ui_qt.rendering.export_view import (
@@ -32,7 +38,12 @@ class ExportMixin:
         return text.strip("-") or "na"
 
     def _annotation_filename_context_tokens(self) -> str:
-        image_id = int(getattr(self.primary_image, "id", -1))
+        context = (
+            dict(self.controller.current_annotation_context() or {})
+            if hasattr(self.controller, "current_annotation_context")
+            else {}
+        )
+        image_id = int(context.get("source_image_id", getattr(self.primary_image, "id", -1)))
         base_meta = self.controller.build_annotation_metadata(image_id)
         scope = self._tokenize_filename_value(
             getattr(self, "annotation_scope", "current")
@@ -40,10 +51,11 @@ class ExportMixin:
         default_target = (
             self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
         )
-        target = self._tokenize_filename_value(getattr(self, "annotate_target", default_target))
+        target = self._tokenize_filename_value(context.get("panel_key", getattr(self, "annotate_target", default_target)))
         space = self._tokenize_filename_value(
-            getattr(self.controller.session_state, "annotation_space", "stack")
+            context.get("annotation_space", getattr(self.controller.session_state, "annotation_space", "stack"))
         )
+        context_key = self._tokenize_filename_value(context.get("context_key", ""))
         t_val = int(getattr(self.controller.view_state, "t", 0))
         z_val = int(getattr(self.controller.view_state, "z", 0))
         roi = base_meta.get("roi")
@@ -58,6 +70,7 @@ class ExportMixin:
             f"__scope={scope}"
             f"__target={target}"
             f"__space={space}"
+            f"__ctx={context_key}"
             f"__t={t_val}"
             f"__z={z_val}"
             f"__roi={roi_token}"
@@ -78,35 +91,185 @@ class ExportMixin:
             "suggestion_id": str(getattr(suggestion, "suggestion_id", "")),
             "source_model": str(getattr(suggestion, "source_model", "unknown")),
             "source_modality": str(getattr(suggestion, "source_modality", "raw")),
+            "supporting_modalities": list(getattr(suggestion, "supporting_modalities", []) or []),
+            "cross_modality_consistency_score": getattr(suggestion, "cross_modality_consistency_score", None),
+            "control_contradiction_score": getattr(suggestion, "control_contradiction_score", None),
             "scale_sigma": float(getattr(suggestion, "scale_sigma", 1.0)),
             "psf_radius": float(getattr(suggestion, "psf_radius", 6.0)),
             "roi_id": getattr(suggestion, "roi_id", None),
+            "uncertainty_score": getattr(suggestion, "uncertainty_score", None),
+            "uncertainty_reason": str(getattr(suggestion, "uncertainty_reason", "") or ""),
+            "density_context": dict(getattr(suggestion, "density_context", {}) or {}),
             "score_components": dict(getattr(suggestion, "score_components", {})),
             "status": str(getattr(suggestion, "status", "proposed")),
             "meta": dict(getattr(suggestion, "meta", {})),
         }
 
+    @staticmethod
+    def _encode_qbytearray(value) -> str:
+        """Encode a QByteArray-like value to ASCII base64 string."""
+        if value is None:
+            return ""
+        try:
+            raw = bytes(value)
+            if not raw:
+                return ""
+            return base64.b64encode(raw).decode("ascii")
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _decode_qbytearray(value: object):
+        """Decode ASCII base64 string to bytes for Qt restore methods."""
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            return base64.b64decode(value.encode("ascii"))
+        except Exception:
+            return None
+
+    def _capture_ui_workspace_state(self) -> dict:
+        """Capture UI-level workspace state for exact project restore."""
+        linked_zoom_bounds = None
+        zoom_state = getattr(self, "_last_zoom_linked", None)
+        if (
+            isinstance(zoom_state, tuple)
+            and len(zoom_state) == 2
+            and all(isinstance(bounds, tuple) and len(bounds) == 2 for bounds in zoom_state)
+        ):
+            linked_zoom_bounds = {
+                "xlim": [float(zoom_state[0][0]), float(zoom_state[0][1])],
+                "ylim": [float(zoom_state[1][0]), float(zoom_state[1][1])],
+            }
+        state = {
+            "panel_visibility": dict(getattr(self, "_panel_visibility", {}) or {}),
+            "annotation_panel_visibility": dict(
+                getattr(self, "_annotation_panel_visibility", {}) or {}
+            ),
+            "canvas_layout_rows": int(getattr(self, "_canvas_layout_rows", 0) or 0),
+            "canvas_layout_cols": int(getattr(self, "_canvas_layout_cols", 0) or 0),
+            "active_layout_preset": str(getattr(self, "_active_layout_preset", "Default") or "Default"),
+            "sidebar_collapsed": bool(getattr(self, "_sidebar_collapsed", False)),
+            "right_sidebar_collapsed": bool(getattr(self, "_right_sidebar_collapsed", False)),
+            "sidebar_index": int(getattr(getattr(self, "sidebar_stack", None), "currentIndex", lambda: 0)()),
+            "window_geometry_b64": self._encode_qbytearray(self.saveGeometry()),
+            "window_state_b64": self._encode_qbytearray(self.saveState()),
+            "linked_zoom_bounds": linked_zoom_bounds,
+        }
+        return state
+
+    def _restore_ui_workspace_state(self, ui_state: dict) -> None:
+        """Restore UI-level workspace state captured in project snapshot."""
+        if not isinstance(ui_state, dict) or not ui_state:
+            return
+
+        panel_visibility = ui_state.get("panel_visibility")
+        if isinstance(panel_visibility, dict):
+            self._panel_visibility.update({str(k): bool(v) for k, v in panel_visibility.items()})
+
+        point_visibility = ui_state.get("annotation_panel_visibility")
+        if isinstance(point_visibility, dict):
+            self._annotation_panel_visibility = {
+                str(k): bool(v) for k, v in point_visibility.items()
+            }
+
+        self._canvas_layout_rows = int(ui_state.get("canvas_layout_rows", self._canvas_layout_rows))
+        self._canvas_layout_cols = int(ui_state.get("canvas_layout_cols", self._canvas_layout_cols))
+        self._active_layout_preset = str(
+            ui_state.get("active_layout_preset", getattr(self, "_active_layout_preset", "Default"))
+        )
+
+        if bool(ui_state.get("sidebar_collapsed", False)) and hasattr(self, "_collapse_sidebar"):
+            self._collapse_sidebar()
+        elif hasattr(self, "_expand_sidebar"):
+            self._expand_sidebar()
+
+        if bool(ui_state.get("right_sidebar_collapsed", False)) and hasattr(self, "_collapse_right_sidebar"):
+            self._collapse_right_sidebar()
+        elif hasattr(self, "_expand_right_sidebar"):
+            self._expand_right_sidebar()
+
+        stack_idx = int(ui_state.get("sidebar_index", 0) or 0)
+        if getattr(self, "sidebar_stack", None) is not None:
+            stack_idx = max(0, min(stack_idx, max(0, self.sidebar_stack.count() - 1)))
+            self.sidebar_stack.setCurrentIndex(stack_idx)
+
+        linked_zoom_bounds = ui_state.get("linked_zoom_bounds")
+        if isinstance(linked_zoom_bounds, dict):
+            try:
+                xlim = tuple(float(v) for v in linked_zoom_bounds.get("xlim", ()))
+                ylim = tuple(float(v) for v in linked_zoom_bounds.get("ylim", ()))
+                if len(xlim) == 2 and len(ylim) == 2:
+                    self._last_zoom_linked = (xlim, ylim)
+            except Exception:
+                pass
+
+        if hasattr(self, "_rebuild_canvas_for_layout"):
+            self._rebuild_canvas_for_layout()
+        if hasattr(self, "_refresh_panel_policy_controls"):
+            self._refresh_panel_policy_controls()
+        if hasattr(self, "_sync_panel_visibility_state"):
+            self._sync_panel_visibility_state()
+
+        # Geometry/state restore is optional best-effort and may be skipped in edge cases.
+        geometry_bytes = self._decode_qbytearray(ui_state.get("window_geometry_b64"))
+        state_bytes = self._decode_qbytearray(ui_state.get("window_state_b64"))
+        if geometry_bytes:
+            try:
+                self.restoreGeometry(geometry_bytes)
+            except Exception:
+                pass
+        if state_bytes:
+            try:
+                self.restoreState(state_bytes)
+            except Exception:
+                pass
+
     def _save_csv(self) -> None:
         csv_path, _ = self._default_export_paths()
         self.controller.save_csv(self, csv_path)
-        self._set_status(f"Saved CSV to {csv_path}")
+        self._status_success(f"Saved CSV to {csv_path}", source="export.save_csv")
         self._mark_dirty(False)
 
     def _quick_save_csv(self) -> None:
         """Quick-save annotations CSV to the default path."""
         csv_path, _ = self._default_export_paths()
         self.controller.save_csv(self, csv_path)
-        self._set_status(f"Saved CSV to {csv_path}")
+        self._status_success(f"Saved CSV to {csv_path}", source="export.quick_save_csv")
         self._mark_dirty(False)
 
     def _save_json(self) -> None:
         _, json_path = self._default_export_paths()
         self.controller.save_json(self, json_path)
-        self._set_status(f"Saved JSON to {json_path}")
+        self._status_success(f"Saved JSON to {json_path}", source="export.save_json")
         self._mark_dirty(False)
 
     def _default_export_paths(self) -> Tuple[pathlib.Path, pathlib.Path]:
-        first = self.primary_image.path
+        context = (
+            dict(self.controller.current_annotation_context() or {})
+            if hasattr(self.controller, "current_annotation_context")
+            else {}
+        )
+        panel_key = str(context.get("panel_key", getattr(self, "annotate_target", "frame")) or "frame")
+        binding = (
+            self.controller.annotation_binding_for_panel(panel_key)
+            if hasattr(self.controller, "annotation_binding_for_panel")
+            else {}
+        )
+        if binding.get("path"):
+            bound_path = pathlib.Path(str(binding["path"]))
+            csv_path = bound_path if bound_path.suffix.lower() == ".csv" else bound_path.with_suffix(".csv")
+            json_path = bound_path if bound_path.suffix.lower() == ".json" else bound_path.with_suffix(".json")
+            return csv_path, json_path
+        source_image_id = int(context.get("source_image_id", getattr(self.primary_image, "id", 0)))
+        source_image = next(
+            (
+                img for img in getattr(self, "images", [])
+                if int(getattr(img, "id", -1)) == source_image_id
+            ),
+            self.primary_image,
+        )
+        first = source_image.path
         csv_path = pathlib.Path(first).with_suffix(".annotations.csv")
         json_path = pathlib.Path(first).with_suffix(".annotations.json")
         export_meta = self.controller.build_annotation_export_metadata(
@@ -114,7 +277,7 @@ class ExportMixin:
             export_format="bundle",
         )
         ts = datetime.now().strftime("%Y%m%dT%H%M%S")
-        img_name = pathlib.Path(str(getattr(self.primary_image, "name", "image"))).stem
+        img_name = pathlib.Path(str(getattr(source_image, "name", "image"))).stem
         core_tokens = (
             f"__ann__img={self._tokenize_filename_value(img_name)}"
             f"__ts={ts}{self._annotation_filename_context_tokens()}"
@@ -180,6 +343,8 @@ class ExportMixin:
             else 100 * 100,
             "current_user": self.controller.session_state.current_user,
             "audit_log": list(self.controller.session_state.audit_log),
+            "feature_flags": dict(getattr(self.controller.session_state, "feature_flags", {}) or {}),
+            "workflow_metrics": dict(getattr(self.controller.session_state, "workflow_metrics", {}) or {}),
             "suggestion_metrics": dict(self.controller.session_state.suggestion_metrics),
             "suggestions_by_image": {
                 int(image_id): [self._serialize_suggestion(s) for s in items]
@@ -189,7 +354,7 @@ class ExportMixin:
                 int(image_id): [self._serialize_suggestion(s) for s in items]
                 for image_id, items in self.controller.session_state.suggestion_history.items()
             },
-            "suggestion_strategy": str(getattr(self, "_suggestion_strategy", "raw")),
+            "suggestion_strategy": str(getattr(self, "_suggestion_strategy", "current_view")),
             "suggestion_score_threshold": float(
                 getattr(self, "_suggestion_score_threshold", 0.0)
             ),
@@ -244,10 +409,17 @@ class ExportMixin:
                 getattr(self.controller.session_state, "smlm_runbook_provenance", [])
             ),
         }
+        settings["ui_workspace_state"] = self._capture_ui_workspace_state()
+        settings["workspace_snapshot"] = build_workspace_snapshot(
+            self.controller,
+            settings,
+            ui_workspace_state=settings.get("ui_workspace_state", {}),
+        )
+        settings["workspace_layer_registry"] = workspace_layer_registry()
         self.controller.save_project(
             self, pathlib.Path(path), settings, self.roi_manager.rois_by_image
         )
-        self._set_status(f"Saved project to {path}")
+        self._status_success(f"Saved project to {path}", source="export.save_project")
         self._mark_dirty(False)
 
     def _load_project(self) -> None:
@@ -357,6 +529,18 @@ class ExportMixin:
         self._disable_bulk_accept_when_stale = bool(
             getattr(self.controller.session_state, "disable_bulk_accept_when_stale", True)
         )
+        if getattr(self, "generation_space_combo", None) is not None:
+            self.generation_space_combo.setCurrentText(
+                str(getattr(self.controller.session_state, "generation_space", "stack"))
+            )
+        if getattr(self, "disable_bulk_accept_when_stale_chk", None) is not None:
+            self.disable_bulk_accept_when_stale_chk.setChecked(
+                bool(getattr(self.controller.session_state, "disable_bulk_accept_when_stale", True))
+            )
+        if getattr(self, "interactive_learning_experimental_chk", None) is not None:
+            self.interactive_learning_experimental_chk.setChecked(
+                bool(self.controller.feature_enabled("interactive_learning_experimental", False))
+            )
         if getattr(self, "_smlm_runbook_state", None) is None:
             from phage_annotator.smlm.reproducibility import ReproducibilityRunbookState
 
@@ -449,7 +633,10 @@ class ExportMixin:
         self._refresh_metadata_dock(self.primary_image.id)
         if hasattr(self, "_refresh_modality_layers_panel"):
             self._refresh_modality_layers_panel()
-        self._refresh_image()
+        workspace_snapshot = getattr(self.controller.session_state, "workspace_snapshot", {})
+        if isinstance(workspace_snapshot, dict):
+            self._restore_ui_workspace_state(extract_ui_workspace_state(workspace_snapshot))
+        self._request_ui_refresh("export", metadata=True)
         self._mark_dirty(False)
         self._check_recovery()
 
@@ -466,8 +653,11 @@ class ExportMixin:
         if panel is not None:
             panel.set_report(report)
             self.open_panel("project_relink", reason="project_relink:load")
-            self._set_status(
+            self._status_warning(
                 f"Project relink summary: {len(relinked)} relinked, {len(unresolved)} unresolved."
+                ,
+                timeout_ms=5000,
+                source="export.project_relink_summary",
             )
             return
         # Safety fallback if panel is unavailable.
@@ -482,16 +672,17 @@ class ExportMixin:
         """Retry project load with explicit relink mode."""
         path = getattr(self, "_last_loaded_project_path", None)
         if path is None:
-            self._set_status("No loaded project to relink.")
+            self._status_warning("No loaded project to relink.", source="export.retry_project_relink")
             return
         mode_value = str(mode or "ask").strip().lower()
         if mode_value not in {"ask", "auto", "manual"}:
             mode_value = "ask"
         ok = self._load_project_path(pathlib.Path(path), relink_mode=mode_value)
         if ok:
-            self._set_status(
+            self._status_success(
                 "Project reloaded after "
-                + ("manual relink." if mode_value == "manual" else "auto relink retry.")
+                + ("manual relink." if mode_value == "manual" else "auto relink retry."),
+                source="export.retry_project_relink",
             )
 
     def _export_view_dialog(self) -> None:
@@ -807,7 +998,13 @@ class ExportMixin:
                 progress(int((idx + 1) / max(1, total) * 100), f"{idx + 1}/{total}")
             return True
 
-        self.jobs.submit(_job, name="Export view", timeout_sec=600.0)
+        self.jobs.submit(
+            _job,
+            name="Export view",
+            timeout_sec=600.0,
+            priority="normal",
+            replace_key="export-view",
+        )
     
     def _export_view_job_chunked(
         self, frame, offset, t_idx, z_idx, cmap, norm,

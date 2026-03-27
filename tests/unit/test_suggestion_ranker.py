@@ -7,6 +7,7 @@ import numpy as np
 from phage_annotator.analysis.suggestion_ranker import (
     LightweightSuggestionRanker,
     dataset_metrics_from_suggestions,
+    expected_calibration_error,
     feature_vector_from_suggestion,
 )
 from phage_annotator.core.annotation import PointSuggestion
@@ -42,6 +43,7 @@ def test_ranker_applies_calibrated_confidence_to_suggestions() -> None:
     out = ranker.apply_to_suggestions(suggestions)
     assert float(out[1].score) > float(out[0].score)
     assert "p_accept" in out[0].meta
+    assert out[0].meta["confidence_available"] is True
     assert out[0].confidence == float(out[0].meta["p_accept"])
     assert feature_vector_from_suggestion(out[0]).shape[0] == len(ranker.weights)
 
@@ -56,3 +58,32 @@ def test_dataset_metrics_contains_requested_fields() -> None:
     assert "precision_at_threshold" in metrics
     assert "acceptance_rate" in metrics
     assert "estimated_time_saved_minutes" in metrics
+
+
+def test_ranker_persists_calibration_monitoring_fields() -> None:
+    ranker = LightweightSuggestionRanker()
+    x = np.asarray(
+        [
+            [0.1] * len(ranker.weights),
+            [0.2] * len(ranker.weights),
+            [0.8] * len(ranker.weights),
+            [0.9] * len(ranker.weights),
+        ],
+        dtype=np.float64,
+    )
+    y = np.asarray([0.0, 0.0, 1.0, 1.0], dtype=np.float64)
+    ranker.fit(x, y, epochs=50)
+
+    payload = ranker.to_dict()
+    restored = LightweightSuggestionRanker.from_dict(payload)
+
+    assert payload["calibration_ece"] >= 0.0
+    assert isinstance(payload["calibration_bins_payload"], list)
+    assert restored.calibration_ece == payload["calibration_ece"]
+    assert restored.calibration_bins_payload == payload["calibration_bins_payload"]
+
+
+def test_expected_calibration_error_is_non_negative() -> None:
+    probs = np.asarray([0.1, 0.2, 0.8, 0.9], dtype=np.float64)
+    y = np.asarray([0.0, 0.0, 1.0, 1.0], dtype=np.float64)
+    assert expected_calibration_error(probs, y) >= 0.0

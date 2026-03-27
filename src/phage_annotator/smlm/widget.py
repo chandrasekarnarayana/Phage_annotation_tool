@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from phage_annotator.smlm.backends import discover_bundled_thunderstorm_jar
@@ -45,7 +46,16 @@ class SmlmDockWidget(QtWidgets.QWidget):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
-        layout = QtWidgets.QVBoxLayout(self)
+        self._localizations: list[object] = []
+        self._scroll = QtWidgets.QScrollArea(self)
+        self._scroll.setWidgetResizable(True)
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(self._scroll)
+
+        container = QtWidgets.QWidget()
+        self._scroll.setWidget(container)
+        layout = QtWidgets.QVBoxLayout(container)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
@@ -257,44 +267,53 @@ class SmlmDockWidget(QtWidgets.QWidget):
         self.export_csv_btn = QtWidgets.QPushButton("Export CSV")
         self.export_h5_btn = QtWidgets.QPushButton("Export HDF5")
         self.add_ann_btn = QtWidgets.QPushButton("Add to Annotations")
+        self.add_ann_btn.setEnabled(False)
         export_row.addWidget(self.export_csv_btn)
         export_row.addWidget(self.export_h5_btn)
         export_row.addWidget(self.add_ann_btn)
         layout.addLayout(export_row)
 
-        # TODO: Make the ThunderSTORM panel scrollable
-        # - Wrap main layout in QScrollArea to handle overflow when many controls are visible
-        # - Set scroll area widget resizable and ensure proper minimum size hints
-        # - Consider collapsible sections for advanced parameters to reduce initial vertical space
-        
-        # TODO: Add results table at bottom to display localizations
-        # - Create QTableWidget showing columns: frame, x_px, y_px, sigma_px, photons, uncertainty_px
-        # - Table should be scrollable and resizable
-        # - Enable row selection (single and multiple) with visual highlighting
-        # - Add context menu for table (copy, select all, clear selection)
-        
-        # TODO: Add "Show as Points" option below results table
-        # - Add checkbox/button "Display points on image" to overlay localizations on canvas
-        # - When checked, render localization results as point overlays on the current image view
-        # - Use different colors/markers to distinguish from manual annotations
-        # - Update overlay dynamically when user scrolls through frames/slices
-        
-        # TODO: Implement "Move to Annotations" functionality
-        # - When table rows are selected, enable "Move Selected to Annotations" button
-        # - Convert selected localization results into Keypoint objects
-        # - Add converted points to main annotation table with proper metadata (source="thunderstorm")
-        # - Remove moved points from localization results table
-        # - Show confirmation dialog with count of points to be moved
-        
-        # TODO: Improve CSV export with file dialog
-        # - Replace simple export with QFileDialog.getSaveFileName() for user-selected location
-        # - Default filename: "thunderstorm_results_YYYYMMDD_HHMMSS.csv"
-        # - Remember last export directory in settings
-        # - Add export options: include/exclude uncertainty, photons, background columns
-        # - Show success message with file path after export
-        # - Add "Auto-export after run" checkbox option in settings
+        results_group = QtWidgets.QGroupBox("Localization Results")
+        results_layout = QtWidgets.QVBoxLayout(results_group)
+        summary_row = QtWidgets.QHBoxLayout()
+        self.results_summary_lbl = QtWidgets.QLabel("No localizations yet.")
+        summary_row.addWidget(self.results_summary_lbl)
+        summary_row.addStretch(1)
+        self.show_points_chk = QtWidgets.QCheckBox("Show as points on canvas")
+        self.show_points_chk.setChecked(True)
+        summary_row.addWidget(self.show_points_chk)
+        results_layout.addLayout(summary_row)
+
+        self.results_table = QtWidgets.QTableWidget(0, 6)
+        self.results_table.setHorizontalHeaderLabels(
+            ["Frame", "X (px)", "Y (px)", "Sigma", "Photons", "Uncertainty"]
+        )
+        self.results_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.results_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.results_table.setAlternatingRowColors(True)
+        self.results_table.verticalHeader().setVisible(False)
+        self.results_table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.results_table.horizontalHeader().setStretchLastSection(True)
+        results_layout.addWidget(self.results_table)
+
+        results_btn_row = QtWidgets.QHBoxLayout()
+        self.copy_results_btn = QtWidgets.QPushButton("Copy Rows")
+        self.select_all_results_btn = QtWidgets.QPushButton("Select All")
+        self.clear_selection_btn = QtWidgets.QPushButton("Clear Selection")
+        results_btn_row.addWidget(self.copy_results_btn)
+        results_btn_row.addWidget(self.select_all_results_btn)
+        results_btn_row.addWidget(self.clear_selection_btn)
+        results_btn_row.addStretch(1)
+        results_layout.addLayout(results_btn_row)
+        layout.addWidget(results_group)
 
         layout.addStretch(1)
+        self.results_table.itemSelectionChanged.connect(self._update_selection_state)
+        self.results_table.customContextMenuRequested.connect(self._open_results_context_menu)
+        self.copy_results_btn.clicked.connect(self._copy_selected_results)
+        self.select_all_results_btn.clicked.connect(self.results_table.selectAll)
+        self.clear_selection_btn.clicked.connect(self.results_table.clearSelection)
         self._refresh_effective_config()
 
     def values(self) -> SmlmUiValues:
@@ -417,6 +436,121 @@ class SmlmDockWidget(QtWidgets.QWidget):
         existing = self.effective_config_view.toPlainText().strip()
         prefix = f"{existing}\n\n" if existing else ""
         self.effective_config_view.setPlainText(prefix + text.strip())
+
+    def set_localizations(self, localizations: Iterable[object]) -> None:
+        """Render the current ThunderSTORM results as a selectable table."""
+        self._localizations = list(localizations or [])
+        self.results_table.setRowCount(len(self._localizations))
+        for row, loc in enumerate(self._localizations):
+            values = [
+                int(getattr(loc, "frame_index", 0)),
+                float(getattr(loc, "x_px", 0.0)),
+                float(getattr(loc, "y_px", 0.0)),
+                float(getattr(loc, "sigma_px", 0.0)),
+                float(getattr(loc, "photons", 0.0)),
+                float(getattr(loc, "uncertainty_px", 0.0)),
+            ]
+            for col, value in enumerate(values):
+                text = str(value) if col == 0 else f"{value:.4f}"
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, row)
+                self.results_table.setItem(row, col, item)
+        self.results_table.resizeColumnsToContents()
+        count = len(self._localizations)
+        self.results_summary_lbl.setText(f"{count} localizations available.")
+        self._update_selection_state()
+
+    def clear_localizations(self) -> None:
+        self._localizations = []
+        self.results_table.setRowCount(0)
+        self.results_summary_lbl.setText("No localizations yet.")
+        self._update_selection_state()
+
+    def selected_localization_indices(self) -> list[int]:
+        rows = sorted({index.row() for index in self.results_table.selectionModel().selectedRows()})
+        return [row for row in rows if 0 <= row < len(self._localizations)]
+
+    def selected_localizations(self) -> list[object]:
+        return [self._localizations[row] for row in self.selected_localization_indices()]
+
+    def export_localizations_csv(self, path: str) -> None:
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    "frame_index",
+                    "x_px",
+                    "y_px",
+                    "sigma_px",
+                    "photons",
+                    "background",
+                    "uncertainty_px",
+                    "label",
+                ]
+            )
+            for loc in self._localizations:
+                writer.writerow(
+                    [
+                        int(getattr(loc, "frame_index", 0)),
+                        f"{float(getattr(loc, 'x_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'y_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'sigma_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'photons', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'background', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'uncertainty_px', 0.0)):.4f}",
+                        str(getattr(loc, "label", "") or ""),
+                    ]
+                )
+
+    def _update_selection_state(self) -> None:
+        total = len(self._localizations)
+        selected = len(self.selected_localization_indices())
+        if total == 0:
+            self.add_ann_btn.setEnabled(False)
+            self.add_ann_btn.setText("Add to Annotations")
+            return
+        if selected > 0:
+            self.results_summary_lbl.setText(f"{total} localizations available | {selected} selected")
+            self.add_ann_btn.setEnabled(True)
+            self.add_ann_btn.setText(f"Add Selected ({selected})")
+        else:
+            self.results_summary_lbl.setText(f"{total} localizations available.")
+            self.add_ann_btn.setEnabled(True)
+            self.add_ann_btn.setText(f"Add All ({total})")
+
+    def _copy_selected_results(self) -> None:
+        indices = self.selected_localization_indices()
+        if not indices:
+            return
+        lines = ["frame_index\tx_px\ty_px\tsigma_px\tphotons\tuncertainty_px"]
+        for row in indices:
+            loc = self._localizations[row]
+            lines.append(
+                "\t".join(
+                    [
+                        str(int(getattr(loc, "frame_index", 0))),
+                        f"{float(getattr(loc, 'x_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'y_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'sigma_px', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'photons', 0.0)):.4f}",
+                        f"{float(getattr(loc, 'uncertainty_px', 0.0)):.4f}",
+                    ]
+                )
+            )
+        QtWidgets.QApplication.clipboard().setText("\n".join(lines))
+
+    def _open_results_context_menu(self, pos: QtCore.QPoint) -> None:
+        menu = QtWidgets.QMenu(self)
+        copy_act = menu.addAction("Copy Selected")
+        select_all_act = menu.addAction("Select All")
+        clear_sel_act = menu.addAction("Clear Selection")
+        chosen = menu.exec_(self.results_table.viewport().mapToGlobal(pos))
+        if chosen is copy_act:
+            self._copy_selected_results()
+        elif chosen is select_all_act:
+            self.results_table.selectAll()
+        elif chosen is clear_sel_act:
+            self.results_table.clearSelection()
 
     def set_generated_macro(self, macro_text: str) -> None:
         """Set generated/executed macro text in debug panel."""

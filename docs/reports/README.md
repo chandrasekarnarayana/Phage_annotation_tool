@@ -8,6 +8,8 @@ This folder contains the reviewer-facing report set.
 - `Reproducibility_and_Validation.md`: Environment, test, and benchmark reproducibility guide.
 - `Testing_Strategy.md`: Test architecture, coverage posture, and quality roadmap.
 - `THUNDERSTORM_JAR_INTEGRATION_STATUS.md`: current ThunderSTORM/Fiji bridge status and validation notes.
+- `ASSIST_ANNOTATION_VALIDATION_SUMMARY.md`: consolidated assist validation status replacing fragmented root notes.
+- `RETRAINING_AND_STACK_OPTIMIZATION_SUMMARY.md`: consolidated retraining/stack optimization summary replacing fragmented root notes.
 
 ## Suggested Authoring Order
 1. Complete `Design_Report.md` sections 1-7 (scope and architecture).
