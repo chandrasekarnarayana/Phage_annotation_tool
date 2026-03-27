@@ -521,18 +521,19 @@ class UiSetupMixin(UiSetupRegistryMixin):
         r += 1
 
         # ROI shape controls.
-        self.roi_shape_group = QtWidgets.QButtonGroup()
-        roi_rect = QtWidgets.QRadioButton("Rectangle")
-        roi_circle = QtWidgets.QRadioButton("Circle")
-        roi_rect.setChecked(True)
-        self.roi_shape_group.addButton(roi_rect)
-        self.roi_shape_group.addButton(roi_circle)
-        roi_shape_layout = QtWidgets.QHBoxLayout()
-        roi_shape_layout.addWidget(roi_rect)
-        roi_shape_layout.addWidget(roi_circle)
-        adv_layout.addWidget(QtWidgets.QLabel("ROI shape"), r, 0)
-        adv_layout.addLayout(roi_shape_layout, r, 1, 1, 3)
-        r += 1
+        if not bool(getattr(self, "_annotate_roi_embedded", False)):
+            self.roi_shape_group = QtWidgets.QButtonGroup()
+            roi_rect = QtWidgets.QRadioButton("Rectangle")
+            roi_circle = QtWidgets.QRadioButton("Circle")
+            roi_rect.setChecked(True)
+            self.roi_shape_group.addButton(roi_rect)
+            self.roi_shape_group.addButton(roi_circle)
+            roi_shape_layout = QtWidgets.QHBoxLayout()
+            roi_shape_layout.addWidget(roi_rect)
+            roi_shape_layout.addWidget(roi_circle)
+            adv_layout.addWidget(QtWidgets.QLabel("ROI shape"), r, 0)
+            adv_layout.addLayout(roi_shape_layout, r, 1, 1, 3)
+            r += 1
 
         self.cache_budget_spin = QtWidgets.QSpinBox()
         self.cache_budget_spin.setRange(64, 8192)
@@ -785,6 +786,18 @@ class UiSetupMixin(UiSetupRegistryMixin):
             lambda _checked=False: self._toggle_focus_canvas_mode()
         )
         self.command_palette_act.triggered.connect(self._show_command_palette)
+        if getattr(self, "open_logs_help_act", None) is not None:
+            self.open_logs_help_act.triggered.connect(
+                lambda _checked=False: self.open_panel("logs", reason="menu:help")
+            )
+        if getattr(self, "open_performance_help_act", None) is not None:
+            self.open_performance_help_act.triggered.connect(
+                lambda _checked=False: self.open_panel("performance", reason="menu:help")
+            )
+        if getattr(self, "open_recorder_help_act", None) is not None:
+            self.open_recorder_help_act.triggered.connect(
+                lambda _checked=False: self.open_panel("recorder", reason="menu:help")
+            )
         if not DISABLE_DIAGNOSTICS:
             self.toggle_logs_act.triggered.connect(
                 lambda checked: self.set_panel_visible("logs", bool(checked), source="menu:layout")
@@ -849,6 +862,9 @@ class UiSetupMixin(UiSetupRegistryMixin):
         self.assist_warmup_next_btn.clicked.connect(self._next_uncertain_suggestion)
         self.assist_warmup_refresh_btn.clicked.connect(self._refresh_assist_warmup_panel)
         if getattr(self, "review_queue_panel", None) is not None:
+            self.review_queue_panel.show_suggestions_chk.setChecked(
+                bool(getattr(self, "_show_suggestion_overlay", True))
+            )
             self.review_queue_panel.accept_requested.connect(
                 self._accept_current_uncertain_suggestion
             )
@@ -864,6 +880,15 @@ class UiSetupMixin(UiSetupRegistryMixin):
             self.review_queue_panel.skip_requested.connect(self._next_uncertain_suggestion)
             self.review_queue_panel.next_uncertain_requested.connect(
                 self._focus_current_uncertain_suggestion
+            )
+            self.review_queue_panel.suggest_points_requested.connect(
+                self._suggest_points_current_slice
+            )
+            self.review_queue_panel.clear_suggestions_requested.connect(
+                self._clear_suggestions_current_image
+            )
+            self.review_queue_panel.show_suggestions_toggled.connect(
+                self._toggle_suggestions_overlay
             )
             self.review_queue_panel.apply_offset_requested.connect(
                 self._apply_review_queue_offset
@@ -1114,6 +1139,9 @@ class UiSetupMixin(UiSetupRegistryMixin):
 
     def _build_roi_controls_layout(self) -> None:
         """Build ROI/crop controls used by the ROI dock."""
+        if bool(getattr(self, "_annotate_roi_embedded", False)):
+            self._roi_controls_layout = None
+            return
         layout = QtWidgets.QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)

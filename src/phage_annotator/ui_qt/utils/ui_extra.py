@@ -22,6 +22,7 @@ from phage_annotator.ui_qt.models.lazy_loader import (
     LAZY_TABLE_COLUMN_SYNC_CONTRAST,
     LAZY_TABLE_COLUMN_SYNC_TIME,
     LAZY_TABLE_COLUMN_SYNC_VIEW,
+    LAZY_TABLE_COLUMN_TABLE,
     LazyTableRowSpec,
     normalize_lazy_sync_groups,
     iter_tiff_paths,
@@ -628,13 +629,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         target_layout = QtWidgets.QVBoxLayout(target_group)
         target_layout.setContentsMargins(8, 8, 8, 8)
         target_layout.setSpacing(6)
-        target_help_lbl = QtWidgets.QLabel("Active write target")
+        target_help_lbl = QtWidgets.QLabel(
+            "Choose the canvas view you are annotating. This list updates from the views currently visible on the canvas."
+        )
         target_help_lbl.setWordWrap(True)
         target_help_lbl.setStyleSheet("color: #546e7a;")
         target_layout.addWidget(target_help_lbl)
         self.annotate_target_combo = QtWidgets.QComboBox(target_group)
         self.annotate_target_combo.setToolTip(
-            "Choose the visible canvas view/modality where new points will be written."
+            "Choose the visible canvas view/modality where new points will be written. Hidden views are removed from this list."
         )
         target_layout.addWidget(self.annotate_target_combo)
         self.target_state_badge_lbl = QtWidgets.QLabel("Write target: -")
@@ -642,6 +645,17 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             "background:#e8f0fe; color:#1d4e89; padding:3px 6px; border-radius:4px; font-weight:600;"
         )
         target_layout.addWidget(self.target_state_badge_lbl)
+        self.annotate_enabled_chk = QtWidgets.QCheckBox("Enable click annotation", target_group)
+        self.annotate_enabled_chk.setChecked(
+            bool(self._settings.value("annotationClickEnabled", True, type=bool))
+        )
+        self.annotate_enabled_chk.setToolTip(
+            "When enabled, left-clicking on the selected target view adds or removes annotation points."
+        )
+        self.annotate_enabled_chk.toggled.connect(
+            lambda checked: self._settings.setValue("annotationClickEnabled", bool(checked))
+        )
+        target_layout.addWidget(self.annotate_enabled_chk)
         self.target_unavailable_hint_lbl = _LogicalVisibilityLabel("")
         self.target_unavailable_hint_lbl.setWordWrap(True)
         self.target_unavailable_hint_lbl.setStyleSheet("color: #546e7a; font-style: italic;")
@@ -686,7 +700,29 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             )
         layout.addWidget(scope_group)
 
-        tool_group = QtWidgets.QGroupBox("4. Tools")
+        self._annotate_roi_embedded = False
+        roi_shortcuts_group = QtWidgets.QGroupBox("4. ROI")
+        roi_shortcuts_layout = QtWidgets.QVBoxLayout(roi_shortcuts_group)
+        roi_shortcuts_layout.setContentsMargins(8, 8, 8, 8)
+        roi_shortcuts_layout.setSpacing(6)
+        roi_hint_lbl = QtWidgets.QLabel(
+            "ROI controls were moved to the ROI panel. Open it here for ROI/crop/edit tools."
+        )
+        roi_hint_lbl.setWordWrap(True)
+        roi_hint_lbl.setStyleSheet("color: #546e7a;")
+        roi_shortcuts_layout.addWidget(roi_hint_lbl)
+        roi_open_btn_row = QtWidgets.QHBoxLayout()
+        roi_open_btn = QtWidgets.QPushButton("Open ROI Controls")
+        roi_open_btn.clicked.connect(lambda: self.open_panel("roi", reason="annotate_sidebar"))
+        roi_manager_btn = QtWidgets.QPushButton("Open ROI Manager")
+        roi_manager_btn.clicked.connect(lambda: self.open_panel("roi_manager", reason="annotate_sidebar"))
+        roi_open_btn_row.addWidget(roi_open_btn)
+        roi_open_btn_row.addWidget(roi_manager_btn)
+        roi_open_btn_row.addStretch(1)
+        roi_shortcuts_layout.addLayout(roi_open_btn_row)
+        layout.addWidget(roi_shortcuts_group)
+
+        tool_group = QtWidgets.QGroupBox("5. Tools")
         tool_layout = QtWidgets.QVBoxLayout(tool_group)
         tool_layout.setContentsMargins(8, 8, 8, 8)
         tool_layout.setSpacing(6)
@@ -707,10 +743,43 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             "Profile mode:\nClick two points to extract an intensity profile\nalong the line between them.",
         )
         tool_layout.addWidget(self.profile_mode_chk)
+
+        marker_group = QtWidgets.QGroupBox("Marker style")
+        marker_layout = QtWidgets.QGridLayout(marker_group)
+        marker_layout.setContentsMargins(6, 6, 6, 6)
+        marker_layout.setHorizontalSpacing(6)
+        marker_layout.setVerticalSpacing(4)
+        self.annotate_marker_shape_combo = QtWidgets.QComboBox(marker_group)
+        self.annotate_marker_shape_combo.addItem("Circle", "o")
+        self.annotate_marker_shape_combo.addItem("Square", "s")
+        self.annotate_marker_shape_combo.addItem("Triangle", "^")
+        self.annotate_marker_shape_combo.addItem("Diamond", "D")
+        self.annotate_marker_shape_combo.addItem("Cross", "x")
+        self.annotate_marker_shape_combo.addItem("Plus", "P")
+        self.annotate_marker_shape_combo.setToolTip(
+            "Choose marker shape for rendered annotation points."
+        )
+        shape_idx = self.annotate_marker_shape_combo.findData(
+            str(getattr(self, "marker_shape", "o"))
+        )
+        self.annotate_marker_shape_combo.setCurrentIndex(shape_idx if shape_idx >= 0 else 0)
+
+        self.annotate_marker_size_spin = QtWidgets.QSpinBox(marker_group)
+        self.annotate_marker_size_spin.setRange(1, 100)
+        self.annotate_marker_size_spin.setValue(int(getattr(self, "marker_size", 40)))
+        self.annotate_marker_size_spin.setToolTip(
+            "Set marker size used for annotation overlays."
+        )
+
+        marker_layout.addWidget(QtWidgets.QLabel("Shape"), 0, 0)
+        marker_layout.addWidget(self.annotate_marker_shape_combo, 0, 1)
+        marker_layout.addWidget(QtWidgets.QLabel("Size"), 1, 0)
+        marker_layout.addWidget(self.annotate_marker_size_spin, 1, 1)
+        tool_layout.addWidget(marker_group)
         
         layout.addWidget(tool_group)
 
-        vis_group = QtWidgets.QGroupBox("5. Annotation overlays")
+        vis_group = QtWidgets.QGroupBox("6. Annotation overlays")
         vis_layout = QtWidgets.QVBoxLayout(vis_group)
         vis_layout.setContentsMargins(8, 8, 8, 8)
         vis_layout.setSpacing(6)
@@ -1226,14 +1295,16 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
 
         table.blockSignals(False)
         table.resizeColumnsToContents()
+        table.resizeRowsToContents()
         table.setColumnWidth(LAZY_TABLE_COLUMN_SHOW, 44)
         table.setColumnWidth(LAZY_TABLE_COLUMN_POINTS, 44)
-        table.setColumnWidth(LAZY_TABLE_COLUMN_NAME, 180)
-        table.setColumnWidth(LAZY_TABLE_COLUMN_SOURCE, 150)
-        table.setColumnWidth(LAZY_TABLE_COLUMN_PROJECTION, 110)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_NAME, 220)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_SOURCE, 220)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_PROJECTION, 130)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_TABLE, 76)
         table.setColumnWidth(LAZY_TABLE_COLUMN_ANNOTATION_MODE, 120)
-        table.setColumnWidth(LAZY_TABLE_COLUMN_ANNOTATION_FILE, 84)
-        table.setColumnWidth(LAZY_TABLE_COLUMN_GROUP, 70)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_ANNOTATION_FILE, 120)
+        table.setColumnWidth(LAZY_TABLE_COLUMN_GROUP, 84)
         table.setColumnWidth(LAZY_TABLE_COLUMN_SYNC_CONTRAST, 86)
         table.setColumnWidth(LAZY_TABLE_COLUMN_SYNC_VIEW, 88)
         table.setColumnWidth(LAZY_TABLE_COLUMN_SYNC_TIME, 84)
@@ -1329,30 +1400,24 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         return normalized
 
     def _set_sync_mode_for_role(self, role_key, mode_key: str, enabled: bool) -> None:
-        """Update one sync mode flag for all rows in the same sync group."""
+        """Update one sync mode flag for a single row."""
         key = str(mode_key).strip().lower()
         if key not in {"contrast", "zoom", "playback"}:
             return
-        groups = self._lazy_sync_groups_state()
-        group_key = str(groups.get(role_key, "")).strip()
-        target_roles = {role_key}
-        if group_key.isdigit():
-            target_roles = {rk for rk, gk in groups.items() if str(gk).strip() == group_key}
         modes = self._lazy_sync_modes_state()
         controller = getattr(self, "controller", None)
-        for target_role in target_roles:
-            row_modes = dict(modes.get(target_role, {}) or {})
-            row_modes[key] = bool(enabled)
-            normalized = {
-                "contrast": bool(row_modes.get("contrast", True)),
-                "zoom": bool(row_modes.get("zoom", True)),
-                "playback": bool(row_modes.get("playback", True)),
-            }
-            if controller is not None and hasattr(controller, "set_lazy_sync_mode"):
-                modes[target_role] = dict(controller.set_lazy_sync_mode(target_role, key, bool(enabled)) or {})
-            else:
-                modes[target_role] = normalized
-        self._sync_mode_widgets_for_roles(target_roles, key)
+        row_modes = dict(modes.get(role_key, {}) or {})
+        row_modes[key] = bool(enabled)
+        normalized = {
+            "contrast": bool(row_modes.get("contrast", True)),
+            "zoom": bool(row_modes.get("zoom", True)),
+            "playback": bool(row_modes.get("playback", True)),
+        }
+        if controller is not None and hasattr(controller, "set_lazy_sync_mode"):
+            modes[role_key] = dict(controller.set_lazy_sync_mode(role_key, key, bool(enabled)) or {})
+        else:
+            modes[role_key] = normalized
+        self._sync_mode_widgets_for_roles({role_key}, key)
         if hasattr(self, "_on_sync_mode_changed"):
             self._on_sync_mode_changed()
         self._request_ui_refresh("lazy-sync-group", status=True)
@@ -1435,7 +1500,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
     def _lazy_loader_source_images(self) -> list:
         """Return image objects that are still available to the loader controls."""
         visible_ids = set(self._lazy_loader_visible_image_ids())
-        return [img for img in getattr(self, "images", []) or [] if int(getattr(img, "id", -1)) in visible_ids]
+        images = list(getattr(self, "images", []) or [])
+        filtered = [img for img in images if int(getattr(img, "id", -1)) in visible_ids]
+        # Recovery path: if manifest ids become stale after image-id remapping,
+        # keep controls usable by falling back to all loaded images.
+        return filtered if filtered else images
 
     def _refresh_lazy_loader_tree(self) -> None:
         """Rebuild the file/folder browser shown above the lazy modality table."""
@@ -1447,6 +1516,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         frame = manifest.to_frame()
         current = tree.currentItem()
         current_path = str(current.data(0, QtCore.Qt.ItemDataRole.UserRole)) if current is not None else ""
+        info_icon = self.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_FileDialogInfoView)
+        controller = getattr(self, "controller", None)
+        bindings = dict(getattr(getattr(controller, "session_state", None), "annotation_file_bindings", {}) or {})
         tree.blockSignals(True)
         tree.clear()
         items = {}
@@ -1454,6 +1526,17 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             item = QtWidgets.QTreeWidgetItem([str(row.name)])
             item.setData(0, QtCore.Qt.ItemDataRole.UserRole, str(row.path))
             item.setToolTip(0, str(row.path))
+            image_ids = [int(v) for v in tuple(getattr(row, "image_ids", ()) or ())]
+            has_auto_annotations = bool(
+                controller is not None
+                and any(bool(controller.annotation_entries_for_image(image_id)) for image_id in image_ids)
+            )
+            has_bound_annotations = any(
+                int(binding.get("source_image_id", -1)) in image_ids and str(binding.get("path", "")).strip()
+                for binding in bindings.values()
+            )
+            if has_auto_annotations or has_bound_annotations:
+                item.setIcon(0, info_icon)
             items[str(row.path)] = item
             parent_path = str(row.parent_path) if row.parent_path else ""
             if parent_path and parent_path in items:
@@ -1462,8 +1545,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 tree.addTopLevelItem(item)
         if current_path and current_path in items:
             tree.setCurrentItem(items[current_path])
-        elif tree.topLevelItemCount() > 0:
-            tree.setCurrentItem(tree.topLevelItem(0))
         tree.expandAll()
         tree.blockSignals(False)
 
@@ -1496,6 +1577,27 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         if int(getattr(self, "current_image_idx", -1)) == target_idx:
             return
         self._set_primary_combo(target_idx, refresh_lazy_table=True, schedule_prefetch=False)
+        if hasattr(self, "_append_log"):
+            try:
+                self._append_log(
+                    f"[GUI] Lazy loader selection → image id={target_id} path={path}",
+                    category="GUI",
+                )
+            except Exception:
+                pass
+        if hasattr(getattr(self, "recorder", None), "record"):
+            try:
+                self.recorder.record(
+                    "gui_lazy_loader_select",
+                    {"image_id": int(target_id), "path": str(path)},
+                )
+            except Exception:
+                pass
+        if hasattr(self, "_auto_contrast"):
+            try:
+                self._auto_contrast()
+            except Exception:
+                pass
 
     def _open_lazy_loader_dialog(self) -> None:
         """Open a small menu that can add files or folders through one button."""
@@ -1517,6 +1619,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         if not paths:
             return
+        if hasattr(self, "_append_log"):
+            self._append_log(f"[GUI] Open files in lazy loader ({len(paths)} selected)", category="GUI")
         self._add_paths_to_lazy_loader([Path(path) for path in paths])
 
     def _open_lazy_loader_folder(self) -> None:
@@ -1528,6 +1632,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         if not folder:
             return
+        if hasattr(self, "_append_log"):
+            self._append_log(f"[GUI] Open folder in lazy loader: {folder}", category="GUI")
         self._add_paths_to_lazy_loader([Path(folder)])
 
     def _add_paths_to_lazy_loader(self, paths: list[Path]) -> None:
@@ -1556,6 +1662,22 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
                 new_images.append(image)
         if new_images:
             self.controller.add_images(new_images)
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[GUI] Lazy loader added {len(new_images)} image(s)",
+                    category="GUI",
+                )
+            if hasattr(getattr(self, "recorder", None), "record"):
+                try:
+                    self.recorder.record(
+                        "gui_lazy_loader_add",
+                        {
+                            "roots": [str(p) for p in roots],
+                            "added_images": int(len(new_images)),
+                        },
+                    )
+                except Exception:
+                    pass
         self._lazy_loader_path_to_ids = path_to_ids
         self._lazy_loader_manifest.add_paths(roots, path_to_ids)
         self._schedule_lazy_panel_sync("lazy-loader-open")
@@ -1600,11 +1722,33 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         """
         self._lazy_apply_table_refresh = bool(getattr(self, "_lazy_apply_table_refresh", False) or refresh_table)
         self._lazy_refresh_reason = str(reason)
-        btn = getattr(self, "lazy_apply_btn", None)
-        if btn is not None:
-            btn.setEnabled(not bool(getattr(self, "lazy_auto_update_chk", None) and self.lazy_auto_update_chk.isChecked()))
         if bool(getattr(self, "lazy_auto_update_chk", None) and self.lazy_auto_update_chk.isChecked()):
             self._lazy_apply_timer.start()
+
+    def _commit_lazy_group_value(self, role_key, text: str) -> None:
+        """Persist one edited sync-group value from the lazy table."""
+        new_key = self._set_lazy_sync_group_for_role(role_key, text)
+        table = getattr(self, "lazy_modality_table", None)
+        if table is None:
+            return
+        for row in range(table.rowCount()):
+            if self._role_key_for_lazy_row(row) != role_key:
+                continue
+            editor = table.cellWidget(row, LAZY_TABLE_COLUMN_GROUP)
+            if editor is not None and hasattr(editor, "setText"):
+                editor.blockSignals(True)
+                try:
+                    editor.setText(new_key)
+                finally:
+                    editor.blockSignals(False)
+            break
+        self._status_info("Sync group updated.", source="ui_extra.lazy_loader")
+
+    def _queue_lazy_panel_auto_contrast(self, panel_key: str) -> None:
+        """Remember one panel to auto-contrast after the next lazy refresh."""
+        key = str(panel_key or "").strip().lower()
+        if key:
+            self._lazy_pending_auto_contrast_panel = key
 
     def _flush_lazy_canvas_refresh(self) -> None:
         """Apply queued table/tree changes to the canvas asynchronously."""
@@ -1614,11 +1758,19 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self._refresh_lazy_loader_tree()
         self._reconcile_lazy_loader_sources()
         self._refresh_annotation_view_controls()
-        self._request_ui_refresh("lazy-panel-flush")
+        self._request_render_refresh("lazy-panel-flush")
+        self._request_ui_refresh("lazy-panel-flush", table=True, status=True)
+        pending_panel = str(getattr(self, "_lazy_pending_auto_contrast_panel", "") or "").strip().lower()
+        self._lazy_pending_auto_contrast_panel = ""
+        if pending_panel and hasattr(self, "_auto_contrast_panel"):
+            try:
+                self._auto_contrast_panel(pending_panel)
+            except Exception:
+                pass
         self._lazy_apply_table_refresh = False
         btn = getattr(self, "lazy_apply_btn", None)
         if btn is not None:
-            btn.setEnabled(False)
+            btn.setEnabled(True)
 
     def _sync_mode_toolbutton(self, table, role_key, mode_key: str):
         """Create compact lazy-table sync mode toggle button (C/Z/P)."""
@@ -1692,12 +1844,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             if widget is None:
                 continue
             target_checked = bool(self._sync_modes_for_role(rk).get(mk, True))
-            widget.blockSignals(True)
+            checkbox = self._lazy_checkbox_from_cell(widget) if hasattr(self, "_lazy_checkbox_from_cell") else None
+            target = checkbox if checkbox is not None else widget
+            target.blockSignals(True)
             try:
-                if hasattr(widget, "setChecked"):
-                    widget.setChecked(target_checked)
+                if hasattr(target, "setChecked"):
+                    target.setChecked(target_checked)
             finally:
-                widget.blockSignals(False)
+                target.blockSignals(False)
 
     def _ensure_lazy_sync_group_keys(self) -> None:
         """Ensure every lazy modality/view row has a numeric sync key (default to 1)."""
@@ -1728,11 +1882,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
             cfg = dict(builtin.get(proj_key, {}) or {})
             cfg["projection"] = proj_key
-            cfg.setdefault("name", "Mean Projection" if proj_key == "mean" else "Std Projection")
-            cfg.setdefault("image_id", active_image_id)
+            cfg["name"] = str(cfg.get("name", "")).strip() or (
+                "Mean Projection" if proj_key == "mean" else "Std Projection"
+            )
+            # Always bind newly added/edited built-in view to the active source.
+            cfg["image_id"] = int(active_image_id)
             builtin[proj_key] = cfg
             self._lazy_builtin_views = builtin
             self._panel_visibility[proj_key] = True
+            self._auto_bind_detected_annotation_for_panel(str(proj_key), active_image_id)
             self._ensure_lazy_sync_group_keys()
             self._request_lazy_canvas_refresh("lazy-add-builtin", refresh_table=True)
             return
@@ -1753,10 +1911,13 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         except Exception as exc:
             self._status_error(f"Could not add modality/view: {exc}", source="ui_extra.lazy_loader")
             return
-        self._panel_visibility[f"modality_{int(modality.idx)}"] = True
+        panel_key = self._panel_key_for_modality_idx(int(modality.idx))
+        self._panel_visibility[str(panel_key)] = True
+        self._auto_bind_detected_annotation_for_panel(str(panel_key), active_image_id)
         self._ensure_lazy_sync_group_keys()
         if hasattr(self, "_update_analysis_panel_modalities"):
             self._update_analysis_panel_modalities()
+        self._queue_lazy_panel_auto_contrast(str(panel_key))
         self._request_lazy_canvas_refresh("lazy-add-view", refresh_table=True)
 
     def _remove_selected_lazy_modality_view(self) -> None:
@@ -1939,9 +2100,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         """Handle auto-update checkbox toggle and persist preference."""
         if hasattr(self, "_settings"):
             self._settings.setValue("lazyModalityAutoUpdate", bool(checked))
-        btn = getattr(self, "lazy_apply_btn", None)
-        if btn is not None:
-            btn.setEnabled(not bool(checked))
         if bool(checked):
             self._request_lazy_canvas_refresh("lazy-auto-update", refresh_table=True)
 
@@ -1960,7 +2118,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         if modality is None:
             return
         modality.image_id = int(image_id)
+        panel_key = self._panel_key_for_modality_idx(int(modality_idx))
+        self.controller.clear_annotation_binding_for_panel(
+            panel_key,
+            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+        )
+        self._auto_bind_detected_annotation_for_panel(panel_key, int(image_id))
+        self._queue_lazy_panel_auto_contrast(panel_key)
         self._request_lazy_canvas_refresh("lazy-source-change", refresh_table=False)
+        self._flush_lazy_canvas_refresh()
 
     def _on_lazy_modality_projection_changed(self, modality_idx: int, projection_key: str) -> None:
         if getattr(self, "controller", None) is None:
@@ -1976,7 +2142,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             modality.projection_type = ProjectionType(str(projection_key).strip().lower())
         except Exception:
             modality.projection_type = ProjectionType.RAW
+        self._queue_lazy_panel_auto_contrast(self._panel_key_for_modality_idx(int(modality_idx)))
         self._request_lazy_canvas_refresh("lazy-projection-change", refresh_table=False)
+        self._flush_lazy_canvas_refresh()
 
     def _on_lazy_builtin_source_changed(self, panel_key: str, image_id: int) -> None:
         """Update source image for built-in mean/std panel rows."""
@@ -1985,7 +2153,14 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         cfg["image_id"] = int(image_id)
         builtin[str(panel_key)] = cfg
         self._lazy_builtin_views = builtin
+        self.controller.clear_annotation_binding_for_panel(
+            str(panel_key),
+            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+        )
+        self._auto_bind_detected_annotation_for_panel(str(panel_key), int(image_id))
+        self._queue_lazy_panel_auto_contrast(str(panel_key))
         self._request_lazy_canvas_refresh("lazy-builtin-source", refresh_table=False)
+        self._flush_lazy_canvas_refresh()
 
     def _on_lazy_builtin_projection_changed(self, panel_key: str, projection_key: str) -> None:
         """Update projection type for built-in mean/std panel rows."""
@@ -1996,7 +2171,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         cfg["projection"] = str(projection_key).strip().lower()
         builtin[str(panel_key)] = cfg
         self._lazy_builtin_views = builtin
+        self._queue_lazy_panel_auto_contrast(str(panel_key))
         self._request_lazy_canvas_refresh("lazy-builtin-projection", refresh_table=False)
+        self._flush_lazy_canvas_refresh()
 
     def _on_lazy_builtin_support_source_changed(self, image_id: int) -> None:
         """Update support panel source image from lazy table."""
@@ -2814,18 +2991,38 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         panel_visibility = dict(getattr(self, "_panel_visibility", {}) or {})
         point_visibility = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
         groups = self._lazy_sync_groups_state()
+        source_images = list(self._lazy_loader_source_images())
+        available_ids = {int(getattr(img, "id", -1)) for img in source_images}
+        fallback_source_id = int(getattr(getattr(self, "primary_image", None), "id", 0))
+
+        def _normalize_source_id(candidate: object) -> int:
+            try:
+                value = int(candidate)
+            except Exception:
+                value = fallback_source_id
+            if available_ids and value not in available_ids:
+                return fallback_source_id if fallback_source_id in available_ids else int(next(iter(available_ids)))
+            return value
+
         for modality in manager.get_all_modalities():
             panel_key = self._panel_key_for_modality_idx(int(modality.idx))
             if panel_key in hidden_base and int(modality.idx) <= 1:
-                continue
+                # Only hide true legacy base rows. If the manager starts empty
+                # and users add modalities manually, idx 0/1 are user-created
+                # rows and must remain visible/populated in the lazy table.
+                legacy_names = {"primary", "support", "frame", "stack"}
+                name_norm = str(getattr(modality, "display_name", "")).strip().lower()
+                if name_norm in legacy_names:
+                    continue
             context = self.controller.ensure_annotation_context_for_panel(panel_key, writable=True)
             binding = self.controller.annotation_binding_for_panel(panel_key)
+            panel_name = str(getattr(modality, "display_name", "")).strip() or f"Modality {int(modality.idx) + 1}"
             specs.append(
                 LazyTableRowSpec(
                     role_key=int(modality.idx),
                     panel_key=panel_key,
-                    panel_name=str(modality.display_name),
-                    source_image_id=int(modality.image_id),
+                    panel_name=panel_name,
+                    source_image_id=_normalize_source_id(getattr(modality, "image_id", fallback_source_id)),
                     projection_key=str(modality.projection_type.value),
                     group_key=str(groups.get(int(modality.idx), "")),
                     visible=bool(panel_visibility.get(panel_key, True)),
@@ -2845,13 +3042,15 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             if panel_key not in builtin:
                 continue
             cfg = dict(builtin.get(panel_key, {}) or {})
+            panel_name = str(cfg.get("name", "")).strip() or f"{panel_key.title()} Projection"
+            projection_key = str(cfg.get("projection", panel_key)).strip().lower() or panel_key
             specs.append(
                 LazyTableRowSpec(
                     role_key=f"builtin:{panel_key}",
                     panel_key=panel_key,
-                    panel_name=str(cfg.get("name", f"{panel_key.title()} Projection")),
-                    source_image_id=int(cfg.get("image_id", 0)),
-                    projection_key=str(cfg.get("projection", panel_key)).strip().lower(),
+                    panel_name=panel_name,
+                    source_image_id=_normalize_source_id(cfg.get("image_id", fallback_source_id)),
+                    projection_key=projection_key,
                     group_key=str(groups.get(f"builtin:{panel_key}", "")),
                     visible=bool(panel_visibility.get(panel_key, True)),
                     show_points=bool(point_visibility.get(panel_key, True)),
@@ -2918,6 +3117,51 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         suffix = str(context.get("panel_key", panel_key)).strip().lower() or "frame"
         return source_path.with_name(f"{source_path.stem}.{suffix}.annotations.json")
 
+    def _auto_detect_annotation_path_for_image(self, image_id: int) -> str:
+        """Return the first discovered annotation path for an image, if any."""
+        controller = getattr(self, "controller", None)
+        if controller is None or not hasattr(controller, "annotation_entries_for_image"):
+            return ""
+        entries = list(controller.annotation_entries_for_image(int(image_id)) or [])
+        if not entries:
+            image = next(
+                (
+                    img for img in getattr(self, "images", [])
+                    if int(getattr(img, "id", -1)) == int(image_id)
+                ),
+                None,
+            )
+            if image is not None and hasattr(controller, "build_annotation_index"):
+                try:
+                    controller.build_annotation_index(Path(str(getattr(image, "path", ""))).parent)
+                except Exception:
+                    pass
+                entries = list(controller.annotation_entries_for_image(int(image_id)) or [])
+        if not entries:
+            return ""
+        return str(getattr(entries[0], "path", "") or "")
+
+    def _auto_bind_detected_annotation_for_panel(self, panel_key: str, source_image_id: int) -> None:
+        """Bind the first discovered annotation file for a panel when available."""
+        if not panel_key or getattr(self, "controller", None) is None:
+            return
+        existing = dict(self.controller.annotation_binding_for_panel(panel_key) or {})
+        if str(existing.get("path", "")).strip():
+            return
+        detected_path = self._auto_detect_annotation_path_for_image(int(source_image_id))
+        if not detected_path:
+            return
+        detected = Path(detected_path)
+        suffix = detected.suffix.lower()
+        fmt = "json" if suffix == ".json" else "csv" if suffix == ".csv" else "other"
+        self.controller.bind_annotation_file_to_panel(
+            panel_key,
+            str(detected),
+            fmt=fmt,
+            mtime=detected.stat().st_mtime if detected.exists() else None,
+            annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+        )
+
     def _set_lazy_annotation_context_mode_for_panel(self, panel_key: str, mode: str) -> None:
         """Apply annotation ownership mode for one lazy-table row/panel."""
         if not panel_key or getattr(self, "controller", None) is None:
@@ -2933,9 +3177,9 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         if not panel_key or getattr(self, "controller", None) is None:
             return
         default_path = self._default_annotation_binding_path_for_panel(panel_key)
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            "Bind Annotation File",
+            "Select Annotation File",
             str(default_path),
             "Annotation Files (*.json *.csv)",
         )
@@ -3007,10 +3251,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
     def _insert_lazy_table_row(self, table, row_spec: LazyTableRowSpec) -> None:
         """Insert one derived row into the lazy-loading table."""
         source_images = list(self._lazy_loader_source_images())
-        projection_options = ("raw", "mean", "std", "min", "max")
+        projection_options = ("raw", "mean", "median", "std", "min", "max")
         projection_labels = {
             "raw": "Source Frame",
             "mean": "Mean",
+            "median": "Median",
             "std": "Std",
             "min": "Min",
             "max": "Max",
@@ -3056,6 +3301,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             f"Context: {row_spec.annotation_context_key or 'unresolved'}\n"
             f"Binding: {binding_txt}"
         )
+        name_item.setFlags(name_item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
         table.setItem(row, LAZY_TABLE_COLUMN_NAME, name_item)
 
         source_combo = QtWidgets.QComboBox(table)
@@ -3063,21 +3309,31 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             source_combo.addItem(str(getattr(img, "name", f"Image {img.id}")), int(img.id))
         src_idx = max(0, source_combo.findData(int(row_spec.source_image_id)))
         source_combo.setCurrentIndex(src_idx)
+
+        def _combo_image_id(combo: QtWidgets.QComboBox, fallback: int) -> int:
+            value = combo.currentData()
+            try:
+                return int(value)
+            except Exception:
+                return int(fallback)
+
         if str(row_spec.role_key) == "builtin:support":
             source_combo.currentIndexChanged.connect(
-                lambda _i, combo=source_combo: self._on_lazy_builtin_support_source_changed(int(combo.currentData()))
+                lambda _i, combo=source_combo, fallback=row_spec.source_image_id: self._on_lazy_builtin_support_source_changed(
+                    _combo_image_id(combo, int(fallback))
+                )
             )
         elif isinstance(row_spec.role_key, str) and str(row_spec.role_key).startswith("builtin:"):
             panel_key = str(row_spec.role_key).split(":", 1)[1]
             source_combo.currentIndexChanged.connect(
-                lambda _i, k=panel_key, combo=source_combo: self._on_lazy_builtin_source_changed(
-                    str(k), int(combo.currentData())
+                lambda _i, k=panel_key, combo=source_combo, fallback=row_spec.source_image_id: self._on_lazy_builtin_source_changed(
+                    str(k), _combo_image_id(combo, int(fallback))
                 )
             )
         else:
             source_combo.currentIndexChanged.connect(
-                lambda _i, mid=int(row_spec.role_key), combo=source_combo: self._on_lazy_modality_source_changed(
-                    mid, int(combo.currentData())
+                lambda _i, mid=int(row_spec.role_key), combo=source_combo, fallback=row_spec.source_image_id: self._on_lazy_modality_source_changed(
+                    mid, _combo_image_id(combo, int(fallback))
                 )
             )
         table.setCellWidget(row, LAZY_TABLE_COLUMN_SOURCE, source_combo)
@@ -3120,41 +3376,66 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         table.setCellWidget(row, LAZY_TABLE_COLUMN_ANNOTATION_MODE, owner_combo)
 
-        file_btn = QtWidgets.QToolButton(table)
-        file_btn.setText("Bound" if row_spec.annotation_binding_path else "Unbound")
-        file_btn.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.InstantPopup)
-        file_btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
-        file_btn.setToolTip(
-            "Manage the annotation file linked to this row.\n"
-            f"Current: {Path(row_spec.annotation_binding_path).name if row_spec.annotation_binding_path else 'Unbound'}"
+        binding_path = str(row_spec.annotation_binding_path or "").strip()
+        binding_exists = bool(binding_path and Path(binding_path).exists())
+        file_cell = QtWidgets.QWidget(table)
+        file_layout = QtWidgets.QHBoxLayout(file_cell)
+        file_layout.setContentsMargins(2, 0, 2, 0)
+        file_layout.setSpacing(4)
+        path_edit = QtWidgets.QLineEdit(file_cell)
+        path_edit.setReadOnly(True)
+        path_edit.setText(binding_path)
+        path_edit.setPlaceholderText("No annotation file detected")
+        path_edit.setToolTip(
+            "Annotation file linked to this row.\n"
+            f"Path: {binding_path if binding_path else 'Not bound'}\n"
+            f"Status: {'Available' if binding_exists else 'Missing' if binding_path else 'Not bound'}"
         )
-        menu = QtWidgets.QMenu(file_btn)
-        bind_text = "Rebind file…" if row_spec.annotation_binding_path else "Bind file…"
-        menu.addAction(bind_text, lambda k=row_spec.panel_key: self._bind_lazy_annotation_file_for_panel(str(k)))
-        if row_spec.annotation_binding_path:
-            menu.addAction("Load bound annotations", lambda k=row_spec.panel_key: self._load_lazy_annotation_binding_for_panel(str(k)))
-            menu.addAction("Clear binding", lambda k=row_spec.panel_key: self._clear_lazy_annotation_binding_for_panel(str(k)))
-        file_btn.setMenu(menu)
-        table.setCellWidget(row, LAZY_TABLE_COLUMN_ANNOTATION_FILE, file_btn)
+        browse_btn = QtWidgets.QToolButton(file_cell)
+        browse_btn.setText("...")
+        browse_btn.setToolTip("Browse for a different annotation file to link to this row.")
+        browse_btn.clicked.connect(
+            lambda _checked=False, k=row_spec.panel_key: self._bind_lazy_annotation_file_for_panel(str(k))
+        )
+        file_layout.addWidget(path_edit, 1)
+        file_layout.addWidget(browse_btn)
+        table.setCellWidget(row, LAZY_TABLE_COLUMN_ANNOTATION_FILE, file_cell)
 
-        group_item = QtWidgets.QTableWidgetItem(str(row_spec.group_key))
-        group_item.setData(QtCore.Qt.ItemDataRole.UserRole, row_spec.role_key)
-        group_item.setTextAlignment(
-            int(QtCore.Qt.AlignmentFlag.AlignCenter | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        group_editor = QtWidgets.QLineEdit(str(row_spec.group_key), table)
+        group_editor.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        group_editor.setClearButtonEnabled(False)
+        group_editor.setToolTip("Edit the sync group directly in this cell.")
+        group_editor.editingFinished.connect(
+            lambda rk=row_spec.role_key, editor=group_editor: self._commit_lazy_group_value(rk, editor.text())
         )
-        table.setItem(row, LAZY_TABLE_COLUMN_GROUP, group_item)
+        table.setCellWidget(row, LAZY_TABLE_COLUMN_GROUP, group_editor)
         table.setCellWidget(
             row,
             LAZY_TABLE_COLUMN_SYNC_CONTRAST,
-            self._sync_mode_toolbutton(table, row_spec.role_key, "contrast"),
+            self._centered_lazy_checkbox(
+                table,
+                checked=row_spec.sync_contrast,
+                tooltip="Enable contrast sync for this row.",
+                on_toggled=lambda checked, rk=row_spec.role_key: self._set_sync_mode_for_role(rk, "contrast", bool(checked)),
+            ),
         )
         table.setCellWidget(
             row,
             LAZY_TABLE_COLUMN_SYNC_VIEW,
-            self._sync_mode_toolbutton(table, row_spec.role_key, "zoom"),
+            self._centered_lazy_checkbox(
+                table,
+                checked=row_spec.sync_view,
+                tooltip="Enable zoom/pan sync for this row.",
+                on_toggled=lambda checked, rk=row_spec.role_key: self._set_sync_mode_for_role(rk, "zoom", bool(checked)),
+            ),
         )
         table.setCellWidget(
             row,
             LAZY_TABLE_COLUMN_SYNC_TIME,
-            self._sync_mode_toolbutton(table, row_spec.role_key, "playback"),
+            self._centered_lazy_checkbox(
+                table,
+                checked=row_spec.sync_time,
+                tooltip="Enable playback sync for this row.",
+                on_toggled=lambda checked, rk=row_spec.role_key: self._set_sync_mode_for_role(rk, "playback", bool(checked)),
+            ),
         )

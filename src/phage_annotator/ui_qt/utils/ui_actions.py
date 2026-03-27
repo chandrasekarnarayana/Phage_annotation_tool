@@ -204,7 +204,10 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     self.context_help_act.setShortcut("Shift+F1")
     self.shortcuts_act = shortcuts_act
     help_menu.addSeparator()
+    self.open_logs_help_act = help_menu.addAction("Open Logs / Diagnostics")
     diagnostics_menu = help_menu.addMenu("Diagnostics")
+    self.open_performance_help_act = diagnostics_menu.addAction("Open Performance")
+    self.open_recorder_help_act = diagnostics_menu.addAction("Open Recorder")
     self.toggle_logs_act = diagnostics_menu.addAction("Toggle Diagnostics Dock")
     self.toggle_logs_act.setCheckable(True)
     self.toggle_logs_act.setChecked(False)

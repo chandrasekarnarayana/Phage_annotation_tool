@@ -17,61 +17,138 @@ from phage_annotator.session.suggestion_commands import (
 )
 
 
+def _set_generation_progress(
+    owner,
+    *,
+    running: bool,
+    text: str,
+    progress_value: int | None = None,
+) -> None:
+    """Update assist queue generation state without blocking the GUI."""
+    owner._assist_generation_running = bool(running)
+    owner._assist_generation_message = str(text)
+    owner._assist_generation_progress = None if progress_value is None else int(progress_value)
+    panel = getattr(owner, "review_queue_panel", None)
+    if panel is None:
+        return
+    panel.suggest_btn.setEnabled(not running)
+    if running:
+        panel.progress_lbl.setText(str(text))
+        if progress_value is None:
+            panel.progress_bar.setRange(0, 0)
+        else:
+            panel.progress_bar.setRange(0, 100)
+            panel.progress_bar.setValue(max(0, min(100, int(progress_value))))
+    else:
+        panel.progress_bar.setRange(0, 100)
+
+
 def suggest_points_current_slice(owner) -> None:
     """Generate ranked suggestions for the active T/Z slice."""
-    image_data = owner._slice_data(owner.primary_image)
-    if image_data is None:
-        return
-    image_id = owner.primary_image.id
+    image = owner.primary_image
+    image_id = image.id
     t_idx = int(owner.t_slider.value())
     z_idx = int(owner.z_slider.value())
-    generated = owner._gating_strategy_candidates(
-        image=owner.primary_image,
-        t_idx=t_idx,
-        z_idx=z_idx,
-        strategy=str(getattr(owner, "_suggestion_strategy", "current_view")),
-        label=str(owner.current_label),
+    strategy = str(getattr(owner, "_suggestion_strategy", "current_view"))
+    label = str(owner.current_label)
+    if owner._slice_data(image) is None:
+        return
+    _set_generation_progress(
+        owner,
+        running=True,
+        text=f"Generating suggestions for slice T={t_idx}, Z={z_idx}...",
+        progress_value=None,
     )
-    generated = owner._rank_and_calibrate_suggestions(generated)
-    owner._enrich_suggestions_for_training(generated, image_data)
-    generated_at = float(time.time())
-    for suggestion in generated:
-        suggestion.meta["generated_at_ts"] = generated_at
-    summary = owner.controller.append_generated_suggestions(image_id, generated, sort_pending=True)
-    owner.controller.update_suggestion_metrics(generated=int(summary.get("input_count", len(generated))))
-    owner.controller.append_audit_event(
-        "suggestions_generated",
-        image_id=image_id,
-        model=getattr(getattr(owner, "_suggestion_model", None), "model_name", "unknown"),
-        count=len(generated),
-        strategy=str(getattr(owner, "_suggestion_strategy", "current_view")),
+
+    def _worker(progress, cancel):
+        if cancel.is_cancelled():
+            return None
+        progress(15, "Finding candidates")
+        image_data = owner._slice_data(image)
+        generated = owner._gating_strategy_candidates(
+            image=image,
+            t_idx=t_idx,
+            z_idx=z_idx,
+            strategy=strategy,
+            label=label,
+        )
+        if cancel.is_cancelled():
+            return None
+        progress(70, "Ranking suggestions")
+        generated = owner._rank_and_calibrate_suggestions(generated)
+        owner._enrich_suggestions_for_training(generated, image_data)
+        progress(100, "Finalizing")
+        return generated
+
+    def _on_progress(value, message):
+        _set_generation_progress(
+            owner,
+            running=True,
+            text=f"Generating suggestions: {message}" if message else "Generating suggestions...",
+            progress_value=value,
+        )
+
+    def _on_result(generated):
+        _set_generation_progress(owner, running=False, text="Progress: 0 / 0", progress_value=0)
+        if generated is None:
+            return
+        generated_at = float(time.time())
+        for suggestion in generated:
+            suggestion.meta["generated_at_ts"] = generated_at
+        summary = owner.controller.append_generated_suggestions(image_id, generated, sort_pending=True)
+        owner.controller.update_suggestion_metrics(generated=int(summary.get("input_count", len(generated))))
+        owner.controller.append_audit_event(
+            "suggestions_generated",
+            image_id=image_id,
+            model=getattr(getattr(owner, "_suggestion_model", None), "model_name", "unknown"),
+            count=len(generated),
+            strategy=strategy,
+        )
+        owner._remember_generation_context(generated)
+        ctx_key = owner.controller._context_key(
+            suggestion=(
+                generated[0]
+                if generated
+                else PointSuggestion(image_id, image.name, t_idx, z_idx, 0, 0, 0.0)
+            ),
+            annotation_space=str(getattr(owner.controller.session_state, "annotation_space", "stack")),
+        )
+        _, assist_txt = owner.controller.assist_status(
+            annotation_space=str(getattr(owner.controller.session_state, "annotation_space", "stack")),
+            context_key=ctx_key,
+        )
+        owner._suggestion_cursor = 0
+        owner._request_ui_refresh("standard-actions")
+        owner._status_success(
+            "Generated "
+            f"{int(summary.get('input_count', len(generated)))} candidate(s): "
+            f"{int(summary.get('new_count', 0))} new, "
+            f"{int(summary.get('near_count', 0))} near existing, "
+            f"{int(summary.get('conflict_count', 0))} conflict, "
+            f"{int(summary.get('duplicate_count', 0))} duplicate skipped. "
+            f"{assist_txt}",
+            source="assist.generate.slice",
+        )
+        owner._refresh_assist_warmup_panel()
+
+    def _on_error(err: str) -> None:
+        _set_generation_progress(owner, running=False, text="Progress: 0 / 0", progress_value=0)
+        owner._append_log(f"[Assist] Suggest slice error\n{err}")
+        owner._status_error(
+            "Suggestion generation failed (see Logs).",
+            timeout_ms=5000,
+            source="assist.generate.slice",
+        )
+
+    owner.jobs.submit(
+        _worker,
+        name="Generate suggestions (current slice)",
+        on_result=_on_result,
+        on_error=_on_error,
+        on_progress=_on_progress,
+        priority="interactive",
+        replace_key=f"suggest-slice-{image_id}",
     )
-    owner._remember_generation_context(generated)
-    ctx_key = owner.controller._context_key(
-        suggestion=(
-            generated[0]
-            if generated
-            else PointSuggestion(image_id, owner.primary_image.name, t_idx, z_idx, 0, 0, 0.0)
-        ),
-        annotation_space=str(getattr(owner.controller.session_state, "annotation_space", "stack")),
-    )
-    _, assist_txt = owner.controller.assist_status(
-        annotation_space=str(getattr(owner.controller.session_state, "annotation_space", "stack")),
-        context_key=ctx_key,
-    )
-    owner._suggestion_cursor = 0
-    owner._request_ui_refresh("standard-actions")
-    owner._status_success(
-        "Generated "
-        f"{int(summary.get('input_count', len(generated)))} candidate(s): "
-        f"{int(summary.get('new_count', 0))} new, "
-        f"{int(summary.get('near_count', 0))} near existing, "
-        f"{int(summary.get('conflict_count', 0))} conflict, "
-        f"{int(summary.get('duplicate_count', 0))} duplicate skipped. "
-        f"{assist_txt}",
-        source="assist.generate.slice",
-    )
-    owner._refresh_assist_warmup_panel()
 
 
 def suggest_points_current_image(owner) -> None:
@@ -92,50 +169,105 @@ def suggest_points_current_image(owner) -> None:
         getattr(owner.controller.session_state, "generation_space", "stack")
     ).strip().lower()
     z_indices = [0] if generation_space == "projection" else list(range(z_size))
-    for t_idx in range(t_size):
-        for z_idx in z_indices:
-            slice_data = owner._slice_data(image, t_override=t_idx, z_override=z_idx)
-            generated = owner._gating_strategy_candidates(
-                image=image,
-                t_idx=t_idx,
-                z_idx=z_idx,
-                strategy=str(getattr(owner, "_suggestion_strategy", "current_view")),
-                label=str(owner.current_label),
-            )
-            generated = owner._rank_and_calibrate_suggestions(generated)
-            owner._enrich_suggestions_for_training(generated, slice_data)
-            generated_at = float(time.time())
-            for suggestion in generated:
-                suggestion.meta["generated_at_ts"] = generated_at
-            summary = owner.controller.append_generated_suggestions(image_id, generated, sort_pending=False)
-            total += int(summary.get("input_count", len(generated)))
-            queued_total += int(summary.get("queued_count", 0))
-            duplicate_total += int(summary.get("duplicate_count", 0))
-            near_total += int(summary.get("near_count", 0))
-            conflict_total += int(summary.get("conflict_count", 0))
-            new_total += int(summary.get("new_count", 0))
-    owner.controller.sort_pending_suggestions(image_id)
-    owner.controller.update_suggestion_metrics(generated=total)
-    owner.controller.append_audit_event(
-        "suggestions_generated",
-        image_id=image_id,
-        model=getattr(getattr(owner, "_suggestion_model", None), "model_name", "unknown"),
-        count=total,
-        scope="all_slices",
-        strategy=str(getattr(owner, "_suggestion_strategy", "current_view")),
+    strategy = str(getattr(owner, "_suggestion_strategy", "current_view"))
+    label = str(owner.current_label)
+    _set_generation_progress(
+        owner,
+        running=True,
+        text="Generating suggestions for the full image...",
+        progress_value=0,
     )
-    owner._remember_generation_context(owner.suggestions.get(image_id, []))
-    owner._suggestion_cursor = 0
-    owner._request_ui_refresh("standard-actions")
-    owner._status_success(
-        "Generated "
-        f"{total} candidate(s) for full image: "
-        f"{new_total} new, {near_total} near existing, "
-        f"{conflict_total} conflict, {duplicate_total} duplicate skipped, "
-        f"{queued_total} queued for review.",
-        source="assist.generate.image",
+
+    def _worker(progress, cancel):
+        all_generated = []
+        total_steps = max(1, t_size * len(z_indices))
+        completed = 0
+        for t_idx in range(t_size):
+            for z_idx in z_indices:
+                if cancel.is_cancelled():
+                    return None
+                slice_data = owner._slice_data(image, t_override=t_idx, z_override=z_idx)
+                generated = owner._gating_strategy_candidates(
+                    image=image,
+                    t_idx=t_idx,
+                    z_idx=z_idx,
+                    strategy=strategy,
+                    label=label,
+                )
+                generated = owner._rank_and_calibrate_suggestions(generated)
+                owner._enrich_suggestions_for_training(generated, slice_data)
+                all_generated.extend(generated)
+                completed += 1
+                progress(
+                    int(round(100.0 * float(completed) / float(total_steps))),
+                    f"Slice {completed}/{total_steps}",
+                )
+        return all_generated
+
+    def _on_progress(value, message):
+        _set_generation_progress(
+            owner,
+            running=True,
+            text=f"Generating suggestions: {message}" if message else "Generating suggestions...",
+            progress_value=value,
+        )
+
+    def _on_result(all_generated):
+        nonlocal total, queued_total, duplicate_total, near_total, conflict_total, new_total
+        _set_generation_progress(owner, running=False, text="Progress: 0 / 0", progress_value=0)
+        if all_generated is None:
+            return
+        generated_at = float(time.time())
+        for suggestion in all_generated:
+            suggestion.meta["generated_at_ts"] = generated_at
+        summary = owner.controller.append_generated_suggestions(image_id, all_generated, sort_pending=False)
+        total = int(summary.get("input_count", len(all_generated)))
+        queued_total = int(summary.get("queued_count", 0))
+        duplicate_total = int(summary.get("duplicate_count", 0))
+        near_total = int(summary.get("near_count", 0))
+        conflict_total = int(summary.get("conflict_count", 0))
+        new_total = int(summary.get("new_count", 0))
+        owner.controller.sort_pending_suggestions(image_id)
+        owner.controller.update_suggestion_metrics(generated=total)
+        owner.controller.append_audit_event(
+            "suggestions_generated",
+            image_id=image_id,
+            model=getattr(getattr(owner, "_suggestion_model", None), "model_name", "unknown"),
+            count=total,
+            scope="all_slices",
+            strategy=strategy,
+        )
+        owner._remember_generation_context(owner.suggestions.get(image_id, []))
+        owner._suggestion_cursor = 0
+        owner._request_ui_refresh("standard-actions")
+        owner._status_success(
+            "Generated "
+            f"{total} candidate(s) for full image: "
+            f"{new_total} new, {near_total} near existing, "
+            f"{conflict_total} conflict, {duplicate_total} duplicate skipped, "
+            f"{queued_total} queued for review.",
+            source="assist.generate.image",
+        )
+        owner._refresh_assist_warmup_panel()
+
+    def _on_error(err: str) -> None:
+        _set_generation_progress(owner, running=False, text="Progress: 0 / 0", progress_value=0)
+        owner._append_log(f"[Assist] Suggest image error\n{err}")
+        owner._status_error(
+            "Full-image suggestion generation failed (see Logs).",
+            timeout_ms=5000,
+            source="assist.generate.image",
+        )
+
+    owner.jobs.submit(
+        _worker,
+        name="Generate suggestions (full image)",
+        on_result=_on_result,
+        on_error=_on_error,
+        on_progress=_on_progress,
+        priority="interactive",
+        replace_key=f"suggest-image-{image_id}",
     )
-    owner._refresh_assist_warmup_panel()
 
 
 def preview_batch_accept_dialog(

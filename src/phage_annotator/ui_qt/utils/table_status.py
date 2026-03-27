@@ -388,15 +388,11 @@ class TableStatusMixin:
             jump_btn = QtWidgets.QToolButton(widget)
             jump_btn.setText("◎")
             jump_btn.setToolTip("Jump to suggestion")
-            refine_btn = QtWidgets.QToolButton(widget)
-            refine_btn.setText("↔")
-            refine_btn.setToolTip("Accept and refine")
             suggestion_id = str(row["id"])
             accept_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._set_selected_suggestion_decision(sid, "accepted"))
             reject_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._set_selected_suggestion_decision(sid, "rejected"))
             jump_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._jump_to_table_suggestion(sid))
-            refine_btn.clicked.connect(lambda _checked=False, sid=suggestion_id: self._accept_and_refine_suggestion(sid))
-            for btn in (accept_btn, reject_btn, jump_btn, refine_btn):
+            for btn in (accept_btn, reject_btn, jump_btn):
                 layout.addWidget(btn)
         else:
             jump_btn = QtWidgets.QToolButton(widget)
@@ -902,14 +898,6 @@ class TableStatusMixin:
             self._request_ui_refresh("table-jump-annotation", image=True, table=True)
             return
 
-    def _accept_and_refine_suggestion(self, suggestion_id: str) -> None:
-        self._set_selected_suggestion_decision(suggestion_id, "accepted")
-        self._assist_refine_pending_annotation_id = str(suggestion_id)
-        self._status_info(
-            "Accepted suggestion. Click a refined position on the canvas to adjust it.",
-            source="assist.table.refine",
-        )
-    
     def _get_current_modality_idx(self) -> Optional[int]:
         """Get the modality index for the currently displayed image."""
         manager = getattr(self.controller.session_state, "modality_manager", None)

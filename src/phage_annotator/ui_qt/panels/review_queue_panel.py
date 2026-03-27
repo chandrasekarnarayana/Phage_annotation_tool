@@ -19,6 +19,9 @@ class ReviewQueuePanel(QtWidgets.QWidget):
     apply_offset_requested = QtCore.Signal(int, float, float)
     suggestion_row_selected = QtCore.Signal(int)
     decision_requested = QtCore.Signal(str, str)
+    suggest_points_requested = QtCore.Signal()
+    clear_suggestions_requested = QtCore.Signal()
+    show_suggestions_toggled = QtCore.Signal(bool)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -71,6 +74,38 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         controls_row.addWidget(QtWidgets.QLabel("Sort:"))
         controls_row.addWidget(self.sort_combo, 1)
         layout.addLayout(controls_row)
+
+        # Add quick action buttons for suggest and clear
+        quick_actions_row = QtWidgets.QHBoxLayout()
+        quick_actions_row.setSpacing(6)
+        self.suggest_btn = QtWidgets.QPushButton("💡 Suggest Points")
+        self.clear_btn = QtWidgets.QPushButton("🗑️ Clear Suggestions")
+        self.suggest_btn.setMinimumHeight(26)
+        self.clear_btn.setMinimumHeight(26)
+        self.suggest_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.clear_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.suggest_btn.setStyleSheet(
+            "QPushButton { background-color: #2196f3; color: white; font-weight: 500; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #1976d2; }"
+            "QPushButton:pressed { background-color: #1565c0; }"
+        )
+        self.clear_btn.setStyleSheet(
+            "QPushButton { background-color: #757575; color: white; font-weight: 500; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #616161; }"
+            "QPushButton:pressed { background-color: #424242; }"
+        )
+        self.suggest_btn.setToolTip("Generate suggestions for the current image\nMenu: Assist → Suggest Points")
+        self.clear_btn.setToolTip("Clear all current suggestions\nMenu: Assist → Clear Suggestions")
+        quick_actions_row.addWidget(self.suggest_btn)
+        quick_actions_row.addWidget(self.clear_btn)
+        quick_actions_row.addStretch(1)
+        layout.addLayout(quick_actions_row)
+
+        self.show_suggestions_chk = QtWidgets.QCheckBox("Show suggestions on canvas")
+        self.show_suggestions_chk.setChecked(True)
+        self.show_suggestions_chk.setToolTip("Toggle suggestion markers on the canvas without clearing the queue.")
+        layout.addWidget(self.show_suggestions_chk)
+
 
         self.remaining_lbl = QtWidgets.QLabel("Queue: 0 uncertain")
         self.remaining_lbl.setStyleSheet("font-size: 11px; color: #546e7a; padding: 6px; background-color: #f5f5f5; border-radius: 3px;")
@@ -160,7 +195,6 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         decision_row.addWidget(self.mark_accept_btn)
         decision_row.addWidget(self.mark_reject_btn)
         decision_row.addWidget(self.mark_proposed_btn)
-        table_layout.addLayout(decision_row)
         layout.addWidget(table_group)
 
         btn_row = QtWidgets.QHBoxLayout()
@@ -204,6 +238,36 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         btn_row.addWidget(self.skip_btn)
         layout.addLayout(btn_row)
 
+        self.advanced_toggle_btn = QtWidgets.QToolButton(self)
+        self.advanced_toggle_btn.setText("Advanced Assist Controls")
+        self.advanced_toggle_btn.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.advanced_toggle_btn.setArrowType(QtCore.Qt.ArrowType.RightArrow)
+        self.advanced_toggle_btn.setCheckable(True)
+        self.advanced_toggle_btn.setChecked(False)
+        self.advanced_toggle_btn.setStyleSheet(
+            "QToolButton { font-weight: 600; color: #455a64; padding: 4px 2px; border: none; }"
+            "QToolButton:hover { color: #1976d2; }"
+        )
+        self.advanced_toggle_btn.setToolTip(
+            "Show batch actions, decision-state tools, offset correction, and confidence details."
+        )
+        layout.addWidget(self.advanced_toggle_btn)
+
+        self.advanced_container = QtWidgets.QWidget(self)
+        advanced_layout = QtWidgets.QVBoxLayout(self.advanced_container)
+        advanced_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_layout.setSpacing(10)
+
+        decision_group = QtWidgets.QGroupBox("Selected Queue Item")
+        decision_group.setStyleSheet(
+            "QGroupBox { border: 1px solid #e0e0e0; border-radius: 4px; margin-top: 6px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 6px; padding: 0 4px; }"
+        )
+        decision_group_layout = QtWidgets.QVBoxLayout(decision_group)
+        decision_group_layout.setContentsMargins(8, 8, 8, 8)
+        decision_group_layout.addLayout(decision_row)
+        advanced_layout.addWidget(decision_group)
+
         next_row = QtWidgets.QHBoxLayout()
         next_row.setSpacing(6)
         self.next_uncertain_btn = QtWidgets.QPushButton("↓ Next Uncertain")
@@ -226,7 +290,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.accept_green_btn.setToolTip("Batch accept all high-confidence suggestions (score ≥ 0.75)")
         next_row.addWidget(self.next_uncertain_btn)
         next_row.addWidget(self.accept_green_btn)
-        layout.addLayout(next_row)
+        advanced_layout.addLayout(next_row)
 
         offset_group = QtWidgets.QGroupBox("Offset correction")
         offset_group.setStyleSheet(
@@ -265,7 +329,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         offset_layout.addWidget(QtWidgets.QLabel("dy"), 0, 4)
         offset_layout.addWidget(self.offset_dy_spin, 0, 5)
         offset_layout.addWidget(self.apply_offset_btn, 1, 0, 1, 6)
-        layout.addWidget(offset_group)
+        advanced_layout.addWidget(offset_group)
 
         reasoning_group = QtWidgets.QGroupBox("Confidence Details")
         reasoning_group.setStyleSheet(
@@ -276,7 +340,9 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         reasoning_layout.setContentsMargins(0, 0, 0, 0)
         self.explain_panel = SuggestionExplainPanel(parent=reasoning_group)
         reasoning_layout.addWidget(self.explain_panel)
-        layout.addWidget(reasoning_group)
+        advanced_layout.addWidget(reasoning_group)
+        self.advanced_container.setVisible(False)
+        layout.addWidget(self.advanced_container)
 
         self.progress_lbl = QtWidgets.QLabel("Progress: 0 / 0")
         self.progress_lbl.setStyleSheet("font-weight: 500; font-size: 11px; color: #546e7a;")
@@ -307,6 +373,9 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         self.reject_btn.clicked.connect(self.reject_requested.emit)
         self.skip_btn.clicked.connect(self.skip_requested.emit)
         self.next_uncertain_btn.clicked.connect(self.next_uncertain_requested.emit)
+        self.suggest_btn.clicked.connect(self.suggest_points_requested.emit)
+        self.clear_btn.clicked.connect(self.clear_suggestions_requested.emit)
+        self.show_suggestions_chk.toggled.connect(self.show_suggestions_toggled.emit)
         self.help_btn.clicked.connect(self._show_keyboard_shortcuts)
         self.apply_offset_btn.clicked.connect(
             lambda: self.apply_offset_requested.emit(
@@ -315,6 +384,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
                 float(self.offset_dy_spin.value()),
             )
         )
+        self.advanced_toggle_btn.toggled.connect(self._toggle_advanced_controls)
         self.mark_accept_btn.clicked.connect(
             lambda: self._emit_decision_for_selected("accepted")
         )
@@ -347,6 +417,13 @@ class ReviewQueuePanel(QtWidgets.QWidget):
         msg_box.setText(text)
         msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
         msg_box.exec()
+
+    def _toggle_advanced_controls(self, checked: bool) -> None:
+        """Show or hide advanced assist controls."""
+        self.advanced_container.setVisible(bool(checked))
+        self.advanced_toggle_btn.setArrowType(
+            QtCore.Qt.ArrowType.DownArrow if bool(checked) else QtCore.Qt.ArrowType.RightArrow
+        )
 
     def set_suggestions(self, rows: list[dict[str, str]], current_row: int) -> None:
         """Populate suggested-points table and keep selected row in sync."""

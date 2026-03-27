@@ -115,6 +115,230 @@ class RoiControlsMixin:
             return
         rois = self.roi_manager.list_rois(self.primary_image.id)
         self.roi_manager_widget.set_rois(rois)
+        selected = self._roi_mgr_selected()
+        self._sync_roi_inline_editor(selected)
+
+    def _roi_current_points(self, roi_type: str) -> list[tuple[float, float]]:
+        """Translate the current editor ROI rect into ROI points for persistence."""
+        if self.roi_shape == "none" or self.roi_rect[2] <= 0 or self.roi_rect[3] <= 0:
+            raise ValueError("Set an ROI first.")
+        x, y, w, h = self.roi_rect
+        kind = str(roi_type or "box").strip().lower()
+        if kind == "circle":
+            return [(x + w / 2, y + h / 2), (x + w / 2 + min(w, h) / 2, y + h / 2)]
+        if kind == "polygon":
+            return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        return [(x, y), (x + w, y + h)]
+
+    def _sync_roi_inline_editor(self, roi: Optional[Roi]) -> None:
+        """Keep inline ROI panel fields aligned with the current selection."""
+        if getattr(self, "roi_measure_export_path_edit", None) is not None:
+            try:
+                if not self.roi_measure_export_path_edit.text().strip():
+                    self.roi_measure_export_path_edit.setText(str(self._roi_measurement_default_path()))
+            except Exception:
+                pass
+        if roi is None:
+            if getattr(self, "roi_inline_name_edit", None) is not None and not self.roi_inline_name_edit.hasFocus():
+                self.roi_inline_name_edit.setText("")
+            if getattr(self, "roi_inline_tags_edit", None) is not None and not self.roi_inline_tags_edit.hasFocus():
+                self.roi_inline_tags_edit.setText("")
+            return
+        if getattr(self, "roi_inline_name_edit", None) is not None and not self.roi_inline_name_edit.hasFocus():
+            self.roi_inline_name_edit.setText(str(getattr(roi, "name", "")))
+        if getattr(self, "roi_inline_type_combo", None) is not None and not self.roi_inline_type_combo.hasFocus():
+            idx = self.roi_inline_type_combo.findText(str(getattr(roi, "roi_type", "box")))
+            if idx >= 0:
+                self.roi_inline_type_combo.setCurrentIndex(idx)
+        if getattr(self, "roi_inline_tags_edit", None) is not None and not self.roi_inline_tags_edit.hasFocus():
+            self.roi_inline_tags_edit.setText(", ".join(str(tag) for tag in getattr(roi, "tags", []) if str(tag).strip()))
+
+    def _roi_mgr_add_inline(self) -> None:
+        """Add a saved ROI using the inline panel fields instead of a popup dialog."""
+        roi_name = str(
+            getattr(self, "roi_inline_name_edit", None).text()
+            if getattr(self, "roi_inline_name_edit", None) is not None
+            else ""
+        ).strip() or "ROI"
+        roi_type = str(
+            getattr(self, "roi_inline_type_combo", None).currentText()
+            if getattr(self, "roi_inline_type_combo", None) is not None
+            else "box"
+        ).strip().lower()
+        try:
+            points = self._roi_current_points(roi_type)
+        except ValueError as exc:
+            self._status_warning(str(exc), timeout_ms=2500, source="roi.add")
+            return
+        roi = Roi(
+            roi_id=int(time.time() * 1000),
+            name=roi_name,
+            roi_type=roi_type,
+            points=points,
+        )
+        cmd = AddRoiCommand(self.roi_manager, self.primary_image.id, roi)
+        if self.roi_manager.execute_command(cmd):
+            self.roi_manager.set_active(roi.roi_id)
+            self._refresh_roi_manager()
+            self._sync_active_roi(roi)
+            self._status_success(
+                f"Saved ROI '{roi_name}'.",
+                timeout_ms=2500,
+                source="roi.add",
+            )
+        else:
+            self._status_error("Failed to add ROI.", timeout_ms=3500, source="roi.add")
+
+    def _roi_mgr_rename_inline(self) -> None:
+        """Rename the selected ROI from the inline panel field."""
+        roi = self._roi_mgr_selected()
+        if roi is None:
+            self._status_info("Select an ROI to rename.", timeout_ms=2500, source="roi.rename")
+            return
+        new_name = str(
+            getattr(self, "roi_inline_name_edit", None).text()
+            if getattr(self, "roi_inline_name_edit", None) is not None
+            else ""
+        ).strip()
+        if not new_name:
+            self._status_warning("ROI name cannot be empty.", timeout_ms=2500, source="roi.rename")
+            return
+        if new_name == str(roi.name):
+            return
+        cmd = RenameRoiCommand(self.roi_manager, self.primary_image.id, roi.roi_id, new_name)
+        if self.roi_manager.execute_command(cmd):
+            self._refresh_roi_manager()
+            self._status_success(
+                f"Renamed ROI to '{new_name}'.",
+                timeout_ms=2500,
+                source="roi.rename",
+            )
+        else:
+            self._status_error("Failed to rename ROI.", timeout_ms=3000, source="roi.rename")
+
+    def _roi_mgr_apply_tags_inline(self) -> None:
+        """Apply comma-separated tags from the inline panel to the selected ROI."""
+        roi = self._roi_mgr_selected()
+        if roi is None:
+            self._status_info("Select an ROI to edit tags.", timeout_ms=2500, source="roi.tags")
+            return
+        raw = str(
+            getattr(self, "roi_inline_tags_edit", None).text()
+            if getattr(self, "roi_inline_tags_edit", None) is not None
+            else ""
+        )
+        target_tags = [tag.strip() for tag in raw.split(",") if tag.strip()]
+        current_tags = list(getattr(roi, "tags", []) or [])
+        for tag in list(current_tags):
+            if tag not in target_tags:
+                cmd = RemoveTagCommand(self.roi_manager, self.primary_image.id, roi.roi_id, tag)
+                self.roi_manager.execute_command(cmd)
+        for tag in target_tags:
+            if tag in current_tags:
+                continue
+            cmd = AddTagCommand(self.roi_manager, self.primary_image.id, roi.roi_id, tag)
+            self.roi_manager.execute_command(cmd)
+        self._refresh_roi_manager()
+        self._status_success("Updated ROI tags.", timeout_ms=2500, source="roi.tags")
+
+    def _roi_mgr_filter_by_tag_inline(self) -> None:
+        """Filter the ROI list from the inline tag filter field."""
+        if self.roi_manager_widget is None:
+            return
+        raw = str(
+            getattr(self, "roi_inline_filter_edit", None).text()
+            if getattr(self, "roi_inline_filter_edit", None) is not None
+            else ""
+        )
+        tags = [tag.strip() for tag in raw.split(",") if tag.strip()]
+        self.roi_manager_widget.set_tag_filter(tags)
+        self._status_info(
+            f"Showing ROIs with tags: {', '.join(tags) if tags else 'all'}.",
+            timeout_ms=2500,
+            source="roi.tags",
+        )
+
+    def _roi_mgr_clear_tag_filter_inline(self) -> None:
+        """Clear any inline ROI tag filter and show the full list again."""
+        if getattr(self, "roi_inline_filter_edit", None) is not None:
+            self.roi_inline_filter_edit.clear()
+        if self.roi_manager_widget is not None:
+            self.roi_manager_widget.set_tag_filter([])
+        self._status_info("Showing all ROIs.", timeout_ms=2000, source="roi.tags")
+
+    def _roi_mgr_measure_inline(self) -> None:
+        """Measure ROIs and render the results directly in the embedded ROI panel."""
+        if self.primary_image.array is None:
+            self._status_warning("Load an image before measuring.", timeout_ms=2500, source="roi.measure")
+            return
+        rois = self.roi_manager.list_rois(self.primary_image.id)
+        if not rois:
+            self._status_warning("Add ROIs before measuring.", timeout_ms=2500, source="roi.measure")
+            return
+        rows = self._roi_measurement_rows(self.primary_image.array, rois, int(self.primary_image.id))
+        self._last_roi_measurements = rows
+        if getattr(self, "roi_measure_summary_lbl", None) is not None:
+            self.roi_measure_summary_lbl.setText(
+                self._roi_measurement_summary_text(
+                    rows,
+                    len(rois),
+                    int(self.primary_image.array.shape[0]),
+                    int(self.primary_image.id),
+                )
+            )
+        table = getattr(self, "roi_measure_table", None)
+        if table is not None:
+            headers = list(rows[0].keys()) if rows else []
+            table.clear()
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(len(rows))
+            for ridx, row in enumerate(rows):
+                for cidx, key in enumerate(headers):
+                    value = row[key]
+                    text = f"{value:.4f}" if isinstance(value, float) else str(value)
+                    item = QtWidgets.QTableWidgetItem(text)
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemFlag.ItemIsEditable)
+                    table.setItem(ridx, cidx, item)
+            table.resizeColumnsToContents()
+        self._status_success(
+            f"Measured {len(rows)} ROI-frame rows.",
+            timeout_ms=2500,
+            source="roi.measure",
+        )
+
+    def _roi_mgr_export_measurements_inline(self) -> None:
+        """Export the latest inline ROI measurement results to CSV."""
+        rows = list(getattr(self, "_last_roi_measurements", []) or [])
+        if not rows:
+            self._status_info(
+                "Run ROI measurement first.",
+                timeout_ms=2500,
+                source="roi.measure",
+            )
+            return
+        path_text = str(
+            getattr(self, "roi_measure_export_path_edit", None).text()
+            if getattr(self, "roi_measure_export_path_edit", None) is not None
+            else ""
+        ).strip()
+        path = pathlib.Path(path_text) if path_text else self._roi_measurement_default_path()
+        try:
+            self._write_roi_measurements_csv(path, rows)
+            if getattr(self, "roi_measure_export_path_edit", None) is not None:
+                self.roi_measure_export_path_edit.setText(str(path))
+            self._status_success(
+                f"Exported ROI measurements to {path}.",
+                timeout_ms=3000,
+                source="roi.measure",
+            )
+        except Exception as exc:
+            logger.error(f"Failed to export inline ROI measurements: {exc}")
+            self._status_error(
+                f"Failed to export ROI measurements: {exc}",
+                timeout_ms=3500,
+                source="roi.measure",
+            )
     def _roi_mgr_add(self) -> None:
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("Add ROI")
@@ -394,8 +618,10 @@ class RoiControlsMixin:
     def _roi_mgr_selection_changed(self) -> None:
         roi = self._roi_mgr_selected()
         if roi is None:
+            self._sync_roi_inline_editor(None)
             return
         self.roi_manager.set_active(roi.roi_id)
+        self._sync_roi_inline_editor(roi)
         self._sync_active_roi(roi)
         self._request_ui_refresh("roi-controls")
     def _roi_mgr_item_changed(self, item: QtWidgets.QTableWidgetItem) -> None:
@@ -434,6 +660,14 @@ class RoiControlsMixin:
         if not hasattr(self, '_roi_show_all_enabled'):
             self._roi_show_all_enabled = False
         self._roi_show_all_enabled = checked
+        if getattr(self, "roi_show_all_chk", None) is not None and bool(self.roi_show_all_chk.isChecked()) != bool(checked):
+            self.roi_show_all_chk.blockSignals(True)
+            self.roi_show_all_chk.setChecked(bool(checked))
+            self.roi_show_all_chk.blockSignals(False)
+        if self.roi_manager_widget is not None and bool(self.roi_manager_widget.show_all_btn.isChecked()) != bool(checked):
+            self.roi_manager_widget.show_all_btn.blockSignals(True)
+            self.roi_manager_widget.show_all_btn.setChecked(bool(checked))
+            self.roi_manager_widget.show_all_btn.blockSignals(False)
         logger.info(f"Show All ROIs: {'ON' if checked else 'OFF'}")
         self._request_ui_refresh("roi-controls")
 
@@ -442,6 +676,17 @@ class RoiControlsMixin:
         if not hasattr(self, '_roi_show_current_slice_only'):
             self._roi_show_current_slice_only = False
         self._roi_show_current_slice_only = checked
+        if getattr(self, "roi_show_current_slice_only_chk", None) is not None and bool(self.roi_show_current_slice_only_chk.isChecked()) != bool(checked):
+            self.roi_show_current_slice_only_chk.blockSignals(True)
+            self.roi_show_current_slice_only_chk.setChecked(bool(checked))
+            self.roi_show_current_slice_only_chk.blockSignals(False)
+        if (
+            self.roi_manager_widget is not None
+            and bool(self.roi_manager_widget.show_current_slice_only_btn.isChecked()) != bool(checked)
+        ):
+            self.roi_manager_widget.show_current_slice_only_btn.blockSignals(True)
+            self.roi_manager_widget.show_current_slice_only_btn.setChecked(bool(checked))
+            self.roi_manager_widget.show_current_slice_only_btn.blockSignals(False)
         
         # Get current slice indices from view_state
         current_z = getattr(self.controller.view_state, 'z', 0)
@@ -730,10 +975,13 @@ class RoiControlsMixin:
     def _roi_mgr_selected(self) -> Optional[Roi]:
         if self.roi_manager_widget is None:
             return None
+        selected = self.roi_manager_widget.get_selected_rois() if hasattr(self.roi_manager_widget, "get_selected_rois") else []
+        if selected:
+            return selected[0]
         rows = {idx.row() for idx in self.roi_manager_widget.table.selectionModel().selectedRows()}
         if not rows:
             return None
-        rois = self.roi_manager.list_rois(self.primary_image.id)
+        rois = list(getattr(self.roi_manager_widget, "_current_rois", []) or [])
         row = min(rows)
         if 0 <= row < len(rois):
             return rois[row]
@@ -761,3 +1009,5 @@ class RoiControlsMixin:
             self.roi_rect = rect
             self.roi_shape = "box"
         self._sync_roi_controls()
+        self._sync_roi_inline_editor(roi)
+        self._request_ui_refresh("roi-controls")

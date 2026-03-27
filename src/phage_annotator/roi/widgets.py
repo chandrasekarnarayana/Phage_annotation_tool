@@ -25,6 +25,7 @@ class RoiManagerWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self.manager = manager
         self._current_rois: List[Roi] = []  # cache for multi-select support
+        self._all_rois: List[Roi] = []
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(6)
@@ -93,10 +94,19 @@ class RoiManagerWidget(QtWidgets.QWidget):
 
     def set_rois(self, rois: List[Roi]) -> None:
         """Populate table with ROIs, preserving selection if possible."""
-        self._current_rois = rois  # cache for multi-select
+        self._all_rois = list(rois)
+        display_rois = (
+            [
+                roi for roi in self._all_rois
+                if any(tag in getattr(roi, "tags", []) for tag in self._tag_filter)
+            ]
+            if self._tag_filter
+            else list(self._all_rois)
+        )
+        self._current_rois = display_rois
         self.table.blockSignals(True)
-        self.table.setRowCount(len(rois))
-        for row, roi in enumerate(rois):
+        self.table.setRowCount(len(display_rois))
+        for row, roi in enumerate(display_rois):
             # Name
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(roi.name))
             # Type
@@ -137,18 +147,8 @@ class RoiManagerWidget(QtWidgets.QWidget):
             tags: List of tags to filter by (empty list = show all)
         """
         self._tag_filter = tags
-        # Re-display ROIs applying the filter
-        if tags:
-            filtered_rois = [
-                roi for roi in self._current_rois
-                if any(tag in roi.tags for tag in tags)
-            ]
-            self.set_rois(filtered_rois)
-        else:
-            # Show all
-            self.set_rois(self._current_rois)
+        self.set_rois(self._all_rois)
     
     def get_tag_filter(self) -> List[str]:
         """Get currently active tag filter."""
         return self._tag_filter
-

@@ -25,25 +25,37 @@ class DisplayControlsMixin(DisplayContrastMixin):
     def _hist_scope_widget(self):
         return getattr(self, "contrast_hist_scope_combo", None) or getattr(self, "hist_scope_combo", None)
 
+    def _sync_role_for_panel(self, panel_key: str):
+        """Return the lazy-table role key associated with a canvas panel."""
+        key = str(panel_key or "").strip().lower()
+        if not key:
+            return None
+        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
+        modality = panel_map.get(key)
+        if modality is not None:
+            idx = int(getattr(modality, "idx", -1))
+            if idx >= 0:
+                return idx
+        if key == "frame":
+            return 0
+        if key == "support":
+            return 1
+        if key in {"mean", "std"}:
+            return f"builtin:{key}"
+        if key.startswith("modality_"):
+            try:
+                return int(key.split("_", 1)[1])
+            except Exception:
+                return None
+        return None
+
     def _sync_mode_enabled_for_panel(self, panel_key: str, mode_key: str) -> bool:
         """Return whether a panel participates in a given sync mode."""
         key = str(panel_key or "").strip()
         mode = str(mode_key or "").strip().lower()
         if not key or mode not in {"contrast", "zoom", "playback"}:
             return False
-        if not hasattr(self, "_sync_key_for_panel"):
-            return True
-        role = None
-        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        modality = panel_map.get(key)
-        if modality is not None:
-            idx = int(getattr(modality, "idx", -1))
-            role = idx if idx >= 0 else None
-        if role is None and key.startswith("modality_"):
-            try:
-                role = int(key.split("_", 1)[1])
-            except Exception:
-                role = None
+        role = self._sync_role_for_panel(key)
         if role is None:
             return True
         modes = self._lazy_sync_modes_state() if hasattr(self, "_lazy_sync_modes_state") else {}
@@ -318,10 +330,101 @@ class DisplayControlsMixin(DisplayContrastMixin):
             self._request_ui_refresh("display-controls")
 
     def _toggle_play(self, axis: str) -> None:
-        if self.play_mode == axis:
-            self.stop_playback_t()
+        axis = str(axis or "").strip().lower()
+        if axis not in {"t", "z"}:
             return
-        self.start_playback_t()
+        source_panel = str(self._playback_source_panel_key()) if hasattr(self, "_playback_source_panel_key") else "frame"
+        source_img = self._playback_source_image() if hasattr(self, "_playback_source_image") else None
+        source_id = int(getattr(source_img, "id", -1)) if source_img is not None else -1
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[GUI] Playback toggle requested axis={axis} panel={source_panel} image_id={source_id}",
+                category="GUI",
+            )
+        if hasattr(getattr(self, "recorder", None), "record"):
+            try:
+                self.recorder.record(
+                    "gui_play_toggle",
+                    {"axis": axis, "panel": source_panel, "image_id": source_id},
+                )
+            except Exception:
+                pass
+        timer = getattr(self, "play_timer", None)
+
+        # Toggle off when clicking the active play mode.
+        if timer is not None and timer.isActive() and str(getattr(self, "play_mode", "")) == axis:
+            timer.stop()
+            self.play_mode = None
+            self._sync_playback_button_labels(None)
+            if hasattr(self, "_append_log"):
+                self._append_log(f"[GUI] Playback stopped axis={axis}", category="GUI")
+            self._update_status()
+            return
+
+        # Stop any currently running playback mode.
+        if getattr(self, "_playback_mode", False):
+            self.stop_playback_t()
+        if timer is not None and timer.isActive():
+            timer.stop()
+
+        # Prefer high-FPS threaded playback for T when possible.
+        if axis == "t":
+            self.start_playback_t()
+            if getattr(self, "_playback_mode", False):
+                self._sync_playback_button_labels("t")
+                return
+
+        # Fallback: timer-driven slider playback (works for Z and non-RAW T views).
+        if timer is None:
+            return
+        self.play_mode = axis
+        fps = max(1, int(getattr(self, "speed_slider", None).value() if getattr(self, "speed_slider", None) is not None else 10))
+        timer.setInterval(max(16, int(1000 / fps)))
+        timer.start()
+        self._sync_playback_button_labels(axis)
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[GUI] Playback started axis={axis} fps={int(fps)} loop={bool(getattr(self, 'loop_playback', False))}",
+                category="GUI",
+            )
+        self._update_status()
+
+    def _sync_playback_button_labels(self, active_axis: str | None) -> None:
+        """Reflect active playback mode in play button text."""
+        axis = str(active_axis or "").strip().lower()
+        if getattr(self, "play_t_btn", None) is not None:
+            self.play_t_btn.setText("Stop T" if axis == "t" else "Play T")
+        if getattr(self, "play_z_btn", None) is not None:
+            self.play_z_btn.setText("Stop Z" if axis == "z" else "Play Z")
+
+    def _on_play_timer_tick(self) -> None:
+        """Advance T/Z slider for timer-based playback mode."""
+        axis = str(getattr(self, "play_mode", "") or "").strip().lower()
+        if axis not in {"t", "z"}:
+            timer = getattr(self, "play_timer", None)
+            if timer is not None and timer.isActive():
+                timer.stop()
+            self._sync_playback_button_labels(None)
+            return
+
+        slider = self.t_slider if axis == "t" else self.z_slider
+        if slider is None:
+            return
+        next_value = int(slider.value()) + 1
+        if next_value > int(slider.maximum()):
+            if bool(getattr(self, "loop_playback", False)):
+                next_value = int(slider.minimum())
+            else:
+                timer = getattr(self, "play_timer", None)
+                if timer is not None and timer.isActive():
+                    timer.stop()
+                self.play_mode = None
+                self._sync_playback_button_labels(None)
+                if hasattr(self, "_append_log"):
+                    self._append_log(f"[GUI] Playback reached end axis={axis} (loop off)", category="GUI")
+                self._update_status()
+                return
+        slider.setValue(int(next_value))
 
     def _init_modality_playback(self) -> None:
         if getattr(self, "modality_playback", None) is None:
@@ -370,6 +473,29 @@ class DisplayControlsMixin(DisplayContrastMixin):
 
     def _on_loop_change(self) -> None:
         self.loop_playback = self.loop_chk.isChecked()
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[GUI] Loop playback {'enabled' if self.loop_playback else 'disabled'}",
+                category="GUI",
+            )
+        if getattr(self, "_playback_mode", False):
+            try:
+                self._playback_ring.reset()
+                self._playback_cursor = int(self.t_slider.value())
+                if hasattr(self, "_restart_playback_prefetch"):
+                    self._restart_playback_prefetch(self._playback_cursor)
+                if hasattr(self, "_append_log"):
+                    self._append_log(
+                        f"[GUI] Playback prefetch reconfigured loop={bool(self.loop_playback)} t={int(self._playback_cursor)}",
+                        category="GUI",
+                    )
+            except Exception:
+                pass
+        if hasattr(getattr(self, "recorder", None), "record"):
+            try:
+                self.recorder.record("gui_loop_toggle", {"enabled": bool(self.loop_playback)})
+            except Exception:
+                pass
 
     def _on_speed_change(self, value: int) -> None:
         if getattr(self, "fps_label", None) is not None:
@@ -379,6 +505,13 @@ class DisplayControlsMixin(DisplayContrastMixin):
         if timer is not None:
             fps = max(1, int(value))
             timer.setInterval(max(16, int(1000 / fps)))
+        if hasattr(self, "_append_log"):
+            self._append_log(f"[GUI] Playback speed set fps={int(value)}", category="GUI")
+        if hasattr(getattr(self, "recorder", None), "record"):
+            try:
+                self.recorder.record("gui_playback_speed", {"fps": int(value)})
+            except Exception:
+                pass
 
     def _on_axis_mode_change(self, mode: str) -> None:
         self.stop_playback_t()
@@ -757,6 +890,24 @@ class DisplayControlsMixin(DisplayContrastMixin):
     def _on_marker_size_change(self, val: int) -> None:
         self.marker_size = float(val)
         self._settings.setValue("markerSize", int(val))
+        for attr in ("marker_size_spin", "annotate_marker_size_spin"):
+            widget = getattr(self, attr, None)
+            if widget is None:
+                continue
+            if int(widget.value()) == int(val):
+                continue
+            widget.blockSignals(True)
+            widget.setValue(int(val))
+            widget.blockSignals(False)
+        self._request_ui_refresh("display-controls")
+
+    def _on_marker_shape_change(self, _index: int = -1) -> None:
+        combo = getattr(self, "annotate_marker_shape_combo", None)
+        if combo is None or combo.count() <= 0:
+            return
+        marker = str(combo.currentData() or "o").strip() or "o"
+        self.marker_shape = marker
+        self._settings.setValue("markerShape", marker)
         self._request_ui_refresh("display-controls")
 
     def _on_click_radius_change(self, val: float) -> None:
@@ -1027,6 +1178,37 @@ class DisplayControlsMixin(DisplayContrastMixin):
         )
         self._auto_job_id = handle.job_id
 
+    def _auto_contrast_panel(self, panel_key: str) -> None:
+        """Apply a quick auto-contrast window to one panel immediately."""
+        key = str(panel_key or "").strip().lower()
+        if not key:
+            return
+        panel_map = getattr(self, "_panel_modality_map", {})
+        modality = panel_map.get(key)
+        if modality is not None:
+            auto_img = self._image_obj_from_id(int(modality.image_id))
+        elif key == "support":
+            auto_img = getattr(self, "support_image", None)
+        else:
+            auto_img = getattr(self, "primary_image", None)
+        if auto_img is None:
+            return
+        if auto_img.array is None:
+            self._ensure_loaded(auto_img.id)
+            if auto_img.array is None:
+                return
+        low_pct = float(self._settings.value("autoLowPct", 0.35))
+        high_pct = float(self._settings.value("autoHighPct", 99.65))
+        slice_data = self._slice_data(auto_img)
+        stride = max(1, int(getattr(self, "downsample_factor", 1)))
+        quick = slice_data[::stride, ::stride]
+        vmin, vmax = compute_auto_window(quick, low_pct, high_pct)
+        self._apply_auto_to_panels([key], vmin, vmax)
+        if hasattr(self, "_schedule_refresh"):
+            self._schedule_refresh()
+        else:
+            self._request_ui_refresh("display-controls")
+
     def _apply_auto_to_panels(
         self, panel_ids: List[str], vmin: float, vmax: float
     ) -> None:
@@ -1232,26 +1414,8 @@ class DisplayControlsMixin(DisplayContrastMixin):
     def _sync_key_for_panel(self, panel_key: str) -> str:
         """Return sync key for a panel from lazy modality/view group mapping."""
         groups = self._lazy_sync_groups_state() if hasattr(self, "_lazy_sync_groups_state") else {}
-        key = str(panel_key or "").strip()
-        if not key:
-            return ""
-        panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
-        modality = panel_map.get(key)
-        if modality is not None:
-            idx = int(getattr(modality, "idx", -1))
-            if idx >= 0:
-                text = str(groups.get(idx, "")).strip()
-                if text:
-                    return text
-        if key.startswith("modality_"):
-            try:
-                idx = int(key.split("_", 1)[1])
-                text = str(groups.get(idx, "")).strip()
-                if text:
-                    return text
-            except Exception:
-                pass
-        return ""
+        role = self._sync_role_for_panel(panel_key)
+        return str(groups.get(role, "")).strip() if role is not None else ""
 
     def _update_sync_keys_hint(self) -> None:
         """Show available sync keys and effective target source."""

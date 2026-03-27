@@ -86,7 +86,7 @@ class RenderContext:
         Per-panel colormaps.
     panel_ranges : dict[str, tuple[float, float]]
         Per-panel vmin/vmax ranges used as a fallback.
-    panel_annotations : dict[str, list[tuple[float, float, str, bool]]]
+    panel_annotations : dict[str, list[tuple[float, float, str, bool, bool]]]
         Per-panel display coordinates for annotations:
         (x, y, color, selected).
     suggestion_staleness_labels : dict[str, list[tuple[float, float, str]]]
@@ -99,6 +99,8 @@ class RenderContext:
         Always-visible non-interactive header text rendered above the frame panel.
     marker_size : float
         Marker size for scatter annotations.
+    marker_shape : str
+        Matplotlib marker code for annotation points.
     localization_points : list[tuple[float, float, float]]
         Optional localization overlays as (x, y, value).
     localization_visible : bool
@@ -152,12 +154,13 @@ class RenderContext:
     titles: Dict[str, str]
     extents: Dict[str, Tuple[float, float, float, float]]
     std_range: Tuple[float, float]
-    panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]]
+    panel_annotations: Dict[str, List[Tuple[float, float, str, bool, bool]]]
     suggestion_staleness_labels: Dict[str, List[Tuple[float, float, str]]]
     roi_overlays: Dict[str, List[Tuple[str, object, str]]]
     overlay_text: Optional[str]
     canvas_header_text: Optional[str]
     marker_size: float
+    marker_shape: str
     norms: Dict[str, matplotlib.colors.Normalize]
     panel_cmaps: Dict[str, matplotlib.colors.Colormap]
     panel_ranges: Dict[str, Tuple[float, float]]
@@ -407,12 +410,31 @@ class Renderer:
             ax = self.axes.get(panel)
             if ax is None or not points:
                 continue
-            xs = [p[0] for p in points]
-            ys = [p[1] for p in points]
-            selected = [p[3] for p in points]
-            colors = ["#ff2d95" if sel else p[2] for p, sel in zip(points, selected)]
-            sizes = [ctx.marker_size * (1.3 if sel else 1.0) for sel in selected]
-            ax.scatter(xs, ys, c=colors, s=sizes, marker="o", edgecolors="k")
+            marker = str(getattr(ctx, "marker_shape", "o") or "o")
+            filled_points = [p for p in points if len(p) < 5 or bool(p[4])]
+            hollow_points = [p for p in points if len(p) >= 5 and not bool(p[4])]
+            if hollow_points:
+                xs = [p[0] for p in hollow_points]
+                ys = [p[1] for p in hollow_points]
+                selected = [bool(p[3]) for p in hollow_points]
+                colors = ["#ff2d95" if sel else p[2] for p, sel in zip(hollow_points, selected)]
+                sizes = [ctx.marker_size * (1.4 if sel else 1.1) for sel in selected]
+                ax.scatter(
+                    xs,
+                    ys,
+                    s=sizes,
+                    marker="o",
+                    facecolors="none",
+                    edgecolors=colors,
+                    linewidths=[1.8 if sel else 1.4 for sel in selected],
+                )
+            if filled_points:
+                xs = [p[0] for p in filled_points]
+                ys = [p[1] for p in filled_points]
+                selected = [bool(p[3]) for p in filled_points]
+                colors = ["#ff2d95" if sel else p[2] for p, sel in zip(filled_points, selected)]
+                sizes = [ctx.marker_size * (1.3 if sel else 1.0) for sel in selected]
+                ax.scatter(xs, ys, c=colors, s=sizes, marker=marker, edgecolors="k")
         for panel, labels in ctx.suggestion_staleness_labels.items():
             ax = self.axes.get(panel)
             if ax is None or not labels:

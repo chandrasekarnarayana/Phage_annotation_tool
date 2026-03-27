@@ -143,6 +143,11 @@ class ActionsMixin(
         self._bump_job_generation()
         paths = self.controller.open_files(self)
         if paths:
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[GUI] Open files from main import ({len(paths)} selected)",
+                    category="GUI",
+                )
             self.recorder.record("open_files", {"count": len(paths)})
             self._open_files_from_paths(paths)
 
@@ -152,6 +157,11 @@ class ActionsMixin(
         self._bump_job_generation()
         paths = self.controller.open_folder(self)
         if paths:
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[GUI] Open folder from main import ({len(paths)} files discovered)",
+                    category="GUI",
+                )
             self.recorder.record("open_folder", {"count": len(paths)})
             # Load metadata for all files in the background with progress + cancel (P1.3)
             files = list(paths)
@@ -173,6 +183,11 @@ class ActionsMixin(
                 if not result:
                     return
                 new_images = result
+                if hasattr(self, "_append_log"):
+                    self._append_log(
+                        f"[GUI] Folder load completed ({len(new_images)} image(s) added)",
+                        category="GUI",
+                    )
                 # Add images and update UI on GUI thread
                 self.controller.add_images(new_images)
                 for meta in new_images:
@@ -180,6 +195,11 @@ class ActionsMixin(
                 # Build annotation index (lightweight) and update availability
                 try:
                     self.controller.build_annotation_index(files[0].parent)
+                    if hasattr(self, "_append_log"):
+                        self._append_log(
+                            f"[Annotations] Indexed annotation files in {files[0].parent}",
+                            category="Annotations",
+                        )
                 except Exception:
                     logger.warning("Failed to build annotation index after opening folder", exc_info=True)
                 self._refresh_annotation_availability()
@@ -401,20 +421,33 @@ class ActionsMixin(
 
     def _visible_suggestions(self) -> list[PointSuggestion]:
         """Return suggestions visible on active image and T/Z slice."""
-        return self.controller.get_visible_suggestions(
+        visible = self.controller.get_visible_suggestions(
             self.primary_image.id,
             t_index=int(self.t_slider.value()),
             z_index=int(self.z_slider.value()),
             min_score=float(getattr(self, "_suggestion_score_threshold", 0.0)),
         )
+        return self._filter_suggestions_to_active_roi(visible)
 
     def _suggestions_for_current_tz(self) -> list[PointSuggestion]:
         """Return all suggestions for active image and current T/Z, including decided history rows."""
-        return self.controller.get_slice_suggestions(
+        visible = self.controller.get_slice_suggestions(
             int(self.primary_image.id),
             t_index=int(self.t_slider.value()),
             z_index=int(self.z_slider.value()),
         )
+        return self._filter_suggestions_to_active_roi(visible)
+
+    def _filter_suggestions_to_active_roi(
+        self, suggestions: list[PointSuggestion]
+    ) -> list[PointSuggestion]:
+        if str(getattr(self, "roi_shape", "none")) == "none":
+            return list(suggestions or [])
+        return [
+            suggestion
+            for suggestion in list(suggestions or [])
+            if self._point_in_roi(float(getattr(suggestion, "x", 0.0)), float(getattr(suggestion, "y", 0.0)))
+        ]
 
     def _candidate_suggestion_strategies(self) -> list[str]:
         """Return available suggestion strategies for the current context."""
@@ -728,7 +761,7 @@ class ActionsMixin(
                 row.source_modality = modality_id
                 row.meta.setdefault("features", {})
                 row.meta["features"][modality_id] = dict(row.score_components)
-            return rows
+            return self._filter_suggestions_to_active_roi(rows)
 
         # Projection-space generation changes the evidence basis without
         # changing the annotation truth path. It stays deterministic for
@@ -756,7 +789,7 @@ class ActionsMixin(
                     row.meta.setdefault("features", {})
                     row.meta["generation_space"] = "projection"
                     row.meta["features"][row.source_modality] = dict(row.score_components)
-                return rows
+                return self._filter_suggestions_to_active_roi(rows)
             except Exception:
                 pass
 
@@ -781,7 +814,7 @@ class ActionsMixin(
                         row.source_modality = "stack_aware"
                         row.meta.setdefault("features", {})
                         row.meta["features"]["stack_aware"] = dict(row.score_components)
-                    return rows
+                    return self._filter_suggestions_to_active_roi(rows)
                 except Exception as exc:
                     import sys
                     print(f"Warning: stack-aware prediction failed: {exc}", file=sys.stderr)
@@ -794,7 +827,9 @@ class ActionsMixin(
         if strategy_key in ("evidence_consensus", "consensus"):
             use_modalities = [mid for mid in ("raw", "corrected", "mean_projection") if mid in frames]
             modality_candidates = {mid: _predict_one(mid, frames[mid]) for mid in use_modalities}
-            return self._merge_modal_consensus(modality_candidates, k_required=2)
+            return self._filter_suggestions_to_active_roi(
+                self._merge_modal_consensus(modality_candidates, k_required=2)
+            )
 
         if strategy_key in ("evidence_contradiction",):
             base_ids = [mid for mid in ("raw", "corrected", "mean_projection") if mid in frames]
@@ -802,10 +837,10 @@ class ActionsMixin(
             seeds = self._merge_modal_consensus(modality_candidates, k_required=1)
             cfg = getattr(self, "_suggestion_rule_config", None)
             if cfg is None:
-                return seeds
+                return self._filter_suggestions_to_active_roi(seeds)
             rule = getattr(cfg, "semantic_rules", {}).get(strategy_key)
             if rule is None:
-                return seeds
+                return self._filter_suggestions_to_active_roi(seeds)
             for suggestion in seeds:
                 features = dict(suggestion.meta.get("features", {}))
                 penalty = 0.0
@@ -845,19 +880,21 @@ class ActionsMixin(
                     suggestion.meta["uncertainty_reason"] = suggestion.uncertainty_reason
                     suggestion.uncertainty_score = float(max(float(getattr(suggestion, "uncertainty_score", 0.0) or 0.0), min(1.0, contradiction)))
                     suggestion.meta["uncertainty_score"] = float(suggestion.uncertainty_score)
-            return seeds
+            return self._filter_suggestions_to_active_roi(seeds)
 
         # Legacy channel strategies still supported via existing gating.
         seed_id = "current_view" if "current_view" in frames else next(iter(frames.keys()))
         seeded = _predict_one(seed_id, frames[seed_id])
         if strategy_key.startswith("channel_"):
-            return self._apply_cross_channel_gating(
-                seeded,
-                strategy=strategy_key,
-                t_idx=t_idx,
-                z_idx=z_idx,
+            return self._filter_suggestions_to_active_roi(
+                self._apply_cross_channel_gating(
+                    seeded,
+                    strategy=strategy_key,
+                    t_idx=t_idx,
+                    z_idx=z_idx,
+                )
             )
-        return seeded
+        return self._filter_suggestions_to_active_roi(seeded)
 
     def _load_suggestion_rule_config_dialog(self) -> None:
         """Load JSON/YAML experiment rule config for cross-channel gating."""
@@ -1322,7 +1359,19 @@ class ActionsMixin(
 
     def _toggle_suggestions_overlay(self, checked: bool) -> None:
         """Toggle suggestion overlay rendering."""
-        self._show_suggestion_overlay = bool(checked)
+        visible = bool(checked)
+        self._show_suggestion_overlay = visible
+        if getattr(self, "review_queue_panel", None) is not None and hasattr(
+            self.review_queue_panel, "show_suggestions_chk"
+        ):
+            self.review_queue_panel.show_suggestions_chk.blockSignals(True)
+            self.review_queue_panel.show_suggestions_chk.setChecked(visible)
+            self.review_queue_panel.show_suggestions_chk.blockSignals(False)
+        action = getattr(self, "toggle_suggestions_overlay_act", None)
+        if action is not None and bool(action.isChecked()) != visible:
+            action.blockSignals(True)
+            action.setChecked(visible)
+            action.blockSignals(False)
         self._request_ui_refresh("standard-actions")
 
     def _visible_suggestions_uncertain_first(self) -> list[PointSuggestion]:
@@ -1696,6 +1745,19 @@ class ActionsMixin(
         self._suggestion_cursor = (int(getattr(self, "_suggestion_cursor", 0)) - 1) % len(ranked)
         self._focus_current_uncertain_suggestion()
 
+    def _schedule_suggestion_decision_followup(self, *, refresh_table: bool, run_qc: bool) -> None:
+        """Defer review follow-up work so accept/reject feels responsive."""
+        def _run() -> None:
+            if refresh_table:
+                self._refresh_table()
+            self._request_ui_refresh("standard-actions")
+            if run_qc:
+                self._schedule_qc_validation(self.primary_image.id)
+            self._refresh_assist_warmup_panel()
+            self._focus_current_uncertain_suggestion()
+
+        QtCore.QTimer.singleShot(0, _run)
+
     def _accept_current_uncertain_suggestion(self) -> None:
         if not self._ensure_annotation_write_context_confirmed("Accept current suggestion"):
             return
@@ -1726,14 +1788,10 @@ class ActionsMixin(
             self._note_annotation_edit(self.primary_image.id)
             self.undo_act.setEnabled(self.controller.can_undo())
             self.redo_act.setEnabled(self.controller.can_redo())
-            self._refresh_table()
-            self._request_ui_refresh("standard-actions")
-            self._schedule_qc_validation(self.primary_image.id)
             if bool(getattr(self, "_timed_session_active", False)):
                 self._timed_session_accepts = int(getattr(self, "_timed_session_accepts", 0)) + 1
                 self._timed_session_points = int(getattr(self, "_timed_session_points", 0)) + 1
-            self._refresh_assist_warmup_panel()
-        self._focus_current_uncertain_suggestion()
+            self._schedule_suggestion_decision_followup(refresh_table=True, run_qc=True)
 
     def _accept_and_next_uncertain_suggestion(self) -> None:
         """Mirror keyboard cadence A then N for mixed-input review workflows."""
@@ -1771,11 +1829,9 @@ class ActionsMixin(
         if self.controller.execute_view_command(cmd):
             self.undo_act.setEnabled(self.controller.can_undo())
             self.redo_act.setEnabled(self.controller.can_redo())
-            self._request_ui_refresh("standard-actions")
             if bool(getattr(self, "_timed_session_active", False)):
                 self._timed_session_rejects = int(getattr(self, "_timed_session_rejects", 0)) + 1
-            self._refresh_assist_warmup_panel()
-        self._focus_current_uncertain_suggestion()
+            self._schedule_suggestion_decision_followup(refresh_table=False, run_qc=False)
 
     def _show_current_suggestion_patch(self) -> None:
         """Show a small snap-view patch around the current uncertain suggestion."""

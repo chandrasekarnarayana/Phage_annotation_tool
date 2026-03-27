@@ -34,6 +34,10 @@ class UiAnnotationViewsMixin:
         """Return currently available canvas views for annotation visibility controls."""
         table = getattr(self, "lazy_modality_table", None)
         availability: dict[str, bool] = {}
+        panel_visibility = {
+            str(key): bool(value)
+            for key, value in dict(getattr(self, "_panel_visibility", {}) or {}).items()
+        }
         if table is not None and table.rowCount() > 0:
             for row in range(table.rowCount()):
                 name_item = table.item(row, 2)
@@ -54,18 +58,19 @@ class UiAnnotationViewsMixin:
                         panel_key = ""
                 if not panel_key:
                     continue
+                if str(panel_key) in panel_visibility:
+                    availability[str(panel_key)] = bool(panel_visibility.get(str(panel_key), False))
+                    continue
                 visible_chk = (
                     self._lazy_checkbox_from_cell(table.cellWidget(row, 0))
                     if hasattr(self, "_lazy_checkbox_from_cell")
                     else table.cellWidget(row, 0)
                 )
-                is_selected_visible = bool(
+                availability[str(panel_key)] = bool(
                     isinstance(visible_chk, QtWidgets.QCheckBox) and visible_chk.isChecked()
                 )
-                availability[str(panel_key)] = is_selected_visible
             if availability:
                 return availability
-        panel_visibility = dict(getattr(self, "_panel_visibility", {}) or {})
         availability = {"frame": bool(panel_visibility.get("frame", True))}
         for key, visible in panel_visibility.items():
             k = str(key)
@@ -280,11 +285,16 @@ class UiAnnotationViewsMixin:
             combo.addItem(f"{labels.get(str(key), str(label))}{suffix}", str(key))
         combo.blockSignals(False)
         if combo.count() <= 0:
+            combo.setEnabled(False)
             hint = getattr(self, "target_unavailable_hint_lbl", None)
             if hint is not None:
                 hint.setText("No visible target view. Enable at least one view in Lazy Loading.")
                 hint.setVisible(True)
+            badge = getattr(self, "target_state_badge_lbl", None)
+            if badge is not None:
+                badge.setText("Write target: -")
             return
+        combo.setEnabled(True)
         idx = combo.findData(current_target)
         if idx < 0:
             idx = 0

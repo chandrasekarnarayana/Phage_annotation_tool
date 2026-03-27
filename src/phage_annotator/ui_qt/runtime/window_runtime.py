@@ -54,6 +54,7 @@ def init_settings_runtime(owner) -> None:
 def init_display_runtime_preferences(owner) -> None:
     """Initialize persisted display/layout preferences consumed across mixins."""
     owner.marker_size = owner._get_setting("markerSize", 40, int)
+    owner.marker_shape = str(owner._get_setting("markerShape", "o", str) or "o")
     owner.click_radius_px = owner._get_setting("clickRadiusPx", 6.0, float)
     owner._canvas_layout_rows = int(owner._settings.value("canvasLayoutRows", 0, type=int))
     owner._canvas_layout_cols = int(owner._settings.value("canvasLayoutCols", 0, type=int))
@@ -311,6 +312,9 @@ def init_feature_runtime_state(owner) -> None:
     owner._density_last_result = None
     owner._density_last_panel = "frame"
     owner._show_suggestion_overlay = True
+    owner._suggestion_overlay_limit = int(
+        owner._settings.value("suggestionOverlayLimit", 24, type=int)
+    )
     from phage_annotator.analysis.suggestion_model import LocalPeakSuggestionModel
 
     owner._suggestion_model = LocalPeakSuggestionModel()

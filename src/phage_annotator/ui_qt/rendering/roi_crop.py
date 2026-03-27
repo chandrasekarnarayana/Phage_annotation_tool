@@ -203,6 +203,22 @@ class RoiCropMixin:
         self._request_ui_refresh("roi-crop")
 
     def _sync_roi_controls(self) -> None:
+        if not all(
+            hasattr(self, attr)
+            for attr in ("roi_x_spin", "roi_y_spin", "roi_w_spin", "roi_h_spin")
+        ):
+            return
+        group = getattr(self, "roi_shape_group", None)
+        if group is not None:
+            buttons = list(group.buttons())
+            if len(buttons) >= 2:
+                is_box = str(getattr(self, "roi_shape", "box")) == "box"
+                buttons[0].blockSignals(True)
+                buttons[1].blockSignals(True)
+                buttons[0].setChecked(bool(is_box))
+                buttons[1].setChecked(not bool(is_box))
+                buttons[0].blockSignals(False)
+                buttons[1].blockSignals(False)
         rect = self.roi_rect
         self.roi_x_spin.blockSignals(True)
         self.roi_y_spin.blockSignals(True)
@@ -263,6 +279,8 @@ class RoiCropMixin:
         self.roi_rect = rect
         self._store_roi_for_current_sync_group()
         self.recorder.record("roi_change", {"rect": self.roi_rect, "shape": self.roi_shape})
+        if hasattr(self, "_refresh_roi_manager"):
+            self._refresh_roi_manager()
         self._request_ui_refresh("roi-crop")
 
     def _on_roi_shape_change(self) -> None:
@@ -277,6 +295,8 @@ class RoiCropMixin:
         self.roi_shape = shape
         self._store_roi_for_current_sync_group()
         self.recorder.record("roi_shape", {"shape": shape})
+        if hasattr(self, "_refresh_roi_manager"):
+            self._refresh_roi_manager()
         self._request_ui_refresh("roi-crop")
 
     def _auto_roi_mode_changed(self, text: str) -> None:
@@ -430,6 +450,11 @@ class RoiCropMixin:
 
     def _on_crop_change(self) -> None:
         """Handle crop spinbox changes with validation and clamping to image bounds."""
+        if any(
+            getattr(self, attr, None) is None
+            for attr in ("crop_x_spin", "crop_y_spin", "crop_w_spin", "crop_h_spin")
+        ):
+            return
         # Get current values from spinboxes
         x = float(self.crop_x_spin.value())
         y = float(self.crop_y_spin.value())
@@ -479,6 +504,11 @@ class RoiCropMixin:
         self._request_ui_refresh("roi-crop")
 
     def _sync_crop_controls(self) -> None:
+        if any(
+            getattr(self, attr, None) is None
+            for attr in ("crop_x_spin", "crop_y_spin", "crop_w_spin", "crop_h_spin")
+        ):
+            return
         if self.crop_rect is None:
             rect = (0.0, 0.0, 0.0, 0.0)
         else:

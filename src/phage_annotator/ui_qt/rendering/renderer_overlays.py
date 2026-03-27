@@ -13,6 +13,46 @@ from phage_annotator.ui_qt.rendering.lut_manager import LUTS
 class RenderingOverlayMixin:
     """Mixin for overlay, label, and header text generation."""
 
+    def _visible_suggestion_overlay_rows(self) -> List[object]:
+        if not bool(getattr(self, "_show_suggestion_overlay", True)):
+            return []
+        image_id = self.primary_image.id
+        t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
+        z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
+        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
+        rows = list(
+            self.controller.get_visible_suggestions(
+                image_id,
+                t_index=t_idx,
+                z_index=z_idx,
+                min_score=min_score,
+            )
+        )
+        if hasattr(self, "_filter_suggestions_to_active_roi"):
+            rows = list(self._filter_suggestions_to_active_roi(rows))
+        selected_suggestion_id = str(getattr(self, "_selected_suggestion_id", "") or "")
+        max_points = int(getattr(self, "_suggestion_overlay_limit", 24) or 24)
+        if max_points > 0 and len(rows) > max_points:
+            pinned = [
+                suggestion
+                for suggestion in rows
+                if str(getattr(suggestion, "suggestion_id", "")) == selected_suggestion_id
+            ]
+            remaining = [
+                suggestion
+                for suggestion in rows
+                if str(getattr(suggestion, "suggestion_id", "")) != selected_suggestion_id
+            ]
+            remaining.sort(
+                key=lambda suggestion: float(
+                    getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0))
+                ),
+                reverse=True,
+            )
+            budget = max(0, max_points - len(pinned))
+            rows = pinned[:1] + remaining[:budget]
+        return rows
+
     def _particle_labels(self) -> List[Tuple[float, float, str]]:
         if self.particles_panel is None or not self.particles_panel.show_labels_chk.isChecked():
             return []
@@ -27,42 +67,29 @@ class RenderingOverlayMixin:
             labels.append((x, y, str(idx + 1)))
         return labels
 
-    def _build_panel_annotations(self) -> Dict[str, List[Tuple[float, float, str, bool]]]:
+    def _build_panel_annotations(self) -> Dict[str, List[Tuple[float, float, str, bool, bool]]]:
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         show_all_annotations = bool(
             getattr(getattr(self, "show_ann_master_chk", None), "isChecked", lambda: True)()
         )
         points_visible_by_panel = dict(getattr(self, "_annotation_panel_visibility", {}) or {})
-        suggestion_points: List[Tuple[float, float, str, bool]] = []
-        if bool(getattr(self, "_show_suggestion_overlay", True)):
-            image_id = self.primary_image.id
-            t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
-            z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
-            min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
-            selected_suggestion_id = str(getattr(self, "_selected_suggestion_id", "") or "")
-            for suggestion in self.suggestions.get(image_id, ()):
-                if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
-                    continue
-                if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
-                    continue
-                score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
-                if score < min_score:
-                    continue
-                color, _state = self._suggestion_overlay_style(suggestion)
-                suggestion_points.append(
-                    (
-                        float(suggestion.x),
-                        float(suggestion.y),
-                        color,
-                        str(getattr(suggestion, "suggestion_id", "")) == selected_suggestion_id,
-                    )
+        suggestion_points: List[Tuple[float, float, str, bool, bool]] = []
+        selected_suggestion_id = str(getattr(self, "_selected_suggestion_id", "") or "")
+        for suggestion in self._visible_suggestion_overlay_rows():
+            color, _state = self._suggestion_overlay_style(suggestion)
+            suggestion_points.append(
+                (
+                    float(suggestion.x),
+                    float(suggestion.y),
+                    color,
+                    str(getattr(suggestion, "suggestion_id", "")) == selected_suggestion_id,
+                    False,
                 )
-        panel_annotations: Dict[str, List[Tuple[float, float, str, bool]]] = {}
+            )
+        panel_annotations: Dict[str, List[Tuple[float, float, str, bool, bool]]] = {}
         for panel in panel_map.keys():
             pts = []
             if show_all_annotations and bool(points_visible_by_panel.get(str(panel), True)):
-                drag_state = dict(getattr(self, "_assist_drag_refine_state", {}) or {})
-                drag_annotation_id = str(drag_state.get("annotation_id", "") or "")
                 for kp in self.controller.annotations_for_panel(str(panel)):
                     source = str(getattr(kp, "source", "manual")).strip().lower()
                     if source.startswith("suggested:"):
@@ -70,9 +97,7 @@ class RenderingOverlayMixin:
                     else:
                         color = self._label_color(kp.label, faded=kp.image_id != self.primary_image.id)
                     selected_ids = getattr(self, "_selected_annotation_ids", set()) or set()
-                    x = float(drag_state.get("preview_x", kp.x)) if str(getattr(kp, "annotation_id", "")) == drag_annotation_id else kp.x
-                    y = float(drag_state.get("preview_y", kp.y)) if str(getattr(kp, "annotation_id", "")) == drag_annotation_id else kp.y
-                    pts.append((x, y, color, str(kp.annotation_id) in selected_ids))
+                    pts.append((kp.x, kp.y, color, str(kp.annotation_id) in selected_ids, True))
             if suggestion_points and str(panel) == str(next(iter(panel_map.keys()), "")):
                 pts.extend(suggestion_points)
             if not pts:
@@ -80,7 +105,7 @@ class RenderingOverlayMixin:
                 continue
             panel_ax = self.renderer.axes.get(panel) if getattr(self, "renderer", None) is not None else None
             scale = self._axis_scale(panel_ax) if panel_ax is not None else 1.0
-            panel_annotations[panel] = [(x / scale, y / scale, c, s) for x, y, c, s in pts]
+            panel_annotations[panel] = [(x / scale, y / scale, c, s, f) for x, y, c, s, f in pts]
         return panel_annotations
 
     def _build_suggestion_staleness_labels(self) -> Dict[str, List[Tuple[float, float, str]]]:
@@ -88,24 +113,13 @@ class RenderingOverlayMixin:
         labels: Dict[str, List[Tuple[float, float, str]]] = {str(k): [] for k in panel_keys}
         if not bool(getattr(self, "_show_suggestion_overlay", True)):
             return labels
-        image_id = self.primary_image.id
-        t_idx = int(self.t_slider.value()) if hasattr(self, "t_slider") else 0
-        z_idx = int(self.z_slider.value()) if hasattr(self, "z_slider") else 0
-        min_score = float(getattr(self, "_suggestion_score_threshold", 0.0))
         now_ts = float(time.time())
         frame_ax = None
         if getattr(self, "renderer", None) is not None:
             frame_ax = next(iter(self.renderer.axes.values()), None)
         scale = self._axis_scale(frame_ax) if frame_ax is not None else 1.0
         primary_panel = panel_keys[0] if panel_keys else ""
-        for suggestion in self.suggestions.get(image_id, ()):
-            if int(getattr(suggestion, "t", -1)) not in (t_idx, -1):
-                continue
-            if int(getattr(suggestion, "z", -1)) not in (z_idx, -1):
-                continue
-            score = float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0)))
-            if score < min_score:
-                continue
+        for suggestion in self._visible_suggestion_overlay_rows():
             ts = dict(getattr(suggestion, "meta", {}) or {}).get("generated_at_ts")
             if ts is None:
                 continue

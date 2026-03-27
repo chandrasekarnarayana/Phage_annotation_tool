@@ -54,6 +54,8 @@ class EventsMixin(KeyboardEventsMixin):
             self._bind_controller_signals()
         self.play_t_btn.clicked.connect(lambda: self._toggle_play("t"))
         self.play_z_btn.clicked.connect(lambda: self._toggle_play("z"))
+        if getattr(self, "play_timer", None) is not None:
+            self.play_timer.timeout.connect(self._on_play_timer_tick)
         self.t_minus_button.clicked.connect(lambda: self._step_slider(self.t_slider, -1))
         self.t_plus_button.clicked.connect(lambda: self._step_slider(self.t_slider, 1))
         self.z_minus_button.clicked.connect(lambda: self._step_slider(self.z_slider, -1))
@@ -83,7 +85,8 @@ class EventsMixin(KeyboardEventsMixin):
         self.auto_set_btn.clicked.connect(self._auto_set_dialog)
         if getattr(self, "pixel_size_spin", None) is not None:
             self.pixel_size_spin.valueChanged.connect(self._on_pixel_size_change)
-        self.reset_view_btn.clicked.connect(self.reset_all_view)
+        if getattr(self, "reset_view_btn", None) is not None:
+            self.reset_view_btn.clicked.connect(self.reset_all_view)
         self.lut_combo.currentIndexChanged.connect(self._on_lut_change)
         self.lut_invert_chk.stateChanged.connect(self._on_lut_invert)
         self.gamma_slider.valueChanged.connect(self._on_gamma_change)
@@ -111,6 +114,10 @@ class EventsMixin(KeyboardEventsMixin):
         elif getattr(self, "target_group", None) is not None:
             self.target_group.buttonClicked.connect(self._on_target_change)
         self.marker_size_spin.valueChanged.connect(self._on_marker_size_change)
+        if getattr(self, "annotate_marker_size_spin", None) is not None:
+            self.annotate_marker_size_spin.valueChanged.connect(self._on_marker_size_change)
+        if getattr(self, "annotate_marker_shape_combo", None) is not None:
+            self.annotate_marker_shape_combo.currentIndexChanged.connect(self._on_marker_shape_change)
         self.click_radius_spin.valueChanged.connect(self._on_click_radius_change)
         self.show_profile_chk.stateChanged.connect(self._on_profile_chk_changed)
         self.show_hist_chk.stateChanged.connect(self._on_hist_chk_changed)
@@ -145,15 +152,16 @@ class EventsMixin(KeyboardEventsMixin):
             if getattr(self, "bc_dialog_btn", None) is not None:
                 self.bc_dialog_btn.clicked.connect(self._open_contrast_dialog)
             self.bc_apply_btn.clicked.connect(self._apply_display_mapping)
-        self.roi_shape_group.buttonClicked.connect(self._on_roi_shape_change)
-        self.roi_x_spin.valueChanged.connect(self._on_roi_change)
-        self.roi_y_spin.valueChanged.connect(self._on_roi_change)
-        self.roi_w_spin.valueChanged.connect(self._on_roi_change)
-        self.roi_h_spin.valueChanged.connect(self._on_roi_change)
-        self.crop_x_spin.valueChanged.connect(self._on_crop_change)
-        self.crop_y_spin.valueChanged.connect(self._on_crop_change)
-        self.crop_w_spin.valueChanged.connect(self._on_crop_change)
-        self.crop_h_spin.valueChanged.connect(self._on_crop_change)
+        if getattr(self, "roi_shape_group", None) is not None:
+            self.roi_shape_group.buttonClicked.connect(self._on_roi_shape_change)
+        for attr in ("roi_x_spin", "roi_y_spin", "roi_w_spin", "roi_h_spin"):
+            spin = getattr(self, attr, None)
+            if spin is not None:
+                spin.valueChanged.connect(self._on_roi_change)
+        for attr in ("crop_x_spin", "crop_y_spin", "crop_w_spin", "crop_h_spin"):
+            spin = getattr(self, attr, None)
+            if spin is not None:
+                spin.valueChanged.connect(self._on_crop_change)
         if getattr(self, "auto_roi_btn", None) is not None:
             self.auto_roi_btn.clicked.connect(self._run_auto_roi)
         if getattr(self, "auto_roi_mode_combo", None) is not None:
@@ -273,7 +281,10 @@ class EventsMixin(KeyboardEventsMixin):
     def _bind_controller_signals(self) -> None:
         """Bind immediate Qt controller signals used for GUI synchronization."""
         self.controller.annotations_changed.connect(
-            lambda: self._request_ui_refresh("controller-annotations", table=True, image=True, status=True)
+            lambda: (
+                self._request_ui_refresh("controller-annotations", table=True, image=True, status=True),
+                QtCore.QTimer.singleShot(0, self._refresh_assist_warmup_panel),
+            )
         )
         self.controller.view_changed.connect(self._on_controller_view_changed)
         self.controller.state_changed.connect(
@@ -328,6 +339,7 @@ class EventsMixin(KeyboardEventsMixin):
         """Handle annotation changes from event bus."""
         try:
             self._request_ui_refresh("annotations-event", table=True, image=True, status=True)
+            QtCore.QTimer.singleShot(0, self._refresh_assist_warmup_panel)
         except Exception:
             logger.warning("Failed to handle AnnotationChangedEvent", exc_info=True)
 
@@ -459,7 +471,8 @@ class EventsMixin(KeyboardEventsMixin):
             return
         self._playback_ring.reset()
         self._playback_cursor = self.t_slider.value()
-        self._prefetcher.start(self._playback_cursor, self.z_slider.value())
+        if hasattr(self, "_restart_playback_prefetch"):
+            self._restart_playback_prefetch(self._playback_cursor)
 
     def _on_z_slider_pressed(self) -> None:
         if self._playback_mode:
@@ -473,23 +486,14 @@ class EventsMixin(KeyboardEventsMixin):
             return
         self._playback_ring.reset()
         self._playback_cursor = self.t_slider.value()
-        self._prefetcher.start(self._playback_cursor, self.z_slider.value())
+        if hasattr(self, "_restart_playback_prefetch"):
+            self._restart_playback_prefetch(self._playback_cursor)
 
     def _on_mouse_press(self, event) -> None:
         if self._toolbar_navigation_active():
             return
         if self._interactive:
             return
-        if (
-            getattr(event, "button", None) == 1
-            and getattr(event, "inaxes", None) in self._get_image_axes()
-            and getattr(event, "xdata", None) is not None
-            and getattr(event, "ydata", None) is not None
-        ):
-            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
-            if hasattr(self, "_start_assist_refine_drag") and self._start_assist_refine_drag(event.inaxes, fx, fy):
-                self._start_interaction()
-                return
         self._start_interaction()
 
     def _on_mouse_release(self, event) -> None:
@@ -497,36 +501,12 @@ class EventsMixin(KeyboardEventsMixin):
             return
         if not self._interactive:
             return
-        if (
-            getattr(event, "button", None) == 1
-            and getattr(event, "inaxes", None) in self._get_image_axes()
-            and getattr(event, "xdata", None) is not None
-            and getattr(event, "ydata", None) is not None
-            and hasattr(self, "_finish_assist_refine_drag")
-        ):
-            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
-            if self._finish_assist_refine_drag(event.inaxes, fx, fy):
-                self._end_interaction()
-                return
-        if hasattr(self, "_cancel_assist_refine_drag"):
-            self._cancel_assist_refine_drag()
         self._end_interaction()
 
     def _on_mouse_move(self, event) -> None:
         if self._toolbar_navigation_active():
             QtWidgets.QToolTip.hideText()
             return
-        if (
-            self._interactive
-            and getattr(event, "inaxes", None) in self._get_image_axes()
-            and getattr(event, "xdata", None) is not None
-            and getattr(event, "ydata", None) is not None
-            and hasattr(self, "_update_assist_refine_drag")
-        ):
-            fx, fy = self._to_full_coords(event.inaxes, event.xdata, event.ydata)
-            if self._update_assist_refine_drag(event.inaxes, fx, fy):
-                QtWidgets.QToolTip.hideText()
-                return
         if self._interactive:
             QtWidgets.QToolTip.hideText()
             self._schedule_refresh()

@@ -557,6 +557,7 @@ class RenderingMixin(RenderingOverlayMixin):
             overlay_text=overlay_text,
             canvas_header_text=canvas_header_text,
             marker_size=self.marker_size,
+            marker_shape=str(getattr(self, "marker_shape", "o") or "o"),
             norms=norms,
             panel_cmaps=panel_cmaps,
             panel_ranges=panel_ranges,

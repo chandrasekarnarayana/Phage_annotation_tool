@@ -75,6 +75,11 @@ class WorkspaceActionsMixin:
         for p in paths:
             meta = read_metadata(p)
             new_images.append(meta)
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[GUI] Loaded {len(new_images)} image metadata record(s) from explicit paths",
+                category="GUI",
+            )
         self.controller.add_images(new_images)
         for meta in new_images:
             self.roi_manager.rois_by_image[meta.id] = []
@@ -107,8 +112,18 @@ class WorkspaceActionsMixin:
 
     def _maybe_autoload_annotations(self, image_id: int) -> None:
         if not self._settings.value("autoLoadAnnotations", True, type=bool):
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[Annotations] Auto-load skipped for image id={int(image_id)} (disabled in preferences)",
+                    category="Annotations",
+                )
             return
         if self.controller.annotations_are_loaded(image_id):
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[Annotations] Auto-load skipped for image id={int(image_id)} (already loaded)",
+                    category="Annotations",
+                )
             return
         if not self.controller.annotation_entries_for_image(image_id):
             img = next(
@@ -124,10 +139,28 @@ class WorkspaceActionsMixin:
                     self.controller.build_annotation_index(
                         pathlib.Path(str(getattr(img, "path", ""))).parent
                     )
+                    if hasattr(self, "_append_log"):
+                        self._append_log(
+                            f"[Annotations] Rebuilt annotation index for image id={int(image_id)} "
+                            f"folder={pathlib.Path(str(getattr(img, 'path', ''))).parent}",
+                            category="Annotations",
+                        )
                 except Exception:
                     pass
         if not self.controller.annotation_entries_for_image(image_id):
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[Annotations] Auto-load found no annotation candidates for image id={int(image_id)}",
+                    category="Annotations",
+                )
             return
+        entries = self.controller.annotation_entries_for_image(image_id)
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[Annotations] Auto-load queued for image id={int(image_id)} "
+                f"with {len(entries)} candidate file(s)",
+                category="Annotations",
+            )
         cal = self._get_calibration_state(image_id)
         pixel_size_nm = cal.pixel_size_um_per_px * 1000.0 if cal.pixel_size_um_per_px else None
         self._start_annotation_load_job(image_id, replace=False, pixel_size_nm=pixel_size_nm)
@@ -138,6 +171,11 @@ class WorkspaceActionsMixin:
         existing = self._annotation_job_tokens.get(image_id)
         if existing is not None:
             existing.cancel()
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[Annotations] Cancelled previous annotation-load job for image id={int(image_id)}",
+                    category="Annotations",
+                )
 
         def _worker(progress, cancel):
             paths = [entry.path for entry in self.controller.annotation_entries_for_image(image_id)]
@@ -154,6 +192,12 @@ class WorkspaceActionsMixin:
             if result is None:
                 return
             points, imports = result
+            if hasattr(self, "_append_log"):
+                self._append_log(
+                    f"[Annotations] Loaded {len(points)} annotation point(s) for image id={int(image_id)} "
+                    f"from {len(imports)} file import(s)",
+                    category="Annotations",
+                )
             self.controller._record_annotation_imports(imports)
             if replace:
                 self.controller.replace_annotations(image_id, points)
@@ -197,6 +241,11 @@ class WorkspaceActionsMixin:
             self._append_log(f"[Annotations] Load error for image id={image_id}\n{err}")
 
         self._status_info("Loading annotations…", timeout_ms=2000, source="workspace.annotations_load")
+        if hasattr(self, "_append_log"):
+            self._append_log(
+                f"[Annotations] Starting annotation-load job for image id={int(image_id)} replace={bool(replace)}",
+                category="Annotations",
+            )
         handle = self.jobs.submit(
             _worker,
             name="Load annotations",

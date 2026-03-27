@@ -146,6 +146,18 @@ def refresh_review_queue_panel(owner) -> None:
     visible_count = len(ranked)
     roi_count = len([s for s in ranked if owner._point_in_roi(float(s.x), float(s.y))]) if hasattr(owner, "_point_in_roi") else visible_count
     panel.remaining_lbl.setText(f"Queue: {visible_count} uncertain | ROI: {roi_count}")
+    generating = bool(getattr(owner, "_assist_generation_running", False))
+    generation_message = str(getattr(owner, "_assist_generation_message", "") or "Generating suggestions...")
+    generation_progress = getattr(owner, "_assist_generation_progress", None)
+    if generating:
+        panel.progress_lbl.setText(generation_message)
+        if generation_progress is None:
+            panel.progress_bar.setRange(0, 0)
+        else:
+            panel.progress_bar.setRange(0, 100)
+            panel.progress_bar.setValue(int(max(0, min(100, int(generation_progress)))))
+    else:
+        panel.progress_bar.setRange(0, 100)
     
     # Prepare assist state info
     freshness = owner._suggestion_freshness_state(owner.primary_image.id, ranked)
@@ -225,10 +237,11 @@ def refresh_review_queue_panel(owner) -> None:
     panel.accept_green_btn.setEnabled(True)
     
     # Update progress
-    processed, total = review_queue_progress_counts(owner)
-    panel.progress_lbl.setText(f"Progress: {processed} / {total}")
-    panel.progress_bar.setValue(int(round(100.0 * float(processed) / max(1.0, float(total)))) if total > 0 else 0)
-    
+    if not generating:
+        processed, total = review_queue_progress_counts(owner)
+        panel.progress_lbl.setText(f"Progress: {processed} / {total}")
+        panel.progress_bar.setValue(int(round(100.0 * float(processed) / max(1.0, float(total)))) if total > 0 else 0)
+
     owner._refresh_suggestion_explain_panel(current)
 
 

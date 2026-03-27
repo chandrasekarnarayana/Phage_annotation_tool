@@ -349,18 +349,39 @@ def generate_dummy_image(
         raise ValueError(f"Unknown dummy mode: {mode}")
 
     tif.imwrite(path, data, photometric="minisblack", metadata=metadata)
-    
-    # Generate annotation CSV
-    csv_path = path.with_suffix('.csv')
-    with open(csv_path, 'w', newline='') as f:
-        if all_spots:
-            fieldnames = list(all_spots[0].keys())
-        else:
-            fieldnames = ['y', 'x', 'sigma', 'intensity']
-        
+
+    # Generate annotation CSV using the app's canonical import schema.
+    # Required columns for keypoints_from_csv: image_name, t, z, y, x
+    standardized_rows = []
+    image_name = path.name
+    for spot in all_spots:
+        row_t = -1
+        row_z = -1
+        if mode == "t":
+            row_t = int(spot.get("timepoint", -1))
+        elif mode == "z":
+            row_z = int(spot.get("timepoint", -1))
+        elif mode == "tz":
+            row_t = int(spot.get("t", -1))
+            row_z = int(spot.get("z", -1))
+        standardized_rows.append(
+            {
+                "image_name": image_name,
+                "t": row_t,
+                "z": row_z,
+                "y": float(spot.get("y", -1)),
+                "x": float(spot.get("x", -1)),
+                "label": "phage",
+                "source": "demo_ground_truth",
+            }
+        )
+
+    csv_path = path.with_suffix(".csv")
+    with open(csv_path, "w", newline="") as f:
+        fieldnames = ["image_name", "t", "z", "y", "x", "label", "source"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(all_spots)
+        writer.writerows(standardized_rows)
     
     return DummyImageArtifacts(path, csv_path)
 
