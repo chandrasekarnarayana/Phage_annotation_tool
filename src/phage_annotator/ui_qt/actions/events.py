@@ -34,6 +34,10 @@ class EventsMixin(KeyboardEventsMixin):
             self.lazy_open_btn.pressed.connect(self._open_lazy_loader_dialog)
         if getattr(self, "lazy_clear_btn", None) is not None:
             self.lazy_clear_btn.pressed.connect(self._clear_lazy_loader_sources)
+        if getattr(self, "lazy_loader_tree", None) is not None:
+            self.lazy_loader_tree.currentItemChanged.connect(
+                self._on_lazy_loader_tree_item_changed
+            )
         if getattr(self, "lazy_add_raw_btn", None) is not None:
             self.lazy_add_raw_btn.pressed.connect(lambda: self._add_lazy_modality_view("raw"))
         if getattr(self, "lazy_add_mean_btn", None) is not None:

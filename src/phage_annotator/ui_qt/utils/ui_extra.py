@@ -1467,6 +1467,36 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         tree.expandAll()
         tree.blockSignals(False)
 
+    def _on_lazy_loader_tree_item_changed(self, current, _previous) -> None:
+        """Sync active image to the selected lazy-loader tree entry.
+
+        This keeps Add Modality/Add View defaults aligned with the user's
+        selected file/folder in the loader browser.
+        """
+        if current is None or not getattr(self, "images", None):
+            return
+        path = str(current.data(0, QtCore.Qt.ItemDataRole.UserRole) or "").strip()
+        if not path:
+            return
+        manifest = getattr(self, "_lazy_loader_manifest", None)
+        image_ids: list[int] = []
+        if manifest is not None and hasattr(manifest, "subtree_image_ids"):
+            try:
+                image_ids = [int(v) for v in (manifest.subtree_image_ids(path) or [])]
+            except Exception:
+                image_ids = []
+        if not image_ids:
+            lookup = dict(getattr(self, "_lazy_loader_path_to_ids", {}) or {})
+            image_ids = [int(v) for v in (lookup.get(path, []) or [])]
+        if not image_ids:
+            return
+        active_id = int(getattr(getattr(self, "primary_image", None), "id", image_ids[0]))
+        target_id = active_id if active_id in image_ids else int(image_ids[0])
+        target_idx = int(self._image_index_for_id(target_id))
+        if int(getattr(self, "current_image_idx", -1)) == target_idx:
+            return
+        self._set_primary_combo(target_idx, refresh_lazy_table=True, schedule_prefetch=False)
+
     def _open_lazy_loader_dialog(self) -> None:
         """Open a small menu that can add files or folders through one button."""
         btn = getattr(self, "lazy_open_btn", None)
@@ -1693,12 +1723,13 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         from phage_annotator.session.modality import ProjectionType
 
         proj_key = str(projection_key).strip().lower()
+        active_image_id = int(getattr(getattr(self, "primary_image", None), "id", getattr(self, "current_image_idx", 0)))
         if proj_key in {"mean", "std"}:
             builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
             cfg = dict(builtin.get(proj_key, {}) or {})
             cfg["projection"] = proj_key
             cfg.setdefault("name", "Mean Projection" if proj_key == "mean" else "Std Projection")
-            cfg.setdefault("image_id", int(getattr(self, "current_image_idx", 0)))
+            cfg.setdefault("image_id", active_image_id)
             builtin[proj_key] = cfg
             self._lazy_builtin_views = builtin
             self._panel_visibility[proj_key] = True
@@ -1716,7 +1747,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         }.get(proj_key, ProjectionType.RAW)
         try:
             modality = manager.add_modality(
-                image_id=int(getattr(self, "current_image_idx", 0)),
+                image_id=active_image_id,
                 projection_type=proj,
             )
         except Exception as exc:
