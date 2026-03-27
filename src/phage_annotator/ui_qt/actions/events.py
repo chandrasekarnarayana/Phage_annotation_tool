@@ -37,7 +37,16 @@ class EventsMixin(KeyboardEventsMixin):
             self.lazy_modality_table.itemChanged.connect(self._on_lazy_modality_item_changed)
         if getattr(self, "lazy_open_btn", None) is not None:
             self.lazy_open_btn.pressed.connect(self._open_lazy_loader_dialog)
-            self.lazy_remove_btn.pressed.connect(self._clear_lazy_loader_sources)
+        if getattr(self, "lazy_clear_btn", None) is not None:
+            self.lazy_clear_btn.pressed.connect(self._clear_lazy_loader_sources)
+        if getattr(self, "lazy_add_raw_btn", None) is not None:
+            self.lazy_add_raw_btn.pressed.connect(lambda: self._add_lazy_modality_view("raw"))
+        if getattr(self, "lazy_add_mean_btn", None) is not None:
+            self.lazy_add_mean_btn.pressed.connect(lambda: self._add_lazy_modality_view("mean"))
+        if getattr(self, "lazy_add_std_btn", None) is not None:
+            self.lazy_add_std_btn.pressed.connect(lambda: self._add_lazy_modality_view("std"))
+        if getattr(self, "lazy_remove_btn", None) is not None:
+            self.lazy_remove_btn.pressed.connect(self._remove_selected_lazy_modality_view)
         if getattr(self, "lazy_auto_update_chk", None) is not None:
             self.lazy_auto_update_chk.toggled.connect(self._on_lazy_auto_update_toggled)
         if getattr(self, "lazy_apply_btn", None) is not None:

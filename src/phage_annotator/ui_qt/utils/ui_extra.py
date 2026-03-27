@@ -328,19 +328,6 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         bar.addAction(qc_act)
 
-        # Add separator and collapse/expand toggle
-        bar.addSeparator()
-        collapse_act = QtWidgets.QAction(
-            right_sidebar_icon(self.style(), "collapse"),
-            "Collapse/Expand Sidebar",
-            self,
-        )
-        collapse_act.setObjectName("right_sidebar_collapse_toggle")
-        collapse_act.setToolTip("Collapse (←) or Expand (→) right sidebar")
-        collapse_act.triggered.connect(self._toggle_right_sidebar_collapse)
-        bar.addAction(collapse_act)
-        self.right_sidebar_collapse_action = collapse_act
-
         self.annotation_toolbar = bar
         self.annotation_toolbar_action = table_act
         self.right_sidebar_actions = {
