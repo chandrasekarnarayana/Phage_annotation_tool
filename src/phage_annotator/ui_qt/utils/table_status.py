@@ -460,20 +460,42 @@ class TableStatusMixin:
             self._block_table = False
 
     def _on_table_selection(self) -> None:
+        logger = get_panel_logger("annotation_table")
         if self._block_table:
             return
         selected_ids = set()
+        selected_annotations = []
+        selected_suggestions = []
         if self.annot_table.selectionModel() is not None:
             for idx in self.annot_table.selectionModel().selectedRows():
                 kp = self._keypoint_for_table_row(idx.row())
                 if kp is not None:
                     selected_ids.add(str(kp.annotation_id))
+                    selected_annotations.append({
+                        "annotation_id": str(kp.annotation_id),
+                        "label": str(kp.label),
+                        "t": int(kp.t),
+                        "z": int(kp.z),
+                    })
                 else:
                     suggestion = self._suggestion_for_table_row(idx.row())
                     if suggestion is not None:
                         self._selected_suggestion_id = str(getattr(suggestion, "suggestion_id", ""))
+                        selected_suggestions.append({
+                            "suggestion_id": self._selected_suggestion_id,
+                            "score": float(getattr(suggestion, "score", 0.0)),
+                        })
                         self._focus_suggestion(suggestion)
                         self._refresh_suggestion_explain_panel(suggestion)
+        
+        logger.log_action(
+            "table_selection_changed",
+            annotation_count=len(selected_annotations),
+            suggestion_count=len(selected_suggestions),
+            annotation_ids=selected_annotations,
+            suggestion_ids=selected_suggestions,
+        )
+        
         self._selected_annotation_ids = selected_ids
         self._request_ui_refresh("table-status", table=True)
 

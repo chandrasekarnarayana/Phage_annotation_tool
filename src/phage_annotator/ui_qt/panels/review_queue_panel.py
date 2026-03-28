@@ -5,6 +5,7 @@ from __future__ import annotations
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
 from phage_annotator.ui_qt.panels.suggestion_explain_panel import SuggestionExplainPanel
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 
 
 class ReviewQueuePanel(QtWidgets.QWidget):
@@ -427,6 +428,7 @@ class ReviewQueuePanel(QtWidgets.QWidget):
 
     def set_suggestions(self, rows: list[dict[str, str]], current_row: int) -> None:
         """Populate suggested-points table and keep selected row in sync."""
+        logger = get_panel_logger("assist")
         status_bg = {
             "accepted": QtGui.QColor("#e8f5e9"),
             "rejected": QtGui.QColor("#ffebee"),
@@ -437,6 +439,20 @@ class ReviewQueuePanel(QtWidgets.QWidget):
             "rejected": QtGui.QColor("#b71c1c"),
             "proposed": QtGui.QColor("#7f6000"),
         }
+        
+        # Log suggestion queue update
+        accepted = sum(1 for r in rows if str(r.get("status", "")).lower() == "accepted")
+        rejected = sum(1 for r in rows if str(r.get("status", "")).lower() == "rejected")
+        proposed = len(rows) - accepted - rejected
+        logger.log_action(
+            "suggestion_queue_updated",
+            total_suggestions=len(rows),
+            accepted_count=accepted,
+            rejected_count=rejected,
+            proposed_count=proposed,
+            current_row_idx=current_row,
+        )
+        
         self.suggestions_table.blockSignals(True)
         self.suggestions_table.setRowCount(len(rows))
         for ridx, row in enumerate(rows):

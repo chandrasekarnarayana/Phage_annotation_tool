@@ -15,6 +15,7 @@ from phage_annotator.session.suggestion_commands import (
     ClearSuggestionsCommand,
     RejectSuggestionCommand,
 )
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 
 
 def _set_generation_progress(
@@ -45,6 +46,7 @@ def _set_generation_progress(
 
 def suggest_points_current_slice(owner) -> None:
     """Generate ranked suggestions for the active T/Z slice."""
+    logger = get_panel_logger("assist")
     image = owner.primary_image
     image_id = image.id
     t_idx = int(owner.t_slider.value())
@@ -53,6 +55,18 @@ def suggest_points_current_slice(owner) -> None:
     label = str(owner.current_label)
     if owner._slice_data(image) is None:
         return
+    
+    logger.log_action(
+        "suggest_points_started",
+        image_id=int(image_id),
+        image_name=str(image.name),
+        scope="current_slice",
+        t_idx=t_idx,
+        z_idx=z_idx,
+        strategy=strategy,
+        label=label,
+    )
+    
     _set_generation_progress(
         owner,
         running=True,
