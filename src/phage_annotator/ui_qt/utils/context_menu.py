@@ -12,6 +12,7 @@ from phage_annotator.session.context_commands import (
     SnapToLocalMaxCommand,
 )
 from phage_annotator.ui_qt.dialogs.metadata_editor_dialog import MetadataEditorDialog
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 from phage_annotator.utils.hit_testing import HitTester
 
 
@@ -139,6 +140,13 @@ class ContextMenuMixin:
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
+        logger = get_panel_logger("annotate")
+        changes = {}
+        if draft.label != annotation.label:
+            changes["label"] = {"old": annotation.label, "new": draft.label}
+        if draft.meta != annotation.meta:
+            changes["meta"] = {"old": annotation.meta.copy(), "new": draft.meta.copy()}
+        
         command = EditNearestMetadataCommand(
             self.controller,
             self.primary_image.id,
@@ -150,3 +158,11 @@ class ContextMenuMixin:
             new_meta=dict(draft.meta),
         )
         self._execute_context_command(command, "Updated annotation metadata.")
+        
+        if changes:
+            logger.log_action(
+                "edit_annotation_metadata",
+                annotation_id=int(annotation.annotation_id) if annotation.annotation_id else None,
+                image_id=int(annotation.image_id),
+                changes=changes,
+            )

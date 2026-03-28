@@ -18,6 +18,8 @@ except ImportError:  # pragma: no cover - exercised in headless CI/test envs
     QtCore = _MissingQtWidgets()
     QtGui = _MissingQtWidgets()
 
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
+
 from phage_annotator.annotation.core import Keypoint
 from phage_annotator.tools import Tool
 from phage_annotator.ui_qt.assist_state import (
@@ -555,11 +557,18 @@ class TableStatusMixin:
             )
             if reply != QtWidgets.QMessageBox.StandardButton.Yes:
                 return
+        logger = get_panel_logger("annotate")
         by_image = {}
         for kp in removed:
             by_image.setdefault(int(kp.image_id), []).append(kp)
         for image_id, rows in by_image.items():
             self.controller.delete_annotations(int(image_id), rows)
+        logger.log_action(
+            "delete_selected_annotations",
+            count=len(removed),
+            by_image_id={str(img_id): len(pts) for img_id, pts in by_image.items()},
+            labels=[str(kp.label) for kp in removed],
+        )
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
         self._request_ui_refresh("table-status", table=True)

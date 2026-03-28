@@ -8,6 +8,7 @@ import numpy as np
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 from phage_annotator.tools.router import Tool
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 
 
 class AnnotationsMixin:
@@ -160,6 +161,7 @@ class AnnotationsMixin:
             ),
             self.primary_image,
         )
+        logger = get_panel_logger("annotate")
         self.controller.add_annotation(
             image_id=target_image_id,
             image_name=str(getattr(source_image, "name", self.primary_image.name)),
@@ -171,6 +173,17 @@ class AnnotationsMixin:
             scope=scope,
             modality_idx=context.get("modality_idx"),
             annotation_context=str(context.get("context_key", "")),
+        )
+        logger.log_action(
+            "add_annotation",
+            image_id=target_image_id,
+            t=t,
+            z=z,
+            y=round(float(y), 2),
+            x=round(float(x), 2),
+            label=label,
+            scope=scope,
+            context_key=context.get("context_key"),
         )
         self.undo_act.setEnabled(self.controller.can_undo())
         self.redo_act.setEnabled(self.controller.can_redo())
@@ -219,7 +232,19 @@ class AnnotationsMixin:
                 removed = pts[idx]
                 # Confirmation for click deletion (P3.3) - only for multi-select delete via table
                 # Single clicks typically don't need confirmation for better UX
+                logger = get_panel_logger("annotate")
                 self.controller.delete_annotations(removed.image_id, [removed])
+                logger.log_action(
+                    "delete_annotation_near",
+                    image_id=int(removed.image_id),
+                    t=int(removed.t),
+                    z=int(removed.z),
+                    y=round(float(removed.y), 2),
+                    x=round(float(removed.x), 2),
+                    label=removed.label,
+                    click_x=round(float(x), 2),
+                    click_y=round(float(y), 2),
+                )
                 self.undo_act.setEnabled(self.controller.can_undo())
                 self.redo_act.setEnabled(self.controller.can_redo())
                 self._update_status()
