@@ -1,11 +1,10 @@
-"""Lightweight, non-blocking UI action logging for complete diagnostics.
+"""Unified UI action logging for both file storage and real-time GUI display.
 
-This module provides:
-- Fast action logging with timing
-- Automatic parameter capture
-- Background async writing
-- Error tracking
-- Reproducible session replay
+This module provides a SINGLE logging system that handles:
+- File-based persistence (phage_annotator_actions.jsonl)
+- Real-time GUI display (MainWindow._all_logs)
+- Non-blocking async I/O
+- Complete action tracking with timing and errors
 """
 
 from __future__ import annotations
@@ -26,7 +25,10 @@ LOGGER = get_logger(__name__)
 
 
 class ActionLogger:
-    """Non-blocking UI action recorder for full session diagnostics."""
+    """Unified action logger - handles BOTH file and GUI logging."""
+
+    # Class-level GUI owner reference (set by MainWindow at startup)
+    _gui_owner: Optional[Any] = None
 
     def __init__(self, log_file: Optional[Path] = None):
         """Initialize action logger with optional file output.
@@ -41,6 +43,19 @@ class ActionLogger:
         self.running = False
         self.writer_thread: Optional[Thread] = None
         self._start_writer()
+
+    @classmethod
+    def set_gui_owner(cls, owner: Optional[Any]) -> None:
+        """Set the global GUI owner for real-time log display.
+        
+        Called once from MainWindow.__init__() to enable unified logging.
+        
+        Parameters
+        ----------
+        owner : MainWindow or None
+            The main window instance (has _append_log method)
+        """
+        cls._gui_owner = owner
 
     def _start_writer(self) -> None:
         """Start background thread for writing logs."""
@@ -74,25 +89,27 @@ class ActionLogger:
         details: Optional[Dict[str, Any]] = None,
         duration_ms: Optional[float] = None,
         error: Optional[str] = None,
-        gui_callback: Optional[Any] = None,
     ) -> None:
-        """Log a UI action with metadata.
+        """Log a UI action to BOTH file and GUI in a unified operation.
 
         Parameters
         ----------
         action : str
-            Action name (e.g., 'add_modality', 'change_projection')
+            Action name (e.g., 'add_annotation', 'pixel_size_change')
         panel : str
-            Panel name (lazy_loader, prepare, annotate, contrast, assist, qc, annotation_table)
+            Panel name (annotate, prepare, qc, assist, table, etc.)
         details : dict, optional
             Action-specific parameters
         duration_ms : float, optional
             Duration of action in milliseconds
         error : str, optional
             Error message if action failed
-        gui_callback : callable, optional
-            Callback to update GUI logs (e.g., owner._append_log)
+        
+        Note: This method automatically handles both:
+        1. File persistence (phage_annotator_actions.jsonl async)
+        2. GUI display (MainWindow._all_logs real-time)
         """
+        # Record for file storage
         record = {
             "timestamp": time.time(),
             "action": str(action).strip(),
@@ -101,23 +118,44 @@ class ActionLogger:
             "duration_ms": float(duration_ms) if duration_ms else None,
             "error": str(error).strip() if error else None,
         }
+        
+        # Queue to file (async, non-blocking)
         try:
             self.queue.put_nowait(record)
         except Exception:
             LOGGER.debug("Action log queue full, dropping oldest")
         
-        # Also push to GUI logs in real-time if callback provided
-        if gui_callback is not None:
-            try:
-                # Format for GUI display
-                details_str = " | ".join(f"{k}={v}" for k, v in (details or {}).items()) if details else ""
-                summary = f"[{panel.upper()}] {action}"
-                if details_str:
-                    summary = f"{summary} | {details_str[:100]}"  # Truncate for readability
-                gui_callback(summary, severity="INFO", category="Action")
-            except Exception:
-                # Fail silently if GUI callback fails
-                pass
+        # Push to GUI in real-time if owner is available
+        if ActionLogger._gui_owner is not None:
+            self._push_to_gui(action, panel, details)
+
+    def _push_to_gui(
+        self, 
+        action: str, 
+        panel: str, 
+        details: Optional[Dict[str, Any]]
+    ) -> None:
+        """Push formatted action to GUI logs via _append_log().
+        
+        This is called automatically from log_action() when GUI owner is set.
+        """
+        try:
+            # Format summary for GUI display
+            detail_items = " | ".join(
+                f"{k}={v}" for k, v in (details or {}).items()
+            ) if details else ""
+            summary = f"[{panel.upper()}] {action}"
+            if detail_items:
+                # Truncate details for readability (100 char limit)
+                summary = f"{summary} | {detail_items[:100]}"
+            
+            # Call _append_log on the GUI owner
+            owner = ActionLogger._gui_owner
+            if hasattr(owner, "_append_log"):
+                owner._append_log(summary, severity="INFO", category="Action")
+        except Exception:
+            # Silently fail - don't let GUI logging break file logging
+            pass
 
     def log_click(self, button: str, panel: str = "") -> None:
         """Log a button click."""

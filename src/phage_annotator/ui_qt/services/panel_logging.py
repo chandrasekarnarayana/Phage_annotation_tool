@@ -1,7 +1,8 @@
 """Panel-specific action logging helpers.
 
 Provides lightweight decorators and context managers for logging actions
-across different UI panels without modifying core logic.
+across different UI panels. Uses the unified ActionLogger system which
+automatically handles both file and GUI logging.
 """
 
 from __future__ import annotations
@@ -13,21 +14,21 @@ from phage_annotator.ui_qt.services.action_logger import get_action_logger
 
 
 class PanelActionLogger:
-    """Helper for logging panel-specific actions."""
+    """Helper for logging panel-specific actions.
+    
+    Uses unified ActionLogger which automatically logs to both file and GUI.
+    """
 
-    def __init__(self, panel_name: str, owner: Optional[Any] = None):
+    def __init__(self, panel_name: str):
         self.panel_name = panel_name
         self.logger = get_action_logger()
-        self.owner = owner  # Optional reference to GUI owner for real-time log display
 
     def log_click(self, button_name: str, **details) -> None:
         """Log a button click."""
-        gui_callback = getattr(self.owner, "_append_log", None) if self.owner else None
         self.logger.log_action(
             "click",
             panel=self.panel_name,
             details={"button": button_name, **details},
-            gui_callback=gui_callback,
         )
 
     def log_value_change(
@@ -38,7 +39,6 @@ class PanelActionLogger:
         **details
     ) -> None:
         """Log a control value change."""
-        gui_callback = getattr(self.owner, "_append_log", None) if self.owner else None
         self.logger.log_action(
             "value_changed",
             panel=self.panel_name,
@@ -48,17 +48,14 @@ class PanelActionLogger:
                 "new_value": str(new_value),
                 **details
             },
-            gui_callback=gui_callback,
         )
 
     def log_action(self, action: str, **details) -> None:
         """Log a custom action."""
-        gui_callback = getattr(self.owner, "_append_log", None) if self.owner else None
         self.logger.log_action(
             action, 
             panel=self.panel_name, 
             details=details,
-            gui_callback=gui_callback,
         )
 
     def log_data_operation(
@@ -70,55 +67,53 @@ class PanelActionLogger:
         **details
     ) -> None:
         """Log data modification operations (add/delete/edit)."""
-        gui_callback = getattr(self.owner, "_append_log", None) if self.owner else None
         self.logger.log_action(
             operation,
             panel=self.panel_name,
             details={"item_count": item_count, **details},
             error=error if not success else None,
-            gui_callback=gui_callback,
         )
-    
-    def set_owner(self, owner: Any) -> None:
-        """Set the GUI owner for real-time log display."""
-        self.owner = owner
 
 
-# Panel-specific loggers
+# Panel-specific loggers cache
 _loggers: Dict[str, PanelActionLogger] = {}
-_global_owner: Optional[Any] = None  # Global reference to main GUI window
 
 
 def set_global_gui_owner(owner: Any) -> None:
-    """Set the global GUI owner for all panel loggers.
+    """Set the global GUI owner for the unified logging system.
     
-    This allows panel loggers to display logs in the GUI window.
+    IMPORTANT: This must be called from MainWindow.__init__() to enable GUI display.
+    Calling this is now OPTIONAL - you can also call ActionLogger.set_gui_owner() directly.
+    
+    Parameters
+    ----------
+    owner : MainWindow or None
+        The main GUI window instance (should have _append_log method)
     """
-    global _global_owner
-    _global_owner = owner
-    for logger in _loggers.values():
-        logger.set_owner(owner)
+    from phage_annotator.ui_qt.services.action_logger import ActionLogger
+    ActionLogger.set_gui_owner(owner)
 
 
-def get_panel_logger(panel_name: str, owner: Optional[Any] = None) -> PanelActionLogger:
+def get_panel_logger(panel_name: str) -> PanelActionLogger:
     """Get or create a panel-specific logger.
+    
+    The returned logger automatically logs to both file and GUI via
+    the unified ActionLogger system.
     
     Parameters
     ----------
     panel_name : str
-        Name of the panel
-    owner : Any, optional
-        GUI owner for real-time log display; uses global if not provided
+        Name of the panel (annotate, prepare, qc, assist, table, etc.)
+    
+    Returns
+    -------
+    PanelActionLogger
+        Panel-specific logger instance (cached)
     """
     if panel_name not in _loggers:
-        _loggers[panel_name] = PanelActionLogger(panel_name, owner=owner or _global_owner)
-    else:
-        # Update owner if provided
-        if owner is not None:
-            _loggers[panel_name].set_owner(owner)
-        elif _global_owner is not None:
-            _loggers[panel_name].set_owner(_global_owner)
+        _loggers[panel_name] = PanelActionLogger(panel_name)
     return _loggers[panel_name]
+
 
 
 # Decorators for automatic logging

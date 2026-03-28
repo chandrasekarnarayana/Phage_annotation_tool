@@ -48,7 +48,7 @@ from phage_annotator.ui_qt.rendering.lut_manager import lut_names
 from phage_annotator.ui_qt.panels.registry import PanelSpec
 from phage_annotator.session.multi_playback import PlaybackMode
 from phage_annotator.tools import Tool
-from phage_annotator.ui_qt.services.panel_logging import set_global_gui_owner
+from phage_annotator.ui_qt.services.action_logger import ActionLogger
 
 
 class KeypointAnnotator(
@@ -161,8 +161,8 @@ class KeypointAnnotator(
     def __init__(self, images: List[LazyImage], labels: Sequence[str] | None = None) -> None:
         super().__init__()
 
-        # Initialize logging to display in GUI window
-        set_global_gui_owner(self)
+        # Register GUI owner with unified ActionLogger for real-time GUI display
+        ActionLogger.set_gui_owner(self)
 
         self._configure_window_behavior()
         if not images:
