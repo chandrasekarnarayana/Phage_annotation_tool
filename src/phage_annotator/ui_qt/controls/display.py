@@ -14,6 +14,7 @@ from phage_annotator.session.modality import ProjectionType
 from phage_annotator.session.multi_playback import PlaybackMode
 from phage_annotator.ui_qt.controls.display_contrast import DisplayContrastMixin
 from phage_annotator.ui_qt.rendering.lut_manager import LUTS, lut_names
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 
 
 class DisplayControlsMixin(DisplayContrastMixin):
@@ -528,8 +529,17 @@ class DisplayControlsMixin(DisplayContrastMixin):
                 pass
 
     def _on_axis_mode_change(self, mode: str) -> None:
+        old_mode = getattr(self.controller.view_state, "axis_interpretation", None)
+        logger = get_panel_logger("prepare")
         self.stop_playback_t()
         self.controller.set_axis_interpretation(self.primary_image.id, mode)
+        logger.log_action(
+            "axis_mode_change",
+            image_id=int(self.primary_image.id),
+            image_name=str(self.primary_image.name),
+            old_mode=old_mode,
+            new_mode=mode,
+        )
         # Force reload for current primary to honor new interpretation.
         self._evict_image_cache(self.primary_image)
         self.proj_cache.invalidate_image(self.primary_image.id)

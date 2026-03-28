@@ -7,6 +7,8 @@ from typing import Any, Dict
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
+
 
 class MetadataDock(QtWidgets.QWidget):
     """Viewer widget for TIFF/OME metadata with search and raw view."""
@@ -82,6 +84,12 @@ class MetadataDock(QtWidgets.QWidget):
 
     def _copy_metadata(self) -> None:
         data = _bundle_to_sections(self._bundle) if self._bundle else {}
+        logger = get_panel_logger("prepare")
+        logger.log_action(
+            "copy_metadata",
+            section_count=len(data),
+            sections=list(data.keys()),
+        )
         QtWidgets.QApplication.clipboard().setText(_pretty_text(data))
 
     def _save_metadata(self) -> None:
@@ -96,8 +104,15 @@ class MetadataDock(QtWidgets.QWidget):
         if not path:
             return
         data = _bundle_to_sections(self._bundle)
+        logger = get_panel_logger("prepare")
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, default=str)
+        logger.log_action(
+            "save_metadata",
+            file_path=str(path),
+            section_count=len(data),
+            sections=list(data.keys()),
+        )
 
 
 def _bundle_to_sections(bundle: object) -> Dict[str, Any]:

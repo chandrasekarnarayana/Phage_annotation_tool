@@ -5,6 +5,7 @@ from __future__ import annotations
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.ui_qt.rendering.lut_manager import lut_names
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
 
 
 class PreferencesControlsMixin:
@@ -279,8 +280,15 @@ class PreferencesControlsMixin:
         dlg.exec()
 
     def _on_pixel_size_change(self, val: float) -> None:
+        old_value = self.pixel_size_um_per_px
         self.pixel_size_um_per_px = float(val)
+        logger = get_panel_logger("prepare")
         self._settings.setValue("defaultPixelSizeUmPerPx", self.pixel_size_um_per_px)
+        logger.log_action(
+            "pixel_size_change",
+            old_value=round(float(old_value), 6) if old_value else None,
+            new_value=round(self.pixel_size_um_per_px, 6),
+        )
         if hasattr(self, "_refresh_advanced_settings_panel"):
             self._refresh_advanced_settings_panel()
         self._update_status()
