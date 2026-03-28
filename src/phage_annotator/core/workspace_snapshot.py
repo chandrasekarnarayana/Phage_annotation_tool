@@ -15,6 +15,15 @@ from phage_annotator.session.signal_hub import emit_display_changed
 from phage_annotator.constants.settings import DEFAULTS as SETTINGS_DEFAULTS
 
 
+def _get_action_logger():
+    """Lazy import to avoid circular dependencies."""
+    try:
+        from phage_annotator.ui_qt.services.action_logger import get_action_logger
+        return get_action_logger()
+    except ImportError:
+        return None
+
+
 WORKSPACE_SNAPSHOT_SCHEMA = "workspace_snapshot.v1"
 
 
@@ -257,6 +266,16 @@ def apply_workspace_snapshot_to_controller(controller: Any, snapshot: Mapping[st
 
     This function is best-effort and intentionally ignores invalid payloads.
     """
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action(
+            "workspace_snapshot_applied",
+            details={
+                "snapshot_keys": sorted(snapshot.keys()),
+                "schema": snapshot.get("schema", "unknown")
+            }
+        )
+    
     session_layer = snapshot.get("session_workspace", {})
     if not isinstance(session_layer, dict):
         return
@@ -266,12 +285,21 @@ def apply_workspace_snapshot_to_controller(controller: Any, snapshot: Mapping[st
     if session_state is None or view_state is None:
         return
 
+    applied_fields = []
     for key in ("active_primary_id", "active_support_id", "fps", "current_label"):
         if key in session_layer:
             try:
+                old_val = getattr(session_state, key, None)
                 setattr(session_state, key, session_layer[key])
+                applied_fields.append(f"{key}:{old_val}->{session_layer[key]}")
             except Exception:
                 pass
+    
+    if logger and applied_fields:
+        logger.log_action(
+            "workspace_layer_restored",
+            details={"layer": "session", "fields": applied_fields}
+        )
 
     if isinstance(session_layer.get("lazy_sync_groups"), Mapping):
         try:

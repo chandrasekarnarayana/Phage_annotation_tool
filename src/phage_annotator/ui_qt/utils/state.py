@@ -886,8 +886,15 @@ class StateMixin:
         img = self._playback_source_image() if hasattr(self, "_playback_source_image") else self.primary_image
         if img is None or img.array is None:
             return np.empty((0, 0, 0), dtype=np.float32)
-        z_safe = max(0, min(int(z_idx), int(img.array.shape[1]) - 1))
-        block = read_contiguous_block(img.array, t_start, t_stop, z_safe)
+        arr = img.array
+        if arr.ndim >= 4:
+            z_safe = max(0, min(int(z_idx), int(arr.shape[1]) - 1))
+            block = read_contiguous_block(arr, t_start, t_stop, z_safe)
+        elif arr.ndim == 3:
+            # Compatibility path for legacy (T, Y, X) stacks.
+            block = arr[t_start:t_stop, :, :]
+        else:
+            return np.empty((0, 0, 0), dtype=np.float32)
         if self.crop_rect is None:
             return block
         x, y, w, h = self.crop_rect

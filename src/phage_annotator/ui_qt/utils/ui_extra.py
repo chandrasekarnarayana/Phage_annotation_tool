@@ -7,6 +7,8 @@ from typing import List, Set, Tuple
 
 from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 
+from phage_annotator.ui_qt.services.action_logger import get_action_logger
+
 from phage_annotator.ui_qt.models.lazy_loader import (
     LAZY_LOADER_FILE_FILTER,
     LAZY_LOADER_OPEN_FILES_TITLE,
@@ -1878,6 +1880,8 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
 
         proj_key = str(projection_key).strip().lower()
         active_image_id = int(getattr(getattr(self, "primary_image", None), "id", getattr(self, "current_image_idx", 0)))
+        logger = get_action_logger()
+        
         if proj_key in {"mean", "std"}:
             builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
             cfg = dict(builtin.get(proj_key, {}) or {})
@@ -1893,6 +1897,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self._auto_bind_detected_annotation_for_panel(str(proj_key), active_image_id)
             self._ensure_lazy_sync_group_keys()
             self._request_lazy_canvas_refresh("lazy-add-builtin", refresh_table=True)
+            logger.log_action(
+                "add_builtin_projection",
+                panel="lazy_loader",
+                details={"projection": proj_key, "image_id": active_image_id}
+            )
             return
 
         manager = ensure_modality_system(self.controller.session_state)
@@ -1910,6 +1919,12 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             )
         except Exception as exc:
             self._status_error(f"Could not add modality/view: {exc}", source="ui_extra.lazy_loader")
+            logger.log_action(
+                "add_modality",
+                panel="lazy_loader",
+                details={"projection": proj_key, "image_id": active_image_id},
+                error=str(exc)
+            )
             return
         panel_key = self._panel_key_for_modality_idx(int(modality.idx))
         self._panel_visibility[str(panel_key)] = True
@@ -1919,6 +1934,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             self._update_analysis_panel_modalities()
         self._queue_lazy_panel_auto_contrast(str(panel_key))
         self._request_lazy_canvas_refresh("lazy-add-view", refresh_table=True)
+        logger.log_action(
+            "add_modality",
+            panel="lazy_loader",
+            details={"modality_idx": modality.idx, "projection": proj_key, "image_id": active_image_id}
+        )
 
     def _remove_selected_lazy_modality_view(self) -> None:
         """Remove the selected modality/view row from the lazy table."""
@@ -2138,6 +2158,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         modality = manager.get_modality(int(modality_idx))
         if modality is None:
             return
+        old_projection = str(getattr(modality.projection_type, "value", "raw"))
         try:
             modality.projection_type = ProjectionType(str(projection_key).strip().lower())
         except Exception:
@@ -2145,6 +2166,17 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         self._queue_lazy_panel_auto_contrast(self._panel_key_for_modality_idx(int(modality_idx)))
         self._request_lazy_canvas_refresh("lazy-projection-change", refresh_table=False)
         self._flush_lazy_canvas_refresh()
+        
+        logger = get_action_logger()
+        logger.log_action(
+            "projection_changed",
+            panel="lazy_loader",
+            details={
+                "modality_idx": modality_idx,
+                "old_projection": old_projection,
+                "new_projection": projection_key
+            }
+        )
 
     def _on_lazy_builtin_source_changed(self, panel_key: str, image_id: int) -> None:
         """Update source image for built-in mean/std panel rows."""
@@ -2168,12 +2200,24 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             return
         builtin = dict(getattr(self, "_lazy_builtin_views", {}) or {})
         cfg = dict(builtin.get(str(panel_key), {}) or {})
+        old_projection = str(cfg.get("projection", "raw"))
         cfg["projection"] = str(projection_key).strip().lower()
         builtin[str(panel_key)] = cfg
         self._lazy_builtin_views = builtin
         self._queue_lazy_panel_auto_contrast(str(panel_key))
         self._request_lazy_canvas_refresh("lazy-builtin-projection", refresh_table=False)
         self._flush_lazy_canvas_refresh()
+        
+        logger = get_action_logger()
+        logger.log_action(
+            "projection_changed",
+            panel="lazy_loader",
+            details={
+                "builtin_panel": panel_key,
+                "old_projection": old_projection,
+                "new_projection": projection_key
+            }
+        )
 
     def _on_lazy_builtin_support_source_changed(self, image_id: int) -> None:
         """Update support panel source image from lazy table."""
@@ -3150,6 +3194,7 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             return
         detected_path = self._auto_detect_annotation_path_for_image(int(source_image_id))
         if not detected_path:
+            self._fallback_share_annotation_binding_for_panel(panel_key, source_image_id)
             return
         detected = Path(detected_path)
         suffix = detected.suffix.lower()
@@ -3160,6 +3205,51 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             fmt=fmt,
             mtime=detected.stat().st_mtime if detected.exists() else None,
             annotation_space=str(getattr(self.controller.session_state, "annotation_space", "stack")),
+        )
+
+    def _fallback_share_annotation_binding_for_panel(self, panel_key: str, source_image_id: int) -> None:
+        """Share an existing annotation binding when a new modality has none."""
+        if not panel_key or getattr(self, "controller", None) is None:
+            return
+        controller = self.controller
+        source_id = int(source_image_id)
+        current_space = str(getattr(controller.session_state, "annotation_space", "stack")).strip().lower()
+
+        # Default new modality contexts to shared ownership when no dedicated file was detected.
+        controller.set_annotation_context_mode_for_panel(panel_key, "shared_source")
+
+        bindings = dict(getattr(controller.session_state, "annotation_file_bindings", {}) or {})
+        inherited = {}
+        for binding in bindings.values():
+            candidate = dict(binding or {})
+            if int(candidate.get("source_image_id", -1)) != source_id:
+                continue
+            if str(candidate.get("annotation_space", "")).strip().lower() != current_space:
+                continue
+            if not str(candidate.get("path", "")).strip():
+                continue
+            inherited = candidate
+            break
+        if not inherited:
+            return
+
+        path = str(inherited.get("path", "")).strip()
+        fmt = str(inherited.get("format", "") or "").strip().lower() or "other"
+        if fmt not in {"json", "csv", "other"}:
+            suffix = Path(path).suffix.lower()
+            fmt = "json" if suffix == ".json" else "csv" if suffix == ".csv" else "other"
+        mtime_value = inherited.get("mtime", None)
+        try:
+            mtime = float(mtime_value) if mtime_value is not None else None
+        except Exception:
+            mtime = None
+
+        controller.bind_annotation_file_to_panel(
+            panel_key,
+            path,
+            fmt=fmt,
+            mtime=mtime,
+            annotation_space=current_space,
         )
 
     def _set_lazy_annotation_context_mode_for_panel(self, panel_key: str, mode: str) -> None:
@@ -3197,6 +3287,13 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         self._refresh_lazy_modality_table()
         self._status_success("Annotation file binding updated.", source="ui_extra.lazy_loader")
+        
+        logger = get_action_logger()
+        logger.log_action(
+            "bind_annotation_file",
+            panel="lazy_loader",
+            details={"panel_key": panel_key, "file": str(selected), "format": fmt}
+        )
 
     def _load_lazy_annotation_binding_for_panel(self, panel_key: str) -> None:
         """Load annotations from the bound file for one lazy-table row/panel."""
@@ -3209,6 +3306,12 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         file_path = Path(path)
         if not file_path.exists():
             self._status_warning("Bound annotation file is missing.", source="ui_extra.lazy_loader")
+            get_action_logger().log_action(
+                "load_annotation_binding",
+                panel="lazy_loader",
+                details={"panel_key": panel_key, "file": str(file_path)},
+                error="File not found"
+            )
             return
         context = self.controller.ensure_annotation_context_for_panel(panel_key, writable=True)
         source_image_id = int(context.get("source_image_id", getattr(self.primary_image, "id", 0)))
@@ -3224,6 +3327,12 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
             )
         except Exception as exc:
             self._status_error(f"Could not load bound annotations: {exc}", source="ui_extra.lazy_loader")
+            get_action_logger().log_action(
+                "load_annotation_binding",
+                panel="lazy_loader",
+                details={"panel_key": panel_key, "file": str(file_path)},
+                error=str(exc)
+            )
             return
         self.controller._record_annotation_imports(imports)
         self.controller.replace_annotations(source_image_id, points)
@@ -3236,6 +3345,11 @@ class UiExtrasMixin(UiRefreshMixin, UiTooltipMixin, UiAnnotationViewsMixin):
         )
         self._request_ui_refresh("lazy-binding-load", table=True, image=True, status=True)
         self._status_success("Loaded bound annotations.", source="ui_extra.lazy_loader")
+        get_action_logger().log_action(
+            "load_annotation_binding",
+            panel="lazy_loader",
+            details={"panel_key": panel_key, "file": str(file_path), "point_count": len(points)}
+        )
 
     def _clear_lazy_annotation_binding_for_panel(self, panel_key: str) -> None:
         """Clear the bound annotation file for one lazy-table row/panel."""

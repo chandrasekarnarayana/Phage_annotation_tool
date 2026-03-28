@@ -22,6 +22,15 @@ from phage_annotator.framework.events import (
 )
 
 
+def _get_action_logger():
+    """Lazy import to avoid circular dependencies."""
+    try:
+        from phage_annotator.ui_qt.services.action_logger import get_action_logger
+        return get_action_logger()
+    except ImportError:
+        return None
+
+
 class ControllerSignals:
     """Canonical SessionController signal names."""
 
@@ -59,6 +68,9 @@ def publish_event(event: ApplicationEvent) -> None:
 
 def emit_state_changed(controller: Any) -> None:
     emit_controller_signal(controller, ControllerSignals.STATE_CHANGED)
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action("state_changed", details={"signal": "state_changed"})
 
 
 def _merge_annotation_change_type(previous: str | None, current: str) -> str:
@@ -84,6 +96,20 @@ def _flush_annotation_batch(controller: Any) -> None:
     if not pending:
         return
     emit_controller_signal(controller, ControllerSignals.ANNOTATIONS_CHANGED)
+    
+    logger = _get_action_logger()
+    total_count = sum(len(list(controller.session_state.annotations.get(int(img_id), []))) for img_id in pending)
+    if logger:
+        logger.log_action(
+            "annotations_batch_flushed",
+            panel="annotate",
+            details={
+                "image_count": len(pending),
+                "total_annotations": total_count,
+                "image_ids": sorted(int(k) for k in pending)
+            }
+        )
+    
     for image_id in sorted(int(k) for k in pending):
         entry = dict(pending.get(int(image_id), {}) or {})
         annotations = []
@@ -127,6 +153,20 @@ def emit_view_changed(
     viewport: Optional[Mapping[str, Any]] = None,
 ) -> None:
     emit_controller_signal(controller, ControllerSignals.VIEW_CHANGED)
+    
+    logger = _get_action_logger()
+    if logger and change_type:
+        logger.log_action(
+            "view_state_changed",
+            details={
+                "change_type": change_type,
+                "t_index": t_index,
+                "z_index": z_index,
+                "roi_rect": str(roi_rect) if roi_rect else None,
+                "crop_rect": str(crop_rect) if crop_rect else None,
+            }
+        )
+    
     if change_type:
         publish_event(
             ViewStateChangedEvent(
@@ -142,18 +182,30 @@ def emit_view_changed(
 
 def emit_display_changed(controller: Any) -> None:
     emit_controller_signal(controller, ControllerSignals.DISPLAY_CHANGED)
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action("display_state_changed", details={"signal": "display_changed"})
 
 
 def emit_playback_changed(controller: Any) -> None:
     emit_controller_signal(controller, ControllerSignals.PLAYBACK_CHANGED)
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action("playback_state_changed", details={"signal": "playback_changed"})
 
 
 def emit_roi_changed(controller: Any) -> None:
     emit_controller_signal(controller, ControllerSignals.ROI_CHANGED)
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action("roi_state_changed", details={"signal": "roi_changed"})
 
 
 def emit_error(controller: Any, message: str) -> None:
     emit_controller_signal(controller, ControllerSignals.ERROR_OCCURRED, str(message))
+    logger = _get_action_logger()
+    if logger:
+        logger.log_action("error_signal", details={"message": str(message)}, error=str(message))
 
 
 def emit_annotations_changed(

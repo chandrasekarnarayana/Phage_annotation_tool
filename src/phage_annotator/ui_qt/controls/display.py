@@ -351,6 +351,13 @@ class DisplayControlsMixin(DisplayContrastMixin):
                 pass
         timer = getattr(self, "play_timer", None)
 
+        # Toggle off threaded T playback when clicking Play/Stop T again.
+        if axis == "t" and bool(getattr(self, "_playback_mode", False)):
+            self.stop_playback_t()
+            if hasattr(self, "_append_log"):
+                self._append_log("[GUI] Playback stopped axis=t", category="GUI")
+            return
+
         # Toggle off when clicking the active play mode.
         if timer is not None and timer.isActive() and str(getattr(self, "play_mode", "")) == axis:
             timer.stop()
@@ -367,8 +374,15 @@ class DisplayControlsMixin(DisplayContrastMixin):
         if timer is not None and timer.isActive():
             timer.stop()
 
-        # Prefer high-FPS threaded playback for T when possible.
-        if axis == "t":
+        # Threaded T playback is opt-in; timer playback is the reliable default.
+        use_threaded_t = False
+        settings = getattr(self, "_settings", None)
+        if axis == "t" and settings is not None:
+            try:
+                use_threaded_t = bool(settings.value("threadedPlaybackT", False, type=bool))
+            except Exception:
+                use_threaded_t = False
+        if axis == "t" and use_threaded_t:
             self.start_playback_t()
             if getattr(self, "_playback_mode", False):
                 self._sync_playback_button_labels("t")

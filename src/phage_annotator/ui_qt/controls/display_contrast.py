@@ -7,6 +7,8 @@ from typing import Optional
 import numpy as np
 from matplotlib.backends.qt_compat import QtCore, QtGui
 
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
+
 
 class DisplayContrastMixin:
     """Mixin for brightness/contrast and display-setting controls."""
@@ -79,6 +81,17 @@ class DisplayContrastMixin:
         prim = self._display_source_image()
         if prim.array is None:
             return
+        
+        # Log contrast change
+        logger = get_panel_logger("contrast")
+        old_mapping = self._get_display_mapping(prim.id, panel_key, prim.array)
+        logger.log_value_change(
+            "contrast",
+            f"({old_mapping.min_val:.3f}, {old_mapping.max_val:.3f})",
+            f"({min_val:.3f}, {max_val:.3f})",
+            panel=panel_key
+        )
+        
         data_min = getattr(self, "_bc_data_min", None)
         data_max = getattr(self, "_bc_data_max", None)
         step = float(getattr(self, "_bc_step", 1.0))

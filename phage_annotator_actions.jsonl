@@ -1,0 +1,3 @@
+{"timestamp": 1774680039.727017, "action": "add_modality", "panel": "lazy_loader", "details": {"modality_idx": 0, "projection": "raw", "image_id": 0}, "duration_ms": null, "error": null}
+{"timestamp": 1774680046.9278252, "action": "add_modality", "panel": "lazy_loader", "details": {"modality_idx": 1, "projection": "raw", "image_id": 0}, "duration_ms": null, "error": null}
+{"timestamp": 1774680058.5870802, "action": "projection_changed", "panel": "lazy_loader", "details": {"modality_idx": 1, "old_projection": "raw", "new_projection": "median"}, "duration_ms": null, "error": null}

@@ -253,6 +253,14 @@ class RenderingMixin(RenderingOverlayMixin):
         def _panel_projection_key(panel_key: str, default_projection: str = "raw") -> str:
             spec = panel_specs.get(panel_key)
             if spec is None:
+                # Check if this is a builtin view (mean, std, support)
+                builtin_views = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+                if str(panel_key) in builtin_views:
+                    builtin_cfg = dict(builtin_views.get(str(panel_key), {}) or {})
+                    builtin_proj = str(builtin_cfg.get("projection", str(panel_key))).strip().lower()
+                    if builtin_proj not in {"mean", "std", "support"}:
+                        return builtin_proj
+                    return builtin_proj if builtin_proj != "support" else str(default_projection).strip().lower()
                 return str(default_projection).strip().lower()
             projection = getattr(spec, "projection_type", default_projection)
             return str(getattr(projection, "value", projection)).strip().lower()
@@ -263,6 +271,13 @@ class RenderingMixin(RenderingOverlayMixin):
             if str(panel_key) == "modality_1":
                 default_img = self.support_image
             if spec is None:
+                # Check if this is a builtin view with a configured source image
+                builtin_views = dict(getattr(self, "_lazy_builtin_views", {}) or {})
+                if str(panel_key) in builtin_views:
+                    builtin_cfg = dict(builtin_views.get(str(panel_key), {}) or {})
+                    builtin_image_id = int(builtin_cfg.get("image_id", getattr(default_img, "id", -1)))
+                    img = next((cand for cand in self.images if int(getattr(cand, "id", -1)) == builtin_image_id), None)
+                    return img if img is not None else default_img
                 return default_img
             image_id = int(getattr(spec, "image_id", getattr(default_img, "id", -1)))
             img = next((cand for cand in self.images if int(getattr(cand, "id", -1)) == image_id), None)

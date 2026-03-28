@@ -1,0 +1,41 @@
+[15:53:24] [INFO] [GUI] [GUI] Playback toggle requested axis=t panel=frame image_id=0
+[GUI] Playback toggle requested axis=t panel=frame image_id=0
+
+[15:53:24] [INFO] [GUI] [GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+[GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+
+[15:53:35] [INFO] [GUI] [GUI] Playback toggle requested axis=t panel=frame image_id=0
+[GUI] Playback toggle requested axis=t panel=frame image_id=0
+
+[15:53:35] [INFO] [GUI] [GUI] Threaded playback stopped
+[GUI] Threaded playback stopped
+
+[15:53:35] [INFO] [GUI] [GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+[GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+
+[15:53:38] [INFO] [GUI] [GUI] Playback toggle requested axis=t panel=frame image_id=0
+[GUI] Playback toggle requested axis=t panel=frame image_id=0
+
+[15:53:38] [INFO] [GUI] [GUI] Threaded playback stopped
+[GUI] Threaded playback stopped
+
+[15:53:38] [INFO] [GUI] [GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+[GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+
+[15:53:39] [INFO] [GUI] [GUI] Playback toggle requested axis=t panel=frame image_id=0
+[GUI] Playback toggle requested axis=t panel=frame image_id=0
+
+[15:53:39] [INFO] [GUI] [GUI] Threaded playback stopped
+[GUI] Threaded playback stopped
+
+[15:53:39] [INFO] [GUI] [GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+[GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+
+[15:53:44] [INFO] [GUI] [GUI] Playback toggle requested axis=t panel=frame image_id=0
+[GUI] Playback toggle requested axis=t panel=frame image_id=0
+
+[15:53:44] [INFO] [GUI] [GUI] Threaded playback stopped
+[GUI] Threaded playback stopped
+
+[15:53:44] [INFO] [GUI] [GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False
+[GUI] Threaded playback started panel=frame image_id=0 t0=1 tmax=19 fps=30 loop=False

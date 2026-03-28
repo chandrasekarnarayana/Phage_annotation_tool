@@ -83,6 +83,9 @@ class PlaybackMixin:
         artist = renderer.image_artists.get(panel_key)
         if artist is not None:
             return artist
+        for fallback in renderer.image_artists.values():
+            if fallback is not None:
+                return fallback
         return getattr(self, "im_frame", None)
 
     def start_playback_t(self, fps: Optional[int] = None) -> None:
@@ -202,23 +205,26 @@ class PlaybackMixin:
     def _update_frame_only(self, frame: np.ndarray, t_idx: int) -> None:
         if not self._playback_mode:
             return
-        artist = self._playback_target_artist()
-        if artist is None:
-            return
-        artist.set_data(frame)
         if getattr(self, "t_slider", None) is not None:
             self.t_slider.blockSignals(True)
             self.t_slider.setValue(int(t_idx))
             self.t_slider.blockSignals(False)
+        if getattr(self, "t_slider_label", None) is not None and getattr(self, "t_slider", None) is not None:
+            self.t_slider_label.setText(
+                f"T: {int(self.t_slider.value()) + 1}/{int(self.t_slider.maximum()) + 1}"
+            )
+        artist = self._playback_target_artist()
+        if artist is None:
+            if hasattr(self, "_request_render_refresh"):
+                self._request_render_refresh("playback-missing-artist", debounce=True)
+            self._update_status()
+            return
+        artist.set_data(frame)
         frame_ax = self._playback_target_axis()
         if frame_ax is not None:
             title = frame_ax.get_title() or "Frame"
             base_title = title.split(" (T=", 1)[0]
             frame_ax.set_title(f"{base_title} (T={t_idx})")
-        if getattr(self, "t_slider_label", None) is not None and getattr(self, "t_slider", None) is not None:
-            self.t_slider_label.setText(
-                f"T: {int(self.t_slider.value()) + 1}/{int(self.t_slider.maximum()) + 1}"
-            )
         self._update_status()
         self.canvas.draw_idle()
 
