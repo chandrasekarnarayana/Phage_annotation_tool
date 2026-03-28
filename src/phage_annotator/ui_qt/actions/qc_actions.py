@@ -8,6 +8,8 @@ from typing import Optional
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
+from phage_annotator.ui_qt.services.panel_logging import get_panel_logger
+
 DISABLE_QC = True
 
 
@@ -59,13 +61,17 @@ class QCActionsMixin:
         if not self._is_qc_enabled():
             return
         self._ensure_qc_runtime()
+        logger = get_panel_logger("qc")
         if image_id is None:
             self._qc_pending_image_id = None
+            logger.log_action("qc_validation_scheduled", scope="all", debounce_ms=250)
         elif getattr(self, "_qc_pending_image_id", None) is not None:
             if self._qc_pending_image_id != image_id:
                 self._qc_pending_image_id = None
+                logger.log_action("qc_validation_scheduled", image_id=int(image_id), scope="single", debounce_ms=250)
         else:
             self._qc_pending_image_id = int(image_id)
+            logger.log_action("qc_validation_scheduled", image_id=int(image_id), scope="single", debounce_ms=250)
         self._qc_validation_timer.start()
 
     def _execute_scheduled_qc_validation(self) -> None:
@@ -80,10 +86,12 @@ class QCActionsMixin:
         """Run QC validation immediately for all loaded images."""
         if not self._is_qc_enabled():
             return
+        logger = get_panel_logger("qc")
         self._ensure_qc_runtime()
         if getattr(self, "_qc_validation_timer", None) is not None:
             self._qc_validation_timer.stop()
         self._qc_pending_image_id = None
+        logger.log_action("qc_validation_triggered", scope="all", trigger="immediate")
         self._run_qc_validation(image_id=None)
 
     def _run_qc_validation(self, image_id: Optional[int]) -> None:
@@ -93,16 +101,19 @@ class QCActionsMixin:
         from phage_annotator.analysis.qc_validators import QCValidator
 
         self._ensure_qc_runtime()
+        logger = get_panel_logger("qc")
 
         if image_id is None:
             targets = [img.id for img in self.images]
             self.qc_state.clear_issues()
+            scope = "all"
         else:
             targets = [int(image_id)]
             self.qc_state.issues = [
                 issue for issue in self.qc_state.issues if int(issue.image_id) != int(image_id)
             ]
             self.qc_state.prune_issue_statuses()
+            scope = "single"
 
         allowed_labels = list(self.labels) if self.labels else None
 
@@ -149,6 +160,22 @@ class QCActionsMixin:
                 )
             )
         )
+        
+        issue_counts_by_type: dict[str, int] = {}
+        for issue in self.qc_state.issues:
+            key = str(getattr(issue, "issue_type", "unknown"))
+            issue_counts_by_type[key] = issue_counts_by_type.get(key, 0) + 1
+        
+        logger.log_action(
+            "qc_validation_completed",
+            scope=scope,
+            image_id=image_id,
+            total_issues=issue_count,
+            open_issues=open_count,
+            issue_counts_by_type=issue_counts_by_type,
+            annotation_count=sum(len(self.annotations.get(t_id, [])) for t_id in targets),
+        )
+        
         self._update_qc_button_highlight(open_count)
         dock_qc = getattr(self, "dock_qc_issues", None)
         if dock_qc is not None:
@@ -156,10 +183,6 @@ class QCActionsMixin:
             if open_count > 0 and bool(self._settings.value("qcAutoShowOnIssues", False, type=bool)):
                 # Non-blocking auto-show: reveal panel without stealing focus.
                 self.set_panel_visible("qc_issues", True, source="auto:qc_validation")
-        issue_counts_by_type: dict[str, int] = {}
-        for issue in self.qc_state.issues:
-            key = str(getattr(issue, "issue_type", "unknown"))
-            issue_counts_by_type[key] = issue_counts_by_type.get(key, 0) + 1
         self.controller.append_audit_event(
             "qc_validation_completed",
             image_id=(-1 if image_id is None else int(image_id)),
@@ -178,7 +201,15 @@ class QCActionsMixin:
         """Handle resolve/ignore actions from QC panel."""
         if not self._is_qc_enabled():
             return
+        logger = get_panel_logger("qc")
         self._ensure_qc_runtime()
+        
+        logger.log_action(
+            "qc_issue_status_changed",
+            issue_id=str(issue_id),
+            new_status=status,
+        )
+        
         open_count = int(
             len(
                 self.qc_state.get_visible_issues(
