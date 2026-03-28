@@ -74,6 +74,7 @@ class ActionLogger:
         details: Optional[Dict[str, Any]] = None,
         duration_ms: Optional[float] = None,
         error: Optional[str] = None,
+        gui_callback: Optional[Any] = None,
     ) -> None:
         """Log a UI action with metadata.
 
@@ -89,6 +90,8 @@ class ActionLogger:
             Duration of action in milliseconds
         error : str, optional
             Error message if action failed
+        gui_callback : callable, optional
+            Callback to update GUI logs (e.g., owner._append_log)
         """
         record = {
             "timestamp": time.time(),
@@ -102,6 +105,19 @@ class ActionLogger:
             self.queue.put_nowait(record)
         except Exception:
             LOGGER.debug("Action log queue full, dropping oldest")
+        
+        # Also push to GUI logs in real-time if callback provided
+        if gui_callback is not None:
+            try:
+                # Format for GUI display
+                details_str = " | ".join(f"{k}={v}" for k, v in (details or {}).items()) if details else ""
+                summary = f"[{panel.upper()}] {action}"
+                if details_str:
+                    summary = f"{summary} | {details_str[:100]}"  # Truncate for readability
+                gui_callback(summary, severity="INFO", category="Action")
+            except Exception:
+                # Fail silently if GUI callback fails
+                pass
 
     def log_click(self, button: str, panel: str = "") -> None:
         """Log a button click."""
