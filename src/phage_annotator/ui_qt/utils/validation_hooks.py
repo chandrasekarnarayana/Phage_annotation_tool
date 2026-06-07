@@ -96,6 +96,7 @@ class ValidationHooksMixin:
         """
         def wrapped_add_annotation(*args, **kwargs):
             # Execute original method
+            """Run the wrapped add annotation workflow."""
             result = original_method(*args, **kwargs)
             
             # Schedule validation for affected image
@@ -122,6 +123,7 @@ class ValidationHooksMixin:
         """
         def wrapped_remove_annotation(*args, **kwargs):
             # Execute original method
+            """Run the wrapped remove annotation workflow."""
             result = original_method(*args, **kwargs)
             
             # Schedule validation for affected image
@@ -148,6 +150,7 @@ class ValidationHooksMixin:
         """
         def wrapped_modify_annotation(*args, **kwargs):
             # Execute original method
+            """Run the wrapped modify annotation workflow."""
             result = original_method(*args, **kwargs)
             
             # Schedule validation for affected image

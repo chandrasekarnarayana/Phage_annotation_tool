@@ -196,6 +196,7 @@ def propose_roi(
 
 
 def _percentile_bounds(image: np.ndarray, p_low: float, p_high: float) -> Tuple[float, float]:
+    """Handle the percentile bounds helper flow."""
     sample = image
     if image.size > 200_000:
         stride = int(np.sqrt(image.size / 200_000))
@@ -207,17 +208,20 @@ def _percentile_bounds(image: np.ndarray, p_low: float, p_high: float) -> Tuple[
 
 
 def _integral(image: np.ndarray) -> np.ndarray:
+    """Handle the integral helper flow."""
     padded = np.pad(image, ((1, 0), (1, 0)), mode="constant", constant_values=0.0)
     return padded.cumsum(axis=0).cumsum(axis=1)
 
 
 def _window_sum(ii: np.ndarray, y0: np.ndarray, x0: np.ndarray, h: int, w: int) -> np.ndarray:
+    """Handle the window sum helper flow."""
     y1 = y0 + h
     x1 = x0 + w
     return ii[y1, x1] - ii[y0, x1] - ii[y1, x0] + ii[y0, x0]
 
 
 def _gaussian_blur(image: np.ndarray, sigma: float) -> np.ndarray:
+    """Handle the gaussian blur helper flow."""
     try:
         from scipy.ndimage import gaussian_filter
     except Exception:
@@ -226,6 +230,7 @@ def _gaussian_blur(image: np.ndarray, sigma: float) -> np.ndarray:
 
 
 def _gaussian_blur_np(image: np.ndarray, sigma: float) -> np.ndarray:
+    """Handle the gaussian blur np helper flow."""
     if sigma <= 0:
         return image
     radius = int(max(1, sigma * 3))

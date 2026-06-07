@@ -9,11 +9,13 @@ from phage_annotator.algorithms.analysis import compute_projection, compute_proj
 
 def _make_data() -> np.ndarray:
     # Shape: (T, Z, Y, X)
+    """Create data for the current workflow."""
     data = np.arange(2 * 3 * 4 * 5, dtype=np.float32).reshape(2, 3, 4, 5)
     return data
 
 
 def test_compute_projection_mean() -> None:
+    """Verify compute projection mean for the current workflow."""
     data = _make_data()
     expected = data.mean(axis=(0, 1))
     result = compute_projection(data, "mean")
@@ -21,6 +23,7 @@ def test_compute_projection_mean() -> None:
 
 
 def test_compute_projection_std() -> None:
+    """Verify compute projection std for the current workflow."""
     data = _make_data()
     expected = data.std(axis=(0, 1))
     result = compute_projection(data, "std")
@@ -28,6 +31,7 @@ def test_compute_projection_std() -> None:
 
 
 def test_compute_projection_min() -> None:
+    """Verify compute projection min for the current workflow."""
     data = _make_data()
     expected = data.min(axis=(0, 1))
     result = compute_projection(data, "min")
@@ -35,6 +39,7 @@ def test_compute_projection_min() -> None:
 
 
 def test_compute_projection_max() -> None:
+    """Verify compute projection max for the current workflow."""
     data = _make_data()
     expected = data.max(axis=(0, 1))
     result = compute_projection(data, "max")
@@ -42,6 +47,7 @@ def test_compute_projection_max() -> None:
 
 
 def test_compute_projections_multiple() -> None:
+    """Verify compute projections multiple for the current workflow."""
     data = _make_data()
     result = compute_projections(data, ["mean", "std", "min", "max"])
     assert set(result.keys()) == {"mean", "std", "min", "max"}
@@ -52,6 +58,7 @@ def test_compute_projections_multiple() -> None:
 
 
 def test_compute_projection_axis_t() -> None:
+    """Verify compute projection axis t for the current workflow."""
     data = _make_data()
     expected = data.mean(axis=(0,))
     result = compute_projection(data, "mean", axis="t")
@@ -59,6 +66,7 @@ def test_compute_projection_axis_t() -> None:
 
 
 def test_compute_projection_axis_z() -> None:
+    """Verify compute projection axis z for the current workflow."""
     data = _make_data()
     expected = data.mean(axis=(1,))
     result = compute_projection(data, "mean", axis="z")
@@ -66,6 +74,7 @@ def test_compute_projection_axis_z() -> None:
 
 
 def test_compute_projections_invalid_kind() -> None:
+    """Verify compute projections invalid kind for the current workflow."""
     data = _make_data()
     try:
         compute_projection(data, "median")

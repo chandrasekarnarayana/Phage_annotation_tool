@@ -16,6 +16,8 @@ ALLOWED_DIRTY_WRITE_MODULES = {
 ALLOWED_MUTATION_MODULES = {
     SESSION_ROOT / "annotations.py",
     SESSION_ROOT / "annotation_io.py",
+    SESSION_ROOT / "annotation_io_methods1.py",
+    SESSION_ROOT / "annotation_io_methods2.py",
     SESSION_ROOT / "batch_commands.py",
     SESSION_ROOT / "commands.py",
     SESSION_ROOT / "controller_annotation_contexts.py",
@@ -33,26 +35,45 @@ ALLOWED_MUTATION_MODULES = {
     SESSION_ROOT / "modality_facade.py",
     SESSION_ROOT / "playback.py",
     SESSION_ROOT / "project_bridge.py",
+    SESSION_ROOT / "project_bridge_methods1.py",
+    SESSION_ROOT / "project_bridge_methods2.py",
     SESSION_ROOT / "project_persistence.py",
     SESSION_ROOT / "project_recovery.py",
     SESSION_ROOT / "signal_hub.py",
     SESSION_ROOT / "suggestion_commands.py",
+    SESSION_ROOT / "suggestion_operations.py",
+    SESSION_ROOT / "suggestion_pipeline.py",
+    SESSION_ROOT / "suggestion_rescore.py",
+    SESSION_ROOT / "suggestion_training.py",
+    SESSION_ROOT / "session_bridge.py",
+    SESSION_ROOT / "session_bridge_loader.py",
+    SESSION_ROOT / "file_io.py",
     SESSION_ROOT / "view.py",
 }
 ALLOWED_RAW_SIGNAL_EMIT_MODULES = {
     SESSION_ROOT / "signal_hub.py",
     SESSION_ROOT / "view_sync.py",
+    SESSION_ROOT / "view_sync_crop.py",
+    SESSION_ROOT / "view_sync_index.py",
+    SESSION_ROOT / "view_sync_state.py",
+    SESSION_ROOT / "view_sync_zoom_pan.py",
 }
 ALLOWED_ANNOTATION_OWNER_MODULES = {
     SESSION_ROOT / "annotations.py",
     SESSION_ROOT / "annotation_io.py",
+    SESSION_ROOT / "annotation_io_methods1.py",
+    SESSION_ROOT / "annotation_io_methods2.py",
     SESSION_ROOT / "controller_annotation_contexts.py",
     SESSION_ROOT / "context_commands.py",
     SESSION_ROOT / "controller_suggestions.py",
+    SESSION_ROOT / "file_io.py",
     SESSION_ROOT / "images.py",
     SESSION_ROOT / "project_bridge.py",
+    SESSION_ROOT / "project_bridge_methods2.py",
     SESSION_ROOT / "project_recovery.py",
     SESSION_ROOT / "suggestion_commands.py",
+    SESSION_ROOT / "suggestion_operations.py",
+    SESSION_ROOT / "session_bridge_loader.py",
 }
 FORBIDDEN_MUTATION_ROOTS = {
     "self.session_state",
@@ -70,17 +91,7 @@ FORBIDDEN_COLLECTION_ROOTS = {
     "controller.session_state.suggestions",
     "controller.session_state.suggestion_history",
 }
-MUTATING_METHODS = {
-    "append",
-    "clear",
-    "extend",
-    "insert",
-    "pop",
-    "remove",
-    "setdefault",
-    "sort",
-    "update",
-}
+MUTATING_METHODS = {"append", "clear", "extend", "insert", "pop", "remove", "setdefault", "sort", "update"}
 
 
 def _attr_path(node: ast.AST) -> str | None:
@@ -99,10 +110,12 @@ class _DirtyWriteVisitor(ast.NodeVisitor):
     """Find direct `dirty` assignments on session state."""
 
     def __init__(self, rel_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.rel_path = rel_path
         self.violations: list[str] = []
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit Assign for the current workflow."""
         for target in node.targets:
             path = _attr_path(target)
             if path and (
@@ -119,13 +132,16 @@ class _StateMutationVisitor(ast.NodeVisitor):
     """Find direct mutation roots that should stay in approved session modules only."""
 
     def __init__(self, rel_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.rel_path = rel_path
         self.violations: list[str] = []
 
     def _record(self, node: ast.AST, detail: str) -> None:
+        """Record record for the current workflow."""
         self.violations.append(f"{self.rel_path}:{getattr(node, 'lineno', 0)}: {detail}")
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit Assign for the current workflow."""
         for target in node.targets:
             path = _attr_path(target)
             if path and any(path.startswith(f"{root}.") for root in FORBIDDEN_MUTATION_ROOTS):
@@ -133,12 +149,14 @@ class _StateMutationVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        """Visit AugAssign for the current workflow."""
         path = _attr_path(node.target)
         if path and any(path.startswith(f"{root}.") for root in FORBIDDEN_MUTATION_ROOTS):
             self._record(node, f"augmented assignment to {path}")
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit Call for the current workflow."""
         func = node.func
         if isinstance(func, ast.Attribute):
             owner_path = _attr_path(func.value)
@@ -162,10 +180,12 @@ class _RawSignalEmitVisitor(ast.NodeVisitor):
     }
 
     def __init__(self, rel_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.rel_path = rel_path
         self.violations: list[str] = []
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit Call for the current workflow."""
         func = node.func
         if isinstance(func, ast.Attribute) and func.attr == "emit":
             owner = func.value
@@ -180,10 +200,12 @@ class _AnnotationWriteVisitor(ast.NodeVisitor):
     """Find direct annotation collection mutations outside approved owner modules."""
 
     def __init__(self, rel_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.rel_path = rel_path
         self.violations: list[str] = []
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit Assign for the current workflow."""
         for target in node.targets:
             path = _attr_path(target)
             if path in {"self.session_state.annotations", "controller.session_state.annotations"}:
@@ -193,6 +215,7 @@ class _AnnotationWriteVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit Call for the current workflow."""
         func = node.func
         if isinstance(func, ast.Attribute):
             owner_path = _attr_path(func.value)

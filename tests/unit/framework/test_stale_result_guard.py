@@ -78,6 +78,7 @@ class TestStaleResultGuard:
 
         # Simulate result callback for first job
         def on_result_1(job_id, value):
+            """Run the on result 1 workflow."""
             if not is_current_job(job_type, job_id):
                 return False  # Stale result
             return True  # Process it
@@ -93,6 +94,7 @@ class TestStaleResultGuard:
 
         # Second job's callback should accept results
         def on_result_2(job_id, value):
+            """Run the on result 2 workflow."""
             if not is_current_job(job_type, job_id):
                 return False  # Stale result
             return True  # Process it

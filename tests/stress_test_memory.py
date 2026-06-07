@@ -35,6 +35,7 @@ from phage_annotator.ui_qt.main_window import KeypointAnnotator, create_app
 
 
 def _rss_mb() -> float:
+    """Handle the rss mb helper flow."""
     if psutil:
         return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
     try:
@@ -50,6 +51,7 @@ def _rss_mb() -> float:
 
 
 def _files_from_dir(folder: pathlib.Path, num: int) -> List[pathlib.Path]:
+    """Handle the files from dir helper flow."""
     candidates = sorted(
         [
             p
@@ -63,6 +65,7 @@ def _files_from_dir(folder: pathlib.Path, num: int) -> List[pathlib.Path]:
 
 
 def _measure_first_loads(win: KeypointAnnotator) -> List[float]:
+    """Handle the measure first loads helper flow."""
     for img in win.images:
         win._evict_image_cache(img)
     times = []
@@ -74,6 +77,7 @@ def _measure_first_loads(win: KeypointAnnotator) -> List[float]:
 
 
 def _measure_slider(win: KeypointAnnotator, slider: QtWidgets.QSlider, loops: int) -> List[float]:
+    """Handle the measure slider helper flow."""
     if slider.maximum() <= slider.minimum():
         return []
     times: List[float] = []
@@ -87,6 +91,7 @@ def _measure_slider(win: KeypointAnnotator, slider: QtWidgets.QSlider, loops: in
 
 
 def _measure_fov_switch(win: KeypointAnnotator, loops: int) -> List[float]:
+    """Handle the measure fov switch helper flow."""
     times: List[float] = []
     for _ in range(max(1, loops)):
         for idx in range(len(win.images)):
@@ -119,6 +124,7 @@ def _measure_playback_read(win: KeypointAnnotator, loops: int) -> float:
 
 
 def _run(args: argparse.Namespace) -> None:
+    """Run run for the current workflow."""
     paths = _files_from_dir(args.data_dir, args.num_fovs)
     # create_app will run Qt in offscreen mode due to the env var above.
     win = create_app(paths)
@@ -149,6 +155,7 @@ def _run(args: argparse.Namespace) -> None:
         playback_fps = _measure_playback_read(win, args.loop)
 
     def _avg(vals: Iterable[float]) -> float:
+        """Handle the avg helper flow."""
         vals = list(vals)
         return statistics.mean(vals) if vals else 0.0
 
@@ -169,6 +176,7 @@ def _run(args: argparse.Namespace) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Build parser for the current workflow."""
     parser = argparse.ArgumentParser(
         description="Stress test memory + navigation without showing the full GUI."
     )

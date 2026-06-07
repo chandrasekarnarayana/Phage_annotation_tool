@@ -20,6 +20,7 @@ class _NavigationHistoryHarness(SessionViewMixin, SessionAnnotationsMixin):
     """Controller-like harness to validate stack behavior without Qt GUI."""
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._undo_stack: list[dict] = []
         self._redo_stack: list[dict] = []
         self.state_changed = _Emitter()

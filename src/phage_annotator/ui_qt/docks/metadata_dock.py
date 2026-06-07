@@ -16,6 +16,7 @@ class MetadataDock(QtWidgets.QWidget):
     load_full_requested = QtCore.pyqtSignal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -70,6 +71,7 @@ class MetadataDock(QtWidgets.QWidget):
         self.tree.expandToDepth(1)
 
     def _on_tree_selection(self) -> None:
+        """Handle the on tree selection helper flow."""
         items = self.tree.selectedItems()
         if not items:
             return
@@ -77,12 +79,14 @@ class MetadataDock(QtWidgets.QWidget):
         self.raw_text.setPlainText(_pretty_text(data))
 
     def _filter_tree(self, text: str) -> None:
+        """Handle the filter tree helper flow."""
         text = text.lower().strip()
         for i in range(self.tree.topLevelItemCount()):
             item = self.tree.topLevelItem(i)
             _filter_item(item, text)
 
     def _copy_metadata(self) -> None:
+        """Copy metadata for the current workflow."""
         data = _bundle_to_sections(self._bundle) if self._bundle else {}
         logger = get_panel_logger("prepare")
         logger.log_action(
@@ -93,6 +97,7 @@ class MetadataDock(QtWidgets.QWidget):
         QtWidgets.QApplication.clipboard().setText(_pretty_text(data))
 
     def _save_metadata(self) -> None:
+        """Save metadata for the current workflow."""
         if self._bundle is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -116,6 +121,7 @@ class MetadataDock(QtWidgets.QWidget):
 
 
 def _bundle_to_sections(bundle: object) -> Dict[str, Any]:
+    """Handle the bundle to sections helper flow."""
     if bundle is None:
         return {}
     sections: Dict[str, Any] = {}
@@ -131,6 +137,7 @@ def _bundle_to_sections(bundle: object) -> Dict[str, Any]:
 
 
 def _populate_tree(parent: QtWidgets.QTreeWidgetItem, value: object) -> None:
+    """Handle the populate tree helper flow."""
     if isinstance(value, dict):
         for key, val in value.items():
             child = QtWidgets.QTreeWidgetItem([str(key), _summary_value(val)])
@@ -146,6 +153,7 @@ def _populate_tree(parent: QtWidgets.QTreeWidgetItem, value: object) -> None:
 
 
 def _summary_value(val: object) -> str:
+    """Handle the summary value helper flow."""
     if isinstance(val, dict):
         return f"{len(val)} keys"
     if isinstance(val, (list, tuple)):
@@ -156,6 +164,7 @@ def _summary_value(val: object) -> str:
 
 
 def _pretty_text(data: object) -> str:
+    """Handle the pretty text helper flow."""
     if data is None:
         return ""
     if isinstance(data, str):
@@ -167,6 +176,7 @@ def _pretty_text(data: object) -> str:
 
 
 def _filter_item(item: QtWidgets.QTreeWidgetItem, text: str) -> bool:
+    """Handle the filter item helper flow."""
     if not text:
         item.setHidden(False)
         for i in range(item.childCount()):

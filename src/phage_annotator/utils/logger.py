@@ -10,6 +10,7 @@ _LOGGER_NAME = "phage_annotator"
 
 class _JobIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
+        """Run the filter workflow."""
         if not hasattr(record, "job_id"):
             record.job_id = "-"
         return True

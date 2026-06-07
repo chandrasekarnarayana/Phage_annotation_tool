@@ -20,6 +20,7 @@ class PanelActionLogger:
     """
 
     def __init__(self, panel_name: str):
+        """Initialize the object and prepare its runtime state."""
         self.panel_name = panel_name
         self.logger = get_action_logger()
 
@@ -128,8 +129,10 @@ def log_panel_action(panel_name: str, action_name: Optional[str] = None):
         Action name; defaults to function name
     """
     def decorator(func: Callable) -> Callable:
+        """Wrap one function with panel action logging."""
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Run the wrapper workflow."""
             logger = get_panel_logger(panel_name)
             action = action_name or func.__name__
             try:
@@ -152,8 +155,10 @@ def log_contrast_changes(panel_logger: PanelActionLogger):
         Panel logger instance
     """
     def decorator(func: Callable) -> Callable:
+        """Wrap one function with contrast change logging."""
         @wraps(func)
         def wrapper(old_min, old_max, new_min, new_max, *args, **kwargs):
+            """Run the wrapper workflow."""
             panel_logger.log_value_change(
                 "contrast_range",
                 f"({old_min}, {old_max})",
@@ -173,8 +178,10 @@ def log_annotation_batch(panel_logger: PanelActionLogger):
         Panel logger instance
     """
     def decorator(func: Callable) -> Callable:
+        """Wrap one function with batch annotation logging."""
         @wraps(func)
         def wrapper(annotations: list, operation: str, *args, **kwargs):
+            """Run the wrapper workflow."""
             try:
                 result = func(annotations, operation, *args, **kwargs)
                 panel_logger.log_data_operation(

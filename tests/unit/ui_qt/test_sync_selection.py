@@ -12,9 +12,11 @@ from phage_annotator.ui_qt.controls.display import DisplayControlsMixin
 
 class _ModalityManagerStub:
     def __init__(self, modalities):
+        """Initialize the object and prepare its runtime state."""
         self._modalities = {int(modality.idx): modality for modality in modalities}
 
     def get_modality(self, idx: int):
+        """Return modality for the current workflow."""
         return self._modalities.get(int(idx))
 
 
@@ -35,6 +37,7 @@ class _SyncHarness(DisplayControlsMixin):
     _apply_playback_sync_selection = DisplayControlsMixin._apply_playback_sync_selection
 
     def __init__(self, parent) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.sync_target_mode_combo = QtWidgets.QComboBox(parent)
         self.sync_target_mode_combo.addItem("Manual group", "manual")
         self.sync_target_mode_combo.addItem("Active canvas group", "active")
@@ -92,12 +95,14 @@ class _SyncHarness(DisplayControlsMixin):
         self._updated_windows = []
 
     def _image_obj_from_id(self, image_id: int):
+        """Handle the image obj from id helper flow."""
         for image in self.images:
             if int(getattr(image, "id", -1)) == int(image_id):
                 return image
         return None
 
     def _get_display_mapping(self, image_id, panel, _data):
+        """Return display mapping for the current workflow."""
         mapping = SimpleNamespace(
             min_val=0.0,
             max_val=1.0,
@@ -108,9 +113,11 @@ class _SyncHarness(DisplayControlsMixin):
         return mapping
 
     def _sync_modality_display_settings(self, _panel, _mapping) -> None:
+        """Synchronize modality display settings for the current workflow."""
         return
 
     def _default_panel_key(self) -> str:
+        """Handle the default panel key helper flow."""
         return "frame"
 
 

@@ -45,6 +45,7 @@ class KeyboardEventsMixin:
         )
 
     def _keyboard_registry_ok(self) -> bool:
+        """Handle the keyboard registry ok helper flow."""
         return len(detect_conflicts(all_shortcuts())) == 0
 
     def _on_key(self, event) -> None:

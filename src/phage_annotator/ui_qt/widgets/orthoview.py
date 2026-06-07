@@ -21,6 +21,7 @@ class OrthoViewWidget(QtWidgets.QWidget):
     """XZ/YZ orthogonal viewer with crosshair overlays and click callbacks."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self._last_update = 0.0
         self._downsample = 1
@@ -116,6 +117,7 @@ class OrthoViewWidget(QtWidgets.QWidget):
         self.canvas.draw_idle()
 
     def _set_message(self, text: str) -> None:
+        """Set message for the current workflow."""
         for line in (self.xz_vline, self.xz_hline, self.yz_vline, self.yz_hline):
             line.set_visible(False)
         if self._message_text_xz is None:
@@ -145,12 +147,14 @@ class OrthoViewWidget(QtWidgets.QWidget):
         self.canvas.draw_idle()
 
     def _clear_message(self) -> None:
+        """Clear message for the current workflow."""
         if self._message_text_xz is not None:
             self._message_text_xz.set_text("")
         if self._message_text_yz is not None:
             self._message_text_yz.set_text("")
 
     def _on_click(self, event) -> None:
+        """Handle the on click helper flow."""
         if event.button != 1 or event.xdata is None or event.ydata is None:
             return
         if self._downsample <= 0:
@@ -170,6 +174,7 @@ class OrthoViewWidget(QtWidgets.QWidget):
 
 
 def _update_or_create(ax, artist, data: np.ndarray, norm, cmap):
+    """Update or create for the current workflow."""
     if artist is None:
         return ax.imshow(data, norm=norm, cmap=cmap, extent=(0, data.shape[1], data.shape[0], 0))
     artist.set_data(data)

@@ -15,9 +15,11 @@ class SessionProjectExportMixin:
     """Mixin for annotation export metadata and file export helpers."""
 
     def _annotation_export_timestamp(self) -> str:
+        """Handle the annotation export timestamp helper flow."""
         return datetime.now().isoformat(timespec="seconds")
 
     def _current_annotation_target(self) -> str:
+        """Handle the current annotation target helper flow."""
         target = str(getattr(self, "annotate_target", "frame")).strip()
         return target or "frame"
 
@@ -35,6 +37,7 @@ class SessionProjectExportMixin:
         }
 
     def _image_export_context(self, image_id: int) -> Dict[str, object]:
+        """Handle the image export context helper flow."""
         image = next((img for img in self.session_state.images if int(getattr(img, "id", -1)) == int(image_id)), None)
         if image is None:
             return {"image_id": int(image_id)}

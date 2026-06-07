@@ -11,6 +11,7 @@ class _Harness(RenderingMixin):
 
 
 def _suggestion(*, score: float = 0.0, confidence_available: bool = False, p_accept: float | None = None):
+    """Handle the suggestion helper flow."""
     suggestion = PointSuggestion(
         image_id=0,
         image_name="img",
@@ -27,6 +28,7 @@ def _suggestion(*, score: float = 0.0, confidence_available: bool = False, p_acc
 
 
 def test_heuristic_only_is_gray() -> None:
+    """Verify heuristic only is gray for the current workflow."""
     harness = _Harness()
     color, state = harness._suggestion_overlay_style(_suggestion(score=0.9, confidence_available=False))
     assert state == "heuristic"
@@ -34,6 +36,7 @@ def test_heuristic_only_is_gray() -> None:
 
 
 def test_calibrated_probability_bands_use_green_yellow_red() -> None:
+    """Verify calibrated probability bands use green yellow red for the current workflow."""
     harness = _Harness()
     green, state_g = harness._suggestion_overlay_style(
         _suggestion(score=0.2, confidence_available=True, p_accept=0.80)

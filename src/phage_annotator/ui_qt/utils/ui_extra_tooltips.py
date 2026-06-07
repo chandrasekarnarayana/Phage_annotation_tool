@@ -35,6 +35,7 @@ class UiTooltipMixin:
         timer.setInterval(850)
 
         def _show_tip() -> None:
+            """Show tip for the current workflow."""
             if widget is None or not widget.isVisible():
                 return
             center = widget.rect().center()

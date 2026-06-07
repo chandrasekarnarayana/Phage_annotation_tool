@@ -21,8 +21,9 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     This function converts a session using the old active_primary_id/active_support_id
     system to the new ModalityManager-based system.
 
-    Legacy bootstrap creation of fixed modalities was removed so new/dynamic
-    workflows can start empty and add modalities explicitly from the UI.
+    Legacy primary/support sessions are converted to two explicit modalities
+    so old projects keep the same active image pairing after migration. New
+    dynamic workflows that already carry a manager are left untouched.
     
     After this operation, code can use either:
     - Old API: session_state.active_primary_id (still works)
@@ -46,12 +47,16 @@ def upgrade_to_modalities(session_state: SessionState) -> None:
     if session_state.modality_manager is not None:
         return
     
-    # Import here to avoid circular dependency
+    # Import here to avoid circular dependency during dataclass construction.
     from phage_annotator.session.modality import ModalityManager
     
-    # Start with an empty modality set. Canvas rows are created explicitly via
-    # lazy-loader row actions so UI state remains the single source of truth.
-    manager = ModalityManager()
+    primary_id = int(getattr(session_state, "active_primary_id", 0))
+    support_id = int(getattr(session_state, "active_support_id", primary_id))
+
+    # Preserve the legacy primary/support relationship when it represents two
+    # different images; single-image sessions intentionally get one modality.
+    support_for_migration = support_id if support_id != primary_id else None
+    manager = ModalityManager.create_from_primary_support(primary_id, support_for_migration)
     
     session_state.modality_manager = manager
     session_state.migration_version = 1
@@ -189,6 +194,7 @@ class MigrationContext:
         self.success = False
     
     def __enter__(self) -> "MigrationContext":
+        """Handle the enter helper flow."""
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):

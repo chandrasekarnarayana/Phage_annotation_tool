@@ -38,6 +38,7 @@ from phage_annotator.smlm.reproducibility import (
 
 
 def _loc(frame: int, x: float, y: float) -> Localization:
+    """Handle the loc helper flow."""
     return Localization(
         frame_index=frame,
         x_px=x,
@@ -50,6 +51,7 @@ def _loc(frame: int, x: float, y: float) -> Localization:
 
 
 def test_build_fiji_command_default() -> None:
+    """Verify build fiji command default for the current workflow."""
     config = ThunderstormBridgeConfig(
         backend="fiji_subprocess",
         fiji_executable="/opt/Fiji/ImageJ-linux64",
@@ -67,6 +69,7 @@ def test_build_fiji_command_default() -> None:
 
 
 def test_build_fiji_command_template() -> None:
+    """Verify build fiji command template for the current workflow."""
     config = ThunderstormBridgeConfig(
         backend="fiji_subprocess",
         fiji_executable="/opt/Fiji/ImageJ-linux64",
@@ -85,6 +88,7 @@ def test_build_fiji_command_template() -> None:
 
 
 def test_parity_metrics_counts_and_error() -> None:
+    """Verify parity metrics counts and error for the current workflow."""
     internal = [_loc(0, 10.0, 10.0), _loc(0, 20.0, 20.0), _loc(1, 5.0, 5.0)]
     bridge = [_loc(0, 10.2, 10.1), _loc(0, 20.1, 20.0), _loc(1, 9.0, 9.0)]
     metrics = compute_parity_metrics(internal, bridge, tolerance_px=1.0)
@@ -95,6 +99,7 @@ def test_parity_metrics_counts_and_error() -> None:
 
 
 def test_runbook_lock_and_export(tmp_path: Path) -> None:
+    """Verify runbook lock and export for the current workflow."""
     state = ReproducibilityRunbookState(enabled=True)
     lock_profile(state, "ThunderSTORM", {"backend": "internal", "params": {"sigma_px": 1.3}})
     eff = resolve_profile(state, "ThunderSTORM", {"backend": "fiji_subprocess", "params": {"sigma_px": 2.0}})
@@ -114,6 +119,7 @@ def test_runbook_lock_and_export(tmp_path: Path) -> None:
 
 
 def test_discover_bundled_thunderstorm_jar(tmp_path: Path) -> None:
+    """Verify discover bundled thunderstorm jar for the current workflow."""
     plugin_dir = tmp_path / "external_plugins"
     plugin_dir.mkdir()
     jar = plugin_dir / "Thunder_STORM.jar"
@@ -123,6 +129,7 @@ def test_discover_bundled_thunderstorm_jar(tmp_path: Path) -> None:
 
 
 def test_discover_external_plugins_manifest_and_jar(tmp_path: Path) -> None:
+    """Verify discover external plugins manifest and jar for the current workflow."""
     plugin_dir = tmp_path / "external_plugins"
     plugin_dir.mkdir()
     jar = plugin_dir / "FancyPlugin.jar"
@@ -150,6 +157,7 @@ def test_discover_external_plugins_manifest_and_jar(tmp_path: Path) -> None:
 
 
 def test_strict_manifest_arg_and_macro(tmp_path: Path) -> None:
+    """Verify strict manifest arg and macro for the current workflow."""
     plugin_dir = tmp_path / "external_plugins"
     plugin_dir.mkdir()
     jar = plugin_dir / "AnyPlugin.jar"
@@ -207,6 +215,7 @@ def test_strict_manifest_arg_and_macro(tmp_path: Path) -> None:
 
 
 def test_parse_plugins_config_from_jar(tmp_path: Path) -> None:
+    """Verify parse plugins config from jar for the current workflow."""
     import zipfile
 
     jar = tmp_path / "test.jar"
@@ -221,11 +230,13 @@ def test_parse_plugins_config_from_jar(tmp_path: Path) -> None:
 
 
 def test_preflight_internal_backend_passes() -> None:
+    """Verify preflight internal backend passes for the current workflow."""
     report = run_preflight(ThunderstormBridgeConfig(backend="internal"))
     assert report.ok is True
 
 
 def test_preflight_probe_missing_fiji_returns_code_2() -> None:
+    """Verify preflight probe missing fiji returns code 2 for the current workflow."""
     report = run_preflight(
         ThunderstormBridgeConfig(
             backend="fiji_subprocess",
@@ -239,6 +250,7 @@ def test_preflight_probe_missing_fiji_returns_code_2() -> None:
 
 
 def test_second_plugin_profile_discovered_from_repository_assets() -> None:
+    """Verify second plugin profile discovered from repository assets for the current workflow."""
     discovered = discover_external_fiji_plugins()
     ids = {p.plugin_id for p in discovered}
     assert "thunder_storm" in ids
@@ -246,11 +258,13 @@ def test_second_plugin_profile_discovered_from_repository_assets() -> None:
 
 
 def test_fiji_subprocess_retries_then_succeeds(tmp_path: Path, monkeypatch) -> None:
+    """Verify fiji subprocess retries then succeeds for the current workflow."""
     macro = tmp_path / "macro.ijm"
     macro.write_text("run(\"Anything\");\n", encoding="utf-8")
     calls = {"n": 0}
 
     def _fake_run(*_args, **kwargs):
+        """Handle the fake run helper flow."""
         calls["n"] += 1
         output_path = Path(str(kwargs["env"]["PHAGE_SMLM_OUTPUT"]))
         if calls["n"] == 1:

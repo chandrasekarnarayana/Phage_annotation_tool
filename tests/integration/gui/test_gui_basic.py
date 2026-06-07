@@ -1,3 +1,5 @@
+"""Basic Qt application launch smoke tests."""
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,7 @@ import pytest
 # Widget initialization issues resolved by adding all missing widgets.
 # to the active UI setup helpers. GUI now launches successfully. Re-enabling test.
 def test_gui_launch(qtbot, tmp_path) -> None:
+    """Verify gui launch for the current workflow."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app
@@ -21,6 +24,7 @@ def test_gui_launch(qtbot, tmp_path) -> None:
 @pytest.mark.gui
 # Widget initialization issues resolved. Re-enabling test.
 def test_gui_visual_regression(qtbot, tmp_path) -> None:
+    """Verify gui visual regression for the current workflow."""
     pytest.importorskip("PyQt5")
     from phage_annotator.demo import generate_dummy_image
     from phage_annotator.ui_qt.main_window import create_app

@@ -1,9 +1,12 @@
+"""Unit tests for core image IO and axis standardization."""
+
 import numpy as np
 
 from phage_annotator.io import ImageMeta, load_images, standardize_axes
 
 
 def test_standardize_axes_shapes() -> None:
+    """Verify standardize axes shapes for the current workflow."""
     arr2d = np.zeros((4, 5))
     std, has_time, has_z = standardize_axes(arr2d)
     assert std.shape == (1, 1, 4, 5)
@@ -27,12 +30,14 @@ def test_standardize_axes_shapes() -> None:
 
 def test_load_images(tmp_path, monkeypatch) -> None:
     # create placeholder file and monkeypatch tifffile.imread
+    """Verify load images for the current workflow."""
     img_path = tmp_path / "img.tif"
     img_path.write_bytes(b"")
 
     import phage_annotator.io as io
 
     def fake_imread(path):
+        """Run the fake imread workflow."""
         return np.zeros((2, 3, 4, 5))
 
     monkeypatch.setattr(io.tif, "imread", fake_imread)

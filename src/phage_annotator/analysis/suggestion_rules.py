@@ -35,6 +35,7 @@ class SuggestionRuleConfig:
 
     @classmethod
     def from_dict(cls, payload: dict) -> "SuggestionRuleConfig":
+        """Run the from dict workflow."""
         channels: Dict[str, ChannelRange] = {}
         semantic_rules: Dict[str, SemanticRule] = {}
         channel_rows = payload.get("channels", {}) if isinstance(payload, dict) else {}
@@ -87,6 +88,7 @@ class SuggestionRuleConfig:
 
 
 def load_suggestion_rule_config(path: Path) -> SuggestionRuleConfig:
+    """Load suggestion rule config for the current workflow."""
     text = path.read_text(encoding="utf-8")
     data = None
     if path.suffix.lower() in (".yaml", ".yml"):

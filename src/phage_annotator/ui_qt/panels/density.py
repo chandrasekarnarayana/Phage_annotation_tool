@@ -9,6 +9,7 @@ class DensityPanel(QtWidgets.QWidget):
     """Dock widget for density model inference controls."""
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)

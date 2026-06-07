@@ -52,6 +52,7 @@ def match(
 
 
 def _normalize_image_basename(image_path: pathlib.Path) -> str:
+    """Normalize image basename for the current workflow."""
     name = image_path.name
     if name.lower().endswith(".ome.tif") or name.lower().endswith(".ome.tiff"):
         stem = pathlib.Path(name[:-8]).stem
@@ -62,6 +63,7 @@ def _normalize_image_basename(image_path: pathlib.Path) -> str:
 
 
 def _annotation_base_candidates(filename: str) -> Iterable[str]:
+    """Handle the annotation base candidates helper flow."""
     stem = pathlib.Path(filename).stem
     if "__ann__" in stem:
         stem = stem.split("__ann__", 1)[0]
@@ -84,6 +86,7 @@ def _strip_tokens(name: str) -> str:
 
 
 def _strip_annotation_suffixes(name: str) -> str:
+    """Handle the strip annotation suffixes helper flow."""
     lowered = name.lower()
     for suffix in (
         "annotations",
@@ -100,5 +103,6 @@ def _strip_annotation_suffixes(name: str) -> str:
 
 
 def _normalize_base(name: str) -> str:
+    """Normalize base for the current workflow."""
     cleaned = name.strip().strip("._- ")
     return cleaned.lower()

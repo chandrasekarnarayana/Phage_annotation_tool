@@ -44,6 +44,7 @@ FORBIDDEN_IMPORT_PREFIXES = (
 
 
 def _is_core_candidate(path: Path) -> bool:
+    """Return whether core candidate is true for the current state."""
     rel = path.relative_to(SRC_ROOT)
     if "__pycache__" in rel.parts:
         return False
@@ -53,6 +54,7 @@ def _is_core_candidate(path: Path) -> bool:
 
 
 def _iter_forbidden_imports(path: Path) -> list[str]:
+    """Handle the iter forbidden imports helper flow."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     found: list[str] = []
     for node in ast.walk(tree):
@@ -69,6 +71,7 @@ def _iter_forbidden_imports(path: Path) -> list[str]:
 
 
 def main() -> int:
+    """Run the main workflow."""
     violations: list[tuple[str, str]] = []
     for path in sorted(SRC_ROOT.rglob("*.py")):
         if not _is_core_candidate(path):

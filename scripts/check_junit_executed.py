@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 def _parse_counts(xml_path: Path) -> tuple[int, int]:
+    """Parse counts for the current workflow."""
     tree = ET.parse(str(xml_path))
     root = tree.getroot()
     if root.tag == "testsuite":
@@ -28,6 +29,7 @@ def _parse_counts(xml_path: Path) -> tuple[int, int]:
 
 
 def main() -> int:
+    """Run the main workflow."""
     parser = argparse.ArgumentParser(description="Ensure JUnit report has executed tests.")
     parser.add_argument("junit_xml", type=Path, help="Path to pytest JUnit XML report.")
     parser.add_argument(

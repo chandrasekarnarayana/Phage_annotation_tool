@@ -6,6 +6,7 @@ from phage_annotator.ui_qt.widgets.slider_panel_double import SliderPanelDouble
 
 
 def test_slider_range_updates(qtbot):
+    """Verify slider range updates for the current workflow."""
     slider = SliderPanelDouble()
     qtbot.addWidget(slider)
     slider.setRange(0.0, 10.0)
@@ -14,6 +15,7 @@ def test_slider_range_updates(qtbot):
 
 
 def test_slider_clamps_values(qtbot):
+    """Verify slider clamps values for the current workflow."""
     slider = SliderPanelDouble()
     qtbot.addWidget(slider)
     slider.setRange(0.0, 5.0)

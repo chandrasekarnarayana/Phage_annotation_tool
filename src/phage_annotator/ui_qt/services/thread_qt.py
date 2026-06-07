@@ -20,6 +20,7 @@ class QtRunnable(QRunnable):
     """QRunnable wrapper for Python functions."""
     
     def __init__(self, func: Callable, *args, **kwargs):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.func = func
         self.args = args

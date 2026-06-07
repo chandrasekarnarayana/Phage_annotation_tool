@@ -98,6 +98,7 @@ def export_coco_keypoints(
     categories: list[dict] = []
 
     def _category_id(label: str) -> int:
+        """Handle the category id helper flow."""
         if label not in categories_by_label:
             cid = len(categories_by_label) + 1
             categories_by_label[label] = cid

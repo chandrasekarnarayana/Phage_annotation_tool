@@ -26,6 +26,7 @@ class ResultsTableWidget(QtWidgets.QWidget):
     """Dock widget for measurement results."""
 
     def __init__(self, parent=None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -54,6 +55,7 @@ class ResultsTableWidget(QtWidgets.QWidget):
         layout.addWidget(self.table)
 
     def add_row(self, row: Dict[str, object]) -> None:
+        """Add row for the current workflow."""
         self.table.blockSignals(True)
         r = self.table.rowCount()
         self.table.insertRow(r)
@@ -63,9 +65,11 @@ class ResultsTableWidget(QtWidgets.QWidget):
         self.table.resizeColumnsToContents()
 
     def clear(self) -> None:
+        """Clear clear for the current workflow."""
         self.table.setRowCount(0)
 
     def copy_to_clipboard(self) -> None:
+        """Copy to clipboard for the current workflow."""
         sio = StringIO()
         writer = csv.writer(sio)
         writer.writerow(RESULT_COLUMNS)
@@ -76,6 +80,7 @@ class ResultsTableWidget(QtWidgets.QWidget):
         QtWidgets.QApplication.clipboard().setText(sio.getvalue())
 
     def export_csv(self, path: str) -> None:
+        """Export csv for the current workflow."""
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(RESULT_COLUMNS)

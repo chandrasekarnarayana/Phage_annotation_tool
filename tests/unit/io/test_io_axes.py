@@ -1,3 +1,5 @@
+"""Unit tests for supported image-axis normalization shapes."""
+
 import numpy as np
 import pytest
 
@@ -5,6 +7,7 @@ from phage_annotator.io import standardize_axes
 
 
 def test_standardize_axes_basic_shapes() -> None:
+    """Verify standardize axes basic shapes for the current workflow."""
     arr2d = np.zeros((4, 5))
     std, has_time, has_z = standardize_axes(arr2d)
     assert std.shape == (1, 1, 4, 5)
@@ -27,6 +30,7 @@ def test_standardize_axes_basic_shapes() -> None:
 
 
 def test_standardize_axes_degenerate_shapes() -> None:
+    """Verify standardize axes degenerate shapes for the current workflow."""
     arr3d_single = np.zeros((1, 4, 5))  # ambiguous single axis -> treat as time
     std, has_time, has_z = standardize_axes(arr3d_single)
     assert std.shape == (1, 1, 4, 5)
@@ -44,6 +48,7 @@ def test_standardize_axes_degenerate_shapes() -> None:
 
 
 def test_standardize_axes_invalid_ome_axes_strict() -> None:
+    """Verify standardize axes invalid ome axes strict for the current workflow."""
     arr = np.zeros((3, 4, 5))
     std, has_time, has_z = standardize_axes(arr, ome_axes="CYX", strict=True)
     assert std.shape == (1, 1, 4, 5)

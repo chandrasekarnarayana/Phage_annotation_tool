@@ -126,6 +126,7 @@ def parse_thunderstorm_csv(
 
 
 def _build_thunderstorm_mapping(columns: Iterable[str]) -> Dict[str, str]:
+    """Build thunderstorm mapping for the current workflow."""
     cols = {c.strip().lower(): c for c in columns}
     mapping: Dict[str, str] = {}
     for key in ("x [nm]", "x(nm)", "x_nm"):
@@ -158,6 +159,7 @@ def _build_thunderstorm_mapping(columns: Iterable[str]) -> Dict[str, str]:
 
 
 def _frame_base(series: Optional[pd.Series]) -> int:
+    """Handle the frame base helper flow."""
     if series is None or series.empty:
         return 0
     vals = series.dropna().astype(int)

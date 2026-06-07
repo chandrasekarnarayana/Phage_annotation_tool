@@ -43,39 +43,48 @@ def qapp():
 
 class _Slider:
     def __init__(self, value: int):
+        """Initialize the object and prepare its runtime state."""
         self._value = value
 
     def value(self) -> int:
+        """Run the value workflow."""
         return self._value
 
 
 class _Action:
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.enabled = False
 
     def setEnabled(self, value: bool) -> None:
+        """Run the setEnabled workflow."""
         self.enabled = bool(value)
 
 
 class _FakeMenu:
     def __init__(self, selected_index: int) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._selected_index = selected_index
         self._actions: list[object] = []
 
     def addAction(self, _text: str) -> object:
+        """Run the addAction workflow."""
         action = object()
         self._actions.append(action)
         return action
 
     def addSeparator(self) -> None:
+        """Run the addSeparator workflow."""
         return None
 
     def exec(self, _global_pos):
+        """Run the exec workflow."""
         return self._actions[self._selected_index]
 
 
 class _WindowStub(ContextMenuMixin):
     def __init__(self, annotation_uncertain: bool = False) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.images = [object()]
         self.primary_image = Mock(id=0)
         self.annotations = {

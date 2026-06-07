@@ -79,6 +79,7 @@ def build_sidebar_panel_registry(self) -> list[SidebarPanelSpec]:
 
         # Create a closure that returns the pre-built widget
         def make_widget_factory(w=widget):
+            """Create widget factory for the current workflow."""
             return lambda: w
 
         spec = SidebarPanelSpec(

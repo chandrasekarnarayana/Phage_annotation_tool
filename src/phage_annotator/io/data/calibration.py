@@ -34,6 +34,7 @@ def resolve_calibration(
 
 
 def _pixel_size_from_summary(summary: Dict[str, object]) -> Optional[float]:
+    """Handle the pixel size from summary helper flow."""
     value = summary.get("pixel_size_um")
     if isinstance(value, (float, int)):
         return float(value)

@@ -39,13 +39,16 @@ def test_cache_strategies_registry_returns_expected_type() -> None:
 class _EchoCommand(Command):
     @property
     def id(self) -> str:
+        """Run the id workflow."""
         return "test.echo"
 
     @property
     def title(self) -> str:
+        """Run the title workflow."""
         return "Echo"
 
     def execute(self, context=None, **kwargs):
+        """Execute execute for the current workflow."""
         return kwargs.get("value", context)
 
 

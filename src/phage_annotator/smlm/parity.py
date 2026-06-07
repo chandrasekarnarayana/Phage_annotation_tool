@@ -71,6 +71,7 @@ def compute_parity_metrics(
 
 
 def _to_frame_arrays(locs: Iterable[Localization]) -> dict[int, np.ndarray]:
+    """Convert frame arrays for the current workflow."""
     by_frame: dict[int, list[list[float]]] = {}
     for loc in locs:
         frame = int(getattr(loc, "frame_index", 0))
@@ -81,4 +82,3 @@ def _to_frame_arrays(locs: Iterable[Localization]) -> dict[int, np.ndarray]:
         frame: np.asarray(points, dtype=np.float32)
         for frame, points in by_frame.items()
     }
-

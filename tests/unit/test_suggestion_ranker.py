@@ -14,6 +14,7 @@ from phage_annotator.core.annotation import PointSuggestion
 
 
 def test_ranker_fit_and_predict_probability() -> None:
+    """Verify ranker fit and predict probability for the current workflow."""
     ranker = LightweightSuggestionRanker()
     x = np.asarray(
         [
@@ -32,6 +33,7 @@ def test_ranker_fit_and_predict_probability() -> None:
 
 
 def test_ranker_applies_calibrated_confidence_to_suggestions() -> None:
+    """Verify ranker applies calibrated confidence to suggestions for the current workflow."""
     ranker = LightweightSuggestionRanker()
     suggestions = [
         PointSuggestion(0, "img", 0, 0, 2.0, 2.0, score=0.1, score_components={"peak": 0.2, "snr": 0.1, "local_contrast": 0.1, "local_std": 0.4}),
@@ -49,6 +51,7 @@ def test_ranker_applies_calibrated_confidence_to_suggestions() -> None:
 
 
 def test_dataset_metrics_contains_requested_fields() -> None:
+    """Verify dataset metrics contains requested fields for the current workflow."""
     rows = [
         PointSuggestion(0, "a", 0, 0, 1, 1, score=0.8, status="accepted"),
         PointSuggestion(0, "a", 0, 0, 2, 2, score=0.7, status="rejected"),
@@ -61,6 +64,7 @@ def test_dataset_metrics_contains_requested_fields() -> None:
 
 
 def test_ranker_persists_calibration_monitoring_fields() -> None:
+    """Verify ranker persists calibration monitoring fields for the current workflow."""
     ranker = LightweightSuggestionRanker()
     x = np.asarray(
         [
@@ -84,6 +88,7 @@ def test_ranker_persists_calibration_monitoring_fields() -> None:
 
 
 def test_expected_calibration_error_is_non_negative() -> None:
+    """Verify expected calibration error is non negative for the current workflow."""
     probs = np.asarray([0.1, 0.2, 0.8, 0.9], dtype=np.float64)
     y = np.asarray([0.0, 0.0, 1.0, 1.0], dtype=np.float64)
     assert expected_calibration_error(probs, y) >= 0.0

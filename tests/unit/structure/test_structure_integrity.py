@@ -33,6 +33,7 @@ HEADLESS_ROOT_MODULES = {
 
 
 def _iter_source_modules() -> list[tuple[str, Path]]:
+    """Handle the iter source modules helper flow."""
     modules: list[tuple[str, Path]] = []
     for py_file in sorted(SRC_ROOT.rglob("*.py")):
         if "__pycache__" in py_file.parts:
@@ -47,6 +48,7 @@ def _iter_source_modules() -> list[tuple[str, Path]]:
 
 
 def _is_headless_candidate(path: Path) -> bool:
+    """Return whether headless candidate is true for the current state."""
     rel = path.relative_to(SRC_ROOT)
     if rel.parts and rel.parts[0] in HEADLESS_PACKAGES:
         return True
@@ -54,6 +56,7 @@ def _is_headless_candidate(path: Path) -> bool:
 
 
 def _run_script(script_name: str) -> subprocess.CompletedProcess[str]:
+    """Run script for the current workflow."""
     return subprocess.run(
         [sys.executable, str(REPO_ROOT / "scripts" / script_name)],
         cwd=REPO_ROOT,
@@ -78,6 +81,18 @@ def test_core_no_qt_script_passes() -> None:
 def test_package_layout_script_passes() -> None:
     """Top-level package layout should stay in the post-facade state."""
     result = _run_script("check_package_layout.py")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_root_cleanliness_script_passes() -> None:
+    """Root-level files should stay limited to project essentials."""
+    result = _run_script("check_root_cleanliness.py")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_source_quality_script_passes() -> None:
+    """Python files should keep docstrings and report modularity pressure."""
+    result = _run_script("check_source_quality.py")
     assert result.returncode == 0, result.stdout + result.stderr
 
 

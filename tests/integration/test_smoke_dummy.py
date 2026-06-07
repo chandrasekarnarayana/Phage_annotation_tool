@@ -1,8 +1,11 @@
+"""Smoke tests for generated demo data loading."""
+
 from phage_annotator.demo import generate_dummy_image
 from phage_annotator.io import load_images
 
 
 def test_dummy_image_loads(tmp_path) -> None:
+    """Verify dummy image loads for the current workflow."""
     path = generate_dummy_image(tmp_path / "dummy.tif", mode="tz")
     metas = load_images([path])
     assert len(metas) == 1

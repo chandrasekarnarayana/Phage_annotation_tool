@@ -1,3 +1,5 @@
+"""Unit tests for project persistence annotation links."""
+
 from __future__ import annotations
 
 import json
@@ -7,6 +9,7 @@ from phage_annotator.io.projects.base import load_project
 
 
 def test_load_project_resolves_relative_annotation_path(tmp_path: Path) -> None:
+    """Verify load project resolves relative annotation path for the current workflow."""
     project_path = tmp_path / "session.phageproj"
     image_path = tmp_path / "sample_stack.tif"
     ann_path = tmp_path / "sample_stack.annotations.json"
@@ -34,6 +37,7 @@ def test_load_project_resolves_relative_annotation_path(tmp_path: Path) -> None:
 
 
 def test_load_project_falls_back_to_sidecar_annotation(tmp_path: Path) -> None:
+    """Verify load project falls back to sidecar annotation for the current workflow."""
     project_path = tmp_path / "session.phageproj"
     image_path = tmp_path / "moved_stack.tif"
     sidecar = tmp_path / "moved_stack.annotations.json"

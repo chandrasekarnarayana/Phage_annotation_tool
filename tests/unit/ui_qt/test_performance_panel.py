@@ -1,3 +1,5 @@
+"""Unit tests for the performance panel update behavior."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -11,6 +13,7 @@ from phage_annotator.ui_qt.services.jobs import JobTelemetry, JobSnapshot
 
 class _MainWindowStub:
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._status_events = []
         self.images = []
         self.current_image_idx = 0
@@ -33,13 +36,16 @@ class _MainWindowStub:
         )
 
     def _status_success(self, text: str, **_kwargs) -> None:
+        """Handle the status success helper flow."""
         self._status_events.append(str(text))
 
     def _status_info(self, text: str, **_kwargs) -> None:
+        """Handle the status info helper flow."""
         self._status_events.append(str(text))
 
 
 def test_performance_panel_warns_when_cache_reaches_ninety_percent(qtbot) -> None:
+    """Verify performance panel warns when cache reaches ninety percent for the current workflow."""
     cache = ProjectionCache(max_mb=1)
     arr = np.zeros((1000, 1000), dtype=np.uint8)
     cache.put((0, "mean", (0.0, 0.0, 1.0, 1.0), 0, 0, 0), arr)
@@ -55,6 +61,7 @@ def test_performance_panel_warns_when_cache_reaches_ninety_percent(qtbot) -> Non
 
 
 def test_performance_panel_clear_cache_resets_usage_and_surfaces_status(qtbot) -> None:
+    """Verify performance panel clear cache resets usage and surfaces status for the current workflow."""
     cache = ProjectionCache(max_mb=8)
     arr = np.zeros((512, 512), dtype=np.uint8)
     cache.put((0, "mean", (0.0, 0.0, 1.0, 1.0), 0, 0, 0), arr)
@@ -75,6 +82,7 @@ def test_performance_panel_clear_cache_resets_usage_and_surfaces_status(qtbot) -
 
 
 def test_performance_panel_surfaces_job_queue_summary(qtbot) -> None:
+    """Verify performance panel surfaces job queue summary for the current workflow."""
     main_window = _MainWindowStub()
     main_window.jobs = SimpleNamespace(
         queue_snapshot=lambda: JobTelemetry(
@@ -142,6 +150,7 @@ def test_performance_panel_surfaces_job_queue_summary(qtbot) -> None:
 
 
 def test_performance_panel_cancel_blocked_jobs_uses_job_ids(qtbot) -> None:
+    """Verify performance panel cancel blocked jobs uses job ids for the current workflow."""
     cancelled: list[str] = []
     main_window = _MainWindowStub()
     main_window.jobs = SimpleNamespace(

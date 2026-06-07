@@ -22,10 +22,21 @@ TARGETS = [ROOT / "README.md"] + [
     if not any(path.is_relative_to(prefix) for prefix in EXCLUDED_PREFIXES)
 ]
 H1_RE = re.compile(r"^#\s+\S")
+ALLOWED_ROOT_MARKDOWN = {"README.md"}
 
 
 def main() -> int:
+    """Run the main workflow."""
     failures: list[str] = []
+    root_markdown = sorted(path.name for path in ROOT.glob("*.md"))
+    unexpected_root_markdown = [
+        name for name in root_markdown if name not in ALLOWED_ROOT_MARKDOWN
+    ]
+    if unexpected_root_markdown:
+        failures.append(
+            "root Markdown files must move under docs/: "
+            + ", ".join(unexpected_root_markdown)
+        )
     for path in TARGETS:
         if not path.exists():
             continue

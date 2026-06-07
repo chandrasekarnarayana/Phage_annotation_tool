@@ -81,8 +81,14 @@ providing the PyQt5-based GUI for image annotation and analysis.
 - Event subscription and full integration complete
 """
 
+from matplotlib.backends.qt_compat import QtCore
+
+if not hasattr(QtCore, "pyqtSignal") and hasattr(QtCore, "Signal"):
+    QtCore.pyqtSignal = QtCore.Signal
+
 # Lazy imports to avoid circular dependencies during module initialization
 def __getattr__(name):
+    """Delegate unknown attribute access to the wrapped value."""
     if name == 'KeypointAnnotator':
         from phage_annotator.ui_qt.main_window import KeypointAnnotator
         return KeypointAnnotator

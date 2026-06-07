@@ -15,6 +15,7 @@ class AdvancedSettingsPanel(QtWidgets.QWidget):
     retry_project_relink_requested = QtCore.Signal(str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.setObjectName("advanced_settings_panel")
         root = QtWidgets.QVBoxLayout(self)

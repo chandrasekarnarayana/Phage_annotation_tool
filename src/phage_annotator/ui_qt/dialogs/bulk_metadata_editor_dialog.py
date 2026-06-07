@@ -55,9 +55,7 @@ class BulkMetadataEditorDialog(QtWidgets.QDialog):
         self.taxonomy = taxonomy
         self.schema = schema or get_global_schema()
         self.validator = MetadataValidator(self.schema)
-        
         self.field_widgets: Dict[str, tuple[QtWidgets.QCheckBox, QtWidgets.QWidget]] = {}
-        
         self._setup_ui()
     
     def _setup_ui(self) -> None:

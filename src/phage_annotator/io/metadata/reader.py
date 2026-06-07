@@ -58,6 +58,7 @@ def _build_summary(
     ome_parsed: Optional[Dict[str, Any]],
     mm: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """Build summary for the current workflow."""
     axes = series.axes
     shape = series.shape
     dims = _axes_to_tzyx(axes, shape)
@@ -85,6 +86,7 @@ def _build_summary(
 
 
 def _axes_to_tzyx(axes: str, shape: Tuple[int, ...]) -> Tuple[int, int, int, int]:
+    """Handle the axes to tzyx helper flow."""
     axes = axes.upper()
     mapping = dict(zip(axes, shape))
     return (
@@ -96,6 +98,7 @@ def _axes_to_tzyx(axes: str, shape: Tuple[int, ...]) -> Tuple[int, int, int, int
 
 
 def _parse_ome_metadata(ome_xml: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Parse ome metadata for the current workflow."""
     if not ome_xml:
         return None
     try:
@@ -136,6 +139,7 @@ def _parse_ome_metadata(ome_xml: Optional[str]) -> Optional[Dict[str, Any]]:
 
 
 def _parse_micromanager(tf: tif.TiffFile, tags: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Parse micromanager for the current workflow."""
     try:
         mm = getattr(tf, "micromanager_metadata", None)
         if mm:
@@ -154,6 +158,7 @@ def _parse_micromanager(tf: tif.TiffFile, tags: Dict[str, Any]) -> Optional[Dict
 
 
 def _extract_vendor_private(tags: tif.TiffTags) -> Dict[str, Any]:
+    """Extract vendor private for the current workflow."""
     vendor: Dict[str, Any] = {}
     for tag in tags.values():
         if tag.code >= 65000 or tag.name.lower().startswith("unknown"):
@@ -162,6 +167,7 @@ def _extract_vendor_private(tags: tif.TiffTags) -> Dict[str, Any]:
 
 
 def _int_or_none(value: Optional[str]) -> Optional[int]:
+    """Handle the int or none helper flow."""
     try:
         return int(value) if value is not None else None
     except ValueError:
@@ -169,6 +175,7 @@ def _int_or_none(value: Optional[str]) -> Optional[int]:
 
 
 def _float_or_none(value: Optional[str]) -> Optional[float]:
+    """Handle the float or none helper flow."""
     try:
         return float(value) if value is not None else None
     except ValueError:

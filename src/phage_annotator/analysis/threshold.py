@@ -183,6 +183,7 @@ def watershed_split(mask: np.ndarray) -> np.ndarray:
 
 
 def _skimage_threshold_fn(name: str):
+    """Handle the skimage threshold fn helper flow."""
     if sk_filters is None:
         return None
     mapping = {
@@ -202,6 +203,7 @@ def _skimage_threshold_fn(name: str):
 
 
 def _otsu_threshold(data: np.ndarray) -> float:
+    """Handle the otsu threshold helper flow."""
     hist, bin_edges = np.histogram(data.ravel(), bins=256)
     hist = hist.astype(np.float64)
     prob = hist / hist.sum()
@@ -214,6 +216,7 @@ def _otsu_threshold(data: np.ndarray) -> float:
 
 
 def _disk(radius: int) -> np.ndarray:
+    """Handle the disk helper flow."""
     r = int(max(1, radius))
     y, x = np.ogrid[-r : r + 1, -r : r + 1]
     return (x * x + y * y) <= r * r

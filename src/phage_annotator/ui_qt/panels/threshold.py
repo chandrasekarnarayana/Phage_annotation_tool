@@ -38,6 +38,7 @@ class ThresholdPanel(QtWidgets.QWidget):
     """Threshold control panel with preview and post-processing."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -180,6 +181,7 @@ class ThresholdPanel(QtWidgets.QWidget):
         )
 
     def _sync_labels(self) -> None:
+        """Synchronize labels for the current workflow."""
         low = int(self.low_slider.value())
         high = int(self.high_slider.value())
         if low > high:
@@ -191,6 +193,7 @@ class ThresholdPanel(QtWidgets.QWidget):
         self.high_label.setText(f"High: {high}%")
 
     def _apply_tooltips(self) -> None:
+        """Apply tooltips for the current workflow."""
         sigma_tip = "sigma_px ≈ FWHM/2.35; start 1.1–1.6 px."
         thr_tip = "Threshold 2–6 sigma."
         fit_tip = "Fit radius 3–5 px."

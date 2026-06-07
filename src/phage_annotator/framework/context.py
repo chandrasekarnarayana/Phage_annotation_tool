@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Type, TypeVar
 
 from phage_annotator.framework.base import (
@@ -32,6 +31,7 @@ from phage_annotator.framework.base import (
     CacheService,
     ServiceRegistry,
 )
+from phage_annotator.framework.context_config import ContextConfig
 from phage_annotator.framework.services import (
     DefaultEventService,
     DefaultLogService,
@@ -46,31 +46,6 @@ ServiceType = TypeVar("ServiceType")
 
 # Global context instance - can be overridden for testing
 _global_context: Optional[ApplicationContext] = None
-
-
-@dataclass
-class ContextConfig:
-    """Configuration for ApplicationContext initialization."""
-
-    # Logging
-    log_level: str = "INFO"
-    log_file: Optional[str] = None
-
-    # Threading
-    max_worker_threads: int = 4
-
-    # Cache
-    global_cache_budget_mb: float = 1024.0
-
-    # Settings
-    settings_defaults: Optional[Dict[str, Any]] = None
-
-    # Custom service implementations (for testing/override)
-    event_service: Optional[EventService] = None
-    log_service: Optional[LogService] = None
-    settings_service: Optional[SettingsService] = None
-    thread_service: Optional[ThreadService] = None
-    cache_service: Optional[CacheService] = None
 
 
 class ApplicationContext:

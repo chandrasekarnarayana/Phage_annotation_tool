@@ -8,6 +8,7 @@ import click
 
 from phage_annotator import __version__
 from phage_annotator.demo import generate_dummy_image
+from phage_annotator.runtime import build_runtime_policy, check_environment
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -67,10 +68,18 @@ def main(
     If no input files are specified, a demo image is automatically generated
     for exploration and testing.
     """
+    check_environment()
+    runtime_policy = build_runtime_policy()
+
     # Initialize application context (services) before GUI
-    from phage_annotator.framework import ApplicationContext
+    from phage_annotator.framework import ApplicationContext, ContextConfig
     
-    context = ApplicationContext.create_default()
+    context = ApplicationContext.create_default(
+        ContextConfig(
+            max_worker_threads=runtime_policy.max_worker_threads,
+            global_cache_budget_mb=runtime_policy.global_cache_budget_mb,
+        )
+    )
     ApplicationContext.set_global(context)
 
     # Import GUI lazily to avoid initializing Qt during module import or non-GUI tests.

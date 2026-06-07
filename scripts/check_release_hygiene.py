@@ -25,6 +25,7 @@ IGNORE_PREFIXES = (
 
 
 def _tracked_files() -> list[Path]:
+    """Handle the tracked files helper flow."""
     proc = subprocess.run(
         ["git", "ls-files"],
         check=True,
@@ -35,6 +36,7 @@ def _tracked_files() -> list[Path]:
 
 
 def main() -> int:
+    """Run the main workflow."""
     root = Path.cwd()
     bad_generated: list[str] = []
     bad_large: list[str] = []

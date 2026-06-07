@@ -10,6 +10,7 @@ from phage_annotator.analysis.reviewer_analytics import (
 
 
 def test_compute_reviewer_metrics_aggregates_by_user() -> None:
+    """Verify compute reviewer metrics aggregates by user for the current workflow."""
     audit_log = [
         {"timestamp": 10.0, "user": "alice", "event_type": "annotation_added", "details": {}},
         {"timestamp": 20.0, "user": "alice", "event_type": "annotation_updated", "details": {}},
@@ -25,6 +26,7 @@ def test_compute_reviewer_metrics_aggregates_by_user() -> None:
 
 
 def test_issue_trend_and_dashboard_text() -> None:
+    """Verify issue trend and dashboard text for the current workflow."""
     audit_log = [
         {
             "timestamp": 100.0,

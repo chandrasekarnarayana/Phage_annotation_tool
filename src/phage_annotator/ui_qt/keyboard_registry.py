@@ -149,6 +149,7 @@ SHORTCUTS: Tuple[ShortcutEntry, ...] = (
 
 
 def all_shortcuts() -> Tuple[ShortcutEntry, ...]:
+    """Run the all shortcuts workflow."""
     return SHORTCUTS
 
 
@@ -184,6 +185,7 @@ def apply_menu_shortcuts(window) -> None:
 
 
 def qt_match(event, key: int, modifiers: Any = None) -> bool:
+    """Run the qt match workflow."""
     if QtCore is None:
         return False
     if modifiers is None:
@@ -204,23 +206,27 @@ def qt_key_bindings() -> tuple[tuple[int, Any, str], ...]:
     """Map Qt key/modifier pairs -> action id."""
     if QtCore is None:
         return ()
+    def modifiers(value: Any) -> int:
+        """Return a stable integer mask for Qt modifier values."""
+        return int(getattr(value, "value", value))
+
     return (
-        (QtCore.Qt.Key_Left, QtCore.Qt.KeyboardModifier.AltModifier, "nav_time_prev"),
-        (QtCore.Qt.Key_Right, QtCore.Qt.KeyboardModifier.AltModifier, "nav_time_next"),
-        (QtCore.Qt.Key_Up, QtCore.Qt.KeyboardModifier.AltModifier, "nav_z_prev"),
-        (QtCore.Qt.Key_Down, QtCore.Qt.KeyboardModifier.AltModifier, "nav_z_next"),
-        (QtCore.Qt.Key_Space, QtCore.Qt.KeyboardModifier.ControlModifier, "play_pause"),
-        (QtCore.Qt.Key_F1, QtCore.Qt.KeyboardModifier.ShiftModifier, "contextual_help"),
-        (QtCore.Qt.Key_Delete, QtCore.Qt.KeyboardModifier.NoModifier, "delete_selected"),
-        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.NoModifier, "accept_suggestion"),
-        (QtCore.Qt.Key_A, QtCore.Qt.KeyboardModifier.ShiftModifier, "accept_current_suggestion"),
-        (QtCore.Qt.Key_Delete, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "clear_roi"),
-        (QtCore.Qt.Key_N, QtCore.Qt.KeyboardModifier.NoModifier, "next_suggestion"),
-        (QtCore.Qt.Key_P, QtCore.Qt.KeyboardModifier.NoModifier, "prev_suggestion"),
-        (QtCore.Qt.Key_BracketLeft, QtCore.Qt.KeyboardModifier.ControlModifier, "label_prev"),
-        (QtCore.Qt.Key_BracketRight, QtCore.Qt.KeyboardModifier.ControlModifier, "label_next"),
-        (QtCore.Qt.Key_F, QtCore.Qt.KeyboardModifier.AltModifier, "focus_canvas_mode"),
-        (QtCore.Qt.Key_0, QtCore.Qt.KeyboardModifier.ControlModifier, "reset_view"),
-        (QtCore.Qt.Key_R, QtCore.Qt.KeyboardModifier.NoModifier, "reject_suggestion"),
-        (QtCore.Qt.Key_C, QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier, "cycle_colormap"),
+        (QtCore.Qt.Key_Left, modifiers(QtCore.Qt.KeyboardModifier.AltModifier), "nav_time_prev"),
+        (QtCore.Qt.Key_Right, modifiers(QtCore.Qt.KeyboardModifier.AltModifier), "nav_time_next"),
+        (QtCore.Qt.Key_Up, modifiers(QtCore.Qt.KeyboardModifier.AltModifier), "nav_z_prev"),
+        (QtCore.Qt.Key_Down, modifiers(QtCore.Qt.KeyboardModifier.AltModifier), "nav_z_next"),
+        (QtCore.Qt.Key_Space, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier), "play_pause"),
+        (QtCore.Qt.Key_F1, modifiers(QtCore.Qt.KeyboardModifier.ShiftModifier), "contextual_help"),
+        (QtCore.Qt.Key_Delete, modifiers(QtCore.Qt.KeyboardModifier.NoModifier), "delete_selected"),
+        (QtCore.Qt.Key_A, modifiers(QtCore.Qt.KeyboardModifier.NoModifier), "accept_suggestion"),
+        (QtCore.Qt.Key_A, modifiers(QtCore.Qt.KeyboardModifier.ShiftModifier), "accept_current_suggestion"),
+        (QtCore.Qt.Key_Delete, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier), "clear_roi"),
+        (QtCore.Qt.Key_N, modifiers(QtCore.Qt.KeyboardModifier.NoModifier), "next_suggestion"),
+        (QtCore.Qt.Key_P, modifiers(QtCore.Qt.KeyboardModifier.NoModifier), "prev_suggestion"),
+        (QtCore.Qt.Key_BracketLeft, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier), "label_prev"),
+        (QtCore.Qt.Key_BracketRight, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier), "label_next"),
+        (QtCore.Qt.Key_F, modifiers(QtCore.Qt.KeyboardModifier.AltModifier), "focus_canvas_mode"),
+        (QtCore.Qt.Key_0, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier), "reset_view"),
+        (QtCore.Qt.Key_R, modifiers(QtCore.Qt.KeyboardModifier.NoModifier), "reject_suggestion"),
+        (QtCore.Qt.Key_C, modifiers(QtCore.Qt.KeyboardModifier.ControlModifier | QtCore.Qt.KeyboardModifier.ShiftModifier), "cycle_colormap"),
     )

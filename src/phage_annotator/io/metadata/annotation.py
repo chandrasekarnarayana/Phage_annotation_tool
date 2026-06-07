@@ -153,6 +153,7 @@ def format_tokens(meta: Dict[str, object]) -> str:
 
 
 def _parse_roi(value: str) -> Optional[Dict[str, object]]:
+    """Parse roi for the current workflow."""
     match = _ROI_RE.match(value)
     if not match:
         return None
@@ -167,6 +168,7 @@ def _parse_roi(value: str) -> Optional[Dict[str, object]]:
 
 
 def _parse_rect(value: str) -> Optional[tuple[float, float, float, float]]:
+    """Parse rect for the current workflow."""
     parts = _parse_list(value)
     if len(parts) != 4:
         return None
@@ -174,6 +176,7 @@ def _parse_rect(value: str) -> Optional[tuple[float, float, float, float]]:
 
 
 def _parse_pair(value: str) -> Optional[tuple[float, float]]:
+    """Parse pair for the current workflow."""
     parts = _parse_list(value)
     if len(parts) != 2:
         return None
@@ -181,6 +184,7 @@ def _parse_pair(value: str) -> Optional[tuple[float, float]]:
 
 
 def _parse_list(value: str) -> list[float]:
+    """Parse list for the current workflow."""
     parts = []
     for chunk in value.split(","):
         chunk = chunk.strip()
@@ -194,6 +198,7 @@ def _parse_list(value: str) -> list[float]:
 
 
 def _merge_dict(base: Dict[str, object], update: Dict[str, object]) -> None:
+    """Merge dict for the current workflow."""
     for key, val in update.items():
         if key in base and isinstance(base[key], dict) and isinstance(val, dict):
             _merge_dict(base[key], val)  # type: ignore[arg-type]
@@ -202,6 +207,7 @@ def _merge_dict(base: Dict[str, object], update: Dict[str, object]) -> None:
 
 
 def _fmt_num(value: object) -> str:
+    """Handle the fmt num helper flow."""
     if isinstance(value, (int, float)):
         return f"{value:g}"
     return str(value)

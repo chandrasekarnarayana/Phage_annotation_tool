@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable, Optional
 
 import numpy as np
-from matplotlib import colors as mcolors
 
 
 @dataclass
@@ -56,6 +55,7 @@ class DisplayMapping:
 
     @vmin.setter
     def vmin(self, value: float) -> None:
+        """Return the vmin value."""
         self.min_val = float(value)
 
     @property
@@ -65,6 +65,7 @@ class DisplayMapping:
 
     @vmax.setter
     def vmax(self, value: float) -> None:
+        """Return the vmax value."""
         self.max_val = float(value)
 
     @property
@@ -280,25 +281,4 @@ def mapping_from_dict(data: dict, fallback: Optional[DisplayMapping] = None) -> 
     return mapping
 
 
-def build_norm(mapping: DisplayMapping) -> mcolors.Normalize:
-    """Return a matplotlib normalization for the display mapping.
-
-    Notes
-    -----
-    Gamma is applied via PowerNorm. Log mode uses a log1p transform so values
-    at or below vmin remain stable and zero-safe.
-    """
-    vmin = float(mapping.min_val)
-    vmax = float(mapping.max_val)
-    if mapping.mode == "log":
-
-        def _forward(x):
-            return np.log1p(np.maximum(x - vmin, 0.0))
-
-        def _inverse(y):
-            return np.expm1(y) + vmin
-
-        return mcolors.FuncNorm((_forward, _inverse), vmin=vmin, vmax=vmax)
-    if mapping.gamma != 1.0:
-        return mcolors.PowerNorm(gamma=mapping.gamma, vmin=vmin, vmax=vmax)
-    return mcolors.Normalize(vmin=vmin, vmax=vmax)
+from phage_annotator.data.display_norm import build_norm

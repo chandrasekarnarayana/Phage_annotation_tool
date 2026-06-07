@@ -32,6 +32,7 @@ REQUIRED_PACKAGE_DIRS = {
     "plugins",
     "rendering",
     "roi",
+    "runtime",
     "session",
     "smlm",
     "tools",
@@ -101,6 +102,7 @@ LEGACY_FACADE_MODULES = {
 
 
 def main() -> int:
+    """Run the main workflow."""
     issues: list[str] = []
     root_py_files = sorted(path.name for path in PKG_ROOT.glob("*.py"))
 

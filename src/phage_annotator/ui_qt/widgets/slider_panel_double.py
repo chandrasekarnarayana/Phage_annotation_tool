@@ -21,6 +21,7 @@ class SliderPanelDouble(QtWidgets.QWidget):
         min_val: float = 0.0,
         max_val: float = 1.0,
     ) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self._range_min = float(min_val)
         self._range_max = float(max_val)
@@ -70,12 +71,14 @@ class SliderPanelDouble(QtWidgets.QWidget):
         return self._min_value, self._max_value
 
     def _quantize(self, value: float) -> float:
+        """Handle the quantize helper flow."""
         step = self._step
         if step <= 0:
             return value
         return round((value - self._range_min) / step) * step + self._range_min
 
     def _value_from_pos(self, x: int) -> float:
+        """Handle the value from pos helper flow."""
         rect = self._track_rect()
         if rect.width() <= 0:
             return self._range_min
@@ -84,6 +87,7 @@ class SliderPanelDouble(QtWidgets.QWidget):
         return self._range_min + ratio * (self._range_max - self._range_min)
 
     def _pos_from_value(self, value: float) -> int:
+        """Handle the pos from value helper flow."""
         rect = self._track_rect()
         if self._range_max <= self._range_min:
             return rect.left()
@@ -92,6 +96,7 @@ class SliderPanelDouble(QtWidgets.QWidget):
         return int(round(rect.left() + ratio * rect.width()))
 
     def _track_rect(self) -> QtCore.QRect:
+        """Handle the track rect helper flow."""
         padding = 8
         return QtCore.QRect(padding, 8, max(1, self.width() - 2 * padding), 8)
 
@@ -129,6 +134,7 @@ class SliderPanelDouble(QtWidgets.QWidget):
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Run the keyPressEvent workflow."""
         step = self._step if self._step > 0 else (self._range_max - self._range_min) / 100.0
         if step <= 0:
             return
@@ -154,6 +160,7 @@ class SliderPanelDouble(QtWidgets.QWidget):
             self.setValues(min(value, self._max_value), self._max_value)
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        """Run the paintEvent workflow."""
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         rect = self._track_rect()
@@ -178,4 +185,3 @@ class SliderPanelDouble(QtWidgets.QWidget):
         painter.drawEllipse(QtCore.QPoint(max_x, rect.center().y()), 6, 6)
 
         painter.end()
-

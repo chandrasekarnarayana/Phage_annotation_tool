@@ -11,10 +11,12 @@ from typing import Any
 
 
 def _load_json(path: Path) -> Any:
+    """Load json for the current workflow."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _benchmark_label(entry: dict[str, Any]) -> str:
+    """Handle the benchmark label helper flow."""
     for key in ("fullname", "fullfunc", "name"):
         value = entry.get(key)
         if isinstance(value, str) and value.strip():
@@ -23,6 +25,7 @@ def _benchmark_label(entry: dict[str, Any]) -> str:
 
 
 def main() -> int:
+    """Run the main workflow."""
     parser = argparse.ArgumentParser(description="Check benchmark JSON against thresholds.")
     parser.add_argument("benchmark_json", type=Path, help="Path to --benchmark-json output file.")
     parser.add_argument("thresholds_json", type=Path, help="Threshold definition JSON.")

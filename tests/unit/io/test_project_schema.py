@@ -1,3 +1,5 @@
+"""Unit tests for project schema migration and serialization."""
+
 import json
 from types import SimpleNamespace
 
@@ -9,6 +11,7 @@ from phage_annotator.io.projects.base import (
 
 
 def test_save_project_writes_schema_fields(tmp_path) -> None:
+    """Verify save project writes schema fields for the current workflow."""
     img = SimpleNamespace(id=0, path=str(tmp_path / "img.tif"), interpret_3d_as="auto")
     proj = tmp_path / "session.phageproj"
     save_project(proj, [img], {0: []}, {"last_fov_index": 0})
@@ -20,6 +23,7 @@ def test_save_project_writes_schema_fields(tmp_path) -> None:
 
 
 def test_migrate_project_payload_adds_defaults() -> None:
+    """Verify migrate project payload adds defaults for the current workflow."""
     legacy = {"tool": "PhageAnnotator", "version": "0.9.0", "images": [], "settings": {}}
     upgraded = migrate_project_payload(legacy)
     assert upgraded["schema_version"] == SCHEMA_VERSION

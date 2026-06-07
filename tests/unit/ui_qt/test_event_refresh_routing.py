@@ -7,14 +7,17 @@ from phage_annotator.ui_qt.actions.events import EventsMixin
 
 class _Harness(EventsMixin):
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.calls: list[tuple[str, dict]] = []
         self._controller_view_refresh_hint = None
 
     def _request_ui_refresh(self, reason: str, **kwargs) -> None:
+        """Handle the request ui refresh helper flow."""
         self.calls.append((reason, dict(kwargs)))
 
 
 def test_controller_view_sync_hint_skips_image_refresh() -> None:
+    """Verify controller view sync hint skips image refresh for the current workflow."""
     harness = _Harness()
     harness._controller_view_refresh_hint = "view_sync"
 
@@ -24,6 +27,7 @@ def test_controller_view_sync_hint_skips_image_refresh() -> None:
 
 
 def test_controller_view_default_requests_image_refresh() -> None:
+    """Verify controller view default requests image refresh for the current workflow."""
     harness = _Harness()
 
     harness._on_controller_view_changed()

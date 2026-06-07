@@ -15,29 +15,7 @@ from phage_annotator.annotation.metadata_schema import (
     FieldDefinition,
     FieldType,
 )
-
-
-class ValidationError:
-    """Single validation error for a metadata field."""
-    
-    def __init__(self, field_name: str, value: Any, reason: str):
-        """Initialize validation error.
-        
-        Parameters
-        ----------
-        field_name : str
-            Name of field that failed validation.
-        value : Any
-            Value that failed validation.
-        reason : str
-            Human-readable reason for failure.
-        """
-        self.field_name = field_name
-        self.value = value
-        self.reason = reason
-    
-    def __repr__(self) -> str:
-        return f"ValidationError({self.field_name}={self.value!r}): {self.reason}"
+from phage_annotator.annotation.validation_error import ValidationError
 
 
 class MetadataValidator:

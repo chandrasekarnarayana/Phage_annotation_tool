@@ -15,6 +15,7 @@ class DensityControlsMixin:
     """Mixin for density model inference controls."""
 
     def _density_pick_model(self) -> None:
+        """Handle the density pick model helper flow."""
         if self.density_panel is None:
             return
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select model", "", "PyTorch Model (*.pt *.pth)")
@@ -23,6 +24,7 @@ class DensityControlsMixin:
         self.density_panel.model_path_edit.setText(path)
 
     def _density_load_model(self) -> None:
+        """Handle the density load model helper flow."""
         if self.density_panel is None:
             return
         path = self.density_panel.model_path_edit.text().strip()
@@ -44,6 +46,7 @@ class DensityControlsMixin:
         self._settings.setValue("densityDevice", device)
 
     def _density_run(self) -> None:
+        """Handle the density run helper flow."""
         if self.density_panel is None:
             return
         predictor = self.controller.density_predictor
@@ -101,6 +104,7 @@ class DensityControlsMixin:
         }
 
         def _job(progress, cancel_token):
+            """Handle the job helper flow."""
             if cancel_token.is_cancelled():
                 return None
             result = run_density_inference(
@@ -114,6 +118,7 @@ class DensityControlsMixin:
             return result
 
         def _on_result(result):
+            """Handle the on result helper flow."""
             if result is None:
                 return
             if (
@@ -165,6 +170,7 @@ class DensityControlsMixin:
         self.density_panel.model_status.setText("Running…")
 
     def _density_cancel(self) -> None:
+        """Handle the density cancel helper flow."""
         if self._density_job_id is None:
             return
         self.jobs.cancel(self._density_job_id)
@@ -175,6 +181,7 @@ class DensityControlsMixin:
             self.density_panel.model_status.setText("Cancelled.")
 
     def _density_config_from_ui(self) -> DensityConfig:
+        """Handle the density config from ui helper flow."""
         if self.density_panel is None:
             return DensityConfig()
         normalize = self.density_panel.normalize_combo.currentText()
@@ -189,6 +196,7 @@ class DensityControlsMixin:
         return config
 
     def _density_infer_options_from_ui(self) -> DensityInferOptions:
+        """Handle the density infer options from ui helper flow."""
         if self.density_panel is None:
             return DensityInferOptions()
         opts = DensityInferOptions(
@@ -203,6 +211,7 @@ class DensityControlsMixin:
         return opts
 
     def _density_overlay_toggle(self) -> None:
+        """Handle the density overlay toggle helper flow."""
         if self._density_last_result is None:
             return
         if self.density_panel.overlay_chk.isChecked():
@@ -219,6 +228,7 @@ class DensityControlsMixin:
             self._request_ui_refresh("density-controls")
 
     def _density_overlay_changed(self) -> None:
+        """Handle the density overlay changed helper flow."""
         if self._density_last_result is None:
             return
         self._density_overlay_alpha = float(self.density_panel.overlay_alpha.value())
@@ -227,6 +237,7 @@ class DensityControlsMixin:
         self._request_ui_refresh("density-controls")
 
     def _density_export_map(self) -> None:
+        """Handle the density export map helper flow."""
         if self._density_last_result is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -244,6 +255,7 @@ class DensityControlsMixin:
             tifffile.imwrite(path, self._density_last_result.density_map.astype("float32"))
 
     def _density_export_counts(self) -> None:
+        """Handle the density export counts helper flow."""
         if self._density_last_result is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save counts", "", "CSV (*.csv)")

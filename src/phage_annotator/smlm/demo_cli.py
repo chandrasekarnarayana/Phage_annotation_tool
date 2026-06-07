@@ -27,6 +27,7 @@ from phage_annotator.smlm.preflight import report_to_text, run_preflight
 
 
 def _synthetic_frames() -> list[tuple[int, np.ndarray]]:
+    """Handle the synthetic frames helper flow."""
     rng = np.random.default_rng(19)
     frames: list[tuple[int, np.ndarray]] = []
     for t in range(4):
@@ -38,6 +39,7 @@ def _synthetic_frames() -> list[tuple[int, np.ndarray]]:
 
 
 def _exit_code_from_exc(exc: Exception) -> int:
+    """Handle the exit code from exc helper flow."""
     if isinstance(exc, FijiNotFoundError):
         return 2
     if isinstance(exc, PluginNotFoundError):
@@ -50,6 +52,7 @@ def _exit_code_from_exc(exc: Exception) -> int:
 
 
 def _sha256(path: Path) -> str:
+    """Handle the sha256 helper flow."""
     h = hashlib.sha256()
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(8192), b""):

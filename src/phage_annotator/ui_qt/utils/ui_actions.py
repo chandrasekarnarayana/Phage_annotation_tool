@@ -6,19 +6,10 @@ from typing import Dict, Tuple
 
 from matplotlib.backends.qt_compat import QtWidgets
 from phage_annotator.ui_qt.keyboard_registry import apply_menu_shortcuts
-
+from phage_annotator.ui_qt.utils.ui_action_descriptions import describe_main_window_actions
 
 def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
     """Build menus, actions, and shortcuts for the main window."""
-    def _describe(action: QtWidgets.QAction, status_tip: str, *, whats_this: str | None = None) -> None:
-        tip = str(status_tip or "").strip()
-        action.setStatusTip(tip)
-        action.setToolTip(tip)
-        action.setProperty("baseStatusTip", tip)
-        action.setProperty("baseToolTip", tip)
-        if whats_this:
-            action.setWhatsThis(str(whats_this).strip())
-
     menubar = self.menuBar()
     file_menu = menubar.addMenu("&File")
     import_menu = file_menu.addMenu("Import")
@@ -285,68 +276,7 @@ def build_menus(self) -> Tuple[Dict[str, QtWidgets.QAction], QtWidgets.QMenu]:
         "context_help": self.context_help_act,
         "reset_view": self.reset_view_act,
     }
-    _describe(
-        self.open_files_act,
-        "Open one or more image files into the current session",
-        whats_this="Use this first when starting manual work on a small set of images.",
-    )
-    _describe(
-        self.open_folder_act,
-        "Load all supported images from a folder",
-        whats_this="Use this when your experiment is organized as a folder of related microscopy images.",
-    )
-    _describe(self.load_ann_current_act, "Load annotations linked to the current image or context")
-    _describe(self.save_proj_act, "Save the current workspace, views, and linked resources")
-    _describe(self.load_proj_act, "Load a saved project workspace")
-    _describe(
-        self.prefs_act,
-        "Open preferences and advanced panel behavior settings",
-        whats_this="Preferences contains startup defaults, caching, panel behavior, and advanced workflow settings.",
-    )
-    _describe(self.undo_act, "Undo the last annotation or view command")
-    _describe(self.redo_act, "Redo the last undone command")
-    _describe(self.jump_to_frame_act, "Jump directly to a time frame")
-    _describe(self.jump_to_z_act, "Jump directly to a Z slice")
-    _describe(self.measure_act, "Measure the current annotations and send results to the results panel")
-    _describe(self.clear_roi_act, "Clear the current ROI selection")
-    _describe(self.suggest_points_act, "Generate suggestions for the current slice")
-    _describe(self.suggest_points_image_act, "Generate suggestions across all slices in the current image")
-    _describe(self.accept_visible_suggestions_act, "Accept currently visible suggestions")
-    _describe(self.reject_visible_suggestions_act, "Reject currently visible suggestions")
-    _describe(self.qc_validate_act, "Run quality-control validation for loaded annotations")
-    _describe(self.review_context_pack_act, "Toggle the Assist review context pack (table, assist queue, and QC)")
-    _describe(self.save_csv_act, "Write the active annotation context to CSV")
-    _describe(self.save_json_act, "Write the active annotation context to JSON")
-    _describe(self.export_view_act, "Export the current rendered view with overlays")
-    _describe(
-        self.advanced_panels_act,
-        "Open the full dock and panel manager",
-        whats_this="Use the panel manager if you cannot find a dock or want to re-open a hidden analysis panel.",
-    )
-    _describe(self.open_panel_policy_act, "Choose which panels auto-open and remain pinned")
-    _describe(self.toggle_left_act, "Show or hide the left workflow sidebar")
-    _describe(self.toggle_settings_act, "Show or hide the Advanced Settings panel on the right sidebar")
-    _describe(self.link_zoom_act, "Link zoom and pan across synchronized image panels")
-    _describe(self.reset_view_act, "Reset the canvas view to the default zoom and pan")
-    _describe(self.toggle_logs_act, "Show or hide the diagnostics dock")
-    _describe(
-        self.command_palette_act,
-        "Open the command palette for actions and panels",
-        whats_this="The command palette is the fastest way to discover actions, panels, and commands by name.",
-    )
-    _describe(
-        shortcuts_act,
-        "Show the keyboard shortcuts reference",
-        whats_this="Open a reference table of the current keyboard shortcuts used in the application.",
-    )
-    _describe(
-        self.context_help_act,
-        "Show contextual help for the current workflow area",
-        whats_this="Use contextual help when you want a quick explanation of the current panel or workflow without leaving the app.",
-    )
-    _describe(self.layout_preset_annotate_act, "Switch to the annotation-focused layout")
-    _describe(self.layout_preset_analyze_act, "Switch to the analysis-focused layout")
-    _describe(self.layout_preset_assist_expert_act, "Switch to the assist and review layout")
+    describe_main_window_actions(self, shortcuts_act)
 
     apply_menu_shortcuts(self)
     return actions, dock_panels_menu

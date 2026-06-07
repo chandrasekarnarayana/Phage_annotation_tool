@@ -16,6 +16,7 @@ class PlaybackMixin:
     """Mixin for playback thread handling and frame stepping."""
 
     def _restart_playback_prefetch(self, current_t: int) -> None:
+        """Handle the restart playback prefetch helper flow."""
         source_img = self._playback_source_image()
         if source_img is None or getattr(source_img, "array", None) is None:
             return
@@ -24,6 +25,7 @@ class PlaybackMixin:
         self._prefetcher.start(int(current_t), t_max, z_idx, bool(getattr(self, "loop_playback", False)))
 
     def _playback_source_panel_key(self) -> str:
+        """Handle the playback source panel key helper flow."""
         layout_spec = self._current_layout_spec() if hasattr(self, "_current_layout_spec") else {}
         order = list(layout_spec.get("order", []) or [])
         visibility = dict(layout_spec.get("panel_visibility", {}) or {})
@@ -41,6 +43,7 @@ class PlaybackMixin:
         return "frame"
 
     def _playback_panel_is_raw(self, panel_key: str) -> bool:
+        """Handle the playback panel is raw helper flow."""
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         modality = panel_map.get(str(panel_key))
         if modality is None:
@@ -51,6 +54,7 @@ class PlaybackMixin:
         return projection == "raw"
 
     def _playback_source_image(self):
+        """Handle the playback source image helper flow."""
         panel_key = self._playback_source_panel_key()
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         modality = panel_map.get(panel_key)
@@ -63,10 +67,12 @@ class PlaybackMixin:
         return self.primary_image
 
     def _playback_source_is_raw(self) -> bool:
+        """Handle the playback source is raw helper flow."""
         panel_key = self._playback_source_panel_key()
         return bool(self._playback_panel_is_raw(panel_key))
 
     def _playback_target_axis(self):
+        """Handle the playback target axis helper flow."""
         if getattr(self, "renderer", None) is None:
             return None
         panel_key = self._playback_source_panel_key()
@@ -76,6 +82,7 @@ class PlaybackMixin:
         return next(iter(self.renderer.axes.values()), None)
 
     def _playback_target_artist(self):
+        """Handle the playback target artist helper flow."""
         renderer = getattr(self, "renderer", None)
         if renderer is None:
             return None
@@ -162,12 +169,14 @@ class PlaybackMixin:
         self._update_status()
 
     def _start_playback_thread(self) -> None:
+        """Start playback thread for the current workflow."""
         if self._playback_thread is not None:
             return
         self._playback_thread = threading.Thread(target=self._playback_tick, daemon=True)
         self._playback_thread.start()
 
     def _playback_tick(self) -> None:
+        """Handle the playback tick helper flow."""
         self._last_frame_time = time.monotonic()
         while self._playback_mode:
             fps = max(1, self.speed_slider.value())
@@ -203,6 +212,7 @@ class PlaybackMixin:
             time.sleep(sleep_time)
 
     def _update_frame_only(self, frame: np.ndarray, t_idx: int) -> None:
+        """Update frame only for the current workflow."""
         if not self._playback_mode:
             return
         if getattr(self, "t_slider", None) is not None:
@@ -229,6 +239,7 @@ class PlaybackMixin:
         self.canvas.draw_idle()
 
     def _update_fps_meter(self) -> None:
+        """Update fps meter for the current workflow."""
         if self._playback_frame_counter % FPS_UPDATE_STRIDE == 0:
             now = time.monotonic()
             if self._last_frame_time is not None:
@@ -246,6 +257,7 @@ class PlaybackMixin:
             self._fps_text.set_text(f"FPS: {fps:.1f}")
 
     def _step_slider(self, slider: QtWidgets.QSlider, direction: int) -> None:
+        """Handle the step slider helper flow."""
         value = slider.value() + direction
         slider.setValue(max(slider.minimum(), min(slider.maximum(), value)))
         if hasattr(self, "_append_log"):

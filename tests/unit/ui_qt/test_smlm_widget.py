@@ -1,3 +1,5 @@
+"""Unit tests for the SMLM dock widget."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,6 +20,7 @@ class _Loc:
 
 
 def test_smlm_widget_renders_localizations_and_selection(qtbot, tmp_path) -> None:
+    """Verify smlm widget renders localizations and selection for the current workflow."""
     widget = SmlmDockWidget()
     qtbot.addWidget(widget)
     widget.set_localizations(
@@ -44,6 +47,7 @@ def test_smlm_widget_renders_localizations_and_selection(qtbot, tmp_path) -> Non
 
 
 def test_smlm_widget_clear_localizations_disables_add(qtbot) -> None:
+    """Verify smlm widget clear localizations disables add for the current workflow."""
     widget = SmlmDockWidget()
     qtbot.addWidget(widget)
     widget.set_localizations([_Loc(0, 1.0, 2.0, 1.0, 10.0, 1.0, 0.1)])

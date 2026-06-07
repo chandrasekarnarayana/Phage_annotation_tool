@@ -14,6 +14,7 @@ class RenderingOverlayMixin:
     """Mixin for overlay, label, and header text generation."""
 
     def _visible_suggestion_overlay_rows(self) -> List[object]:
+        """Handle the visible suggestion overlay rows helper flow."""
         if not bool(getattr(self, "_show_suggestion_overlay", True)):
             return []
         image_id = self.primary_image.id
@@ -54,6 +55,7 @@ class RenderingOverlayMixin:
         return rows
 
     def _particle_labels(self) -> List[Tuple[float, float, str]]:
+        """Handle the particle labels helper flow."""
         if self.particles_panel is None or not self.particles_panel.show_labels_chk.isChecked():
             return []
         frame_ax = None
@@ -68,6 +70,7 @@ class RenderingOverlayMixin:
         return labels
 
     def _build_panel_annotations(self) -> Dict[str, List[Tuple[float, float, str, bool, bool]]]:
+        """Build panel annotations for the current workflow."""
         panel_map = dict(getattr(self, "_panel_modality_map", {}) or {})
         show_all_annotations = bool(
             getattr(getattr(self, "show_ann_master_chk", None), "isChecked", lambda: True)()
@@ -109,6 +112,7 @@ class RenderingOverlayMixin:
         return panel_annotations
 
     def _build_suggestion_staleness_labels(self) -> Dict[str, List[Tuple[float, float, str]]]:
+        """Build suggestion staleness labels for the current workflow."""
         panel_keys = list(dict(getattr(self, "_panel_modality_map", {}) or {}).keys())
         labels: Dict[str, List[Tuple[float, float, str]]] = {str(k): [] for k in panel_keys}
         if not bool(getattr(self, "_show_suggestion_overlay", True)):
@@ -130,6 +134,7 @@ class RenderingOverlayMixin:
         return labels
 
     def _build_roi_overlays(self) -> Dict[str, List[Tuple[str, object, str]]]:
+        """Build roi overlays for the current workflow."""
         overlays: Dict[str, List[Tuple[str, object, str]]] = {
             panel: [] for panel in dict(getattr(self, "_panel_modality_map", {}) or {}).keys()
         }
@@ -167,6 +172,7 @@ class RenderingOverlayMixin:
         return overlays
 
     def _build_overlay_text(self) -> Optional[str]:
+        """Build overlay text for the current workflow."""
         if not self.overlay_enabled:
             return None
         img = self.primary_image
@@ -227,6 +233,7 @@ class RenderingOverlayMixin:
         )
 
     def _build_canvas_header_text(self) -> str:
+        """Build canvas header text for the current workflow."""
         img = self.primary_image
         t_idx, z_idx = self._slice_indices(img)
         default_target = self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"

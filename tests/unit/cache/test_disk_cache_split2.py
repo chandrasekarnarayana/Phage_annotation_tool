@@ -1,0 +1,258 @@
+"""Split definitions from test_disk_cache.py."""
+
+from __future__ import annotations
+
+import pathlib
+import shutil
+import tempfile
+import unittest
+from concurrent.futures import Future
+
+import numpy as np
+
+try:
+    from phage_annotator.cache.disk_cache import HAS_ZSTD, DiskCache, DiskCacheConfig
+    HAS_DISK_CACHE = True
+except ImportError:
+    HAS_DISK_CACHE = False
+    HAS_ZSTD = False
+
+
+@unittest.skipIf(
+    (not HAS_DISK_CACHE) or (not HAS_ZSTD),
+    "disk cache requires optional zstandard dependency",
+)
+class TestDiskCacheIntegration(unittest.TestCase):
+    """Integration tests for disk cache."""
+
+    def setUp(self):
+        """Create temporary cache directory."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.config = DiskCacheConfig(
+            enabled=True,
+            max_size_mb=50,
+            cache_dir=pathlib.Path(self.temp_dir)
+        )
+        self.cache = DiskCache(self.config)
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        if self.cache:
+            self.cache.clear()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_simulate_fov_browsing(self):
+        """Simulate browsing through multiple FOVs with disk cache fallback.
+        
+        Scenario:
+        1. Load 3 FOVs of a large stack
+        2. Evict oldest FOV (to disk cache)
+        3. Re-access oldest FOV (should restore from disk)
+        """
+        fov_data = {}
+
+        # Load 3 FOVs
+        for fov_id in range(3):
+            key = (fov_id, "mean", (0, 0, 512, 512), -1, -1)
+            data = np.random.rand(512, 512).astype(np.float32)
+            fov_data[fov_id] = data
+
+            self.cache.save(key, data)
+
+        self.assertEqual(self.cache.stats.saves, 3)
+
+        # Re-access FOV 0 (should hit disk cache)
+        key0 = (0, "mean", (0, 0, 512, 512), -1, -1)
+        loaded = self.cache.load(key0)
+
+        self.assertIsNotNone(loaded)
+        self.assertTrue(np.allclose(loaded, fov_data[0]))
+        self.assertGreater(self.cache.stats.hits, 0)
+
+    def test_persistence_across_instances(self):
+        """Test that cache persists on disk across cache instances.
+        
+        Note: This test saves files to disk but doesn't test loading across
+        separate instances (would require restarting the cache).
+        """
+        key = (0, "mean", (0, 0, 512, 512), -1, -1)
+        data = np.ones((100, 100), dtype=np.float32)
+
+        # Save to disk
+        self.cache.save(key, data)
+        cache_files = list(self.config.cache_dir.glob("*"))
+
+        # Should have at least one cached file
+        self.assertGreater(len(cache_files), 0)
+
+    def test_concurrent_access_simulation(self):
+        """Simulate rapid save/load cycles."""
+        for cycle in range(5):
+            for i in range(10):
+                key = (i, "mean", (0, 0, 512, 512), -1, -1)
+                data = np.ones((50, 50), dtype=np.float32) * i
+
+                self.cache.save(key, data)
+                self.cache.load(key)
+
+        # Should have processed all operations
+        self.assertEqual(self.cache.stats.saves, 50)
+        self.assertGreater(self.cache.stats.hits, 40)
+
+@unittest.skipIf(not HAS_DISK_CACHE, "disk_cache module not available")
+class TestDiskCacheConfiguration(unittest.TestCase):
+    """Tests for disk cache configuration."""
+
+    def test_config_default_cache_dir(self):
+        """Test that default cache directory is ~/.cache/phage_annotator."""
+        config = DiskCacheConfig()
+
+        expected = pathlib.Path.home() / ".cache" / "phage_annotator"
+        self.assertEqual(config.cache_dir, expected)
+
+    def test_config_custom_cache_dir(self):
+        """Test setting custom cache directory."""
+        custom_dir = pathlib.Path("/tmp/custom_cache")
+        config = DiskCacheConfig(cache_dir=custom_dir)
+
+        self.assertEqual(config.cache_dir, custom_dir)
+
+    def test_config_disabled(self):
+        """Test that cache respects enabled flag."""
+        config = DiskCacheConfig(enabled=False)
+        cache = DiskCache(config)
+
+        key = (0, "mean", (0, 0, 512, 512), -1, -1)
+        data = np.ones((100, 100), dtype=np.float32)
+
+        # Should not save when disabled
+        result = cache.save(key, data)
+        self.assertFalse(result)
+
+        # Should not load when disabled
+        loaded = cache.load(key)
+        self.assertIsNone(loaded)
+
+@unittest.skipIf(
+    (not HAS_DISK_CACHE) or (not HAS_ZSTD),
+    "disk cache requires optional zstandard dependency",
+)
+class TestProjectionCacheDiskIntegration(unittest.TestCase):
+    """Test integration between ProjectionCache and DiskCache."""
+
+    def setUp(self):
+        """Create temporary cache directory and instances."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.disk_config = DiskCacheConfig(
+            enabled=True,
+            max_size_mb=50,
+            cache_dir=pathlib.Path(self.temp_dir)
+        )
+        self.disk_cache = DiskCache(self.disk_config)
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        if pathlib.Path(self.temp_dir).exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_projection_cache_with_disk_cache(self):
+        """Test that ProjectionCache uses disk cache for evicted items."""
+        from phage_annotator.cache.projection_cache import ProjectionCache
+
+        # Create projection cache with disk cache
+        proj_cache = ProjectionCache(max_mb=10, disk_cache=self.disk_cache)
+
+        # Add large array to trigger eviction
+        key1 = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+        data1 = np.ones((512, 512), dtype=np.float32)  # ~1 MB
+        proj_cache.put(key1, data1)
+
+        # Verify it's in memory
+        retrieved = proj_cache.get(key1)
+        self.assertIsNotNone(retrieved)
+        np.testing.assert_array_equal(retrieved, data1)
+
+        # Add more data to trigger eviction of first
+        for i in range(15):
+            key = (i + 1, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+            data = np.ones((512, 512), dtype=np.float32)
+            proj_cache.put(key, data)
+
+        # Original key1 may or may not still be in memory depending on eviction timing.
+        proj_cache.get(key1)
+
+        # But it should load from disk if available
+        disk_result = self.disk_cache.load(key1)
+        self.assertIsNotNone(disk_result, "Evicted item should be in disk cache")
+        np.testing.assert_array_equal(disk_result, data1)
+
+    def test_disk_cache_hit_after_memory_miss(self):
+        """Test that memory miss falls back to disk cache."""
+        from phage_annotator.cache.projection_cache import ProjectionCache
+
+        # Manually add to disk cache (simulating evicted item)
+        key = (1, "std", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+        data = np.ones((256, 256), dtype=np.float32)
+        self.disk_cache.save(key, data)
+
+        # Create new cache that will check disk on miss
+        new_proj_cache = ProjectionCache(max_mb=10, disk_cache=self.disk_cache)
+
+        # Request evicted item - should fall back to disk
+        result = new_proj_cache.get(key)
+        self.assertIsNotNone(result, "Should load from disk on memory miss")
+        np.testing.assert_array_equal(result, data)
+
+    def test_disk_cache_optional_graceful_degradation(self):
+        """Test that ProjectionCache works without disk cache."""
+        from phage_annotator.cache.projection_cache import ProjectionCache
+
+        # ProjectionCache without disk cache should still work
+        proj_cache = ProjectionCache(max_mb=10, disk_cache=None)
+
+        key = (0, "raw", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+        data = np.ones((256, 256), dtype=np.float32)
+        proj_cache.put(key, data)
+
+        # Should retrieve from memory
+        retrieved = proj_cache.get(key)
+        self.assertIsNotNone(retrieved)
+        np.testing.assert_array_equal(retrieved, data)
+
+    def test_multiple_fov_eviction_cycle(self):
+        """Test disk cache during multi-FOV browsing scenario."""
+        from phage_annotator.cache.projection_cache import ProjectionCache
+
+        proj_cache = ProjectionCache(max_mb=20, disk_cache=self.disk_cache)
+
+        # Simulate browsing 5 FOVs with multiple tiles each
+        fov_data = {}
+        for fov_idx in range(5):
+            for tile_idx in range(4):
+                key = (
+                    fov_idx,
+                    "mean",
+                    (float(tile_idx), 0.0, 0.0, 0.0),
+                    -1,
+                    -1,
+                    0,
+                )
+                data = np.random.rand(256, 256).astype(np.float32)
+                fov_data[key] = data
+                proj_cache.put(key, data)
+
+        # Browse back to first FOV - some tiles might be in disk cache
+        fov0_key = (0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0)
+        
+        # Try to get tile from first FOV
+        result = proj_cache.get(fov0_key)
+        
+        # Either in memory or can be loaded from disk
+        if result is None:
+            # May have been evicted from memory, check disk
+            disk_result = self.disk_cache.load(fov0_key)
+            if disk_result is not None:
+                np.testing.assert_array_equal(disk_result, fov_data[fov0_key])
+        else:
+            # Still in memory
+            np.testing.assert_array_equal(result, fov_data[fov0_key])

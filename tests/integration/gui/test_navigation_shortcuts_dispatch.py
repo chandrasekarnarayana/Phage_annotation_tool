@@ -31,6 +31,7 @@ def test_jump_to_frame_shortcut_dispatch_and_history(tmp_path, monkeypatch):
     calls = {"count": 0}
 
     def _fake_get_int(*args, **kwargs):
+        """Handle the fake get int helper flow."""
         calls["count"] += 1
         return 2, True  # 1-based index -> target frame index 1
 
@@ -84,6 +85,7 @@ def test_jump_to_z_shortcut_dispatch_and_history(tmp_path, monkeypatch):
     calls = {"count": 0}
 
     def _fake_get_int(*args, **kwargs):
+        """Handle the fake get int helper flow."""
         calls["count"] += 1
         return 3, True  # 1-based index -> target z index 2
 

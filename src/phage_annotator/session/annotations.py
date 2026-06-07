@@ -173,16 +173,20 @@ class SessionAnnotationsMixin:
         return True
 
     def can_undo(self) -> bool:
+        """Run the can undo workflow."""
         return bool(self._undo_stack)
 
     def can_redo(self) -> bool:
+        """Run the can redo workflow."""
         return bool(self._redo_stack)
 
     def _push_undo(self, action: dict) -> None:
+        """Handle the push undo helper flow."""
         self._undo_stack.append(action)
         self._redo_stack.clear()
 
     def undo(self) -> bool:
+        """Undo undo for the current workflow."""
         if not self._undo_stack:
             return False
         action = self._undo_stack.pop()
@@ -206,6 +210,7 @@ class SessionAnnotationsMixin:
         return False
 
     def redo(self) -> bool:
+        """Run the redo workflow."""
         if not self._redo_stack:
             return False
         action = self._redo_stack.pop()
@@ -229,6 +234,7 @@ class SessionAnnotationsMixin:
         return False
 
     def _apply_action(self, action: dict, undo: bool) -> Optional[dict]:
+        """Apply action for the current workflow."""
         atype = action.get("type")
         point: Keypoint = action.get("point")
         image_id = action.get("image_id")
@@ -247,6 +253,7 @@ class SessionAnnotationsMixin:
         return None
 
     def _remove_point(self, point: Keypoint, image_id: int) -> None:
+        """Remove point for the current workflow."""
         pts = self.session_state.annotations.get(image_id, [])
         try:
             pts.remove(point)

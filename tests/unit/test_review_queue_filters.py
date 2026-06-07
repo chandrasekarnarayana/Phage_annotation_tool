@@ -10,14 +10,17 @@ from phage_annotator.ui_qt.utils.table_status import TableStatusMixin
 
 class _Check:
     def __init__(self, checked: bool):
+        """Initialize the object and prepare its runtime state."""
         self._checked = checked
 
     def isChecked(self) -> bool:
+        """Run the isChecked workflow."""
         return self._checked
 
 
 class _Harness(TableStatusMixin):
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.primary_image = SimpleNamespace(id=0)
         self.annotations = {
             0: [
@@ -36,6 +39,7 @@ class _Harness(TableStatusMixin):
 
 
 def test_review_queue_filters_apply_expected_subset() -> None:
+    """Verify review queue filters apply expected subset for the current workflow."""
     h = _Harness()
 
     h._review_queue_filter = "all"

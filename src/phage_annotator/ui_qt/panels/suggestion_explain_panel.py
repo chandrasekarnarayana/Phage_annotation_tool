@@ -9,6 +9,7 @@ class SuggestionExplainPanel(QtWidgets.QWidget):
     """Panel showing why the current suggestion was proposed."""
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.setObjectName("suggestion_explain_panel")
         self.setStyleSheet(

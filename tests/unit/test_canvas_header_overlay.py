@@ -11,22 +11,27 @@ from phage_annotator.ui_qt.rendering.renderer import RenderingMixin
 
 class _Harness(RenderingMixin):
     def _slice_indices(self, _img):
+        """Handle the slice indices helper flow."""
         return int(self.t_slider.value()), int(self.z_slider.value())
 
 
 class _Slider:
     def __init__(self, value: int, maximum: int) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._value = int(value)
         self._maximum = int(maximum)
 
     def value(self) -> int:
+        """Run the value workflow."""
         return self._value
 
     def maximum(self) -> int:
+        """Run the maximum workflow."""
         return self._maximum
 
 
 def test_canvas_header_frame_slice_mode() -> None:
+    """Verify canvas header frame slice mode for the current workflow."""
     harness = _Harness()
     harness.primary_image = SimpleNamespace(array=np.zeros((24, 15, 16, 16)))
     harness.t_slider = _Slider(4, 23)
@@ -38,6 +43,7 @@ def test_canvas_header_frame_slice_mode() -> None:
 
 
 def test_canvas_header_mean_stack_mode() -> None:
+    """Verify canvas header mean stack mode for the current workflow."""
     harness = _Harness()
     harness.primary_image = SimpleNamespace(array=np.zeros((24, 15, 16, 16)))
     harness.t_slider = _Slider(0, 23)

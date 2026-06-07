@@ -1,14 +1,4 @@
-"""Plugin discovery and management system.
-
-This module provides plugin loading, discovery, and lifecycle management
-using setuptools entry points. Plugins can extend functionality dynamically.
-
-Example:
-    manager = PluginManager()
-    manager.load_plugins()  # Load entry points
-    for plugin in manager.get_plugins():
-        plugin.activate(context)
-"""
+"""Plugin discovery, loading, and lifecycle management."""
 
 from __future__ import annotations
 
@@ -111,6 +101,7 @@ class PluginManager:
     ENTRY_POINT_GROUP = "phage_annotator.plugins"
     
     def __init__(self):
+        """Initialize the object and prepare its runtime state."""
         self._plugins: Dict[str, PluginMetadata] = {}
         self._loaded_plugins: Dict[str, Plugin] = {}
         self._context: Optional[Any] = None

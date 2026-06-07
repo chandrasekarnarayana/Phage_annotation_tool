@@ -24,4 +24,5 @@ class CancelTokenShim:
     """Minimal CancelToken-compatible shim for synchronous jobs."""
 
     def is_cancelled(self) -> bool:
+        """Return whether cancelled is true for the current state."""
         return False

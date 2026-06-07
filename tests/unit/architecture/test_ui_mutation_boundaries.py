@@ -48,13 +48,16 @@ class _MutationVisitor(ast.NodeVisitor):
     """Collect forbidden UI mutations of controller-owned state."""
 
     def __init__(self, rel_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.rel_path = rel_path
         self.violations: list[str] = []
 
     def _record(self, node: ast.AST, detail: str) -> None:
+        """Record record for the current workflow."""
         self.violations.append(f"{self.rel_path}:{getattr(node, 'lineno', 0)}: {detail}")
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit Assign for the current workflow."""
         for target in node.targets:
             path = _attr_path(target)
             if not path:
@@ -64,12 +67,14 @@ class _MutationVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        """Visit AugAssign for the current workflow."""
         path = _attr_path(node.target)
         if path and any(path.startswith(f"{root}.") for root in FORBIDDEN_STATE_ROOTS):
             self._record(node, f"augmented assignment to {path}")
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
+        """Visit Call for the current workflow."""
         func = node.func
         if isinstance(func, ast.Attribute):
             owner_path = _attr_path(func.value)

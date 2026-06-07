@@ -1,3 +1,5 @@
+"""Unit tests for core analysis and IO utility behavior."""
+
 import json
 from types import SimpleNamespace
 
@@ -11,6 +13,7 @@ from phage_annotator.cache.projection_cache import ProjectionCache
 
 
 def test_standardize_axes_2d_3d_4d_heuristic() -> None:
+    """Verify standardize axes 2d 3d 4d heuristic for the current workflow."""
     arr2d = np.zeros((5, 6), dtype=np.float32)
     std, has_time, has_z = standardize_axes(arr2d)
     assert std.shape == (1, 1, 5, 6)
@@ -33,6 +36,7 @@ def test_standardize_axes_2d_3d_4d_heuristic() -> None:
 
 
 def test_standardize_axes_ome_metadata() -> None:
+    """Verify standardize axes ome metadata for the current workflow."""
     arr_zyx = np.zeros((3, 4, 5), dtype=np.float32)
     std, has_time, has_z = standardize_axes(arr_zyx, ome_axes="ZYX")
     assert std.shape == (1, 3, 4, 5)
@@ -50,6 +54,7 @@ def test_standardize_axes_ome_metadata() -> None:
 
 
 def test_standardize_axes_with_channel_idx() -> None:
+    """Verify standardize axes with channel idx for the current workflow."""
     arr = np.zeros((2, 3, 4, 5), dtype=np.float32)
     std, has_time, has_z = standardize_axes(arr, ome_axes="TCYX", channel_idx=1)
     assert std.shape == (2, 1, 4, 5)
@@ -57,6 +62,7 @@ def test_standardize_axes_with_channel_idx() -> None:
 
 
 def test_crop_mapping() -> None:
+    """Verify crop mapping for the current workflow."""
     arr = np.arange(100, dtype=np.float32).reshape(10, 10)
     crop = (2.0, 3.0, 4.0, 5.0)
     cropped = apply_crop_rect(arr, crop)
@@ -72,6 +78,7 @@ def test_crop_mapping() -> None:
 
 
 def test_roi_mask_box_circle() -> None:
+    """Verify roi mask box circle for the current workflow."""
     box = roi_mask_for_shape((5, 5), (1.0, 1.0, 2.0, 2.0), "box")
     assert box[1, 1]
     assert box[3, 3]
@@ -84,6 +91,7 @@ def test_roi_mask_box_circle() -> None:
 
 
 def test_project_roundtrip_and_backward_compat(tmp_path) -> None:
+    """Verify project roundtrip and backward compat for the current workflow."""
     img1 = SimpleNamespace(id=0, path=str(tmp_path / "img1.tif"), interpret_3d_as="time")
     img2 = SimpleNamespace(id=1, path=str(tmp_path / "img2.tif"), interpret_3d_as="depth")
     ann = {
@@ -124,6 +132,7 @@ def test_project_roundtrip_and_backward_compat(tmp_path) -> None:
 
 
 def test_projection_cache_eviction() -> None:
+    """Verify projection cache eviction for the current workflow."""
     cache = ProjectionCache(max_mb=0)
     arr = np.zeros((10, 10), dtype=np.float64)
     cache.put((0, "mean", (0.0, 0.0, 0.0, 0.0), -1, -1, 0), arr)

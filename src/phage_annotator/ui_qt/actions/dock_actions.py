@@ -9,9 +9,11 @@ class DockActionsMixin:
     """Panel visibility actions with synchronized dock/menu/button state."""
 
     def _toggle_profile_panel(self) -> None:
+        """Toggle profile panel for the current workflow."""
         self._set_panel_visibility("profile")
 
     def _toggle_hist_panel(self) -> None:
+        """Toggle hist panel for the current workflow."""
         self._set_panel_visibility("hist")
 
     def _resolve_panel_dock(self, panel: str):

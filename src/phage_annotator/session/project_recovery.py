@@ -17,6 +17,7 @@ class SessionProjectRecoveryMixin:
 
     @staticmethod
     def _resolve_project_image_path(entry: Dict[str, object], project_dir: pathlib.Path) -> pathlib.Path:
+        """Resolve project image path for the current workflow."""
         raw = pathlib.Path(str(entry.get("path", "")))
         if raw.exists():
             return raw
@@ -37,6 +38,7 @@ class SessionProjectRecoveryMixin:
 
     @staticmethod
     def _prompt_relink_missing_images(parent: QtWidgets.QWidget, missing_entries: List[tuple[int, Dict[str, object], pathlib.Path]], *, mode: str = "ask") -> Dict[int, pathlib.Path]:
+        """Handle the prompt relink missing images helper flow."""
         if not missing_entries:
             return {}
         relinked: Dict[int, pathlib.Path] = {}
@@ -88,6 +90,7 @@ class SessionProjectRecoveryMixin:
         return relinked
 
     def autosave_if_needed(self, parent: QtWidgets.QWidget, current_keypoints) -> Optional[pathlib.Path]:
+        """Run the autosave if needed workflow."""
         if not self._settings.value("autosaveRecoveryEnabled", True, type=bool):
             return None
         if not self.session_state.dirty or self.session_state.project_path is None:
@@ -101,6 +104,7 @@ class SessionProjectRecoveryMixin:
         return recovery_path
 
     def check_recovery(self, parent: QtWidgets.QWidget) -> None:
+        """Check recovery for the current workflow."""
         latest = self.find_recovery_file(None)
         if latest is None:
             return
@@ -114,6 +118,7 @@ class SessionProjectRecoveryMixin:
             QtWidgets.QMessageBox.critical(parent, "Recovery failed", str(exc))
 
     def find_recovery_file(self, current_keypoints) -> Optional[pathlib.Path]:
+        """Find recovery file for the current workflow."""
         if not self._settings.value("autosaveRecoveryEnabled", True, type=bool):
             return None
         if self.session_state.project_path is None or self.session_state.project_save_time is None:
@@ -128,10 +133,12 @@ class SessionProjectRecoveryMixin:
         return latest if latest.stat().st_mtime > self.session_state.project_save_time else None
 
     def restore_recovery(self, path: pathlib.Path) -> None:
+        """Restore recovery for the current workflow."""
         self.apply_recovery_points(keypoints_from_json(path))
         self.set_dirty(True)
 
     def apply_recovery_points(self, kps: Iterable[Keypoint]) -> None:
+        """Apply recovery points for the current workflow."""
         by_name: Dict[str, List[Keypoint]] = {}
         for kp in kps:
             by_name.setdefault(kp.image_name, []).append(kp)

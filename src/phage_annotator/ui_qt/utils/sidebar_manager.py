@@ -28,6 +28,7 @@ class SidebarManager:
     """Compute layout sizes and labels for the sidebar experience."""
 
     def __init__(self, config: SidebarLayoutConfig | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.config = config or SidebarLayoutConfig()
 
     def dock_sizes(

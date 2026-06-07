@@ -1,3 +1,5 @@
+"""Unit tests for CI gate helper scripts."""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,7 @@ CI_SUMMARY_SCRIPT = ROOT / "scripts" / "build_ci_summary.py"
 
 
 def test_junit_gate_passes_with_executed_tests(tmp_path: Path) -> None:
+    """Verify junit gate passes with executed tests for the current workflow."""
     report = tmp_path / "junit.xml"
     report.write_text(
         '<testsuite name="x" tests="5" skipped="1"></testsuite>\n',
@@ -27,6 +30,7 @@ def test_junit_gate_passes_with_executed_tests(tmp_path: Path) -> None:
 
 
 def test_junit_gate_fails_when_all_skipped(tmp_path: Path) -> None:
+    """Verify junit gate fails when all skipped for the current workflow."""
     report = tmp_path / "junit.xml"
     report.write_text(
         '<testsuite name="x" tests="4" skipped="4"></testsuite>\n',
@@ -41,6 +45,7 @@ def test_junit_gate_fails_when_all_skipped(tmp_path: Path) -> None:
 
 
 def test_benchmark_threshold_gate_passes(tmp_path: Path) -> None:
+    """Verify benchmark threshold gate passes for the current workflow."""
     bench = tmp_path / "bench.json"
     thresholds = tmp_path / "thresholds.json"
     bench.write_text(
@@ -66,6 +71,7 @@ def test_benchmark_threshold_gate_passes(tmp_path: Path) -> None:
 
 
 def test_benchmark_threshold_gate_fails_on_regression(tmp_path: Path) -> None:
+    """Verify benchmark threshold gate fails on regression for the current workflow."""
     bench = tmp_path / "bench.json"
     thresholds = tmp_path / "thresholds.json"
     bench.write_text(
@@ -91,6 +97,7 @@ def test_benchmark_threshold_gate_fails_on_regression(tmp_path: Path) -> None:
 
 
 def test_benchmark_trend_report_script_writes_markdown(tmp_path: Path) -> None:
+    """Verify benchmark trend report script writes markdown for the current workflow."""
     bench = tmp_path / "bench.json"
     baseline = tmp_path / "baseline.json"
     out = tmp_path / "trend.md"
@@ -125,6 +132,7 @@ def test_benchmark_trend_report_script_writes_markdown(tmp_path: Path) -> None:
 
 
 def test_ci_summary_script_builds_expected_sections(tmp_path: Path) -> None:
+    """Verify ci summary script builds expected sections for the current workflow."""
     artifacts = tmp_path / "artifacts_download"
     (artifacts / "gui").mkdir(parents=True, exist_ok=True)
     (artifacts / "perf").mkdir(parents=True, exist_ok=True)

@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Mapping
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
+    """Handle the as float helper flow."""
     try:
         return float(value)
     except (TypeError, ValueError):

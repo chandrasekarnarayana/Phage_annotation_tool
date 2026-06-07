@@ -30,18 +30,22 @@ class RoiSpec:
 
     @property
     def x(self) -> float:
+        """Return the x value."""
         return float(self.rect[0])
 
     @property
     def y(self) -> float:
+        """Return the y value."""
         return float(self.rect[1])
 
     @property
     def w(self) -> float:
+        """Return the w value."""
         return float(self.rect[2])
 
     @property
     def h(self) -> float:
+        """Return the h value."""
         return float(self.rect[3])
 
 
@@ -81,6 +85,7 @@ class ViewState:
 
     @roi.setter
     def roi(self, value: RoiSpec) -> None:
+        """Return the roi value."""
         self.roi_spec = value
 
     @property
@@ -90,6 +95,7 @@ class ViewState:
 
     @roi_rect.setter
     def roi_rect(self, value: Tuple[float, float, float, float]) -> None:
+        """Return the roi rect value."""
         self.roi_spec = RoiSpec(rect=tuple(value), shape=self.roi_spec.shape)
 
     @property
@@ -99,6 +105,7 @@ class ViewState:
 
     @roi_shape.setter
     def roi_shape(self, value: str) -> None:
+        """Return the roi shape value."""
         self.roi_spec = RoiSpec(rect=self.roi_spec.rect, shape=str(value))
 
 

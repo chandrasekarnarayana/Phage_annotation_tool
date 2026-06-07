@@ -13,6 +13,7 @@ from phage_annotator.smlm.parity import compute_parity_metrics
 
 
 def _to_locs(points) -> list[Localization]:
+    """Convert locs for the current workflow."""
     locs: list[Localization] = []
     for point in points:
         meta = dict(getattr(point, "meta", {}) or {})
@@ -80,4 +81,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-

@@ -32,6 +32,7 @@ def iter_source_modules() -> list[str]:
 
 
 def _iter_imported_modules(tree: ast.AST) -> Iterable[str]:
+    """Handle the iter imported modules helper flow."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:

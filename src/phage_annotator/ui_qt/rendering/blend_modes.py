@@ -20,6 +20,15 @@ from typing import List, Tuple
 
 import numpy as np
 
+from phage_annotator.ui_qt.rendering.blend_kernels import (
+    blend_add,
+    blend_multiply,
+    blend_normal,
+    blend_overlay,
+    blend_screen,
+    blend_subtract,
+)
+
 
 class BlendMode(Enum):
     """Blend modes for channel compositing."""
@@ -29,175 +38,6 @@ class BlendMode(Enum):
     MULTIPLY = "multiply"
     ADD = "add"
     SUBTRACT = "subtract"
-
-
-def blend_normal(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Standard alpha blending.
-    
-    Composites layer onto base using opacity.
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (any shape, float [0-1] or uint8).
-    layer : np.ndarray
-        Layer to composite (same shape as base).
-    opacity : float
-        Opacity of layer (0-1).
-    
-    Returns
-    -------
-    np.ndarray
-        Composited result with same dtype as input.
-    """
-    opacity = float(np.clip(opacity, 0.0, 1.0))
-    return np.clip(base * (1.0 - opacity) + layer * opacity, 0, 1)
-
-
-def blend_overlay(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Overlay blend mode (Photoshop-style).
-    
-    Multiplies dark colors and screens bright colors.
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (float [0-1]).
-    layer : np.ndarray
-        Layer to composite.
-    opacity : float
-        Opacity/strength of overlay effect.
-    
-    Returns
-    -------
-    np.ndarray
-        Blended result [0-1].
-    """
-    # Overlay formula: 
-    # if base < 0.5: result = 2 * base * layer
-    # else: result = 1 - 2 * (1 - base) * (1 - layer)
-    result = np.where(
-        base < 0.5,
-        2 * base * layer,
-        1 - 2 * (1 - base) * (1 - layer),
-    )
-    return np.clip((1 - opacity) * base + opacity * result, 0, 1)
-
-
-def blend_screen(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Screen blend mode (additive).
-    
-    Inverts, multiplies, and inverts again. Bright colors dominate.
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (float [0-1]).
-    layer : np.ndarray
-        Layer to composite.
-    opacity : float
-        Opacity of effect.
-    
-    Returns
-    -------
-    np.ndarray
-        Blended result [0-1].
-    """
-    # Screen formula: 1 - (1 - base) * (1 - layer)
-    result = 1 - (1 - base) * (1 - layer)
-    return np.clip((1 - opacity) * base + opacity * result, 0, 1)
-
-
-def blend_multiply(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Multiply blend mode (subtractive).
-    
-    Multiplies channels. Dark colors dominate.
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (float [0-1]).
-    layer : np.ndarray
-        Layer to composite.
-    opacity : float
-        Opacity of effect.
-    
-    Returns
-    -------
-    np.ndarray
-        Blended result [0-1].
-    """
-    # Multiply formula: base * layer
-    result = base * layer
-    return np.clip((1 - opacity) * base + opacity * result, 0, 1)
-
-
-def blend_add(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Add blend mode (direct addition).
-    
-    Adds channel values directly. Can exceed [0, 1].
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (float).
-    layer : np.ndarray
-        Layer to add.
-    opacity : float
-        Opacity of layer.
-    
-    Returns
-    -------
-    np.ndarray
-        Sum (may exceed 1.0).
-    """
-    return base + layer * opacity
-
-
-def blend_subtract(
-    base: np.ndarray,
-    layer: np.ndarray,
-    opacity: float = 1.0,
-) -> np.ndarray:
-    """Subtract blend mode (direct subtraction).
-    
-    Subtracts layer from base. Can go negative.
-    
-    Parameters
-    ----------
-    base : np.ndarray
-        Base image (float).
-    layer : np.ndarray
-        Layer to subtract.
-    opacity : float
-        Opacity of effect.
-    
-    Returns
-    -------
-    np.ndarray
-        Difference (may be negative).
-    """
-    return base - layer * opacity
 
 
 # Blend mode function registry

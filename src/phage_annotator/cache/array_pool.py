@@ -32,6 +32,7 @@ class ArrayPool:
     """Reusable buffer pool keyed by (shape, dtype)."""
 
     def __init__(self, config: PoolConfig | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._config = config or PoolConfig()
         self._pool: Dict[Tuple[Tuple[int, ...], np.dtype], List[np.ndarray]] = {}
         self._lock = threading.Lock()

@@ -62,7 +62,7 @@
 
 ## 3. Naming, Ordering, and Style Standards
 
-See `tests/README.md` for contributor-level rules. Key enforced conventions:
+See `docs/TESTING.md` for contributor-level rules. Key enforced conventions:
 
 - Files: `test_<component>_<behavior>.py`
 - Tests: `test_<action>_<expected_result>`

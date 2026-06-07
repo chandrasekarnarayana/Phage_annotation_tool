@@ -8,6 +8,7 @@ from phage_annotator.ui_qt.services.jobs import CancelToken, JobManager
 
 
 def test_active_job_count_tracks_tokens() -> None:
+    """Verify active job count tracks tokens for the current workflow."""
     jobs = JobManager()
     assert jobs.active_job_count() == 0
     jobs._tokens["job-1"] = CancelToken()
@@ -16,6 +17,7 @@ def test_active_job_count_tracks_tokens() -> None:
 
 
 def test_cancel_existing_job_marks_token_cancelled() -> None:
+    """Verify cancel existing job marks token cancelled for the current workflow."""
     jobs = JobManager()
     token = CancelToken()
     jobs._tokens["job-1"] = token
@@ -24,11 +26,13 @@ def test_cancel_existing_job_marks_token_cancelled() -> None:
 
 
 def test_cancel_missing_job_returns_false() -> None:
+    """Verify cancel missing job returns false for the current workflow."""
     jobs = JobManager()
     assert jobs.cancel("missing") is False
 
 
 def test_finalize_job_releases_callbacks_and_running_state() -> None:
+    """Verify finalize job releases callbacks and running state for the current workflow."""
     jobs = JobManager(max_workers=1, max_pending_jobs=1)
     jobs._tokens["job-1"] = CancelToken()
     jobs._callbacks["job-1"] = (lambda _result: None, None, None)
@@ -42,12 +46,14 @@ def test_finalize_job_releases_callbacks_and_running_state() -> None:
 
 
 def test_target_worker_count_reduces_when_ui_busy() -> None:
+    """Verify target worker count reduces when ui busy for the current workflow."""
     jobs = JobManager(max_workers=3)
     jobs.set_ui_busy_provider(lambda: True)
     assert jobs._target_worker_count() == 2
 
 
 def test_enqueue_or_start_drops_when_queue_is_saturated(qtbot) -> None:
+    """Verify enqueue or start drops when queue is saturated for the current workflow."""
     jobs = JobManager(max_workers=1, max_pending_jobs=1)
     started: list[str] = []
     cancelled: list[str] = []
@@ -69,6 +75,7 @@ def test_enqueue_or_start_drops_when_queue_is_saturated(qtbot) -> None:
 
 
 def test_queue_snapshot_reports_blocked_dependencies() -> None:
+    """Verify queue snapshot reports blocked dependencies for the current workflow."""
     jobs = JobManager(max_workers=1, max_pending_jobs=4)
     jobs._start_job = lambda job: jobs._running_jobs.add(job.job_id)  # type: ignore[method-assign]
 
@@ -86,6 +93,7 @@ def test_queue_snapshot_reports_blocked_dependencies() -> None:
 
 
 def test_cancel_pending_job_removes_it_from_queue(qtbot) -> None:
+    """Verify cancel pending job removes it from queue for the current workflow."""
     jobs = JobManager(max_workers=1, max_pending_jobs=4)
     jobs._start_job = lambda job: jobs._running_jobs.add(job.job_id)  # type: ignore[method-assign]
 
@@ -102,6 +110,7 @@ def test_cancel_pending_job_removes_it_from_queue(qtbot) -> None:
 
 
 def test_cancel_matching_cancels_pending_replace_key_only(qtbot) -> None:
+    """Verify cancel matching cancels pending replace key only for the current workflow."""
     jobs = JobManager(max_workers=1, max_pending_jobs=4)
     jobs._start_job = lambda job: jobs._running_jobs.add(job.job_id)  # type: ignore[method-assign]
 

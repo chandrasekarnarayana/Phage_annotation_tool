@@ -67,6 +67,7 @@ def publish_event(event: ApplicationEvent) -> None:
 
 
 def emit_state_changed(controller: Any) -> None:
+    """Emit state changed for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.STATE_CHANGED)
     logger = _get_action_logger()
     if logger:
@@ -83,6 +84,7 @@ def _merge_annotation_change_type(previous: str | None, current: str) -> str:
 
 
 def _annotation_batch_state(controller: Any) -> dict[int, dict[str, Any]]:
+    """Handle the annotation batch state helper flow."""
     state = getattr(controller, _ANNOTATION_BATCH_STATE_ATTR, None)
     if not isinstance(state, dict):
         state = {}
@@ -91,6 +93,7 @@ def _annotation_batch_state(controller: Any) -> dict[int, dict[str, Any]]:
 
 
 def _flush_annotation_batch(controller: Any) -> None:
+    """Flush annotation batch for the current workflow."""
     pending = dict(getattr(controller, _ANNOTATION_BATCH_STATE_ATTR, {}) or {})
     setattr(controller, _ANNOTATION_BATCH_STATE_ATTR, {})
     if not pending:
@@ -152,6 +155,7 @@ def emit_view_changed(
     crop_rect: Optional[tuple] = None,
     viewport: Optional[Mapping[str, Any]] = None,
 ) -> None:
+    """Emit view changed for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.VIEW_CHANGED)
     
     logger = _get_action_logger()
@@ -181,6 +185,7 @@ def emit_view_changed(
 
 
 def emit_display_changed(controller: Any) -> None:
+    """Emit display changed for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.DISPLAY_CHANGED)
     logger = _get_action_logger()
     if logger:
@@ -188,6 +193,7 @@ def emit_display_changed(controller: Any) -> None:
 
 
 def emit_playback_changed(controller: Any) -> None:
+    """Emit playback changed for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.PLAYBACK_CHANGED)
     logger = _get_action_logger()
     if logger:
@@ -195,6 +201,7 @@ def emit_playback_changed(controller: Any) -> None:
 
 
 def emit_roi_changed(controller: Any) -> None:
+    """Emit roi changed for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.ROI_CHANGED)
     logger = _get_action_logger()
     if logger:
@@ -202,6 +209,7 @@ def emit_roi_changed(controller: Any) -> None:
 
 
 def emit_error(controller: Any, message: str) -> None:
+    """Emit error for the current workflow."""
     emit_controller_signal(controller, ControllerSignals.ERROR_OCCURRED, str(message))
     logger = _get_action_logger()
     if logger:

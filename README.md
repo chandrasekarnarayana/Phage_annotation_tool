@@ -29,6 +29,18 @@ python -m pip install --upgrade pip
 python -m pip install -e .[dev,cache]
 ```
 
+### Conda / Mamba
+
+```bash
+conda env create -f project/environment.yml
+conda activate phage-annotator
+python -m pip install -e .
+```
+
+The application checks `project/environment.yml` at startup and prints environment
+warnings before the GUI launches if required runtime packages are missing or too
+old.
+
 ### Optional Fiji bridge dependencies
 
 ```bash
@@ -97,6 +109,11 @@ QT_QPA_PLATFORM=offscreen .venv-phage/bin/python -m pytest -m gui --run-gui
 ## Documentation
 
 - [Documentation Index](docs/README.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Feature Access Guide](docs/FEATURE_ACCESS_GUIDE.md)
+- [Source Reference](docs/SOURCE_REFERENCE.md)
+- [Source Quality Audit](docs/SOURCE_QUALITY_AUDIT.md)
+- [Assist Guide](docs/ASSIST_GUIDE.md)
 - [Current Capabilities](docs/CURRENT_CAPABILITIES.md)
 - [Planned Features](docs/PLANNED_FEATURES.md)
 - [Fiji ThunderSTORM Bridge](docs/FIJI_THUNDERSTORM_BRIDGE.md)

@@ -23,16 +23,19 @@ class ActionRecorder(QtCore.QObject):
     updated = QtCore.Signal()
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.entries: List[RecorderEntry] = []
 
     def record(self, action: str, params: Optional[Dict[str, object]] = None) -> None:
+        """Record record for the current workflow."""
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         entry = RecorderEntry(timestamp=ts, action=action, params=params or {})
         self.entries.append(entry)
         self.updated.emit()
 
     def to_text(self) -> str:
+        """Convert text for the current workflow."""
         lines = []
         for entry in self.entries:
             params = ", ".join(f"{k}={v}" for k, v in entry.params.items())
@@ -40,6 +43,7 @@ class ActionRecorder(QtCore.QObject):
         return "\n".join(lines)
 
     def save_to_project(self, project_path: Path) -> Path:
+        """Save to project for the current workflow."""
         path = Path(project_path).with_suffix(".recorder.txt")
         path.write_text(self.to_text(), encoding="utf-8")
         return path
@@ -54,6 +58,7 @@ class RecorderWidget(QtWidgets.QWidget):
     """Recorder dock widget with copy/save controls."""
 
     def __init__(self, recorder: ActionRecorder, parent=None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.recorder = recorder
         layout = QtWidgets.QVBoxLayout(self)
@@ -76,7 +81,9 @@ class RecorderWidget(QtWidgets.QWidget):
         self._refresh()
 
     def _refresh(self) -> None:
+        """Refresh refresh for the current workflow."""
         self.text.setPlainText(self.recorder.to_text())
 
     def copy_to_clipboard(self) -> None:
+        """Copy to clipboard for the current workflow."""
         QtWidgets.QApplication.clipboard().setText(self.recorder.to_text())

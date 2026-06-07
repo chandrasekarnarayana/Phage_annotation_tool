@@ -86,6 +86,7 @@ class SessionController(
         ring_buffer=None,
         colormaps: Optional[Sequence[str]] = None,
     ) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         if not images:
             raise ValueError("No images provided.")

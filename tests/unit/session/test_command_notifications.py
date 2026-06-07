@@ -21,9 +21,11 @@ from phage_annotator.session.view import SessionViewMixin
 
 class _Emitter:
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.count = 0
 
     def emit(self) -> None:
+        """Emit emit for the current workflow."""
         self.count += 1
 
 
@@ -45,6 +47,7 @@ class _CommandHarness(SessionViewMixin):
     """Minimal controller-like harness for exercising command notifications."""
 
     def __init__(self, tmp_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.state_changed = _Emitter()
         self.view_changed = _Emitter()
         self.display_changed = _Emitter()
@@ -73,9 +76,11 @@ class _CommandHarness(SessionViewMixin):
         )
 
     def get_annotations(self, image_id: int):
+        """Return annotations for the current workflow."""
         return self.session_state.annotations.setdefault(int(image_id), [])
 
     def append_audit_event(self, *_args, **_kwargs) -> None:
+        """Append audit event for the current workflow."""
         return None
 
 

@@ -10,38 +10,47 @@ from phage_annotator.ui_qt.services.status_derived import build_status_snapshot
 
 class _Slider:
     def __init__(self, value: int = 0, maximum: int = 0):
+        """Initialize the object and prepare its runtime state."""
         self._value = value
         self._maximum = maximum
 
     def value(self) -> int:
+        """Run the value workflow."""
         return self._value
 
     def maximum(self) -> int:
+        """Run the maximum workflow."""
         return self._maximum
 
 
 class _SelectionModel:
     def __init__(self, rows: int):
+        """Initialize the object and prepare its runtime state."""
         self._rows = rows
 
     def selectedRows(self):
+        """Run the selectedRows workflow."""
         return [object() for _ in range(self._rows)]
 
 
 class _AnnotTable:
     def __init__(self, rows: int):
+        """Initialize the object and prepare its runtime state."""
         self._rows = rows
 
     def selectionModel(self):
+        """Run the selectionModel workflow."""
         return _SelectionModel(self._rows)
 
 
 class _Cache:
     def stats(self):
+        """Return the stats value."""
         return (0.0, 0)
 
 
 def _make_owner(*, mode: str = "independent", has_suggestions: bool = False, has_qc: bool = False, selected_rows: int = 0):
+    """Create owner for the current workflow."""
     primary_image = SimpleNamespace(
         id=1,
         name="sample_a",
@@ -110,6 +119,7 @@ def _make_owner(*, mode: str = "independent", has_suggestions: bool = False, has
 
 
 def test_menu_action_state_respects_read_only_context() -> None:
+    """Verify menu action state respects read only context for the current workflow."""
     owner = _make_owner(mode="read_only", has_suggestions=True)
     snapshot = build_status_snapshot(owner)
 
@@ -123,6 +133,7 @@ def test_menu_action_state_respects_read_only_context() -> None:
 
 
 def test_menu_action_state_enables_review_and_qc_actions_from_state() -> None:
+    """Verify menu action state enables review and qc actions from state for the current workflow."""
     owner = _make_owner(mode="independent", has_suggestions=True, has_qc=True, selected_rows=2)
     snapshot = build_status_snapshot(owner)
 
@@ -136,6 +147,7 @@ def test_menu_action_state_enables_review_and_qc_actions_from_state() -> None:
 
 
 def test_menu_action_state_explains_qc_and_selection_requirements() -> None:
+    """Verify menu action state explains qc and selection requirements for the current workflow."""
     owner = _make_owner(mode="independent", has_suggestions=False, has_qc=False, selected_rows=0)
     snapshot = build_status_snapshot(owner)
 

@@ -19,8 +19,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-import numpy as np
-
 
 class ApplicationEvent:
     """Base class for all application events.
@@ -58,6 +56,7 @@ class AnnotationChangedEvent(ApplicationEvent):
     change_type: str = "modified"
 
     def __init__(self, image_id: int, annotations: List[Any], change_type: str = "modified"):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.image_id = image_id
         self.annotations = annotations
@@ -102,6 +101,7 @@ class ViewStateChangedEvent(ApplicationEvent):
         crop_rect: Optional[tuple] = None,
         viewport: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.change_type = change_type
         self.t_index = t_index
@@ -141,6 +141,7 @@ class CacheInvalidationEvent(ApplicationEvent):
         t_index: Optional[int] = None,
         z_index: Optional[int] = None,
     ):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.scope = scope
         self.image_id = image_id
@@ -169,6 +170,7 @@ class SettingsChangedEvent(ApplicationEvent):
     old_value: Optional[Any] = None
 
     def __init__(self, key: str, value: Any, old_value: Optional[Any] = None):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.key = key
         self.value = value
@@ -187,6 +189,7 @@ class RenderingStartedEvent(ApplicationEvent):
     z_index: int
 
     def __init__(self, image_id: int, t_index: int, z_index: int):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.image_id = image_id
         self.t_index = t_index
@@ -231,6 +234,7 @@ class RenderingCompletedEvent(ApplicationEvent):
         error: Optional[str] = None,
         elapsed_ms: Optional[float] = None,
     ):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.image_id = image_id
         self.t_index = t_index
@@ -258,6 +262,7 @@ class FileOpenedEvent(ApplicationEvent):
     file_type: str
 
     def __init__(self, file_path: str, file_type: str):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.file_path = file_path
         self.file_type = file_type
@@ -281,19 +286,14 @@ class FileClosedEvent(ApplicationEvent):
     file_type: str
 
     def __init__(self, file_path: str, file_type: str):
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
         self.file_path = file_path
         self.file_type = file_type
 
 
 __all__ = [
-    "ApplicationEvent",
-    "AnnotationChangedEvent",
-    "ViewStateChangedEvent",
-    "CacheInvalidationEvent",
-    "SettingsChangedEvent",
-    "RenderingStartedEvent",
-    "RenderingCompletedEvent",
-    "FileOpenedEvent",
-    "FileClosedEvent",
+    "ApplicationEvent", "AnnotationChangedEvent", "ViewStateChangedEvent",
+    "CacheInvalidationEvent", "SettingsChangedEvent", "RenderingStartedEvent",
+    "RenderingCompletedEvent", "FileOpenedEvent", "FileClosedEvent",
 ]

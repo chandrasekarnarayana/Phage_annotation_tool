@@ -38,7 +38,8 @@ class ActionLogger:
         log_file : Path, optional
             Path to write action log (JSON lines format).
         """
-        self.log_file = log_file or Path.cwd() / "phage_annotator_actions.jsonl"
+        self.log_file = log_file or Path.cwd() / "docs" / "reports" / "phage_annotator_actions.jsonl"
+        self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.queue: Queue[Dict[str, Any]] = Queue(maxsize=10000)
         self.running = False
         self.writer_thread: Optional[Thread] = None

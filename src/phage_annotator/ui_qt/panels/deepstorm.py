@@ -27,6 +27,7 @@ class DeepStormDockWidget(QtWidgets.QWidget):
     """Parameter panel for Deep-STORM inference."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)

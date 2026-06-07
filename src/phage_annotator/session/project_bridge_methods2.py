@@ -1,0 +1,188 @@
+"""Method group 2 split from project_bridge.py."""
+
+from __future__ import annotations
+
+import pathlib
+from typing import Dict, List
+
+from matplotlib.backends.qt_compat import QtWidgets
+
+from phage_annotator.annotation.core import PointSuggestion, keypoints_from_json
+from phage_annotator.config.density import DensityConfig
+from phage_annotator.core.workspace_snapshot import apply_workspace_snapshot_to_controller
+from phage_annotator.data.display_mapping import mapping_from_dict
+from phage_annotator.roi.manager import roi_from_dict
+from phage_annotator.session.signal_hub import emit_annotations_changed, emit_state_changed
+
+
+class _SessionProjectBridgeMixinMethods2:
+    """Methods split from SessionProjectBridgeMixin."""
+
+    def _apply_loaded_project_state(self, *, path: pathlib.Path, image_entries, images, annotations, display_per_image, rois_by_image, settings, thr_map, part_map, import_map, resolved_paths, relinked_images, missing_images) -> None:
+        """Apply a deserialized project payload to session/controller state."""
+        from phage_annotator.density.infer import DensityInferOptions
+
+        self.session_state.images = images
+        self.session_state.annotations = annotations
+        self.session_state.annotation_index = {}
+        self.session_state.annotations_loaded = {img.id: bool(self.session_state.annotations.get(img.id)) for img in images}
+        self.session_state.suggestions = {img.id: [] for img in images}
+        self.session_state.suggestion_history = {img.id: [] for img in images}
+        self.session_state.image_states = {img.id: self._build_image_state(img) for img in images}
+        if display_per_image:
+            self.display_mapping.per_image = display_per_image
+        if rois_by_image:
+            self.rois_by_image = rois_by_image
+        if thr_map:
+            self.session_state.threshold_configs_by_image = {int(k): v for k, v in thr_map.items()}
+        if part_map:
+            self.session_state.particles_configs_by_image = {int(k): v for k, v in part_map.items()}
+        if import_map:
+            self.session_state.annotation_imports = {int(k): v for k, v in import_map.items()}
+        self.session_state.project_path = path
+        self.session_state.project_save_time = path.stat().st_mtime if path.exists() else None
+        default_support = min(1, len(images) - 1)
+        requested_primary = int(settings.get("last_fov_index", 0))
+        requested_support = int(settings.get("last_support_index", default_support))
+        max_id = max(0, len(images) - 1)
+        self.session_state.active_primary_id = min(max(0, requested_primary), max_id)
+        self.session_state.active_support_id = min(max(0, requested_support), max_id)
+        self.session_state.smlm_runs = list(settings.get("smlm_runs", []))
+        self.session_state.threshold_settings = dict(settings.get("threshold_settings", {}))
+        self.session_state.threshold_configs_by_image = dict(settings.get("threshold_configs_by_image", {}))
+        self.session_state.particles_configs_by_image = dict(settings.get("particles_configs_by_image", {}))
+        self.session_state.current_user = str(settings.get("current_user", "local_user"))
+        feature_flags = settings.get("feature_flags", {})
+        if isinstance(feature_flags, dict):
+            self.session_state.feature_flags = {str(k): bool(v) for k, v in feature_flags.items()}
+        workflow_metrics = settings.get("workflow_metrics", {})
+        if isinstance(workflow_metrics, dict):
+            self.session_state.workflow_metrics = dict(workflow_metrics)
+        audit_log = settings.get("audit_log", [])
+        if isinstance(audit_log, list):
+            self.session_state.audit_log = [row for row in audit_log if isinstance(row, dict)]
+        suggestion_metrics = settings.get("suggestion_metrics", {})
+        if isinstance(suggestion_metrics, dict):
+            self.session_state.suggestion_metrics.update({k: float(v) for k, v in suggestion_metrics.items() if isinstance(v, (int, float))})
+        self.session_state.suggestion_strategy = str(settings.get("suggestion_strategy", "current_view"))
+        self.session_state.suggestion_score_threshold = float(settings.get("suggestion_score_threshold", 0.0))
+        self.session_state.suggestion_auto_retrain_enabled = bool(settings.get("suggestion_auto_retrain_enabled", True))
+        self.session_state.suggestion_auto_retrain_min_labels = int(settings.get("suggestion_auto_retrain_min_labels", 25))
+        self.session_state.annotation_space = str(settings.get("annotation_space", "stack"))
+        self.session_state.generation_space = str(settings.get("generation_space", "stack"))
+        self.session_state.assist_min_total_labels = int(settings.get("assist_min_total_labels", 30))
+        self.session_state.assist_min_positive_labels = int(settings.get("assist_min_positive_labels", 15))
+        self.session_state.assist_min_negative_labels = int(settings.get("assist_min_negative_labels", 15))
+        self.session_state.assist_min_labels_per_context = int(settings.get("assist_min_labels_per_context", 10))
+        self.session_state.evidence_layer_config = dict(settings.get("evidence_layer_config", {}))
+        self.session_state.evidence_layer_presets = dict(settings.get("evidence_layer_presets", {}))
+        self.session_state.disable_bulk_accept_when_stale = bool(settings.get("disable_bulk_accept_when_stale", True))
+        self.session_state.smlm_runbook_enabled = bool(settings.get("smlm_runbook_enabled", False))
+        if isinstance(settings.get("smlm_runbook_locked_profiles", {}), dict):
+            self.session_state.smlm_runbook_locked_profiles = dict(settings.get("smlm_runbook_locked_profiles", {}))
+        if isinstance(settings.get("smlm_runbook_provenance", []), list):
+            self.session_state.smlm_runbook_provenance = list(settings.get("smlm_runbook_provenance", []))
+        for store_name, payload_name in (("suggestions", "suggestions_by_image"), ("suggestion_history", "suggestion_history_by_image")):
+            payload = settings.get(payload_name, {})
+            if isinstance(payload, dict):
+                for image_id, rows in payload.items():
+                    if not isinstance(rows, list):
+                        continue
+                    try:
+                        iid = int(image_id)
+                    except (TypeError, ValueError):
+                        continue
+                    if iid not in getattr(self.session_state, store_name):
+                        getattr(self.session_state, store_name)[iid] = []
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        getattr(self.session_state, store_name)[iid].append(
+                            PointSuggestion(
+                                image_id=int(row.get("image_id", iid)),
+                                image_name=str(row.get("image_name", "")),
+                                t=int(row.get("t", -1)),
+                                z=int(row.get("z", -1)),
+                                y=float(row.get("y", 0.0)),
+                                x=float(row.get("x", 0.0)),
+                                score=float(row.get("score", row.get("confidence", 0.0))),
+                                label=str(row.get("label", "phage")),
+                                suggestion_id=str(row.get("suggestion_id", "")),
+                                source_model=str(row.get("source_model", "unknown")),
+                                source_modality=str(row.get("source_modality", "raw")),
+                                supporting_modalities=list(row.get("supporting_modalities", []) or []),
+                                cross_modality_consistency_score=row.get("cross_modality_consistency_score"),
+                                control_contradiction_score=row.get("control_contradiction_score"),
+                                scale_sigma=float(row.get("scale_sigma", 1.0)),
+                                psf_radius=float(row.get("psf_radius", 6.0)),
+                                roi_id=row.get("roi_id"),
+                                uncertainty_score=row.get("uncertainty_score"),
+                                uncertainty_reason=str(row.get("uncertainty_reason", "") or ""),
+                                density_context=dict(row.get("density_context", {}) or {}),
+                                score_components=dict(row.get("score_components", {})),
+                                status=str(row.get("status", "proposed")),
+                                meta=dict(row.get("meta", {})),
+                            )
+                        )
+        self.session_state.suggestion_ranker_state = dict(settings.get("suggestion_ranker_state", {}))
+        samples = settings.get("suggestion_training_samples", [])
+        if isinstance(samples, list):
+            self.session_state.suggestion_training_samples = [row for row in samples if isinstance(row, dict)]
+        self.session_state.suggestion_training_pending = int(settings.get("suggestion_training_pending", 0))
+        context_stats = settings.get("suggestion_context_stats", {})
+        if isinstance(context_stats, dict):
+            self.session_state.suggestion_context_stats = {
+                str(k): {"total": int(dict(v).get("total", 0)), "pos": int(dict(v).get("pos", 0)), "neg": int(dict(v).get("neg", 0))}
+                for k, v in context_stats.items()
+                if isinstance(v, dict)
+            }
+        if hasattr(self, "restore_suggestion_ranker"):
+            self.restore_suggestion_ranker()
+        if isinstance(settings.get("density_config"), dict):
+            self.density_config = DensityConfig(**settings.get("density_config"))
+        if isinstance(settings.get("density_infer_options"), dict):
+            self.density_infer_options = DensityInferOptions(**settings.get("density_infer_options"))
+        self.density_model_path = settings.get("density_model_path")
+        self.density_device = settings.get("density_device", "auto")
+        self.density_target_panel = settings.get("density_target_panel", "frame")
+        self._settings.setValue("autoRoiShape", settings.get("auto_roi_shape", "box"))
+        self._settings.setValue("autoRoiMode", settings.get("auto_roi_mode", "W/H"))
+        self._settings.setValue("autoRoiW", int(settings.get("auto_roi_w", 100)))
+        self._settings.setValue("autoRoiH", int(settings.get("auto_roi_h", 100)))
+        self._settings.setValue("autoRoiArea", int(settings.get("auto_roi_area", 100 * 100)))
+        workspace_snapshot = settings.get("workspace_snapshot")
+        snapshot_has_display_mapping = False
+        if isinstance(workspace_snapshot, dict):
+            self.session_state.workspace_snapshot = dict(workspace_snapshot)
+            snapshot_session_layer = workspace_snapshot.get("session_workspace", {})
+            snapshot_has_display_mapping = bool(isinstance(snapshot_session_layer, dict) and isinstance(snapshot_session_layer.get("display_mapping_frame"), dict) and snapshot_session_layer.get("display_mapping_frame"))
+            apply_workspace_snapshot_to_controller(self, workspace_snapshot)
+        elif isinstance(settings.get("ui_workspace_state"), dict):
+            self.session_state.workspace_snapshot = {"schema": "workspace_snapshot.v1", "session_workspace": {"ui_workspace": dict(settings.get("ui_workspace_state", {}))}}
+        if isinstance(settings.get("workspace_layer_registry"), dict):
+            self.session_state.workspace_layer_registry = dict(settings.get("workspace_layer_registry"))
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        if not snapshot_has_display_mapping:
+            lut = settings.get("lut", 0)
+            if isinstance(lut, str) and lut in self._colormaps:
+                self.set_lut(self._colormaps.index(lut))
+            else:
+                try:
+                    self.set_lut(int(lut))
+                except (TypeError, ValueError):
+                    self.set_lut(0)
+        self.set_dirty(False)
+        unresolved_rows = list(
+            dict(getattr(self.session_state, "project_relink_report", {}) or {}).get("unresolved", []) or []
+        )
+        self._set_project_relink_report(
+            path=path,
+            loaded_count=len(images),
+            relinked_images=relinked_images,
+            missing_images=missing_images,
+            unresolved_rows=unresolved_rows,
+            partial_load=bool(missing_images),
+        )
+        emit_state_changed(self)
+        emit_annotations_changed(self)

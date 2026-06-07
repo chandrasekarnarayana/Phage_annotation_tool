@@ -31,6 +31,7 @@ class ChannelControlPanel(QtWidgets.QWidget):
     blend_mode_changed = QtCore.pyqtSignal(str)                # blend_mode value
     
     def __init__(self, parent=None):
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.setObjectName("ChannelControlPanel")
         

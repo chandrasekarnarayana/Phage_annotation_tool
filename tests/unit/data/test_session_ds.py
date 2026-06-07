@@ -1,3 +1,5 @@
+"""Unit tests for session dataset behavior and ROI metadata."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,17 +27,21 @@ class _LazyImageStub:
 
     @property
     def shape(self):
+        """Run the shape workflow."""
         return self.array.shape
 
     @property
     def dtype(self):
+        """Run the dtype workflow."""
         return self.array.dtype
 
     def get_full_array(self) -> np.ndarray:
+        """Return full array for the current workflow."""
         return self.array
 
 
 def _make_session() -> SimpleNamespace:
+    """Create session for the current workflow."""
     primary = _LazyImageStub(
         np.arange(2 * 3 * 4 * 5, dtype=np.float32).reshape(2, 3, 4, 5),
         id=0,
@@ -71,6 +77,7 @@ def _make_session() -> SimpleNamespace:
 
 
 def test_session_ds_shape_and_frame_extraction() -> None:
+    """Verify session ds shape and frame extraction for the current workflow."""
     ds = SessionDataSource(_make_session())
 
     assert ds.get_shape() == (2, 3, 4, 5)
@@ -82,6 +89,7 @@ def test_session_ds_shape_and_frame_extraction() -> None:
 
 
 def test_session_ds_annotations_transform_and_selection() -> None:
+    """Verify session ds annotations transform and selection for the current workflow."""
     ds = SessionDataSource(_make_session())
 
     anns = ds.get_annotations(t_idx=0, z_idx=0, crop_rect=(0, 0, 10, 10), downsample=1, selected_only=True)
@@ -93,6 +101,7 @@ def test_session_ds_annotations_transform_and_selection() -> None:
 
 
 def test_session_ds_roi_overlay_and_calibration() -> None:
+    """Verify session ds roi overlay and calibration for the current workflow."""
     ds = SessionDataSource(_make_session())
 
     overlays = ds.get_roi_overlays(crop_rect=(0, 0, 20, 20), downsample=2)

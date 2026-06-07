@@ -1,3 +1,5 @@
+"""Unit tests for session annotation export metadata."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +14,7 @@ from phage_annotator.session.project import SessionProjectMixin
 
 class _Harness(SessionProjectMixin):
     def __init__(self, image_path: Path) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.view_state = SimpleNamespace(
             roi_spec=SimpleNamespace(shape="box", x=10.0, y=20.0, w=100.0, h=50.0),
             crop_rect=(0.0, 0.0, 256.0, 256.0),
@@ -58,10 +61,12 @@ class _Harness(SessionProjectMixin):
         frame_map.invert = True
 
     def set_dirty(self, dirty: bool) -> None:
+        """Set dirty for the current workflow."""
         self.session_state.dirty = bool(dirty)
 
 
 def test_save_csv_includes_rich_export_metadata(tmp_path: Path) -> None:
+    """Verify save csv includes rich export metadata for the current workflow."""
     image_path = tmp_path / "dataset_a.tif"
     image_path.write_bytes(b"fake")
     out_csv = tmp_path / "dataset_a.annotations.csv"
@@ -86,6 +91,7 @@ def test_save_csv_includes_rich_export_metadata(tmp_path: Path) -> None:
 
 
 def test_save_json_includes_rich_export_metadata(tmp_path: Path) -> None:
+    """Verify save json includes rich export metadata for the current workflow."""
     image_path = tmp_path / "dataset_b.tif"
     image_path.write_bytes(b"fake")
     out_json = tmp_path / "dataset_b.annotations.json"

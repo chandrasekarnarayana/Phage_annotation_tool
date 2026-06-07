@@ -201,6 +201,7 @@ class ExportActionsMixin:
         layout.addLayout(btn_row)
 
         def _export() -> None:
+            """Export export for the current workflow."""
             path, _ = QtWidgets.QFileDialog.getSaveFileName(
                 dlg,
                 "Export analytics",

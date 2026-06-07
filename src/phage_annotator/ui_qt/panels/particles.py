@@ -33,6 +33,7 @@ class AnalyzeParticlesPanel(QtWidgets.QWidget):
     """Analyze Particles panel with filters and results table."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)

@@ -26,6 +26,7 @@ class DensityPredictor:
     """Load and run a density map model on 2D images."""
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._handle: Optional[ModelHandle] = None
 
     def load(
@@ -120,6 +121,7 @@ class DensityPredictor:
 
 
 def _prepare_input(image2d: np.ndarray, config: DensityConfig) -> np.ndarray:
+    """Prepare input for the current workflow."""
     if image2d.ndim != 2:
         raise ValueError("predict expects a 2D array.")
     arr = image2d.astype(np.float32, copy=False)
@@ -134,6 +136,7 @@ def _prepare_input(image2d: np.ndarray, config: DensityConfig) -> np.ndarray:
 
 
 def _normalize(arr: np.ndarray, config: DensityConfig) -> np.ndarray:
+    """Normalize normalize for the current workflow."""
     mode = config.normalize
     if mode == "minmax":
         vmin, vmax = float(arr.min()), float(arr.max())
@@ -154,6 +157,7 @@ def _normalize(arr: np.ndarray, config: DensityConfig) -> np.ndarray:
 
 
 def _squeeze_output(out: np.ndarray) -> np.ndarray:
+    """Handle the squeeze output helper flow."""
     if out.ndim == 4:
         return out[0, 0, :, :]
     if out.ndim == 3:
@@ -164,6 +168,7 @@ def _squeeze_output(out: np.ndarray) -> np.ndarray:
 
 
 def _load_state_dict(path: Path, definition_path: str, device: str):
+    """Load state dict for the current workflow."""
     import torch
 
     module = _import_definition(definition_path)
@@ -179,6 +184,7 @@ def _load_state_dict(path: Path, definition_path: str, device: str):
 
 
 def _import_definition(definition_path: str):
+    """Import definition for the current workflow."""
     path = Path(definition_path)
     spec = importlib.util.spec_from_file_location("density_model_definition", path)
     if spec is None or spec.loader is None:

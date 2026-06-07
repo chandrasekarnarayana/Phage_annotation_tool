@@ -21,7 +21,7 @@ For implementation-level details and current runtime behavior, use:
 - `docs/CURRENT_CAPABILITIES.md`
 - `docs/PLANNED_FEATURES.md`
 - `docs/reports/Testing_Strategy.md`
-- `tests/README.md`
+- `docs/TESTING.md`
 
 ## Test Entry Points
 

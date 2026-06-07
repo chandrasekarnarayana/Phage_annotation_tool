@@ -18,6 +18,7 @@ class _RoiSummary:
 
 
 def _summary(manager: RoiManager, image_id: int) -> _RoiSummary:
+    """Handle the summary helper flow."""
     rois = manager.list_rois(image_id)
     return _RoiSummary(count=len(rois), names=[roi.name for roi in rois])
 

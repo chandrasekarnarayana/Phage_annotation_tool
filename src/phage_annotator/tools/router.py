@@ -45,6 +45,7 @@ class ToolRouter:
     """Route Matplotlib mouse events to the active tool behavior."""
 
     def __init__(self, callbacks: ToolCallbacks) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._cb = callbacks
         self.tool = Tool.ANNOTATE_POINT
         self._drag_start: Optional[Tuple[float, float]] = None

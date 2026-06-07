@@ -21,10 +21,12 @@ class ImportVisitor(ast.NodeVisitor):
     """Collect imports while skipping `if TYPE_CHECKING:` blocks."""
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.imports: list[tuple[str, str]] = []
         self._in_type_checking = False
 
     def visit_If(self, node: ast.If) -> None:
+        """Visit If for the current workflow."""
         if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
             prev = self._in_type_checking
             self._in_type_checking = True
@@ -37,12 +39,14 @@ class ImportVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
+        """Visit Import for the current workflow."""
         if self._in_type_checking:
             return
         for alias in node.names:
             self.imports.append(("import", alias.name))
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit ImportFrom for the current workflow."""
         if self._in_type_checking:
             return
         if node.module is None:
@@ -54,6 +58,7 @@ class ImportVisitor(ast.NodeVisitor):
 
 
 def _module_name_for_file(path: Path) -> str:
+    """Handle the module name for file helper flow."""
     rel = path.relative_to(PKG_ROOT)
     if rel.name == "__init__.py":
         parts = rel.parent.parts
@@ -70,6 +75,7 @@ def _resolve_relative_import(
     level: int,
     module: str,
 ) -> str | None:
+    """Resolve relative import for the current workflow."""
     base_parts = current_module.split(".") if is_package_module else current_module.split(".")[:-1]
     keep = len(base_parts) - (level - 1)
     if keep <= 0:
@@ -81,6 +87,7 @@ def _resolve_relative_import(
 
 
 def _collect_phage_imports(path: Path) -> Iterable[str]:
+    """Collect phage imports for the current workflow."""
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     visitor = ImportVisitor()
     visitor.visit(tree)
@@ -105,6 +112,7 @@ def _collect_phage_imports(path: Path) -> Iterable[str]:
 
 
 def _module_exists(module_name: str) -> bool:
+    """Handle the module exists helper flow."""
     if module_name == "phage_annotator":
         return (PKG_ROOT / "__init__.py").exists()
     if not module_name.startswith("phage_annotator."):
@@ -123,6 +131,7 @@ def _module_exists(module_name: str) -> bool:
 
 
 def main() -> int:
+    """Run the main workflow."""
     unresolved: list[tuple[str, str]] = []
     self_imports: list[tuple[str, str]] = []
 

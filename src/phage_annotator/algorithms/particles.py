@@ -95,6 +95,7 @@ def analyze_particles(mask: np.ndarray, frame_index: int, opts: ParticleOptions)
 
 
 def _label_components(mask: np.ndarray) -> Tuple[np.ndarray, int]:
+    """Label components for the current workflow."""
     if sk_measure is not None:
         labeled = sk_measure.label(mask, connectivity=2)
         return labeled, int(labeled.max())
@@ -106,8 +107,12 @@ def _label_components(mask: np.ndarray) -> Tuple[np.ndarray, int]:
 
 
 def _perimeter(component: np.ndarray, include_holes: bool) -> float:
+    """Handle the perimeter helper flow."""
     if sk_measure is not None:
-        return float(sk_measure.perimeter(component, neighbourhood=8))
+        try:
+            return float(sk_measure.perimeter(component, neighborhood=8))
+        except TypeError:
+            return float(sk_measure.perimeter(component, neighbourhood=8))
     if ndi is None:
         return float(component.sum())
     eroded = ndi.binary_erosion(component)
@@ -121,6 +126,7 @@ def _perimeter(component: np.ndarray, include_holes: bool) -> float:
 
 
 def _touches_edge(component: np.ndarray) -> bool:
+    """Handle the touches edge helper flow."""
     return bool(
         component[0, :].any()
         or component[-1, :].any()
@@ -130,6 +136,7 @@ def _touches_edge(component: np.ndarray) -> bool:
 
 
 def _outline(component: np.ndarray) -> Optional[List[Tuple[float, float]]]:
+    """Handle the outline helper flow."""
     if sk_measure is None:
         return None
     contours = sk_measure.find_contours(component.astype(float), 0.5)
@@ -140,6 +147,7 @@ def _outline(component: np.ndarray) -> Optional[List[Tuple[float, float]]]:
 
 
 def _watershed_split(mask: np.ndarray) -> np.ndarray:
+    """Handle the watershed split helper flow."""
     if sk_measure is None:
         return mask
     try:

@@ -60,6 +60,8 @@ jobs:
         run: python scripts/check_import_integrity.py
       - name: Package layout check
         run: python scripts/check_package_layout.py
+      - name: Source quality check
+        run: python scripts/check_source_quality.py
       - name: Core Qt import guard
         run: python scripts/check_core_no_qt.py
       - name: Acyclic import check (layer enforcement)
@@ -78,6 +80,8 @@ jobs:
           PY
       - name: Release hygiene guard
         run: python scripts/check_release_hygiene.py
+      - name: Root cleanliness guard
+        run: python scripts/check_root_cleanliness.py
       - name: Markdown quality guard
         run: python scripts/check_markdown_quality.py
       - name: Console scripts declaration guard

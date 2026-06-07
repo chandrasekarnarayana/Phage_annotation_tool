@@ -11,12 +11,14 @@ from typing import Any
 
 
 def _find_one(root: Path, name: str) -> Path | None:
+    """Find one for the current workflow."""
     for path in root.rglob(name):
         return path
     return None
 
 
 def _parse_junit(path: Path) -> tuple[int, int, int]:
+    """Parse junit for the current workflow."""
     tree = ET.parse(str(path))
     root = tree.getroot()
     if root.tag == "testsuite":
@@ -31,6 +33,7 @@ def _parse_junit(path: Path) -> tuple[int, int, int]:
 
 
 def _bench_label(entry: dict[str, Any]) -> str:
+    """Handle the bench label helper flow."""
     for key in ("fullname", "fullfunc", "name"):
         value = entry.get(key)
         if isinstance(value, str) and value.strip():
@@ -39,6 +42,7 @@ def _bench_label(entry: dict[str, Any]) -> str:
 
 
 def _benchmark_table(bench_path: Path, threshold_path: Path) -> list[str]:
+    """Handle the benchmark table helper flow."""
     bench_payload = json.loads(bench_path.read_text(encoding="utf-8"))
     rules_payload = json.loads(threshold_path.read_text(encoding="utf-8"))
     entries = list(bench_payload.get("benchmarks", []))
@@ -68,6 +72,7 @@ def _benchmark_table(bench_path: Path, threshold_path: Path) -> list[str]:
 
 
 def main() -> int:
+    """Run the main workflow."""
     parser = argparse.ArgumentParser(description="Build CI summary markdown from artifacts.")
     parser.add_argument("--artifacts-dir", type=Path, required=True)
     parser.add_argument("--thresholds", type=Path, default=Path("tests/performance/benchmark_thresholds.json"))

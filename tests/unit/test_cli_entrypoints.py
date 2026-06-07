@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 def test_required_console_entrypoints_declared() -> None:
+    """Verify required console entrypoints declared for the current workflow."""
     pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
     block_match = re.search(r"(?ms)^\[project\.scripts\]\n(.*?)(?:^\[|\Z)", pyproject)
     assert block_match, "Missing [project.scripts] block in pyproject.toml"

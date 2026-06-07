@@ -16,6 +16,7 @@ from phage_annotator.io.standard_exports import (
 
 
 def _sample_points() -> list[Keypoint]:
+    """Handle the sample points helper flow."""
     return [
         Keypoint(
             image_id=0,
@@ -41,6 +42,7 @@ def _sample_points() -> list[Keypoint]:
 
 
 def test_standard_exports_generate_expected_files(tmp_path) -> None:
+    """Verify standard exports generate expected files for the current workflow."""
     points = _sample_points()
     assert validate_keypoints_for_export(points) == []
 
@@ -79,6 +81,7 @@ def test_standard_exports_generate_expected_files(tmp_path) -> None:
 
 
 def test_evidence_bundle_contains_manifest_and_logs(tmp_path) -> None:
+    """Verify evidence bundle contains manifest and logs for the current workflow."""
     points = _sample_points()
     manifest = export_evidence_bundle(
         tmp_path / "bundle",

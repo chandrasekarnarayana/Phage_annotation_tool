@@ -1,0 +1,10 @@
+runtime:
+  environment_manifest: project/environment.yml
+  environment_check: startup_warning
+  max_worker_threads_default_cap: 4
+  cache_budget_default_fraction_of_ram: 0.20
+  cache_budget_min_mb: 256
+  cache_budget_default_max_mb: 4096
+  overrides:
+    max_workers: PHAGE_ANNOTATOR_MAX_WORKERS
+    cache_mb: PHAGE_ANNOTATOR_CACHE_MB

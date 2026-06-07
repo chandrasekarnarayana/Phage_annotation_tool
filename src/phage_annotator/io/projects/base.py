@@ -41,6 +41,7 @@ DEFAULT_AXIS_CONTRACT = {
 
 
 def _default_annotation_meta_schema() -> dict:
+    """Handle the default annotation meta schema helper flow."""
     return {
         "fields": list(ANNOTATION_META_DEFAULTS.keys()),
         "defaults": dict(ANNOTATION_META_DEFAULTS),
@@ -254,6 +255,7 @@ def load_project(path: Path) -> Tuple[List[dict], Dict, Dict, Dict, Dict, Dict, 
 
 
 def _resolve_annotation_path(project_dir: Path, entry: dict) -> Optional[Path]:
+    """Resolve annotation path for the current workflow."""
     raw = entry.get("annotations")
     if raw:
         raw_path = Path(str(raw))

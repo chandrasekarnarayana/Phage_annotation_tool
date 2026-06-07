@@ -1,3 +1,5 @@
+"""Round-trip tests for annotation CSV and JSON persistence."""
+
 import json
 from pathlib import Path
 
@@ -8,6 +10,7 @@ from phage_annotator.annotation.core import (Keypoint, keypoints_to_dataframe, s
 
 
 def _sample_keypoints() -> list[Keypoint]:
+    """Handle the sample keypoints helper flow."""
     return [
         Keypoint(image_id=0, image_name="img0.tif", t=0, z=0, y=1.0, x=2.0, label="phage"),
         Keypoint(image_id=0, image_name="img0.tif", t=1, z=0, y=3.5, x=4.5, label="artifact"),
@@ -16,6 +19,7 @@ def _sample_keypoints() -> list[Keypoint]:
 
 
 def test_csv_json_roundtrip(tmp_path: Path) -> None:
+    """Verify csv json roundtrip for the current workflow."""
     kps = _sample_keypoints()
     csv_path = tmp_path / "ann.csv"
     json_path = tmp_path / "ann.json"
@@ -41,6 +45,7 @@ def test_csv_json_roundtrip(tmp_path: Path) -> None:
 
 
 def test_empty_serialization(tmp_path: Path) -> None:
+    """Verify empty serialization for the current workflow."""
     csv_path = tmp_path / "empty.csv"
     json_path = tmp_path / "empty.json"
     save_keypoints_csv([], csv_path)
@@ -53,5 +58,6 @@ def test_empty_serialization(tmp_path: Path) -> None:
 
 
 def test_dataframe_columns_order() -> None:
+    """Verify dataframe columns order for the current workflow."""
     df = keypoints_to_dataframe(_sample_keypoints())
     assert list(df.columns) == ["image_id", "image_name", "t", "z", "y", "x", "label"]

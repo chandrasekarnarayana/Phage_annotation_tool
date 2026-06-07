@@ -112,6 +112,7 @@ def _infer_tiled(
     config: DensityConfig,
     options: DensityInferOptions,
 ) -> Tuple[np.ndarray, int]:
+    """Infer tiled for the current workflow."""
     tile = int(options.tile_size)
     overlap = int(options.overlap)
     stride = max(1, tile - overlap)
@@ -146,6 +147,7 @@ def _infer_tiled(
 
 
 def _flush_tiles(tiles, positions, accum, weights, predictor, config, weight) -> int:
+    """Flush tiles for the current workflow."""
     preds = _predict_batch(predictor, np.stack(tiles, axis=0), config)
     for (y, x), pred in zip(positions, preds):
         accum[y : y + weight.shape[0], x : x + weight.shape[1]] += pred * weight
@@ -156,6 +158,7 @@ def _flush_tiles(tiles, positions, accum, weights, predictor, config, weight) ->
 def _predict_batch(
     predictor: DensityPredictor, tiles: np.ndarray, config: DensityConfig
 ) -> np.ndarray:
+    """Predict batch for the current workflow."""
     if hasattr(predictor, "predict_batch"):
         return predictor.predict_batch(tiles, config=config)
     outputs = []
@@ -165,6 +168,7 @@ def _predict_batch(
 
 
 def _pad_to_grid(image: np.ndarray, tile: int, stride: int) -> Tuple[np.ndarray, Tuple[int, int]]:
+    """Handle the pad to grid helper flow."""
     h, w = image.shape
     n_tiles_y = int(np.ceil(max(1, (h - tile)) / stride)) + 1
     n_tiles_x = int(np.ceil(max(1, (w - tile)) / stride)) + 1
@@ -175,6 +179,7 @@ def _pad_to_grid(image: np.ndarray, tile: int, stride: int) -> Tuple[np.ndarray,
 
 
 def _weight_window(tile: int, mode: str) -> np.ndarray:
+    """Handle the weight window helper flow."""
     key = (tile, mode)
     cached = _WEIGHT_WINDOW_CACHE.get(key)
     if cached is not None:
@@ -192,6 +197,7 @@ def _weight_window(tile: int, mode: str) -> np.ndarray:
 def _apply_crop(
     image: np.ndarray, crop_rect: Optional[Tuple[float, float, float, float]]
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
+    """Apply crop for the current workflow."""
     if crop_rect is None:
         return image, (0, 0)
     x, y, w, h = crop_rect
@@ -207,6 +213,7 @@ def _apply_crop(
 def _parse_roi_spec(
     roi_spec: Optional[object],
 ) -> Tuple[Optional[str], Optional[Tuple[float, float, float, float]]]:
+    """Parse roi spec for the current workflow."""
     if roi_spec is None:
         return None, None
     if hasattr(roi_spec, "shape") and hasattr(roi_spec, "rect"):
@@ -223,6 +230,7 @@ def _parse_roi_spec(
 
 
 def _mask_bbox(mask: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
+    """Handle the mask bbox helper flow."""
     ys, xs = np.nonzero(mask)
     if ys.size == 0:
         return None
@@ -234,5 +242,6 @@ def _mask_bbox(mask: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
 def _shift_rect(
     rect: Tuple[float, float, float, float], offset: Tuple[int, int]
 ) -> Tuple[float, float, float, float]:
+    """Handle the shift rect helper flow."""
     x, y, w, h = rect
     return (x - offset[0], y - offset[1], w, h)

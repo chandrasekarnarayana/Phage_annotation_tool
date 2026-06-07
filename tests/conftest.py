@@ -29,6 +29,7 @@ GUI_CONTENT_HINTS = (
     "qtbot",
     "pytestqt",
     "matplotlib.backends.qt_compat",
+    "ui_qt.panels",
     "ui_qt.dialogs",
     "ui_qt.widgets",
 )
@@ -130,6 +131,16 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_missing_pyqt)
         if run_gui and "gui" in item.keywords and unsupported_gui_runtime:
             item.add_marker(skip_unsupported_runtime)
+
+
+@pytest.fixture
+def benchmark():
+    """Provide a lightweight fallback for pytest-benchmark in local runs."""
+    def _run(fn, *args, **kwargs):
+        """Execute the benchmarked callable once."""
+        return fn(*args, **kwargs)
+
+    return _run
 
 
 # Ensure a safe backend/environment for GUI tests under CI/headless.

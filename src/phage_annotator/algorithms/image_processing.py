@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 
 def _ensure_pillow() -> Any:
+    """Ensure pillow for the current workflow."""
     try:
         from PIL import Image  # type: ignore
     except ImportError as exc:

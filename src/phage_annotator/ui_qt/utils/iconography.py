@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover - optional dependency fallback
 
 
 def _qtawesome_icon(name: str, *, color: str, disabled: str | None = None) -> QtGui.QIcon | None:
+    """Handle the qtawesome icon helper flow."""
     if qta is None:
         return None
     try:
@@ -28,10 +29,12 @@ def _qtawesome_icon(name: str, *, color: str, disabled: str | None = None) -> Qt
 
 
 def _fallback_icon(style: QtWidgets.QStyle, pixmap: QtWidgets.QStyle.StandardPixmap) -> QtGui.QIcon:
+    """Handle the fallback icon helper flow."""
     return style.standardIcon(pixmap)
 
 
 def workflow_sidebar_icon(style: QtWidgets.QStyle, label: str) -> QtGui.QIcon:
+    """Run the workflow sidebar icon workflow."""
     key = str(label or "").strip().lower()
     spec = {
         "lazy loading": ("mdi6.database-search", "#2563eb", QtWidgets.QStyle.StandardPixmap.SP_DirOpenIcon),
@@ -46,6 +49,7 @@ def workflow_sidebar_icon(style: QtWidgets.QStyle, label: str) -> QtGui.QIcon:
 
 
 def right_sidebar_icon(style: QtWidgets.QStyle, panel_id: str) -> QtGui.QIcon:
+    """Run the right sidebar icon workflow."""
     key = str(panel_id or "").strip().lower()
     spec = {
         "annotations": ("mdi6.table-large", "#2563eb", QtWidgets.QStyle.StandardPixmap.SP_FileDialogDetailedView),
@@ -62,6 +66,7 @@ def right_sidebar_icon(style: QtWidgets.QStyle, panel_id: str) -> QtGui.QIcon:
 
 
 def tool_icon(style: QtWidgets.QStyle, tool_name: str) -> QtGui.QIcon:
+    """Run the tool icon workflow."""
     key = str(tool_name or "").strip().lower()
     spec = {
         "pan_zoom": ("mdi6.cursor-move", "#334155", QtWidgets.QStyle.StandardPixmap.SP_ArrowUp),

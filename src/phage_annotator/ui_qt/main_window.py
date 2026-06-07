@@ -159,6 +159,7 @@ class KeypointAnnotator(
         window_services.finalize_runtime_startup(self)
 
     def __init__(self, images: List[LazyImage], labels: Sequence[str] | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__()
 
         # Register GUI owner with unified ActionLogger for real-time GUI display
@@ -193,6 +194,7 @@ def create_app(image_paths: List[pathlib.Path]) -> "KeypointAnnotator":
 
 
 def run_gui(image_paths: List[pathlib.Path]) -> None:
+    """Run gui for the current workflow."""
     images = [img for img in (read_metadata(p) for p in image_paths) if img is not None]
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     window = KeypointAnnotator(images)

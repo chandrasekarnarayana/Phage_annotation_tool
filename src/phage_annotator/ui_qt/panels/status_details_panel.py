@@ -9,6 +9,7 @@ class StatusDetailsPanel(QtWidgets.QWidget):
     """Compact, structured status details that don't fit in the bottom status bar."""
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.setObjectName("status_details_panel")
         self.setStyleSheet(

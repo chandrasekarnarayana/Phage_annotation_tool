@@ -2,6 +2,7 @@
 
 # Lazy imports to avoid circular dependencies
 def __getattr__(name):
+    """Delegate unknown attribute access to the wrapped value."""
     import importlib
     
     # Map requested names to their modules

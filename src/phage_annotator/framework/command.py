@@ -78,6 +78,7 @@ class CommandRegistration:
     tags: List[str] = None
     
     def __post_init__(self):
+        """Normalize derived state after dataclass initialization."""
         if self.tags is None:
             self.tags = []
 
@@ -86,6 +87,7 @@ class CommandRegistry:
     """Registry for managing and executing commands."""
     
     def __init__(self):
+        """Initialize the object and prepare its runtime state."""
         self._commands: Dict[str, CommandRegistration] = {}
         self._callbacks: Dict[str, List[Callable]] = {}
     

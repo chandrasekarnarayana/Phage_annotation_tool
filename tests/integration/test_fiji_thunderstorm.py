@@ -16,6 +16,7 @@ pytestmark = pytest.mark.integration
 
 
 def _synthetic_frames() -> list[tuple[int, np.ndarray]]:
+    """Handle the synthetic frames helper flow."""
     rng = np.random.default_rng(7)
     frames: list[tuple[int, np.ndarray]] = []
     for t in range(3):
@@ -31,6 +32,7 @@ def _synthetic_frames() -> list[tuple[int, np.ndarray]]:
     reason="Set FIJI_APP_PATH and FIJI_EXE_PATH to run real Fiji integration test.",
 )
 def test_fiji_subprocess_bridge_end_to_end(tmp_path: Path) -> None:
+    """Verify fiji subprocess bridge end to end for the current workflow."""
     fiji_exe = os.environ.get("FIJI_EXE_PATH", "")
     if not fiji_exe:
         pytest.skip("FIJI_EXE_PATH not set")

@@ -10,18 +10,22 @@ from phage_annotator.ui_qt.controls.display import DisplayControlsMixin
 
 class _Axis:
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.xlim = None
         self.ylim = None
 
     def set_xlim(self, left: float, right: float) -> None:
+        """Set xlim for the current workflow."""
         self.xlim = (left, right)
 
     def set_ylim(self, top: float, bottom: float) -> None:
+        """Set ylim for the current workflow."""
         self.ylim = (top, bottom)
 
 
 class _Harness(DisplayControlsMixin):
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._panel_sync_reverse = {0: "modality_0"}
         self.renderer = SimpleNamespace(axes={"modality_0": _Axis()})
         self._last_display_shape = (100, 200)
@@ -32,9 +36,11 @@ class _Harness(DisplayControlsMixin):
 
 
 def test_view_sync_handler_accepts_full_signal_signature(monkeypatch) -> None:
+    """Verify view sync handler accepts full signal signature for the current workflow."""
     emitted: list[tuple[object, dict]] = []
 
     def _record_emit(controller, **payload):
+        """Record emit for the current workflow."""
         emitted.append((controller, dict(payload)))
 
     monkeypatch.setattr(display_module, "emit_view_changed", _record_emit)

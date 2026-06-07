@@ -16,9 +16,11 @@ class _Emitter:
     """Minimal Qt-like signal stub used by controller harnesses."""
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.count = 0
 
     def emit(self) -> None:
+        """Emit emit for the current workflow."""
         self.count += 1
 
 

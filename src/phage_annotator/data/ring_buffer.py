@@ -31,6 +31,7 @@ class FrameRingBuffer:
     """
 
     def __init__(self, capacity: int) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._capacity = int(max(1, capacity))
         self._queue: Deque[Tuple[int, np.ndarray]] = deque()
         self._indices: set[int] = set()
@@ -38,9 +39,11 @@ class FrameRingBuffer:
 
     @property
     def capacity(self) -> int:
+        """Return the capacity value."""
         return self._capacity
 
     def reset(self) -> None:
+        """Reset reset for the current workflow."""
         with self._lock:
             self._queue.clear()
             self._indices.clear()
@@ -72,6 +75,7 @@ class FrameRingBuffer:
         return t_idx, frame
 
     def stats(self) -> BufferStats:
+        """Return the stats value."""
         with self._lock:
             return BufferStats(filled=len(self._queue), capacity=self._capacity)
 
@@ -91,6 +95,7 @@ class BlockPrefetcher:
         max_inflight_blocks: int,
         stop_event: threading.Event,
     ) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._read_block = read_block
         self._ring = ring
         self._stop_event = stop_event
@@ -105,6 +110,7 @@ class BlockPrefetcher:
         self._reset_requested = False
 
     def configure(self, block_size: int, max_inflight_blocks: int) -> None:
+        """Configure configure for the current workflow."""
         self._block_size = int(max(1, block_size))
         self._max_inflight_blocks = int(max(1, max_inflight_blocks))
 
@@ -127,12 +133,14 @@ class BlockPrefetcher:
             self._reset_requested = True
 
     def stop(self) -> None:
+        """Stop stop for the current workflow."""
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=0.2)
         self._thread = None
 
     def _run(self) -> None:
+        """Run run for the current workflow."""
         while not self._stop_event.is_set():
             with self._lock:
                 t_max = self._t_max

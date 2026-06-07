@@ -22,6 +22,7 @@ class RoiManagerWidget(QtWidgets.QWidget):
     batch_bind_to_slice_requested = QtCore.pyqtSignal(list)  # batch slice binding, emits list of roi_ids
 
     def __init__(self, manager: RoiManager, parent=None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.manager = manager
         self._current_rois: List[Roi] = []  # cache for multi-select support

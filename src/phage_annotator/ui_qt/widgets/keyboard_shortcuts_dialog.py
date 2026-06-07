@@ -10,6 +10,7 @@ class KeyboardShortcutsDialog(QtWidgets.QDialog):
     """Dialog showing all keyboard shortcuts in a searchable table."""
     
     def __init__(self, parent=None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         self.setWindowTitle("Keyboard Shortcuts")
         self.resize(700, 500)

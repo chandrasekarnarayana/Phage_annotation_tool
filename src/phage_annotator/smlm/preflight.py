@@ -38,6 +38,7 @@ class PreflightReport:
     items: List[PreflightItem] = field(default_factory=list)
 
     def to_lines(self) -> List[str]:
+        """Convert lines for the current workflow."""
         lines = []
         for item in self.items:
             status = "OK" if item.ok else "FAIL"
@@ -95,6 +96,11 @@ def run_preflight(config: ThunderstormBridgeConfig, *, probe: bool = False) -> P
         except Exception as exc:
             items.append(PreflightItem("PyImageJ import", False, str(exc)))
 
+    fiji_missing = any(
+        item.name in {"Fiji executable", "PyImageJ app path"} and not item.ok
+        for item in items
+    )
+
     if plugin_jar:
         jar_path = Path(plugin_jar)
         jar_ok = jar_path.exists()
@@ -106,10 +112,12 @@ def run_preflight(config: ThunderstormBridgeConfig, *, probe: bool = False) -> P
             )
         )
         if not jar_ok:
-            exit_code = max(exit_code, 3)
+            if not fiji_missing:
+                exit_code = max(exit_code, 3)
     else:
         items.append(PreflightItem("Plugin JAR", False, "No plugin JAR resolved."))
-        exit_code = max(exit_code, 3)
+        if not fiji_missing:
+            exit_code = max(exit_code, 3)
 
     if config.macro_path:
         macro = Path(config.macro_path)
@@ -130,7 +138,8 @@ def run_preflight(config: ThunderstormBridgeConfig, *, probe: bool = False) -> P
             )
         )
         if not has_manifest:
-            exit_code = max(exit_code, 4)
+            if not fiji_missing:
+                exit_code = max(exit_code, 4)
 
     try:
         with tempfile.NamedTemporaryFile(prefix="phage_preflight_", suffix=".tmp", delete=True) as tmp:
@@ -151,10 +160,12 @@ def run_preflight(config: ThunderstormBridgeConfig, *, probe: bool = False) -> P
             )
         else:
             items.append(PreflightItem("plugins.config commands", False, "No command entries discovered in JAR."))
-            exit_code = max(exit_code, 3)
+            if not fiji_missing:
+                exit_code = max(exit_code, 3)
     else:
         items.append(PreflightItem("Plugin descriptor", False, "Plugin id not discovered in external_plugins/."))
-        exit_code = max(exit_code, 3)
+        if not fiji_missing:
+            exit_code = max(exit_code, 3)
 
     if probe and backend == "fiji_subprocess":
         probe_item, probe_code = _run_probe(config, plugin_desc)
@@ -227,10 +238,12 @@ def _run_probe(config: ThunderstormBridgeConfig, plugin_desc):
 
 
 def _escape_macro(value: str) -> str:
+    """Handle the escape macro helper flow."""
     return str(value).replace("\\", "\\\\").replace("\"", "\\\"")
 
 
 def _escape_macro_path(value: str) -> str:
+    """Handle the escape macro path helper flow."""
     return _escape_macro(str(value))
 
 

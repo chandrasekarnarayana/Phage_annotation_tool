@@ -15,14 +15,17 @@ class ResultsControlsMixin:
     """Mixin for results table handlers."""
 
     def _results_clear(self) -> None:
+        """Handle the results clear helper flow."""
         if self.results_widget is not None:
             self.results_widget.clear()
 
     def _results_copy(self) -> None:
+        """Handle the results copy helper flow."""
         if self.results_widget is not None:
             self.results_widget.copy_to_clipboard()
 
     def _results_export(self) -> None:
+        """Handle the results export helper flow."""
         if self.results_widget is None:
             return
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -36,6 +39,7 @@ class ResultsControlsMixin:
         self.results_widget.export_csv(path)
 
     def _results_measure_current(self) -> None:
+        """Handle the results measure current helper flow."""
         if self.primary_image.array is None or self.results_widget is None:
             return
         rois = self._results_rois()
@@ -66,6 +70,7 @@ class ResultsControlsMixin:
             )
 
     def _results_measure_over_time(self) -> None:
+        """Handle the results measure over time helper flow."""
         if self.primary_image.array is None or self.results_widget is None:
             return
         rois = self._results_rois()
@@ -100,6 +105,7 @@ class ResultsControlsMixin:
         )
 
     def _results_job(self, progress, cancel_token) -> int | None:
+        """Handle the results job helper flow."""
         ctx = getattr(self, "_results_job_context", None)
         if ctx is None:
             return None
@@ -140,6 +146,7 @@ class ResultsControlsMixin:
         return job_gen
 
     def _results_on_progress(self, value: int, msg: str) -> None:
+        """Handle the results on progress helper flow."""
         if self.results_widget is None:
             return
         parts = msg.split(",")
@@ -160,15 +167,18 @@ class ResultsControlsMixin:
         self.results_widget.add_row(row)
 
     def _results_on_result(self, result: int | None) -> None:
+        """Handle the results on result helper flow."""
         if result is None:
             return
         if result != self._job_generation:
             return
 
     def _results_on_error(self, err: str) -> None:
+        """Handle the results on error helper flow."""
         self._append_log(f"[JOB] Results error\n{err}")
 
     def _results_rois(self) -> List[Roi]:
+        """Handle the results rois helper flow."""
         active = self.roi_manager.get_active(self.primary_image.id)
         if active is not None:
             return [active]

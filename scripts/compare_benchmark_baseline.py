@@ -15,10 +15,12 @@ from typing import Any
 
 
 def _load_json(path: Path) -> Any:
+    """Load json for the current workflow."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _label(entry: dict[str, Any]) -> str:
+    """Label label for the current workflow."""
     for key in ("fullname", "fullfunc", "name"):
         value = entry.get(key)
         if isinstance(value, str) and value.strip():
@@ -27,6 +29,7 @@ def _label(entry: dict[str, Any]) -> str:
 
 
 def main() -> int:
+    """Run the main workflow."""
     parser = argparse.ArgumentParser(description="Compare benchmark run vs baseline.")
     parser.add_argument("benchmark_json", type=Path)
     parser.add_argument("baseline_json", type=Path)

@@ -46,6 +46,7 @@ class DeepLocalization:
 
 
 def is_torch_available() -> bool:
+    """Return whether torch available is true for the current state."""
     return torch is not None
 
 
@@ -169,12 +170,14 @@ def localizations_from_sr(
 
 
 def _aggregate_frames(frames: Sequence[np.ndarray], mode: str) -> np.ndarray:
+    """Handle the aggregate frames helper flow."""
     if mode == "stack":
         return np.stack(frames, axis=0)
     return np.mean(frames, axis=0)
 
 
 def _normalize_global(arr: np.ndarray) -> np.ndarray:
+    """Normalize global for the current workflow."""
     data = arr.astype(np.float32, copy=False)
     mean = float(np.mean(data))
     std = float(np.std(data))
@@ -184,6 +187,7 @@ def _normalize_global(arr: np.ndarray) -> np.ndarray:
 
 
 def _tile_starts(h: int, w: int, patch: int, step: int) -> List[Tuple[int, int]]:
+    """Handle the tile starts helper flow."""
     ys = list(range(0, max(1, h - patch + 1), step))
     xs = list(range(0, max(1, w - patch + 1), step))
     if not ys or ys[-1] != h - patch:
@@ -194,6 +198,7 @@ def _tile_starts(h: int, w: int, patch: int, step: int) -> List[Tuple[int, int]]
 
 
 def _extract_patch(arr: np.ndarray, y0: int, x0: int, size: int) -> np.ndarray:
+    """Extract patch for the current workflow."""
     if arr.ndim == 2:
         h, w = arr.shape
         patch = arr[y0 : y0 + size, x0 : x0 + size]
@@ -211,6 +216,7 @@ def _extract_patch(arr: np.ndarray, y0: int, x0: int, size: int) -> np.ndarray:
 
 
 def _infer_patch(model, patch: np.ndarray, device: str, upsample: int) -> np.ndarray:
+    """Infer patch for the current workflow."""
     if torch is None:
         raise RuntimeError("PyTorch is not available.")
     if patch.ndim == 2:
@@ -233,6 +239,7 @@ def _infer_patch(model, patch: np.ndarray, device: str, upsample: int) -> np.nda
 def _blend_patch(
     sr_accum: np.ndarray, weight_accum: np.ndarray, patch: np.ndarray, y0: int, x0: int
 ) -> None:
+    """Handle the blend patch helper flow."""
     ph, pw = patch.shape
     y1 = min(sr_accum.shape[0], y0 + ph)
     x1 = min(sr_accum.shape[1], x0 + pw)
@@ -243,6 +250,7 @@ def _blend_patch(
 
 
 def _weight_mask(h: int, w: int) -> np.ndarray:
+    """Handle the weight mask helper flow."""
     key = (h, w)
     cached = _WEIGHT_MASK_CACHE.get(key)
     if cached is not None:

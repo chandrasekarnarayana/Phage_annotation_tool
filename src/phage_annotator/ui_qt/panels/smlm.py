@@ -15,6 +15,7 @@ class SmlmPanel(QtWidgets.QWidget):
     """Unified SMLM panel with presets and per-method tabs."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the object and prepare its runtime state."""
         super().__init__(parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -69,6 +70,7 @@ class SmlmPanel(QtWidgets.QWidget):
         self.deep.agg_combo.setCurrentText(deep.aggregation_mode)
 
     def _apply_tooltips(self) -> None:
+        """Apply tooltips for the current workflow."""
         sigma_tip = "sigma_px ≈ FWHM/2.35; start 1.1–1.6 px."
         thr_tip = "Threshold 2–6 sigma; higher = fewer false positives."
         fit_tip = "Fit radius 3–5 px for typical spots."

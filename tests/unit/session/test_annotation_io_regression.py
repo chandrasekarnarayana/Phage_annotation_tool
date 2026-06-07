@@ -1,3 +1,5 @@
+"""Regression tests for session annotation import/export flows."""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +12,7 @@ from phage_annotator.session.annotation_io import SessionAnnotationIOMixin
 
 class _Harness(SessionAnnotationIOMixin):
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.session_state = SimpleNamespace(
             images=[
                 SimpleNamespace(id=0, name="img_a.tif"),
@@ -22,9 +25,11 @@ class _Harness(SessionAnnotationIOMixin):
 
 class _DummySettings:
     def __init__(self, um_per_px: float) -> None:
+        """Initialize the object and prepare its runtime state."""
         self._um_per_px = um_per_px
 
     def value(self, key: str, default=None, type=None):  # noqa: A002 - Qt-style signature
+        """Run the value workflow."""
         if key == "defaultPixelSizeUmPerPx":
             return type(self._um_per_px) if callable(type) else self._um_per_px
         return default

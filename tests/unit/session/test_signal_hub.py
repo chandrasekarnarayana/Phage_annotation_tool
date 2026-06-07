@@ -12,9 +12,11 @@ class _Emitter:
     """Qt-like signal stub for unit tests."""
 
     def __init__(self) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.calls = 0
 
     def emit(self) -> None:
+        """Emit emit for the current workflow."""
         self.calls += 1
 
 
@@ -22,11 +24,13 @@ class _RecordingEmitter:
     """Qt-like signal stub that records emission ordering."""
 
     def __init__(self, events: list[object], label: str, controller=None) -> None:
+        """Initialize the object and prepare its runtime state."""
         self.events = events
         self.label = label
         self.controller = controller
 
     def emit(self) -> None:
+        """Emit emit for the current workflow."""
         dirty = None
         if self.controller is not None:
             dirty = getattr(getattr(self.controller, "session_state", None), "dirty", None)
