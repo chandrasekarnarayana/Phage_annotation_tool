@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phage-annotator"
-version = "1.0.1"
+version = "1.1.0"
 description = "General keypoint annotation GUI for 2D/3D/time microscopy, with a phage preset"
 authors = [
   { name = "Chandrasekar Subramani Narayana" }
@@ -41,12 +41,26 @@ dev = [
   "pytest-benchmark>=4.0",
   "zstandard>=0.22",
 ]
+docs = [
+  "sphinx>=7.2",
+  "myst-parser>=2.0",
+  "pydata-sphinx-theme>=0.15",
+  "sphinx-copybutton>=0.5",
+]
 cache = [
   "zstandard>=0.22",
 ]
 fiji = [
   "pyimagej>=1.5",
   "jpype1>=1.5",
+]
+ml = [
+  "torch>=2.0",
+  "onnxruntime>=1.17",
+]
+ml-gpu = [
+  "torch>=2.0",
+  "onnxruntime-gpu>=1.17",
 ]
 
 [tool.pytest.ini_options]

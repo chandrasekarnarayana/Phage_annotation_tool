@@ -120,3 +120,9 @@ class DockAnalysisWidgetsMixin:
     def _make_qc_issues_widget(self) -> QtWidgets.QWidget:
         """Create qc issues widget for the current workflow."""
         return ui_docks.make_qc_issues_widget(self)
+    def _make_deepstorm_widget(self) -> QtWidgets.QWidget:
+        """Create Deep-STORM super-resolution inference panel."""
+        return ui_docks.make_deepstorm_widget(self)
+    def _make_onnx_density_widget(self) -> QtWidgets.QWidget:
+        """Create ONNX density prediction panel."""
+        return ui_docks.make_onnx_density_widget(self)

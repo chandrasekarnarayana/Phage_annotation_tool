@@ -12,12 +12,11 @@ Architecture
 
 Usage
 -----
-```python
+::
 
-# Wrap existing session controller
-data_source = SessionDataSource(session_controller)
-frame = data_source.get_frame(t_idx=0, z_idx=0)
-```
+    # Wrap existing session controller.
+    data_source = SessionDataSource(session_controller)
+    frame = data_source.get_frame(t_idx=0, z_idx=0)
 """
 
 from __future__ import annotations
@@ -46,19 +45,20 @@ from phage_annotator.data.session_data_source_methods2 import _SessionDataSource
 class SessionDataSource(_SessionDataSourceMethods1, _SessionDataSourceMethods2, ComprehensiveDataSource):
     """Data source adapter wrapping SessionController.
 
-This adapter bridges the old SessionController API to the new
-ComprehensiveDataSource interface, enabling incremental refactoring.
+    This adapter bridges the old SessionController API to the new
+    ComprehensiveDataSource interface, enabling incremental refactoring.
 
-Parameters
-----------
-session : SessionController
-    The session controller to wrap
+    Parameters
+    ----------
+    session : SessionController
+        The session controller to wrap.
 
-Notes
------
-- All coordinate transforms use the session's view state (crop, downsample)
-- Caching is handled by underlying session controller components
-- This adapter is read-only; mutations still go through SessionController"""
+    Notes
+    -----
+    - All coordinate transforms use the session's view state (crop, downsample).
+    - Caching is handled by underlying session controller components.
+    - This adapter is read-only; mutations still go through SessionController.
+    """
 
     # ------------------------------------------------------------------
     # Core shape/dtype/availability

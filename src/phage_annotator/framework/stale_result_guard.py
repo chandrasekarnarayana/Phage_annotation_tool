@@ -4,12 +4,14 @@ Ensures that result callbacks only process results from the active job
 and discard results from cancelled/superseded jobs. This is a critical
 safety layer when multiple jobs of the same type can run in sequence.
 
-Pattern:
+Pattern::
+
     job_id = gen_job_id()
     handle = self.job_manager.submit("job_type", worker_func, args)
     store_current_job_id("job_type", job_id)
 
-Then in the callback:
+Then in the callback::
+
     def on_result(job_id, value):
         if not is_current_job("job_type", job_id):
             return  # Discard stale result

@@ -6,15 +6,17 @@ backward compatible by tolerating missing fields and adding defaults.
 
 Example
 -------
-{
-  "tool": "PhageAnnotator",
-  "version": "0.9.0",
-  "images": [
-    {"path": "/abs/path/img1.tif", "annotations": "/abs/path/img1.annotations.json"},
-    {"path": "/abs/path/img2.tif", "annotations": "/abs/path/img2.annotations.json"}
-  ],
-  "settings": {"last_fov_index": 0, "last_support_index": 1, "fps_default": 10, "lut": "gray"}
-}
+::
+
+    {
+      "tool": "PhageAnnotator",
+      "version": "0.9.0",
+      "images": [
+        {"path": "/abs/path/img1.tif", "annotations": "/abs/path/img1.annotations.json"},
+        {"path": "/abs/path/img2.tif", "annotations": "/abs/path/img2.annotations.json"}
+      ],
+      "settings": {"last_fov_index": 0, "last_support_index": 1, "fps_default": 10, "lut": "gray"}
+    }
 """
 
 from __future__ import annotations

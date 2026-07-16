@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -34,6 +33,15 @@ from phage_annotator.smlm.backends_pyimagej import (
     _keypoints_to_localizations,
     _validate_bridge_output_csv,
 )
+from phage_annotator.smlm.backends_core_impl import (
+    FijiNotFoundError,
+    PluginNotFoundError,
+    MacroExecutionError,
+    OutputMissingError,
+    FijiTimeoutError,
+    ThunderstormBridgeConfig,
+)
+from phage_annotator.smlm.platform_utils import split_command_template, build_fiji_headless_command
 
 
 ProgressCb = Optional[Callable[[int, str], None]]
@@ -56,7 +64,7 @@ def _run_fiji_subprocess(
     if is_cancelled is not None and is_cancelled():
         return [], np.zeros((1, 1), dtype=np.float32), {"backend": "fiji_subprocess", "cancelled": True}
     if not config.fiji_executable:
-        raise (
+        raise FijiNotFoundError(
             "Fiji executable path is required for fiji_subprocess backend. "
             "Set SMLM -> Advanced Bridge -> Fiji executable."
         )
@@ -106,10 +114,10 @@ def _run_fiji_subprocess(
             temp_macro.write_text(executed_macro_text, encoding="utf-8")
             macro_path = str(temp_macro)
         if config.command_template:
-            command = shlex.split(config.command_template)
+            command = split_command_template(config.command_template)
             command = [c.replace("{macro_path}", str(macro_path or "")).replace("{fiji}", config.fiji_executable) for c in command]
         else:
-            command = [config.fiji_executable, "--headless", "--console", f"--run={macro_path or ''}"]
+            command = build_fiji_headless_command(config.fiji_executable, str(macro_path or ""))
         env = os.environ.copy()
         env.setdefault("PHAGE_SMLM_INPUT", str(input_tif))
         env.setdefault("PHAGE_SMLM_OUTPUT", str(output_csv))

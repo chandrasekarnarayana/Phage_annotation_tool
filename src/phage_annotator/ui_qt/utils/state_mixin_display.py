@@ -72,9 +72,10 @@ class StateMixinDisplayMixin:
     def format_diagnostic_tooltip(self, image_id: int) -> str:
         """Format a detailed diagnostic tooltip for display.
         
-        Example output:
-        "Image 1: Spatial 2x downsampled (memory: 1.9 GB > 1.5 GB threshold)
-         Interactive: 2x downsampled; LOD active; Memmap"
+        Example
+        -------
+        ``Image 1: Spatial 2x downsampled (memory: 1.9 GB > 1.5 GB threshold);
+        Interactive: 2x downsampled; LOD active; Memmap``
         """
         diags = self.get_diagnostic_info(image_id)
         if not diags:

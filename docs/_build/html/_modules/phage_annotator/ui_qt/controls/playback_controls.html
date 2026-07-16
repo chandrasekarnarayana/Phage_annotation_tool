@@ -1,0 +1,983 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.ui_qt.controls.playback_controls &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/ui_qt/controls/playback_controls';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../../_static/searchtools.js"></script>
+    <script src="../../../../_static/language_data.js"></script>
+    <script src="../../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.controls.playback_controls</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.ui_qt.controls.playback_controls</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Extracted method group 2 for DisplayControlsMixin.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.qt_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtGui</span><span class="p">,</span> <span class="n">QtWidgets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.analysis.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_auto_window</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.signal_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_display_changed</span><span class="p">,</span> <span class="n">emit_view_changed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.modality</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProjectionType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.multi_playback</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlaybackMode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.controls.display_contrast</span><span class="w"> </span><span class="kn">import</span> <span class="n">DisplayContrastMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.rendering.lut_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">LUTS</span><span class="p">,</span> <span class="n">lut_names</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.services.panel_logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_panel_logger</span>
+
+
+
+<div class="viewcode-block" id="PlaybackControlsMixin">
+<a class="viewcode-back" href="../../../../api/generated/phage_annotator.ui_qt.controls.playback_controls.html#phage_annotator.ui_qt.controls.playback_controls.PlaybackControlsMixin">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PlaybackControlsMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Method group 2 extracted from DisplayControlsMixin.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_schedule_adjacent_fov_prefetch</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Schedule low-priority prefetch of adjacent FOVs (P7c).</span>
+<span class="sd">        </span>
+<span class="sd">        When user navigates to a new FOV in a multi-FOV grid, detect and prefetch</span>
+<span class="sd">        adjacent FOVs (up, down, left, right) to enable faster navigation.</span>
+<span class="sd">        Uses lazy decompression (P7b) for bandwidth efficiency.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Check if FOV grid is configured</span>
+            <span class="n">app_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">app_config</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="p">,</span> <span class="s1">&#39;app_config&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">app_config</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">app_config</span><span class="o">.</span><span class="n">enable_fov_prefetch</span><span class="p">:</span>
+                <span class="k">return</span>
+            
+            <span class="n">cols</span> <span class="o">=</span> <span class="n">app_config</span><span class="o">.</span><span class="n">fov_grid_cols</span>
+            <span class="n">rows</span> <span class="o">=</span> <span class="n">app_config</span><span class="o">.</span><span class="n">fov_grid_rows</span>
+            <span class="k">if</span> <span class="n">cols</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">rows</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span>  <span class="c1"># Grid not configured</span>
+            
+            <span class="n">current_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_image_idx</span>
+            
+            <span class="c1"># Get adjacent FOV indices</span>
+            <span class="n">adjacent_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">get_adjacent_fov_ids</span><span class="p">(</span><span class="n">current_idx</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">rows</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">adjacent_ids</span><span class="p">:</span>
+                <span class="k">return</span>
+            
+            <span class="c1"># Check if we should prefetch (cache not full, not thrashing)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">should_prefetch_adjacent</span><span class="p">(</span><span class="n">current_idx</span><span class="p">):</span>
+                <span class="k">return</span>
+            
+            <span class="c1"># Schedule low-priority prefetch for each adjacent FOV</span>
+            <span class="k">for</span> <span class="n">adj_idx</span> <span class="ow">in</span> <span class="n">adjacent_ids</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">adj_idx</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">adj_idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                
+                <span class="n">adj_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="n">adj_idx</span><span class="p">]</span>
+                
+                <span class="c1"># Use lazy decompression (P7b) for bandwidth efficiency</span>
+                <span class="c1"># Check disk cache first via lazy load</span>
+                <span class="k">def</span><span class="w"> </span><span class="nf">_lazy_prefetch_fn</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="n">callback_mgr</span><span class="p">):</span>
+<span class="w">                    </span><span class="sd">&quot;&quot;&quot;Background job to prefetch adjacent FOV using lazy decomp&quot;&quot;&quot;</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">crop_rect</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache_crop_rect</span><span class="p">(</span><span class="n">img</span><span class="p">)</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_cache_crop_rect&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                        
+                        <span class="c1"># Try lazy decompression from disk cache (P7b)</span>
+                        <span class="k">for</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;std&#39;</span><span class="p">]:</span>
+                            <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">kind</span><span class="p">,</span> <span class="n">crop_rect</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                            <span class="n">buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">get_lazy</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">buffer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="c1"># Got compressed buffer; decompress to reload to memory</span>
+                                <span class="n">data</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">decompress_full</span><span class="p">()</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+                            <span class="k">elif</span> <span class="n">img</span><span class="o">.</span><span class="n">array</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="c1"># Not in disk cache; compute and cache</span>
+                                <span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.analysis.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_mean_std</span>
+                                <span class="n">mean_proj</span><span class="p">,</span> <span class="n">std_proj</span> <span class="o">=</span> <span class="n">compute_mean_std</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">array</span><span class="p">)</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">img</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="n">crop_rect</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">mean_proj</span><span class="p">)</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">proj_cache</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">img</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s1">&#39;std&#39;</span><span class="p">,</span> <span class="n">crop_rect</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">std_proj</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">logger</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="s1">&#39;logging&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Adjacent FOV prefetch failed for </span><span class="si">{</span><span class="n">adj_image</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                
+                <span class="c1"># Queue low-priority background job</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">jobs</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                    <span class="k">lambda</span> <span class="n">img</span><span class="o">=</span><span class="n">adj_image</span><span class="p">:</span> <span class="n">_lazy_prefetch_fn</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobs</span><span class="p">),</span>
+                    <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Prefetch FOV </span><span class="si">{</span><span class="n">adj_idx</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">on_error</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># Silently ignore prefetch errors</span>
+                    <span class="n">priority</span><span class="o">=</span><span class="s2">&quot;background&quot;</span><span class="p">,</span>
+                    <span class="n">replace_key</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;prefetch-fov-</span><span class="si">{</span><span class="n">adj_idx</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+        
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="s1">&#39;logging&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FOV prefetch scheduling failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_support_combo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">refresh_lazy_table</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set support combo for the current workflow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_playback_t</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">support_image_idx</span> <span class="o">=</span> <span class="n">idx</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sync_base_modality_sources</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_maybe_autoload_annotations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">support_image</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_refresh_annotation_view_controls&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_annotation_view_controls</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">refresh_lazy_table</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_refresh_lazy_modality_table&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_lazy_modality_table</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_prepare_setup_summary</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_request_ui_refresh</span><span class="p">(</span><span class="s2">&quot;display-controls&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_toggle_play</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Toggle play for the current workflow.&quot;&quot;&quot;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">axis</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">axis</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">}:</span>
+            <span class="k">return</span>
+        <span class="n">source_panel</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_playback_source_panel_key</span><span class="p">())</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_playback_source_panel_key&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;frame&quot;</span>
+        <span class="n">source_img</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_playback_source_image</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_playback_source_image&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">source_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">source_img</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="k">if</span> <span class="n">source_img</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_append_log&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_append_log</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[GUI] Playback toggle requested axis=</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> panel=</span><span class="si">{</span><span class="n">source_panel</span><span class="si">}</span><span class="s2"> image_id=</span><span class="si">{</span><span class="n">source_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">category</span><span class="o">=</span><span class="s2">&quot;GUI&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;recorder&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">&quot;record&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recorder</span><span class="o">.</span><span class="n">record</span><span class="p">(</span>
+                    <span class="s2">&quot;gui_play_toggle&quot;</span><span class="p">,</span>
+                    <span class="p">{</span><span class="s2">&quot;axis&quot;</span><span class="p">:</span> <span class="n">axis</span><span class="p">,</span> <span class="s2">&quot;panel&quot;</span><span class="p">:</span> <span class="n">source_panel</span><span class="p">,</span> <span class="s2">&quot;image_id&quot;</span><span class="p">:</span> <span class="n">source_id</span><span class="p">},</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="n">timer</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_timer&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># Toggle off threaded T playback when clicking Play/Stop T again.</span>
+        <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;t&quot;</span> <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_playback_mode&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_playback_t</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_append_log&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_append_log</span><span class="p">(</span><span class="s2">&quot;[GUI] Playback stopped axis=t&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;GUI&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Toggle off when clicking the active play mode.</span>
+        <span class="k">if</span> <span class="n">timer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">timer</span><span class="o">.</span><span class="n">isActive</span><span class="p">()</span> <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_mode&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span> <span class="o">==</span> <span class="n">axis</span><span class="p">:</span>
+            <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">play_mode</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sync_playback_button_labels</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_append_log&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_append_log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[GUI] Playback stopped axis=</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;GUI&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_status</span><span class="p">()</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Stop any currently running playback mode.</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_playback_mode&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_playback_t</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">timer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">timer</span><span class="o">.</span><span class="n">isActive</span><span class="p">():</span>
+            <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+
+        <span class="c1"># Threaded T playback is opt-in; timer playback is the reliable default.</span>
+        <span class="n">use_threaded_t</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">settings</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_settings&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;t&quot;</span> <span class="ow">and</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">use_threaded_t</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="s2">&quot;threadedPlaybackT&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">use_threaded_t</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;t&quot;</span> <span class="ow">and</span> <span class="n">use_threaded_t</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">start_playback_t</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_playback_mode&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sync_playback_button_labels</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
+                <span class="k">return</span>
+
+        <span class="c1"># Fallback: timer-driven slider playback (works for Z and non-RAW T views).</span>
+        <span class="k">if</span> <span class="n">timer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">play_mode</span> <span class="o">=</span> <span class="n">axis</span>
+        <span class="n">fps</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;speed_slider&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;speed_slider&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">10</span><span class="p">))</span>
+        <span class="n">timer</span><span class="o">.</span><span class="n">setInterval</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="mi">1000</span> <span class="o">/</span> <span class="n">fps</span><span class="p">)))</span>
+        <span class="n">timer</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sync_playback_button_labels</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_append_log&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_append_log</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[GUI] Playback started axis=</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> fps=</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">fps</span><span class="p">)</span><span class="si">}</span><span class="s2"> loop=</span><span class="si">{</span><span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;loop_playback&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">False</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">category</span><span class="o">=</span><span class="s2">&quot;GUI&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_status</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sync_playback_button_labels</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">active_axis</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reflect active playback mode in play button text.&quot;&quot;&quot;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">active_axis</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_t_btn&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">play_t_btn</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;Stop T&quot;</span> <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;t&quot;</span> <span class="k">else</span> <span class="s2">&quot;Play T&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_z_btn&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">play_z_btn</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;Stop Z&quot;</span> <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;z&quot;</span> <span class="k">else</span> <span class="s2">&quot;Play Z&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_play_timer_tick</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Advance T/Z slider for timer-based playback mode.&quot;&quot;&quot;</span>
+        <span class="n">axis</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_mode&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">axis</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">}:</span>
+            <span class="n">timer</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_timer&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">timer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">timer</span><span class="o">.</span><span class="n">isActive</span><span class="p">():</span>
+                <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sync_playback_button_labels</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">slider</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span> <span class="k">if</span> <span class="n">axis</span> <span class="o">==</span> <span class="s2">&quot;t&quot;</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_slider</span>
+        <span class="k">if</span> <span class="n">slider</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">next_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">slider</span><span class="o">.</span><span class="n">value</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">next_value</span> <span class="o">&gt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">slider</span><span class="o">.</span><span class="n">maximum</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;loop_playback&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+                <span class="n">next_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">slider</span><span class="o">.</span><span class="n">minimum</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">timer</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;play_timer&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">timer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">timer</span><span class="o">.</span><span class="n">isActive</span><span class="p">():</span>
+                    <span class="n">timer</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">play_mode</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sync_playback_button_labels</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_append_log&quot;</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_append_log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[GUI] Playback reached end axis=</span><span class="si">{</span><span class="n">axis</span><span class="si">}</span><span class="s2"> (loop off)&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;GUI&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_update_status</span><span class="p">()</span>
+                <span class="k">return</span>
+        <span class="n">slider</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">next_value</span><span class="p">))</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_modality_playback</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize modality playback for the current workflow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;modality_playback&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">facade</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;modality_facade&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">facade</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">manager</span> <span class="o">=</span> <span class="n">facade</span><span class="o">.</span><span class="n">get_manager</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">modality</span> <span class="ow">in</span> <span class="n">manager</span><span class="o">.</span><span class="n">get_all_modalities</span><span class="p">():</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="n">modality</span><span class="o">.</span><span class="n">image_id</span><span class="p">]</span>
+            <span class="c1"># For projections (mean/std/etc), frame_count should be 1 regardless of image shape</span>
+            <span class="c1"># Only RAW modalities with 3D+ stacks (T, H, W) have multiple frames</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">img</span><span class="p">,</span> <span class="s2">&quot;ndim&quot;</span><span class="p">):</span>
+                <span class="c1"># 3D or higher: shape[0] is time/frame dimension</span>
+                <span class="c1"># 2D: single frame projection</span>
+                <span class="n">frame_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">img</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">img</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;=</span> <span class="mi">3</span> <span class="k">else</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">frame_count</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">modality_playback</span><span class="o">.</span><span class="n">register_modality</span><span class="p">(</span>
+                <span class="n">modality</span><span class="o">.</span><span class="n">idx</span><span class="p">,</span> <span class="n">modality</span><span class="o">.</span><span class="n">display_name</span><span class="p">,</span> <span class="n">frame_count</span><span class="o">=</span><span class="n">frame_count</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">modality_playback</span><span class="o">.</span><span class="n">frame_changed</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_modality_frame_changed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_playback_sync_selection</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_modality_frame_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">modality_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">frame_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the on modality frame changed helper flow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_playback_mode</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;t_slider&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">blockSignals</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">frame_idx</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">blockSignals</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_ui_refresh</span><span class="p">(</span><span class="s2">&quot;display-controls&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

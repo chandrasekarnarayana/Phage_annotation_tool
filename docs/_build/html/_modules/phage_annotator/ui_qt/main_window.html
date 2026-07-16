@@ -1,0 +1,940 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.ui_qt.main_window &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/ui_qt/main_window';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../_static/searchtools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <script src="../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.main_window</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.ui_qt.main_window</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Matplotlib + Qt keypoint annotation GUI for microscopy TIFF stacks.</span>
+
+<span class="sd">This module hosts the main window, dock registry, and interactive tool routing.</span>
+<span class="sd">It embeds Matplotlib canvases for image panels plus diagnostic plots, while</span>
+<span class="sd">persisting UI state via QSettings and supporting background jobs for heavy work.</span>
+
+<span class="sd">Architecture highlights:</span>
+<span class="sd">- Lazy image loading with memmap for large TIFFs.</span>
+<span class="sd">- Tool-based mouse routing (annotate/erase/ROI/profile/pan-zoom).</span>
+<span class="sd">- Projection caching with LRU eviction and crop-aware keys.</span>
+<span class="sd">- Autosave recovery (project-based) with recovery prompts.</span>
+
+<span class="sd">All Qt interactions must run on the GUI thread; background work is routed via</span>
+<span class="sd">JobManager signals to keep the UI responsive.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.qt_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtWidgets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.annotation.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Keypoint</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.config.settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_CONFIG</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.standard</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.annotations</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnotationsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">INTERACTIVE_DOWNSAMPLE</span><span class="p">,</span> <span class="n">PLAYBACK_BUFFER_SIZE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.controls.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">ControlsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.file</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.image_io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_metadata</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.jobs</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.playback</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlaybackMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.rendering.renderer</span><span class="w"> </span><span class="kn">import</span> <span class="n">RenderingMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.rendering.roi_crop</span><span class="w"> </span><span class="kn">import</span> <span class="n">RoiCropMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">StateMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.table_status</span><span class="w"> </span><span class="kn">import</span> <span class="n">TableStatusMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.ui_extra</span><span class="w"> </span><span class="kn">import</span> <span class="n">UiExtrasMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.ui_setup</span><span class="w"> </span><span class="kn">import</span> <span class="n">UiSetupMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">window_runtime</span><span class="p">,</span> <span class="n">window_services</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.modality_helpers</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModalityHelpersMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.handlers.keyboard_handlers</span><span class="w"> </span><span class="kn">import</span> <span class="n">KeyboardHandlersMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.context_menu</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContextMenuMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.data.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">LazyImage</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.rendering.lut_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">lut_names</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.panels.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">PanelSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.multi_playback</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlaybackMode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tool</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.services.action_logger</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActionLogger</span>
+
+
+<div class="viewcode-block" id="KeypointAnnotator">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.ui_qt.main_window.html#phage_annotator.ui_qt.main_window.KeypointAnnotator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">KeypointAnnotator</span><span class="p">(</span>
+    <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMainWindow</span><span class="p">,</span>
+    <span class="n">UiSetupMixin</span><span class="p">,</span>
+    <span class="n">UiExtrasMixin</span><span class="p">,</span>
+    <span class="n">JobsMixin</span><span class="p">,</span>
+    <span class="n">EventsMixin</span><span class="p">,</span>
+    <span class="n">StateMixin</span><span class="p">,</span>
+    <span class="n">PlaybackMixin</span><span class="p">,</span>
+    <span class="n">RenderingMixin</span><span class="p">,</span>
+    <span class="n">RoiCropMixin</span><span class="p">,</span>
+    <span class="n">AnnotationsMixin</span><span class="p">,</span>
+    <span class="n">ContextMenuMixin</span><span class="p">,</span>
+    <span class="n">ActionsMixin</span><span class="p">,</span>
+    <span class="n">FileActionsMixin</span><span class="p">,</span>
+    <span class="n">ControlsMixin</span><span class="p">,</span>
+    <span class="n">TableStatusMixin</span><span class="p">,</span>
+    <span class="n">ExportMixin</span><span class="p">,</span>
+    <span class="n">ModalityHelpersMixin</span><span class="p">,</span>
+    <span class="n">KeyboardHandlersMixin</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Main GUI window for keypoint annotation on T/Z image stacks.</span>
+
+<span class="sd">    The window owns all UI state and must be interacted with on the GUI thread.</span>
+<span class="sd">    Arrays may be full in-memory numpy arrays or memory-mapped TIFFs for large</span>
+<span class="sd">    stacks. Annotation coordinates are stored in full-resolution image space</span>
+<span class="sd">    (crop and downsample only affect display).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_setting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a setting via unified settings proxy.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">type_</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_configure_window_behavior</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply non-modal window flags so the GUI stays cooperative with other apps.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">configure_window_behavior</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_settings_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize unified settings access and migrate persisted UI defaults.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_settings_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_display_runtime_preferences</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize persisted display/layout preferences consumed across mixins.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_display_runtime_preferences</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_view_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize lightweight runtime state used by view/layout coordination.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_view_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_playback_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize playback buffers and pacing state.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_playback_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_refresh_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize queued refresh and debounce timers.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_refresh_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_render_job_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize caches, job manager, and render-related runtime state.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_render_job_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_widget_placeholder_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize widget references populated later during UI setup.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_widget_placeholder_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_feature_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize feature-specific runtime state and persisted toggles.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_feature_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize window runtime state in explicit phases.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_init_controller_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">images</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">LazyImage</span><span class="p">],</span> <span class="n">labels</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create controller-owned runtime collaborators and dependent services.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">init_controller_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">images</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bootstrap_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">images</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">LazyImage</span><span class="p">],</span> <span class="n">labels</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize window-local runtime state before widgets are built.&quot;&quot;&quot;</span>
+        <span class="n">window_runtime</span><span class="o">.</span><span class="n">bootstrap_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">images</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bootstrap_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build widgets and then attach signal-driven runtime integrations.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">bootstrap_ui</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_wire_view_sync_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attach linked-view runtime handlers after widgets exist.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">wire_view_sync_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_restore_runtime_action_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Restore widget-backed runtime toggles after UI setup.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">restore_runtime_action_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bind_runtime_services</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Bind queued signals, recorder hooks, and global exception handling.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">bind_runtime_services</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_session_view</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load initial images and establish the first synchronized viewport.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">initialize_session_view</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_start_background_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Start low-priority background services after the first UI frame is queued.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">start_background_runtime</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_finalize_runtime_startup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Complete GUI startup after UI setup and signal binding.&quot;&quot;&quot;</span>
+        <span class="n">window_services</span><span class="o">.</span><span class="n">finalize_runtime_startup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">images</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">LazyImage</span><span class="p">],</span> <span class="n">labels</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the object and prepare its runtime state.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="c1"># Register GUI owner with unified ActionLogger for real-time GUI display</span>
+        <span class="n">ActionLogger</span><span class="o">.</span><span class="n">set_gui_owner</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_configure_window_behavior</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">images</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No images provided.&quot;</span><span class="p">)</span>
+        <span class="c1"># QSettings keys: layout (customGeometry/customState), cacheMaxMB,</span>
+        <span class="c1"># downsampleFactor, downsampleImages/Hist/Profile, autosaveRecoveryEnabled,</span>
+        <span class="c1"># autoLoadAnnotations, applyAnnotationMetaOnLoad, encodeAnnotationMetaFilename,</span>
+        <span class="c1"># keepRecentImages, recentImages, defaultLayoutPreset, defaultColormap, defaultFPS,</span>
+        <span class="c1"># defaultPixelSizeUmPerPx, scaleBarEnabled, scaleBarLengthUm, scaleBarThicknessPx,</span>
+        <span class="c1"># scaleBarLocation, scaleBarPaddingPx, scaleBarShowText, scaleBarTextOffsetPx,</span>
+        <span class="c1"># scaleBarBackgroundBox, scaleBarIncludeInExport, densityModelPath, densityDevice,</span>
+        <span class="c1"># densityConfig, densityInferOptions, densityTargetPanel,</span>
+        <span class="c1"># prefetchBlockSizeFrames, prefetchMaxInflightBlocks, throttleAnalysisHzDuringPlayback,</span>
+        <span class="c1"># pyramidEnabled, pyramidMaxLevels, showRoiHandles, markerSize, clickRadiusPx, activeTool.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bootstrap_runtime</span><span class="p">(</span><span class="n">images</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bootstrap_ui</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="create_app">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.ui_qt.main_window.html#phage_annotator.ui_qt.main_window.create_app">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_app</span><span class="p">(</span><span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;KeypointAnnotator&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create the Qt application and main window without starting the event loop.&quot;&quot;&quot;</span>
+    <span class="n">app</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">app</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="p">([])</span>
+    <span class="n">images</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">img</span> <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="p">(</span><span class="n">read_metadata</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">p</span><span class="p">))</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">image_paths</span><span class="p">)</span> <span class="k">if</span> <span class="n">img</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">KeypointAnnotator</span><span class="p">(</span><span class="n">images</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="run_gui">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.ui_qt.main_window.html#phage_annotator.ui_qt.main_window.run_gui">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_gui</span><span class="p">(</span><span class="n">image_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run gui for the current workflow.&quot;&quot;&quot;</span>
+    <span class="n">images</span> <span class="o">=</span> <span class="p">[</span><span class="n">img</span> <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="p">(</span><span class="n">read_metadata</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">image_paths</span><span class="p">)</span> <span class="k">if</span> <span class="n">img</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="n">app</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span> <span class="ow">or</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="p">([])</span>
+    <span class="n">window</span> <span class="o">=</span> <span class="n">KeypointAnnotator</span><span class="p">(</span><span class="n">images</span><span class="p">)</span>
+    <span class="n">window</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">exec</span><span class="p">()</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

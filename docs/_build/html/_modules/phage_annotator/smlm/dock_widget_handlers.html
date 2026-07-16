@@ -1,0 +1,1264 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.smlm.dock_widget_handlers &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/smlm/dock_widget_handlers';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../_static/searchtools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <script src="../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.smlm.dock_widget_handlers</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.smlm.dock_widget_handlers</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Event handler mixin and UI-value snapshot for the SMLM parameter panel.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">csv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.qt_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtWidgets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.smlm.backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_bundled_thunderstorm_jar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.smlm.backends_discovery</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_thunderstorm_jar_in_fiji</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.smlm.external_plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_external_fiji_plugins</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.smlm.fiji_downloader</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">download_fiji</span><span class="p">,</span>
+    <span class="n">install_thunderstorm_jar</span><span class="p">,</span>
+    <span class="n">resolve_fiji_plugins_dir</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.smlm.platform_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">discover_fiji_executable</span><span class="p">,</span>
+    <span class="n">fiji_app_to_executable</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="SmlmUiValues">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.SmlmUiValues">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SmlmUiValues</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Typed snapshot of all SMLM panel parameter values.</span>
+
+<span class="sd">    Instances are created by :meth:`DockWidgetHandlersMixin.values` and</span>
+<span class="sd">    passed directly to the analysis backend. All physical-unit fields carry</span>
+<span class="sd">    their unit in the field name (``_px``, ``_nm``) to prevent silent</span>
+<span class="sd">    conversion errors.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Acquisition</span>
+    <span class="n">pixel_size_nm</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">em_wavelength_nm</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="c1"># Filter</span>
+    <span class="n">sigma_px</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">fit_radius_px</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">filter_type</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">dog_sigma1</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">dog_sigma2</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="c1"># Detection</span>
+    <span class="n">detection_thr_sigma</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">max_candidates_per_frame</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="c1"># Post-filter</span>
+    <span class="n">merge_radius_px</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">min_photons</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">max_uncertainty_nm</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="c1"># Rendering</span>
+    <span class="n">upsample</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">render_mode</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">render_sigma_nm</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="c1"># Backend / bridge</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">plugin_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">fiji_executable</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">fiji_macro_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">plugin_jar_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">thunderstorm_jar_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">fiji_command_template</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">pyimagej_app_path</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="c1"># Reproducibility</span>
+    <span class="n">reproducibility_mode</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DockWidgetHandlersMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Event handlers and data-access helpers for the SMLM parameter panel.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.values">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.values">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SmlmUiValues</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a typed snapshot of the current UI parameter values.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">SmlmUiValues</span><span class="p">(</span>
+            <span class="c1"># Acquisition</span>
+            <span class="n">pixel_size_nm</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pixel_size_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">em_wavelength_nm</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">em_wavelength_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="c1"># Filter</span>
+            <span class="n">sigma_px</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sigma_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">fit_radius_px</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fit_radius_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">filter_type</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()),</span>
+            <span class="n">dog_sigma1</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dog_sigma1_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">dog_sigma2</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dog_sigma2_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="c1"># Detection</span>
+            <span class="n">detection_thr_sigma</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">det_thr_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">max_candidates_per_frame</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_candidates_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="c1"># Post-filter</span>
+            <span class="n">merge_radius_px</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">merge_radius_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">min_photons</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_photons_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">max_uncertainty_nm</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_uncertainty_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="c1"># Rendering</span>
+            <span class="n">upsample</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upsample_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="n">render_mode</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">render_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">render_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()),</span>
+            <span class="n">render_sigma_nm</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">render_sigma_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()),</span>
+            <span class="c1"># Backend</span>
+            <span class="n">backend</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">backend_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()),</span>
+            <span class="n">plugin_id</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+            <span class="n">fiji_executable</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">fiji_macro_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fiji_macro_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">plugin_jar_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">thunderstorm_jar_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">fiji_command_template</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fiji_command_template_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">pyimagej_app_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pyimagej_app_edit</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="c1"># Reproducibility</span>
+            <span class="n">reproducibility_mode</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repro_mode_chk</span><span class="o">.</span><span class="n">isChecked</span><span class="p">()),</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_populate_plugin_list</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">current_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">blockSignals</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_plugin_descriptors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">discovered</span> <span class="o">=</span> <span class="n">discover_external_fiji_plugins</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">discovered</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">addItem</span><span class="p">(</span><span class="s2">&quot;None (manual JAR path)&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">plugin</span> <span class="ow">in</span> <span class="n">discovered</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">plugin</span><span class="p">,</span> <span class="s2">&quot;ui_visible&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+                <span class="k">continue</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">plugin</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">plugin</span><span class="o">.</span><span class="n">plugin_id</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">addItem</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">plugin</span><span class="o">.</span><span class="n">plugin_id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_plugin_descriptors</span><span class="p">[</span><span class="n">plugin</span><span class="o">.</span><span class="n">plugin_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">plugin</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">findData</span><span class="p">(</span><span class="n">current_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">setCurrentIndex</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">count</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">setCurrentIndex</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">blockSignals</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_plugin_changed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentIndex</span><span class="p">())</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_plugin_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">plugin_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">plugin_id</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">plugin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plugin_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">plugin_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">plugin</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">plugin</span><span class="o">.</span><span class="n">jar_path</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">plugin</span><span class="o">.</span><span class="n">jar_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">plugin</span><span class="o">.</span><span class="n">macro_path</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_macro_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_macro_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">plugin</span><span class="o">.</span><span class="n">macro_path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_effective_config</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_effective_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;effective_config_view&quot;</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="n">plugin_id</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="n">plugin_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">plugin_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;(none)&quot;</span>
+        <span class="n">plugin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plugin_descriptors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">plugin_id</span><span class="p">)</span>
+        <span class="n">macro_text</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_macro_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">macro_text</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">plugin</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">plugin</span><span class="o">.</span><span class="n">macro_path</span><span class="p">:</span>
+                <span class="n">macro_source</span> <span class="o">=</span> <span class="s2">&quot;bundled default&quot;</span>
+            <span class="k">elif</span> <span class="n">plugin</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">plugin</span><span class="p">,</span> <span class="s2">&quot;manifest&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">macro_source</span> <span class="o">=</span> <span class="s2">&quot;generated-from-manifest&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">macro_source</span> <span class="o">=</span> <span class="s2">&quot;missing&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">macro_source</span> <span class="o">=</span> <span class="s2">&quot;user-supplied&quot;</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="sa">f</span><span class="s2">&quot;backend=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">backend_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">backend_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;plugin=</span><span class="si">{</span><span class="n">plugin_label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;plugin_id=</span><span class="si">{</span><span class="n">plugin_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;fiji_executable=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;macro_path=</span><span class="si">{</span><span class="n">macro_text</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;&lt;auto-resolved&gt;&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;macro_source=</span><span class="si">{</span><span class="n">macro_source</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;plugin_jar=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;pyimagej_app=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pyimagej_app_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;timeout_sec=900&quot;</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;generated_at=</span><span class="si">{</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">plugin</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">plugin</span><span class="o">.</span><span class="n">command_names</span><span class="p">:</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;plugin_commands=</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">plugin</span><span class="o">.</span><span class="n">command_names</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">plugin</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">plugin</span><span class="p">,</span> <span class="s2">&quot;manifest&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">manifest</span> <span class="o">=</span> <span class="n">plugin</span><span class="o">.</span><span class="n">manifest</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;plugin_version_tested=</span><span class="si">{</span><span class="n">manifest</span><span class="o">.</span><span class="n">plugin_version_tested</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;n/a&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;csv_schema_version=</span><span class="si">{</span><span class="n">manifest</span><span class="o">.</span><span class="n">csv_schema_version</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;n/a&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">manifest</span><span class="o">.</span><span class="n">required_columns</span><span class="p">:</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;required_columns=</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">manifest</span><span class="o">.</span><span class="n">required_columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_command_template_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;command_template=custom&quot;</span> <span class="k">if</span> <span class="n">template</span> <span class="k">else</span> <span class="s2">&quot;command_template=default&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_config_view</span><span class="o">.</span><span class="n">setPlainText</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_toggle_generated_macro_view</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">visible</span> <span class="o">=</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">generated_macro_view</span><span class="o">.</span><span class="n">isVisible</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">generated_macro_view</span><span class="o">.</span><span class="n">setVisible</span><span class="p">(</span><span class="n">visible</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_macro_btn</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span>
+            <span class="s2">&quot;Hide Generated Macro&quot;</span> <span class="k">if</span> <span class="n">visible</span> <span class="k">else</span> <span class="s2">&quot;Show Generated Macro&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_copy_debug_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">effective_config_view</span><span class="o">.</span><span class="n">toPlainText</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+        <span class="n">macro</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generated_macro_view</span><span class="o">.</span><span class="n">toPlainText</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">macro</span><span class="p">:</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;=== GENERATED_MACRO ===&quot;</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">macro</span><span class="p">)</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">lines</span> <span class="k">if</span> <span class="n">p</span><span class="p">])</span>
+        <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">clipboard</span><span class="p">()</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.append_debug_report">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.append_debug_report">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">append_debug_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Append diagnostics text to the execution plan panel.&quot;&quot;&quot;</span>
+        <span class="n">existing</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">effective_config_view</span><span class="o">.</span><span class="n">toPlainText</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">existing</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">existing</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">effective_config_view</span><span class="o">.</span><span class="n">setPlainText</span><span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.set_localizations">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.set_localizations">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_localizations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">localizations</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">object</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate the results table with a new set of localisation objects.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">localizations</span> <span class="ow">or</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">setRowCount</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span><span class="p">))</span>
+        <span class="n">pixel_size</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;pixel_size_spin&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pixel_size_spin</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="ow">or</span> <span class="mf">100.0</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">loc</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span><span class="p">):</span>
+            <span class="n">unc_px</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;uncertainty_px&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">))</span>
+            <span class="n">unc_nm</span> <span class="o">=</span> <span class="n">unc_px</span> <span class="o">*</span> <span class="n">pixel_size</span>
+            <span class="n">merged</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;merged&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+            <span class="n">cells</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;frame_index&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;x_px&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span> <span class="s2">&quot;</span><span class="si">{:.3f}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;y_px&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span> <span class="s2">&quot;</span><span class="si">{:.3f}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;sigma_px&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span> <span class="s2">&quot;</span><span class="si">{:.3f}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="s2">&quot;photons&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)),</span> <span class="s2">&quot;</span><span class="si">{:.1f}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="n">unc_nm</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.2f}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">&quot;Yes&quot;</span> <span class="k">if</span> <span class="n">merged</span> <span class="k">else</span> <span class="s2">&quot;No&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">),</span>
+            <span class="p">]</span>
+            <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">fmt</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">cells</span><span class="p">):</span>
+                <span class="n">item</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QTableWidgetItem</span><span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">ItemDataRole</span><span class="o">.</span><span class="n">UserRole</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">resizeColumnsToContents</span><span class="p">()</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_summary_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">count</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> localisation</span><span class="si">{</span><span class="s1">&#39;s&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">}</span><span class="s2"> accepted.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_selection_state</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.clear_localizations">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.clear_localizations">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_localizations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clear the localisation results table.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">setRowCount</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results_summary_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;No localisations yet.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_selection_state</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.selected_localization_indices">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.selected_localization_indices">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">selected_localization_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">i</span><span class="o">.</span><span class="n">row</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">selectionModel</span><span class="p">()</span><span class="o">.</span><span class="n">selectedRows</span><span class="p">()})</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">r</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="DockWidgetHandlersMixin.selected_localizations">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.smlm.dock_widget_handlers.html#phage_annotator.smlm.dock_widget_handlers.DockWidgetHandlersMixin.selected_localizations">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">selected_localizations</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_localizations</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">selected_localization_indices</span><span class="p">()]</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_selection_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">has_sel</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">selected_localization_indices</span><span class="p">())</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;copy_results_btn&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">copy_results_btn</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="n">has_sel</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;add_ann_btn&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_ann_btn</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="n">has_sel</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_copy_selected_results</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">selected_localization_indices</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">rows</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Frame&quot;</span><span class="p">,</span> <span class="s2">&quot;X (px)&quot;</span><span class="p">,</span> <span class="s2">&quot;Y (px)&quot;</span><span class="p">,</span> <span class="s2">&quot;Sigma (px)&quot;</span><span class="p">,</span> <span class="s2">&quot;Photons&quot;</span><span class="p">,</span> <span class="s2">&quot;Uncertainty (nm)&quot;</span><span class="p">,</span> <span class="s2">&quot;Merged&quot;</span><span class="p">]</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">headers</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">:</span>
+            <span class="n">cells</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">columnCount</span><span class="p">()):</span>
+                <span class="n">item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">item</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+                <span class="n">cells</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">text</span><span class="p">()</span> <span class="k">if</span> <span class="n">item</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cells</span><span class="p">))</span>
+        <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">clipboard</span><span class="p">()</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_open_results_context_menu</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">menu</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMenu</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">copy_action</span> <span class="o">=</span> <span class="n">menu</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="s2">&quot;Copy selected rows&quot;</span><span class="p">)</span>
+        <span class="n">sel_action</span> <span class="o">=</span> <span class="n">menu</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="s2">&quot;Select all&quot;</span><span class="p">)</span>
+        <span class="n">copy_action</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_copy_selected_results</span><span class="p">)</span>
+        <span class="n">sel_action</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">selectAll</span><span class="p">)</span>
+        <span class="n">menu</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results_table</span><span class="o">.</span><span class="n">viewport</span><span class="p">()</span><span class="o">.</span><span class="n">mapToGlobal</span><span class="p">(</span><span class="n">pos</span><span class="p">))</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Fiji / ThunderSTORM find &amp; download handlers</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_find_fiji</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Search for a Fiji installation on this system and populate the field.&quot;&quot;&quot;</span>
+        <span class="n">user_hint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="kc">None</span>
+        <span class="n">extra</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">user_hint</span><span class="p">:</span>
+            <span class="c1"># If user typed a path, also search the parent dir as a Fiji.app hint</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">user_hint</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">ancestor</span> <span class="ow">in</span> <span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">ancestor</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                    <span class="n">extra</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">ancestor</span><span class="p">))</span>
+        <span class="n">exe</span> <span class="o">=</span> <span class="n">discover_fiji_executable</span><span class="p">(</span><span class="n">extra_dirs</span><span class="o">=</span><span class="n">extra</span> <span class="ow">or</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">exe</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">exe</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found: </span><span class="si">{</span><span class="n">exe</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">information</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Fiji found&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Fiji detected at:</span><span class="se">\n</span><span class="si">{</span><span class="n">exe</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;Not found on this system.&quot;</span><span class="p">)</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span>
+                <span class="s2">&quot;Fiji not found&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Fiji could not be located automatically.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;Options:</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;• Browse to the Fiji executable manually.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;• Click &#39;Download&#39; to fetch Fiji from downloads.imagej.net.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;• Set the FIJI_EXECUTABLE or FIJI_APP environment variable.&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_download_fiji</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Download Fiji from the internet and populate the executable field.&quot;&quot;&quot;</span>
+        <span class="n">progress</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QProgressDialog</span><span class="p">(</span><span class="s2">&quot;Downloading Fiji…&quot;</span><span class="p">,</span> <span class="s2">&quot;Cancel&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">&quot;Downloading Fiji&quot;</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setMinimumDuration</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setWindowModality</span><span class="p">(</span><span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">ApplicationModal</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cancelled</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_progress_cb</span><span class="p">(</span><span class="n">done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cancelled</span><span class="o">.</span><span class="n">is_set</span><span class="p">():</span>
+                <span class="k">return</span>
+            <span class="k">if</span> <span class="n">total</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">done</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pct</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">99</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">done</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)))</span>
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">QMetaObject</span><span class="o">.</span><span class="n">invokeMethod</span><span class="p">(</span>
+                <span class="n">progress</span><span class="p">,</span> <span class="s2">&quot;setValue&quot;</span><span class="p">,</span> <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">QueuedConnection</span><span class="p">,</span>
+                <span class="n">QtCore</span><span class="o">.</span><span class="n">Q_ARG</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">pct</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_worker</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">exe</span> <span class="o">=</span> <span class="n">download_fiji</span><span class="p">(</span><span class="n">progress_cb</span><span class="o">=</span><span class="n">_progress_cb</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;exe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">exe</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+
+        <span class="n">progress</span><span class="o">.</span><span class="n">canceled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">cancelled</span><span class="o">.</span><span class="n">set</span><span class="p">())</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">_worker</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">t</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">processEvents</span><span class="p">()</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">progress</span><span class="o">.</span><span class="n">wasCanceled</span><span class="p">():</span>
+                <span class="n">cancelled</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+                <span class="n">progress</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">return</span>
+
+        <span class="n">progress</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Download failed&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not download Fiji:</span><span class="se">\n</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;Check your internet connection and try again.&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;exe&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">exe</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;exe&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">exe</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fiji_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Downloaded: </span><span class="si">{</span><span class="n">exe</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">information</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Fiji downloaded&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Fiji installed to:</span><span class="se">\n</span><span class="si">{</span><span class="n">exe</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_find_thunderstorm_jar</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Find or install ThunderSTORM JAR and populate the field.</span>
+
+<span class="sd">        Search order:</span>
+<span class="sd">        1. Already installed in Fiji.app/plugins/ — use it directly.</span>
+<span class="sd">        2. Bundled JAR in external_plugins/ — copy it into Fiji.app/plugins/</span>
+<span class="sd">           (so Fiji can find it) and use that path.</span>
+<span class="sd">        3. Neither found — prompt the user to download.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fiji_exe</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="kc">None</span>
+
+        <span class="c1"># 1. Search inside the configured Fiji installation</span>
+        <span class="k">if</span> <span class="n">fiji_exe</span><span class="p">:</span>
+            <span class="n">plugins_dir</span> <span class="o">=</span> <span class="n">resolve_fiji_plugins_dir</span><span class="p">(</span><span class="n">fiji_exe</span><span class="p">)</span>
+            <span class="n">fiji_app_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugins_dir</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span> <span class="k">if</span> <span class="n">plugins_dir</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">jar</span> <span class="o">=</span> <span class="n">discover_thunderstorm_jar_in_fiji</span><span class="p">(</span><span class="n">fiji_app_path</span><span class="p">)</span> <span class="k">if</span> <span class="n">fiji_app_path</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">jar</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">jar</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found: </span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">information</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;ThunderSTORM found&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;ThunderSTORM JAR detected at:</span><span class="se">\n</span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span>
+
+        <span class="c1"># 2. Bundled JAR available — copy it into Fiji.app/plugins/ if possible</span>
+        <span class="n">bundled</span> <span class="o">=</span> <span class="n">discover_bundled_thunderstorm_jar</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">bundled</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">jar</span> <span class="o">=</span> <span class="n">install_thunderstorm_jar</span><span class="p">(</span><span class="n">fiji_exe</span><span class="o">=</span><span class="n">fiji_exe</span><span class="p">,</span> <span class="n">src_jar</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">bundled</span><span class="p">)))</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+                <span class="c1"># Copy failed (e.g. read-only Fiji dir) — use bundled path directly</span>
+                <span class="n">jar</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">bundled</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bundled (in-place): </span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">jar</span><span class="p">)</span>
+                <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Copy failed&quot;</span><span class="p">,</span>
+                    <span class="sa">f</span><span class="s2">&quot;Could not copy bundled JAR into Fiji plugins:</span><span class="se">\n</span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Using bundled path directly:</span><span class="se">\n</span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">jar</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">fiji_exe</span> <span class="ow">and</span> <span class="n">resolve_fiji_plugins_dir</span><span class="p">(</span><span class="n">fiji_exe</span><span class="p">)</span> <span class="ow">and</span> \
+                    <span class="nb">str</span><span class="p">(</span><span class="n">resolve_fiji_plugins_dir</span><span class="p">(</span><span class="n">fiji_exe</span><span class="p">))</span> <span class="ow">in</span> <span class="n">jar</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Installed into Fiji: </span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">information</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;ThunderSTORM installed&quot;</span><span class="p">,</span>
+                    <span class="sa">f</span><span class="s2">&quot;Bundled ThunderSTORM JAR copied into Fiji plugins:</span><span class="se">\n</span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;Fiji will find it automatically on next run.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bundled: </span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># 3. Nothing found — prompt download</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;Not found — click &#39;Download&#39;.&quot;</span><span class="p">)</span>
+        <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="s2">&quot;ThunderSTORM not found&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ThunderSTORM JAR was not found on this system.</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Click &#39;Download&#39; to fetch it from GitHub.</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;It will be placed in Fiji.app/plugins/ automatically if Fiji is configured.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_download_thunderstorm_jar</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Download ThunderSTORM JAR from GitHub and install it where Fiji expects it.</span>
+
+<span class="sd">        If a Fiji executable is configured the JAR is placed directly in</span>
+<span class="sd">        ``Fiji.app/plugins/`` so Fiji picks it up without any manual copy.</span>
+<span class="sd">        Otherwise it is saved to the user application data directory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fiji_exe</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fiji_exec_edit</span><span class="o">.</span><span class="n">text</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="kc">None</span>
+        <span class="n">plugins_dir</span> <span class="o">=</span> <span class="n">resolve_fiji_plugins_dir</span><span class="p">(</span><span class="n">fiji_exe</span><span class="p">)</span> <span class="k">if</span> <span class="n">fiji_exe</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">dest_label</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugins_dir</span><span class="p">)</span> <span class="k">if</span> <span class="n">plugins_dir</span> <span class="k">else</span> <span class="s2">&quot;user data folder&quot;</span>
+
+        <span class="n">progress</span> <span class="o">=</span> <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QProgressDialog</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Downloading ThunderSTORM JAR to </span><span class="si">{</span><span class="n">dest_label</span><span class="si">}</span><span class="s2">…&quot;</span><span class="p">,</span> <span class="s2">&quot;Cancel&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="bp">self</span>
+        <span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">&quot;Downloading ThunderSTORM&quot;</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setMinimumDuration</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setWindowModality</span><span class="p">(</span><span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">ApplicationModal</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cancelled</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_progress_cb</span><span class="p">(</span><span class="n">done</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cancelled</span><span class="o">.</span><span class="n">is_set</span><span class="p">():</span>
+                <span class="k">return</span>
+            <span class="k">if</span> <span class="n">total</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">done</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="n">total</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pct</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">99</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">done</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)))</span>
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">QMetaObject</span><span class="o">.</span><span class="n">invokeMethod</span><span class="p">(</span>
+                <span class="n">progress</span><span class="p">,</span> <span class="s2">&quot;setValue&quot;</span><span class="p">,</span> <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">QueuedConnection</span><span class="p">,</span>
+                <span class="n">QtCore</span><span class="o">.</span><span class="n">Q_ARG</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">pct</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_worker</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">jar</span> <span class="o">=</span> <span class="n">install_thunderstorm_jar</span><span class="p">(</span><span class="n">fiji_exe</span><span class="o">=</span><span class="n">fiji_exe</span><span class="p">,</span> <span class="n">progress_cb</span><span class="o">=</span><span class="n">_progress_cb</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;jar&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jar</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+
+        <span class="n">progress</span><span class="o">.</span><span class="n">canceled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">cancelled</span><span class="o">.</span><span class="n">set</span><span class="p">())</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">_worker</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">while</span> <span class="n">t</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QApplication</span><span class="o">.</span><span class="n">processEvents</span><span class="p">()</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">progress</span><span class="o">.</span><span class="n">wasCanceled</span><span class="p">():</span>
+                <span class="n">cancelled</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+                <span class="n">progress</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">return</span>
+
+        <span class="n">progress</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">progress</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
+                <span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Download failed&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;Could not download ThunderSTORM JAR:</span><span class="se">\n</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;Check your internet connection and try again.&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;jar&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">jar</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;jar&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">thunderstorm_jar_edit</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">jar</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jar_status_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Installed: </span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">plugins_dir</span> <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugins_dir</span><span class="p">)</span> <span class="ow">in</span> <span class="n">jar</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ThunderSTORM JAR installed in Fiji plugins:</span><span class="se">\n</span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;Fiji will find it automatically — no manual copy needed.&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;ThunderSTORM JAR saved to:</span><span class="se">\n</span><span class="si">{</span><span class="n">jar</span><span class="si">}</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                    <span class="s2">&quot;Configure a Fiji executable above so the JAR can be placed &quot;</span>
+                    <span class="s2">&quot;in Fiji.app/plugins/ automatically next time.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">QtWidgets</span><span class="o">.</span><span class="n">QMessageBox</span><span class="o">.</span><span class="n">information</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;ThunderSTORM installed&quot;</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

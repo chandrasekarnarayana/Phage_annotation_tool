@@ -1,0 +1,1014 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.ui_qt.actions.actions_uncertain_nav &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/ui_qt/actions/actions_uncertain_nav';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../../_static/searchtools.js"></script>
+    <script src="../../../../_static/language_data.js"></script>
+    <script src="../../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.actions.actions_uncertain_nav</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.ui_qt.actions.actions_uncertain_nav</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Extracted method group 9 for ActionsMixin.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.backend_qt5agg</span><span class="w"> </span><span class="kn">import</span> <span class="n">FigureCanvasQTAgg</span><span class="p">,</span> <span class="n">NavigationToolbar2QT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.qt_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtGui</span><span class="p">,</span> <span class="n">QtWidgets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.analysis.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_roi_mean_for_path</span><span class="p">,</span> <span class="n">fit_bleach_curve</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.analysis.suggestion_rules</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_suggestion_rule_config</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.analysis.interactive_learning</span><span class="w"> </span><span class="kn">import</span> <span class="n">InteractiveLearningModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">SUPPORTED_SUFFIXES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.core.annotation</span><span class="w"> </span><span class="kn">import</span> <span class="n">Keypoint</span><span class="p">,</span> <span class="n">PointSuggestion</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.signal_hub</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_annotations_changed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.assist_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">assist_state_label</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.assist_context</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssistContextMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">assist_generation</span><span class="p">,</span> <span class="n">assist_review</span><span class="p">,</span> <span class="n">assist_training</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.assist_strategy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AssistStrategyMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.standard_workspace</span><span class="w"> </span><span class="kn">import</span> <span class="n">WorkspaceActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.suggestion_commands</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AcceptSuggestionCommand</span><span class="p">,</span>
+    <span class="n">AcceptSuggestionsBatchCommand</span><span class="p">,</span>
+    <span class="n">ClearSuggestionsCommand</span><span class="p">,</span>
+    <span class="n">RejectSuggestionCommand</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.dock_actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DockActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.export_actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.navigation_actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">NavigationActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions.qc_actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">QCActionsMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.debug</span><span class="w"> </span><span class="kn">import</span> <span class="n">debug_log</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.image_io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_metadata</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.rendering.lut_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">lut_names</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.io.metadata.reader</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetadataBundle</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+
+<div class="viewcode-block" id="ActionsUncertainNavMixin">
+<a class="viewcode-back" href="../../../../api/generated/phage_annotator.ui_qt.actions.actions_uncertain_nav.html#phage_annotator.ui_qt.actions.actions_uncertain_nav.ActionsUncertainNavMixin">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ActionsUncertainNavMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Method group 9 extracted from ActionsMixin.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_assist_warmup_panel</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Refresh assist warmup counters and queue state in the settings panel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;assist_warmup_status_lbl&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;primary_image&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="n">annotation_space</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="p">,</span> <span class="s2">&quot;annotation_space&quot;</span><span class="p">,</span> <span class="s2">&quot;stack&quot;</span><span class="p">))</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="n">ref</span> <span class="o">=</span> <span class="n">ranked</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">ranked</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">ref</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">all_rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">suggestions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_image</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">[]))</span>
+            <span class="n">proposed</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">all_rows</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="s2">&quot;proposed&quot;</span><span class="p">))</span> <span class="o">==</span> <span class="s2">&quot;proposed&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">proposed</span><span class="p">:</span>
+                <span class="n">ref</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                    <span class="n">proposed</span><span class="p">,</span>
+                    <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s2">&quot;meta&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;p_accept&quot;</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">score</span><span class="p">)),</span>
+                <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">ref</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">context_key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">_context_key</span><span class="p">(</span>
+                <span class="n">suggestion</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span>
+                <span class="n">annotation_space</span><span class="o">=</span><span class="n">annotation_space</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">breakdown</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">assist_need_breakdown</span><span class="p">(</span>
+                <span class="n">annotation_space</span><span class="o">=</span><span class="n">annotation_space</span><span class="p">,</span>
+                <span class="n">context_key</span><span class="o">=</span><span class="n">context_key</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canonical_assist_state</span><span class="p">([</span><span class="n">ref</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_style_assist_state_label</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_status_lbl</span><span class="p">,</span>
+                <span class="n">state</span><span class="p">,</span>
+                <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;Assist: &quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_context_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Context labels: </span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;context_total&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> (need +</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;need_context&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="p">,</span> <span class="s2">&quot;suggestion_training_samples&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">rows</span> <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">neg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">-</span> <span class="n">pos</span><span class="p">)</span>
+            <span class="n">breakdown</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;total&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)),</span>
+                <span class="s2">&quot;pos&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">pos</span><span class="p">),</span>
+                <span class="s2">&quot;neg&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">neg</span><span class="p">),</span>
+                <span class="s2">&quot;need_total&quot;</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="o">.</span><span class="n">assist_min_total_labels</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">))</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;need_pos&quot;</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="o">.</span><span class="n">assist_min_positive_labels</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">pos</span><span class="p">)</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;need_neg&quot;</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span>
+                    <span class="mi">0</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="o">.</span><span class="n">assist_min_negative_labels</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">neg</span><span class="p">)</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;context_total&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;need_context&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="o">.</span><span class="n">assist_min_labels_per_context</span><span class="p">),</span>
+            <span class="p">}</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_style_assist_state_label</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_status_lbl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_canonical_assist_state</span><span class="p">([]),</span>
+                <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;Assist: &quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_context_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Context labels: 0 (need +</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;need_context&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_counts_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Labels total/+/-: </span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;pos&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;neg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_need_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span>
+            <span class="s2">&quot;Need &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;+</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;need_total&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> total, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;+</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;need_pos&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> positive, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;+</span><span class="si">{</span><span class="n">breakdown</span><span class="p">[</span><span class="s1">&#39;need_neg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> negative&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_queue_lbl</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Visible uncertain queue: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;assist_warmup_next_btn&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_next_btn</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">ranked</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_focus_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">suggestion</span><span class="p">:</span> <span class="n">PointSuggestion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Jump view to a suggestion and auto-pan only when it is off-screen.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;t_slider&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span>
+                <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">minimum</span><span class="p">(),</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">suggestion</span><span class="o">.</span><span class="n">t</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_slider</span><span class="o">.</span><span class="n">maximum</span><span class="p">()))</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;z_slider&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">z_slider</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span>
+                <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">z_slider</span><span class="o">.</span><span class="n">minimum</span><span class="p">(),</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">suggestion</span><span class="o">.</span><span class="n">z</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_slider</span><span class="o">.</span><span class="n">maximum</span><span class="p">()))</span>
+            <span class="p">)</span>
+        <span class="n">frame_ax</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">renderer</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frame&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;renderer&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">frame_ax</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">suggestion</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">suggestion</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+            <span class="n">x0</span><span class="p">,</span> <span class="n">x1</span> <span class="o">=</span> <span class="n">frame_ax</span><span class="o">.</span><span class="n">get_xlim</span><span class="p">()</span>
+            <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">frame_ax</span><span class="o">.</span><span class="n">get_ylim</span><span class="p">()</span>
+            <span class="n">bounds_ok</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="n">x0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">bounds_ok</span><span class="p">:</span>
+                <span class="n">x_min</span><span class="p">,</span> <span class="n">x_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">x1</span><span class="p">)</span> <span class="k">if</span> <span class="n">x0</span> <span class="o">&lt;=</span> <span class="n">x1</span> <span class="k">else</span> <span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span>
+                <span class="n">y_min</span><span class="p">,</span> <span class="n">y_max</span> <span class="o">=</span> <span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">)</span> <span class="k">if</span> <span class="n">y0</span> <span class="o">&lt;=</span> <span class="n">y1</span> <span class="k">else</span> <span class="p">(</span><span class="n">y1</span><span class="p">,</span> <span class="n">y0</span><span class="p">)</span>
+                <span class="n">in_view</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_min</span> <span class="o">&lt;=</span> <span class="n">x</span> <span class="o">&lt;=</span> <span class="n">x_max</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">y_min</span> <span class="o">&lt;=</span> <span class="n">y</span> <span class="o">&lt;=</span> <span class="n">y_max</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">in_view</span><span class="p">:</span>
+                    <span class="n">span_x</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">x1</span> <span class="o">-</span> <span class="n">x0</span><span class="p">)</span>
+                    <span class="n">span_y</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">y1</span> <span class="o">-</span> <span class="n">y0</span><span class="p">)</span>
+                    <span class="n">fallback_half</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_focus_zoom_px&quot;</span><span class="p">,</span> <span class="mf">160.0</span><span class="p">))</span> <span class="o">/</span> <span class="mf">2.0</span>
+                    <span class="n">half_x</span> <span class="o">=</span> <span class="n">span_x</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="k">if</span> <span class="n">span_x</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">fallback_half</span>
+                    <span class="n">half_y</span> <span class="o">=</span> <span class="n">span_y</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="k">if</span> <span class="n">span_y</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">fallback_half</span>
+                    <span class="n">frame_ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">half_x</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">half_x</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">y0</span> <span class="o">&lt;=</span> <span class="n">y1</span><span class="p">:</span>
+                        <span class="n">frame_ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">half_y</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">half_y</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">frame_ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="n">half_y</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="n">half_y</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">zoom_px</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_focus_zoom_px&quot;</span><span class="p">,</span> <span class="mf">160.0</span><span class="p">))</span>
+                <span class="n">half</span> <span class="o">=</span> <span class="n">zoom_px</span> <span class="o">/</span> <span class="mf">2.0</span>
+                <span class="n">frame_ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">half</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">half</span><span class="p">)</span>
+                <span class="n">frame_ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="n">half</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="n">half</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_ui_refresh</span><span class="p">(</span><span class="s2">&quot;standard-actions&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_focus_current_uncertain_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the focus current uncertain suggestion helper flow.&quot;&quot;&quot;</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;No visible suggestions above threshold.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+            <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_cursor&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">ranked</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_focus_suggestion</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Suggestion </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span><span class="si">}</span><span class="s2"> score=</span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">current</span><span class="o">.</span><span class="n">score</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+            <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_next_uncertain_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the next uncertain suggestion helper flow.&quot;&quot;&quot;</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;No visible suggestions above threshold.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_cursor&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_focus_current_uncertain_suggestion</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prev_uncertain_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the prev uncertain suggestion helper flow.&quot;&quot;&quot;</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;No visible suggestions above threshold.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_review_queue_panel</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span> <span class="o">=</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_cursor&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_focus_current_uncertain_suggestion</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_schedule_suggestion_decision_followup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">refresh_table</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">run_qc</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Defer review follow-up work so accept/reject feels responsive.&quot;&quot;&quot;</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_run</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Run run for the current workflow.&quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="n">refresh_table</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_table</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_request_ui_refresh</span><span class="p">(</span><span class="s2">&quot;standard-actions&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">run_qc</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_qc_validation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_image</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_assist_warmup_panel</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_focus_current_uncertain_suggestion</span><span class="p">()</span>
+
+        <span class="n">QtCore</span><span class="o">.</span><span class="n">QTimer</span><span class="o">.</span><span class="n">singleShot</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">_run</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_accept_current_uncertain_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the accept current uncertain suggestion helper flow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_annotation_write_context_confirmed</span><span class="p">(</span><span class="s2">&quot;Accept current suggestion&quot;</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;No visible suggestions above threshold.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+            <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_suggestion_cursor&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">ranked</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">ranked</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_suggestion_cursor</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_suggestion_accept_allowed</span><span class="p">(</span>
+            <span class="n">current</span><span class="p">,</span>
+            <span class="n">action_label</span><span class="o">=</span><span class="s2">&quot;Accept current suggestion&quot;</span><span class="p">,</span>
+            <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interactive_learning_enabled</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_interactive_learning_model</span><span class="o">.</span><span class="n">add_example</span><span class="p">(</span><span class="n">current</span><span class="p">,</span> <span class="n">accepted</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.actions</span><span class="w"> </span><span class="kn">import</span> <span class="n">standard</span> <span class="k">as</span> <span class="n">standard_actions</span>
+        <span class="n">command_cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">standard_actions</span><span class="p">,</span> <span class="s2">&quot;AcceptSuggestionCommand&quot;</span><span class="p">,</span> <span class="n">AcceptSuggestionCommand</span><span class="p">)</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="n">command_cls</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_image</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">current</span><span class="o">.</span><span class="n">suggestion_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">execute_view_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_note_annotation_edit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primary_image</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">undo_act</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">can_undo</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">redo_act</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">can_redo</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_timed_session_active&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_timed_session_accepts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_timed_session_accepts&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_timed_session_points</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_timed_session_points&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_suggestion_decision_followup</span><span class="p">(</span><span class="n">refresh_table</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">run_qc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_accept_and_next_uncertain_suggestion</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror keyboard cadence A then N for mixed-input review workflows.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_annotation_write_context_confirmed</span><span class="p">(</span><span class="s2">&quot;Accept current suggestion&quot;</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visible_suggestions_uncertain_first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranked</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;No visible suggestions above threshold.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">2500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;standard.suggestion_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_accept_current_uncertain_suggestion</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_next_uncertain_suggestion</span><span class="p">()</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

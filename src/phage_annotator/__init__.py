@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
 # Note: Backward compatibility facades for old module names are handled
 # through import aliasing (renaming the old files to module structure)
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 __all__ = [
     "__version__",

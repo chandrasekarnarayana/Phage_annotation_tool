@@ -1,0 +1,1244 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.algorithms.onnx_infer &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/algorithms/onnx_infer';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../_static/searchtools.js"></script>
+    <script src="../../../_static/language_data.js"></script>
+    <script src="../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.algorithms.onnx_infer</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.algorithms.onnx_infer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;ONNX-runtime density inference for TensorFlow-exported models.</span>
+
+<span class="sd">Loads an ONNX model produced by TensorFlow (via tf2onnx or the Keras/TF ONNX</span>
+<span class="sd">export path) and runs tiled inference over a 2-D fluorescence image to</span>
+<span class="sd">generate a particle-density map. The implementation mirrors the tiled-blending</span>
+<span class="sd">strategy used in :mod:`phage_annotator.algorithms.density_infer` so that</span>
+<span class="sd">PyTorch and ONNX backends can be used interchangeably.</span>
+
+<span class="sd">Supported model contracts</span>
+<span class="sd">-------------------------</span>
+<span class="sd">Input:</span>
+<span class="sd">    ``(batch, H, W, C)`` or ``(batch, C, H, W)`` float32 tensor. If the model</span>
+<span class="sd">    expects a channel-last layout (TensorFlow default) the ``channel_format``</span>
+<span class="sd">    option must be set to ``&quot;NHWC&quot;``; for channel-first PyTorch-exported ONNX</span>
+<span class="sd">    models use ``&quot;NCHW&quot;``.</span>
+<span class="sd">Output:</span>
+<span class="sd">    ``(batch, H, W)`` or ``(batch, H, W, 1)`` float32 density map.</span>
+
+<span class="sd">Usage example</span>
+<span class="sd">-------------</span>
+<span class="sd">&gt;&gt;&gt; from phage_annotator.algorithms.onnx_infer import OnnxDensityOptions, run_onnx_density</span>
+<span class="sd">&gt;&gt;&gt; opts = OnnxDensityOptions(model_path=&quot;model.onnx&quot;, execution_provider=&quot;CUDAExecutionProvider&quot;)</span>
+<span class="sd">&gt;&gt;&gt; result = run_onnx_density(image, opts)</span>
+<span class="sd">&gt;&gt;&gt; print(f&quot;Estimated count: {result.count_total:.1f}&quot;)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.cache.array_pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">acquire_array</span><span class="p">,</span> <span class="n">release_array</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">onnxruntime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ort</span>
+
+    <span class="n">_ORT_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">ort</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: ignore[assignment]</span>
+    <span class="n">_ORT_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Public API types</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="OnnxDensityOptions">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.OnnxDensityOptions">[docs]</a>
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OnnxDensityOptions</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration for ONNX-based density inference.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    model_path:</span>
+<span class="sd">        Path to the ``.onnx`` model file exported from TensorFlow or PyTorch.</span>
+<span class="sd">    execution_provider:</span>
+<span class="sd">        ONNX Runtime execution provider.  Typical values are</span>
+<span class="sd">        ``&quot;CPUExecutionProvider&quot;`` and ``&quot;CUDAExecutionProvider&quot;``.  Pass</span>
+<span class="sd">        ``&quot;auto&quot;`` (default) to select CUDA if available, otherwise CPU.</span>
+<span class="sd">    channel_format:</span>
+<span class="sd">        Memory layout expected by the model — ``&quot;NHWC&quot;`` (TensorFlow default)</span>
+<span class="sd">        or ``&quot;NCHW&quot;`` (PyTorch default).</span>
+<span class="sd">    normalize_mode:</span>
+<span class="sd">        Pre-processing normalisation applied per-tile before inference.</span>
+<span class="sd">        ``&quot;percentile&quot;`` clips to *p_low*–*p_high* percentiles then rescales</span>
+<span class="sd">        to [0, 1].  ``&quot;zscore&quot;`` applies zero-mean / unit-variance</span>
+<span class="sd">        normalisation.  ``&quot;minmax&quot;`` rescales to [0, 1] using global</span>
+<span class="sd">        min/max.  ``&quot;none&quot;`` skips normalisation.</span>
+<span class="sd">    p_low / p_high:</span>
+<span class="sd">        Percentile bounds used when *normalize_mode* is ``&quot;percentile&quot;``.</span>
+<span class="sd">    invert:</span>
+<span class="sd">        Invert intensity before inference (useful for bright-field images).</span>
+<span class="sd">    tile_size:</span>
+<span class="sd">        Side length of square tiles fed to the model (pixels).</span>
+<span class="sd">    overlap:</span>
+<span class="sd">        Overlap between adjacent tiles (pixels).  Blended via a raised-cosine</span>
+<span class="sd">        weight window to avoid seam artefacts.</span>
+<span class="sd">    batch_tiles:</span>
+<span class="sd">        Number of tiles per inference batch.  Larger values increase GPU</span>
+<span class="sd">        memory usage but reduce Python overhead.</span>
+<span class="sd">    count_scale:</span>
+<span class="sd">        Scalar multiplier applied to the summed density map to convert raw</span>
+<span class="sd">        model output to an estimated particle count.  Calibrate this against</span>
+<span class="sd">        a known-count image during model validation.</span>
+<span class="sd">    threshold_clip_min:</span>
+<span class="sd">        Minimum value below which density map pixels are zeroed.  Set to a</span>
+<span class="sd">        small positive value to suppress background noise.</span>
+<span class="sd">    use_roi_only:</span>
+<span class="sd">        If *True*, inference is restricted to the bounding box of the active</span>
+<span class="sd">        ROI, reducing computation on empty image regions.</span>
+<span class="sd">    stitch_mode:</span>
+<span class="sd">        Tile blending strategy: ``&quot;weighted&quot;`` (raised-cosine window,</span>
+<span class="sd">        recommended) or ``&quot;flat&quot;`` (uniform weight, faster).</span>
+<span class="sd">    inter_op_threads / intra_op_threads:</span>
+<span class="sd">        ONNX Runtime threading parameters.  ``0`` uses the runtime default.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">execution_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span>
+    <span class="n">channel_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;NHWC&quot;</span>
+    <span class="n">normalize_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;percentile&quot;</span>
+    <span class="n">p_low</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">p_high</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">99.0</span>
+    <span class="n">invert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span>
+    <span class="n">overlap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span>
+    <span class="n">batch_tiles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>
+    <span class="n">count_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">threshold_clip_min</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">use_roi_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">stitch_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;weighted&quot;</span>
+    <span class="n">inter_op_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">intra_op_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="OnnxDensityResult">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.OnnxDensityResult">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OnnxDensityResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Result bundle returned by :func:`run_onnx_density`.&quot;&quot;&quot;</span>
+
+    <span class="n">density_map</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">count_total</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">count_roi</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+    <span class="n">tiles_processed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">runtime_ms</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">execution_provider</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Availability helpers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="is_onnxruntime_available">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.is_onnxruntime_available">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_onnxruntime_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return *True* when ``onnxruntime`` is importable.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_ORT_AVAILABLE</span></div>
+
+
+
+<div class="viewcode-block" id="list_available_providers">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.list_available_providers">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">list_available_providers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return execution providers available in the current onnxruntime install.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_ORT_AVAILABLE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">ort</span><span class="o">.</span><span class="n">get_available_providers</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_execution_provider">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.resolve_execution_provider">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_execution_provider</span><span class="p">(</span><span class="n">requested</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve ``&quot;auto&quot;`` to the best available provider.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        A concrete provider string suitable for :class:`onnxruntime.InferenceSession`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_ORT_AVAILABLE</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;onnxruntime is not installed.  Install it with:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;  pip install onnxruntime          # CPU-only</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;  pip install onnxruntime-gpu      # CUDA support&quot;</span>
+        <span class="p">)</span>
+    <span class="n">available</span> <span class="o">=</span> <span class="n">ort</span><span class="o">.</span><span class="n">get_available_providers</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">requested</span> <span class="o">!=</span> <span class="s2">&quot;auto&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">requested</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">requested</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Requested provider </span><span class="si">%r</span><span class="s2"> not available (have: </span><span class="si">%s</span><span class="s2">); falling back to CPU.&quot;</span><span class="p">,</span>
+            <span class="n">requested</span><span class="p">,</span>
+            <span class="n">available</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;CPUExecutionProvider&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;CUDAExecutionProvider&quot;</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX auto-provider: selected CUDAExecutionProvider.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;CUDAExecutionProvider&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;CoreMLExecutionProvider&quot;</span> <span class="ow">in</span> <span class="n">available</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX auto-provider: selected CoreMLExecutionProvider.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;CoreMLExecutionProvider&quot;</span>
+    <span class="k">return</span> <span class="s2">&quot;CPUExecutionProvider&quot;</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Session management</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="load_onnx_session">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.load_onnx_session">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_onnx_session</span><span class="p">(</span>
+    <span class="n">model_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">execution_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+    <span class="n">inter_op_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">intra_op_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ort.InferenceSession&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an ONNX Runtime inference session.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    model_path:</span>
+<span class="sd">        Path to the ``.onnx`` model file.</span>
+<span class="sd">    execution_provider:</span>
+<span class="sd">        ``&quot;auto&quot;``, ``&quot;CPUExecutionProvider&quot;``, ``&quot;CUDAExecutionProvider&quot;``, etc.</span>
+<span class="sd">    inter_op_threads / intra_op_threads:</span>
+<span class="sd">        Threading controls.  ``0`` uses the runtime default.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If onnxruntime is not installed or the model cannot be loaded.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_ORT_AVAILABLE</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;onnxruntime is not installed.&quot;</span><span class="p">)</span>
+    <span class="n">provider</span> <span class="o">=</span> <span class="n">resolve_execution_provider</span><span class="p">(</span><span class="n">execution_provider</span><span class="p">)</span>
+    <span class="n">so</span> <span class="o">=</span> <span class="n">ort</span><span class="o">.</span><span class="n">SessionOptions</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">inter_op_threads</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">so</span><span class="o">.</span><span class="n">inter_op_num_threads</span> <span class="o">=</span> <span class="n">inter_op_threads</span>
+    <span class="k">if</span> <span class="n">intra_op_threads</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">so</span><span class="o">.</span><span class="n">intra_op_num_threads</span> <span class="o">=</span> <span class="n">intra_op_threads</span>
+    <span class="n">so</span><span class="o">.</span><span class="n">graph_optimization_level</span> <span class="o">=</span> <span class="n">ort</span><span class="o">.</span><span class="n">GraphOptimizationLevel</span><span class="o">.</span><span class="n">ORT_ENABLE_ALL</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="n">ort</span><span class="o">.</span><span class="n">InferenceSession</span><span class="p">(</span><span class="n">model_path</span><span class="p">,</span> <span class="n">sess_options</span><span class="o">=</span><span class="n">so</span><span class="p">,</span> <span class="n">providers</span><span class="o">=</span><span class="p">[</span><span class="n">provider</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load ONNX model from </span><span class="si">{</span><span class="n">model_path</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;ONNX session loaded: </span><span class="si">%s</span><span class="s2">  provider=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">model_path</span><span class="p">,</span> <span class="n">provider</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">session</span></div>
+
+
+
+<div class="viewcode-block" id="get_model_metadata">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.get_model_metadata">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_model_metadata</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="s2">&quot;ort.InferenceSession&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract input/output shape metadata from a loaded ONNX session.&quot;&quot;&quot;</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">i</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="n">i</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">i</span><span class="o">.</span><span class="n">type</span><span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">session</span><span class="o">.</span><span class="n">get_inputs</span><span class="p">()</span>
+    <span class="p">]</span>
+    <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">o</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="n">o</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="n">o</span><span class="o">.</span><span class="n">type</span><span class="p">}</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">session</span><span class="o">.</span><span class="n">get_outputs</span><span class="p">()</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="n">inputs</span><span class="p">,</span> <span class="s2">&quot;outputs&quot;</span><span class="p">:</span> <span class="n">outputs</span><span class="p">}</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Pre-processing</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_normalize_tile</span><span class="p">(</span><span class="n">tile</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">opts</span><span class="p">:</span> <span class="n">OnnxDensityOptions</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply per-tile normalisation according to *opts.normalize_mode*.&quot;&quot;&quot;</span>
+    <span class="n">tile</span> <span class="o">=</span> <span class="n">tile</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">invert</span><span class="p">:</span>
+        <span class="n">tile</span> <span class="o">=</span> <span class="n">tile</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">tile</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">normalize_mode</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;none&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tile</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;zscore&quot;</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">tile</span><span class="p">))</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">tile</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">tile</span> <span class="o">-</span> <span class="n">mu</span><span class="p">)</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">sigma</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;minmax&quot;</span><span class="p">:</span>
+        <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">tile</span><span class="o">.</span><span class="n">min</span><span class="p">()),</span> <span class="nb">float</span><span class="p">(</span><span class="n">tile</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">tile</span> <span class="o">-</span> <span class="n">lo</span><span class="p">)</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+    <span class="c1"># percentile (default)</span>
+    <span class="n">lo</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">p_low</span><span class="p">))</span>
+    <span class="n">hi</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">p_high</span><span class="p">))</span>
+    <span class="n">clipped</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">tile</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">clipped</span> <span class="o">-</span> <span class="n">lo</span><span class="p">)</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Tiling helpers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_tile_grid</span><span class="p">(</span><span class="n">h</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">w</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">tile</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">stride</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return (y0, x0) start positions for a tile grid covering (*h*, *w*).&quot;&quot;&quot;</span>
+    <span class="n">ys</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">h</span> <span class="o">-</span> <span class="n">tile</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">stride</span><span class="p">))</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">w</span> <span class="o">-</span> <span class="n">tile</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">stride</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ys</span> <span class="ow">or</span> <span class="n">ys</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">h</span> <span class="o">-</span> <span class="n">tile</span><span class="p">:</span>
+        <span class="n">ys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">h</span> <span class="o">-</span> <span class="n">tile</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">xs</span> <span class="ow">or</span> <span class="n">xs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">w</span> <span class="o">-</span> <span class="n">tile</span><span class="p">:</span>
+        <span class="n">xs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">w</span> <span class="o">-</span> <span class="n">tile</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">[(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">ys</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xs</span><span class="p">]</span>
+
+
+<span class="n">_COSINE_WINDOW_CACHE</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cosine_window</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">size</span>
+    <span class="n">cached</span> <span class="o">=</span> <span class="n">_COSINE_WINDOW_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">cached</span>
+    <span class="k">if</span> <span class="n">size</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+        <span class="n">w1d</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">w1d</span><span class="p">,</span> <span class="n">w1d</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="n">_COSINE_WINDOW_CACHE</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span>
+    <span class="k">return</span> <span class="n">w</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_tile</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">y0</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">x0</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="n">patch</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="n">y0</span> <span class="p">:</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">size</span><span class="p">,</span> <span class="n">x0</span> <span class="p">:</span> <span class="n">x0</span> <span class="o">+</span> <span class="n">size</span><span class="p">]</span>
+    <span class="n">ph</span><span class="p">,</span> <span class="n">pw</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">ph</span> <span class="o">&lt;</span> <span class="n">size</span> <span class="ow">or</span> <span class="n">pw</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">:</span>
+        <span class="n">pad_h</span> <span class="o">=</span> <span class="n">size</span> <span class="o">-</span> <span class="n">ph</span>
+        <span class="n">pad_w</span> <span class="o">=</span> <span class="n">size</span> <span class="o">-</span> <span class="n">pw</span>
+        <span class="n">patch</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">pad_h</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pad_w</span><span class="p">)),</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;reflect&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">patch</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Inference helpers</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_batch</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">channel_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stack normalised tiles into a batch tensor with correct channel layout.&quot;&quot;&quot;</span>
+    <span class="n">stack</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tiles</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># (B, H, W)</span>
+    <span class="k">if</span> <span class="n">channel_format</span> <span class="o">==</span> <span class="s2">&quot;NHWC&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">stack</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>  <span class="c1"># (B, H, W, 1)</span>
+    <span class="k">return</span> <span class="n">stack</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>  <span class="c1"># (B, 1, H, W)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_batch</span><span class="p">(</span>
+    <span class="n">session</span><span class="p">:</span> <span class="s2">&quot;ort.InferenceSession&quot;</span><span class="p">,</span>
+    <span class="n">batch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run one batch through the ONNX session, returning ``(B, H, W)`` output.&quot;&quot;&quot;</span>
+    <span class="n">input_name</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">get_inputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="p">{</span><span class="n">input_name</span><span class="p">:</span> <span class="n">batch</span><span class="p">})[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="c1"># Normalise shape to (B, H, W)</span>
+    <span class="k">if</span> <span class="n">out</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">out</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">4</span> <span class="ow">and</span> <span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+    <span class="k">return</span> <span class="n">out</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_blend_predictions</span><span class="p">(</span>
+    <span class="n">accum</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">weight_accum</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">preds</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">positions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span>
+    <span class="n">tile_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">window</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">x0</span><span class="p">),</span> <span class="n">pred</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">positions</span><span class="p">,</span> <span class="n">preds</span><span class="p">):</span>
+        <span class="n">ph</span><span class="p">,</span> <span class="n">pw</span> <span class="o">=</span> <span class="n">pred</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">accum</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">y0</span> <span class="o">+</span> <span class="n">ph</span><span class="p">)</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">accum</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">x0</span> <span class="o">+</span> <span class="n">pw</span><span class="p">)</span>
+        <span class="n">pred_clip</span> <span class="o">=</span> <span class="n">pred</span><span class="p">[:</span> <span class="n">y1</span> <span class="o">-</span> <span class="n">y0</span><span class="p">,</span> <span class="p">:</span> <span class="n">x1</span> <span class="o">-</span> <span class="n">x0</span><span class="p">]</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">window</span><span class="p">[:</span> <span class="n">y1</span> <span class="o">-</span> <span class="n">y0</span><span class="p">,</span> <span class="p">:</span> <span class="n">x1</span> <span class="o">-</span> <span class="n">x0</span><span class="p">]</span>
+        <span class="n">accum</span><span class="p">[</span><span class="n">y0</span><span class="p">:</span><span class="n">y1</span><span class="p">,</span> <span class="n">x0</span><span class="p">:</span><span class="n">x1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">pred_clip</span> <span class="o">*</span> <span class="n">w</span>
+        <span class="n">weight_accum</span><span class="p">[</span><span class="n">y0</span><span class="p">:</span><span class="n">y1</span><span class="p">,</span> <span class="n">x0</span><span class="p">:</span><span class="n">x1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Main inference entry-point</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="run_onnx_density">
+<a class="viewcode-back" href="../../../api/generated/phage_annotator.algorithms.onnx_infer.html#phage_annotator.algorithms.onnx_infer.run_onnx_density">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_onnx_density</span><span class="p">(</span>
+    <span class="n">image2d</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">opts</span><span class="p">:</span> <span class="n">OnnxDensityOptions</span><span class="p">,</span>
+    <span class="n">session</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;ort.InferenceSession&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">roi_mask</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">progress_cb</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OnnxDensityResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run tiled ONNX density inference over a 2-D image.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    image2d:</span>
+<span class="sd">        Input fluorescence image, shape ``(H, W)``, dtype float32 or uint16.</span>
+<span class="sd">    opts:</span>
+<span class="sd">        Inference configuration; see :class:`OnnxDensityOptions`.</span>
+<span class="sd">    session:</span>
+<span class="sd">        Optional pre-loaded :class:`onnxruntime.InferenceSession`.  If</span>
+<span class="sd">        *None* the session is created from ``opts.model_path``.</span>
+<span class="sd">    roi_mask:</span>
+<span class="sd">        Optional boolean array of shape ``(H, W)`` defining the region of</span>
+<span class="sd">        interest.  Density values outside the ROI are zeroed after inference.</span>
+<span class="sd">    progress_cb:</span>
+<span class="sd">        Optional callable ``(percent: int, message: str) -&gt; None`` invoked</span>
+<span class="sd">        after each tile batch.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    OnnxDensityResult</span>
+<span class="sd">        Density map, estimated counts, and diagnostics.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_ORT_AVAILABLE</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;onnxruntime is required for ONNX inference.  Install with:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;  pip install onnxruntime      # CPU</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;  pip install onnxruntime-gpu  # GPU/CUDA&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">image2d</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected 2-D image, got shape </span><span class="si">{</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">session</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="n">load_onnx_session</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+            <span class="n">execution_provider</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">execution_provider</span><span class="p">,</span>
+            <span class="n">inter_op_threads</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">inter_op_threads</span><span class="p">,</span>
+            <span class="n">intra_op_threads</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">intra_op_threads</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">provider</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">get_providers</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">get_providers</span><span class="p">()</span> <span class="k">else</span> <span class="s2">&quot;unknown&quot;</span>
+    <span class="n">h</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">tile</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">tile_size</span><span class="p">)</span>
+    <span class="n">overlap</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">overlap</span><span class="p">)</span>
+    <span class="n">stride</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">tile</span> <span class="o">-</span> <span class="n">overlap</span><span class="p">)</span>
+    <span class="n">positions</span> <span class="o">=</span> <span class="n">_tile_grid</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+    <span class="n">n_tiles</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions</span><span class="p">)</span>
+    <span class="n">window</span> <span class="o">=</span> <span class="n">_cosine_window</span><span class="p">(</span><span class="n">tile</span><span class="p">)</span> <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">stitch_mode</span> <span class="o">==</span> <span class="s2">&quot;weighted&quot;</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">tile</span><span class="p">,</span> <span class="n">tile</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+    <span class="n">accum</span> <span class="o">=</span> <span class="n">acquire_array</span><span class="p">((</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="n">weight_accum</span> <span class="o">=</span> <span class="n">acquire_array</span><span class="p">((</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="n">tiles_processed</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">batch_tiles</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">batch_pos</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">positions</span><span class="p">):</span>
+            <span class="n">raw_tile</span> <span class="o">=</span> <span class="n">_extract_tile</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">y0</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">tile</span><span class="p">)</span>
+            <span class="n">norm_tile</span> <span class="o">=</span> <span class="n">_normalize_tile</span><span class="p">(</span><span class="n">raw_tile</span><span class="p">,</span> <span class="n">opts</span><span class="p">)</span>
+            <span class="n">batch_tiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">norm_tile</span><span class="p">)</span>
+            <span class="n">batch_pos</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">y0</span><span class="p">,</span> <span class="n">x0</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch_tiles</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">opts</span><span class="o">.</span><span class="n">batch_tiles</span> <span class="ow">or</span> <span class="n">i</span> <span class="o">==</span> <span class="n">n_tiles</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">batch_arr</span> <span class="o">=</span> <span class="n">_build_batch</span><span class="p">(</span><span class="n">batch_tiles</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">channel_format</span><span class="p">)</span>
+                <span class="n">preds</span> <span class="o">=</span> <span class="n">_run_batch</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">batch_arr</span><span class="p">)</span>
+                <span class="n">_blend_predictions</span><span class="p">(</span><span class="n">accum</span><span class="p">,</span> <span class="n">weight_accum</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">batch_pos</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">tiles_processed</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch_tiles</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">progress_cb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">pct</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">tiles_processed</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_tiles</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+                    <span class="n">progress_cb</span><span class="p">(</span><span class="n">pct</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Tile </span><span class="si">{</span><span class="n">tiles_processed</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_tiles</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">batch_tiles</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">batch_pos</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Normalise accumulator</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">weight_accum</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">weight_accum</span><span class="p">)</span>
+        <span class="n">density</span> <span class="o">=</span> <span class="n">accum</span> <span class="o">/</span> <span class="n">weight_accum</span>
+
+        <span class="c1"># Apply minimum threshold to suppress background</span>
+        <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">threshold_clip_min</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">density</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">threshold_clip_min</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">density</span><span class="p">)</span>
+            <span class="n">density</span> <span class="o">-=</span> <span class="n">opts</span><span class="o">.</span><span class="n">threshold_clip_min</span>
+
+        <span class="c1"># Apply ROI mask</span>
+        <span class="n">density_roi</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">roi_mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">density_roi</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">density</span><span class="p">[</span><span class="n">roi_mask</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">*</span> <span class="n">opts</span><span class="o">.</span><span class="n">count_scale</span><span class="p">)</span>
+            <span class="n">density_out</span> <span class="o">=</span> <span class="n">density</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">density_out</span><span class="p">[</span><span class="o">~</span><span class="n">roi_mask</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">density_out</span> <span class="o">=</span> <span class="n">density</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">count_total</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">density_out</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">*</span> <span class="n">opts</span><span class="o">.</span><span class="n">count_scale</span><span class="p">)</span>
+        <span class="n">runtime_ms</span> <span class="o">=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1000.0</span>
+
+        <span class="k">return</span> <span class="n">OnnxDensityResult</span><span class="p">(</span>
+            <span class="n">density_map</span><span class="o">=</span><span class="n">density_out</span><span class="p">,</span>
+            <span class="n">count_total</span><span class="o">=</span><span class="n">count_total</span><span class="p">,</span>
+            <span class="n">count_roi</span><span class="o">=</span><span class="n">density_roi</span><span class="p">,</span>
+            <span class="n">tiles_processed</span><span class="o">=</span><span class="n">tiles_processed</span><span class="p">,</span>
+            <span class="n">runtime_ms</span><span class="o">=</span><span class="n">runtime_ms</span><span class="p">,</span>
+            <span class="n">model_path</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">model_path</span><span class="p">,</span>
+            <span class="n">execution_provider</span><span class="o">=</span><span class="n">provider</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;tile_size&quot;</span><span class="p">:</span> <span class="n">tile</span><span class="p">,</span>
+                <span class="s2">&quot;overlap&quot;</span><span class="p">:</span> <span class="n">overlap</span><span class="p">,</span>
+                <span class="s2">&quot;normalize_mode&quot;</span><span class="p">:</span> <span class="n">opts</span><span class="o">.</span><span class="n">normalize_mode</span><span class="p">,</span>
+                <span class="s2">&quot;channel_format&quot;</span><span class="p">:</span> <span class="n">opts</span><span class="o">.</span><span class="n">channel_format</span><span class="p">,</span>
+                <span class="s2">&quot;stitch_mode&quot;</span><span class="p">:</span> <span class="n">opts</span><span class="o">.</span><span class="n">stitch_mode</span><span class="p">,</span>
+                <span class="s2">&quot;image_shape&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">),</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">release_array</span><span class="p">(</span><span class="n">accum</span><span class="p">)</span>
+        <span class="n">release_array</span><span class="p">(</span><span class="n">weight_accum</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

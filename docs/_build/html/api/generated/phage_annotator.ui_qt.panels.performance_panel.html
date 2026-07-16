@@ -1,0 +1,1558 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>phage_annotator.ui_qt.panels.performance_panel &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/generated/phage_annotator.ui_qt.panels.performance_panel';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="phage_annotator.ui_qt.panels.performance_panel_metrics" href="phage_annotator.ui_qt.panels.performance_panel_metrics.html" />
+    <link rel="prev" title="phage_annotator.ui_qt.panels.performance" href="phage_annotator.ui_qt.panels.performance.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../_static/searchtools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item pst-sidebar-collapse"><button id="pst-collapse-sidebar-button" aria-expanded="true" aria-controls="pst-primary-sidebar"><svg class="pst-icon svg-inline--fa" role="img" aria-hidden="true" focusable="false" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path fill="currentColor" d="M3 15.5C2.36232 15.5 1.74874 15.2564 1.28478 14.8189C0.820828 14.3815 0.541576 13.7832 0.504167 13.1467L0.5 13L0.5 3C0.499965 2.36232 0.743605 1.74874 1.18107 1.28478C1.61854 0.820828 2.21676 0.541576 2.85333 0.504167L3 0.5L13 0.5C13.6377 0.499965 14.2513 0.743605 14.7152 1.18107C15.1792 1.61854 15.4584 2.21676 15.4958 2.85333L15.5 3L15.5 13C15.5 13.6377 15.2564 14.2513 14.8189 14.7152C14.3815 15.1792 13.7832 15.4584 13.1467 15.4958L13 15.5L3 15.5ZM3 13.8333L10.5 13.8333L10.5 2.16667L3 2.16667C2.79589 2.16669 2.59889 2.24163 2.44636 2.37726C2.29383 2.5129 2.19638 2.69979 2.1725 2.9025L2.16667 3L2.16667 13C2.16669 13.2041 2.24163 13.4011 2.37726 13.5536C2.5129 13.7062 2.69979 13.8036 2.9025 13.8275L3 13.8333ZM6.65583 10.325L6.5775 10.2558L4.91083 8.58917C4.76735 8.44567 4.68116 8.25476 4.66843 8.05223C4.65569 7.84971 4.71729 7.6495 4.84167 7.48917L4.91083 7.41083L6.5775 5.74417C6.72747 5.59471 6.9287 5.50794 7.14032 5.50148C7.35194 5.49502 7.55809 5.56935 7.7169 5.70937C7.8757 5.8494 7.97525 6.04463 7.99533 6.25539C8.01541 6.46616 7.95451 6.67667 7.825 6.84417L7.75583 6.9225L6.67917 8L7.75583 9.0775C7.89931 9.22099 7.98551 9.41191 7.99824 9.61443C8.01097 9.81695 7.94938 10.0172 7.825 10.1775L7.75583 10.2558C7.61234 10.3993 7.42142 10.4855 7.2189 10.4982C7.01638 10.511 6.81617 10.4494 6.65583 10.325Z"/>
+  </svg>
+  <span class="pst-collapse-sidebar-label">Collapse Sidebar</span>
+  <span class="pst-expand-sidebar-label">Expand Sidebar</span>
+</button></div>
+        <div class="sidebar-primary-item">
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.algorithms.html">phage_annotator.algorithms</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.analysis.html">phage_annotator.algorithms.analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.analysis_tools.html">phage_annotator.algorithms.analysis_tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.auto_roi.html">phage_annotator.algorithms.auto_roi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.context_commands_snap.html">phage_annotator.algorithms.context_commands_snap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.coordinate_transforms.html">phage_annotator.algorithms.coordinate_transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.deepstorm_infer.html">phage_annotator.algorithms.deepstorm_infer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.density_infer.html">phage_annotator.algorithms.density_infer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.density_model.html">phage_annotator.algorithms.density_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.image_processing.html">phage_annotator.algorithms.image_processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.onnx_infer.html">phage_annotator.algorithms.onnx_infer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.particles.html">phage_annotator.algorithms.particles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.peak_detection.html">phage_annotator.algorithms.peak_detection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.projection_analysis.html">phage_annotator.algorithms.projection_analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.roi_analysis.html">phage_annotator.algorithms.roi_analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.algorithms.smlm_thunderstorm.html">phage_annotator.algorithms.smlm_thunderstorm</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.analysis.html">phage_annotator.analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.candidate_feature_rows.html">phage_annotator.analysis.candidate_feature_rows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.candidate_texture_features.html">phage_annotator.analysis.candidate_texture_features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.core.html">phage_annotator.analysis.core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.file_io.html">phage_annotator.analysis.file_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.interactive_learning.html">phage_annotator.analysis.interactive_learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.learning_model_core.html">phage_annotator.analysis.learning_model_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.learning_model_core_methods1.html">phage_annotator.analysis.learning_model_core_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.learning_model_core_methods2.html">phage_annotator.analysis.learning_model_core_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.particles.html">phage_annotator.analysis.particles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_candidate_collection.html">phage_annotator.analysis.peak_candidate_collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_candidate_collection_methods1.html">phage_annotator.analysis.peak_candidate_collection_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_candidate_collection_methods2.html">phage_annotator.analysis.peak_candidate_collection_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_detection_model.html">phage_annotator.analysis.peak_detection_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_detection_model_methods1.html">phage_annotator.analysis.peak_detection_model_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_detection_model_methods2.html">phage_annotator.analysis.peak_detection_model_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_feature_extraction.html">phage_annotator.analysis.peak_feature_extraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.peak_suggestion_base.html">phage_annotator.analysis.peak_suggestion_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_composite.html">phage_annotator.analysis.qc_composite</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_composite_impl.html">phage_annotator.analysis.qc_composite_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_density_validators.html">phage_annotator.analysis.qc_density_validators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_image_validators.html">phage_annotator.analysis.qc_image_validators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_issue_types.html">phage_annotator.analysis.qc_issue_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.qc_validators.html">phage_annotator.analysis.qc_validators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.reviewer_analytics.html">phage_annotator.analysis.reviewer_analytics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_generation.html">phage_annotator.analysis.suggestion_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model.html">phage_annotator.analysis.suggestion_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model_base.html">phage_annotator.analysis.suggestion_model_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model_candidates.html">phage_annotator.analysis.suggestion_model_candidates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model_features.html">phage_annotator.analysis.suggestion_model_features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model_filtering.html">phage_annotator.analysis.suggestion_model_filtering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_model_predict.html">phage_annotator.analysis.suggestion_model_predict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_ranker.html">phage_annotator.analysis.suggestion_ranker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_ranker_split1.html">phage_annotator.analysis.suggestion_ranker_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_ranker_split2.html">phage_annotator.analysis.suggestion_ranker_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.suggestion_rules.html">phage_annotator.analysis.suggestion_rules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.threshold.html">phage_annotator.analysis.threshold</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.analysis.training_data.html">phage_annotator.analysis.training_data</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.annotation.html">phage_annotator.annotation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.core.html">phage_annotator.annotation.core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.index.html">phage_annotator.annotation.index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.label_taxonomy.html">phage_annotator.annotation.label_taxonomy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.metadata.html">phage_annotator.annotation.metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.metadata_schema.html">phage_annotator.annotation.metadata_schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.metadata_validator.html">phage_annotator.annotation.metadata_validator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.annotation.validation_error.html">phage_annotator.annotation.validation_error</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.cache.html">phage_annotator.cache</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.array_pool.html">phage_annotator.cache.array_pool</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache.html">phage_annotator.cache.disk_cache</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_core.html">phage_annotator.cache.disk_cache_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_eviction.html">phage_annotator.cache.disk_cache_eviction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_io.html">phage_annotator.cache.disk_cache_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_loader.html">phage_annotator.cache.disk_cache_loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_storage.html">phage_annotator.cache.disk_cache_storage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.disk_cache_types.html">phage_annotator.cache.disk_cache_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.eviction_base.html">phage_annotator.cache.eviction_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.fifo_strategy.html">phage_annotator.cache.fifo_strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.lfu_strategy.html">phage_annotator.cache.lfu_strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.lru_strategy.html">phage_annotator.cache.lru_strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache.html">phage_annotator.cache.projection_cache</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_base.html">phage_annotator.cache.projection_cache_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_compute.html">phage_annotator.cache.projection_cache_compute</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_core.html">phage_annotator.cache.projection_cache_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_data.html">phage_annotator.cache.projection_cache_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_eviction.html">phage_annotator.cache.projection_cache_eviction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_fov.html">phage_annotator.cache.projection_cache_fov</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.projection_cache_types.html">phage_annotator.cache.projection_cache_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.source_protocols.html">phage_annotator.cache.source_protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.strategies.html">phage_annotator.cache.strategies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.cache.strategy_registry.html">phage_annotator.cache.strategy_registry</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.cli.html">phage_annotator.cli</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="simple">
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.config.html">phage_annotator.config</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.config.density.html">phage_annotator.config.density</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.config.performance.html">phage_annotator.config.performance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.config.settings.html">phage_annotator.config.settings</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.constants.html">phage_annotator.constants</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.constants.settings.html">phage_annotator.constants.settings</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.core.html">phage_annotator.core</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.annotation.html">phage_annotator.core.annotation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.annotation_serialization.html">phage_annotator.core.annotation_serialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.annotation_types.html">phage_annotator.core.annotation_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.annotation_types_impl.html">phage_annotator.core.annotation_types_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.multi_modality.html">phage_annotator.core.multi_modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.roi_serialization.html">phage_annotator.core.roi_serialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.rollout.html">phage_annotator.core.rollout</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.session_state.html">phage_annotator.core.session_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.source_protocols.html">phage_annotator.core.source_protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.source_protocols_impl.html">phage_annotator.core.source_protocols_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_restore.html">phage_annotator.core.workspace_restore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_snapshot.html">phage_annotator.core.workspace_snapshot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_snapshot_ops.html">phage_annotator.core.workspace_snapshot_ops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_snapshot_ops_split1.html">phage_annotator.core.workspace_snapshot_ops_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_snapshot_ops_split2.html">phage_annotator.core.workspace_snapshot_ops_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.core.workspace_state.html">phage_annotator.core.workspace_state</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.data.html">phage_annotator.data</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.channel_display.html">phage_annotator.data.channel_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.display_mapping.html">phage_annotator.data.display_mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.display_norm.html">phage_annotator.data.display_norm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.mock_data_source.html">phage_annotator.data.mock_data_source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.mock_ds.html">phage_annotator.data.mock_ds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.models.html">phage_annotator.data.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.pyramid.html">phage_annotator.data.pyramid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.ring_buffer.html">phage_annotator.data.ring_buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_data_source.html">phage_annotator.data.session_data_source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_data_source_methods1.html">phage_annotator.data.session_data_source_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_data_source_methods2.html">phage_annotator.data.session_data_source_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_ds.html">phage_annotator.data.session_ds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_ds_methods1.html">phage_annotator.data.session_ds_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.session_ds_methods2.html">phage_annotator.data.session_ds_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.source_abstracts.html">phage_annotator.data.source_abstracts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.source_base.html">phage_annotator.data.source_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.source_protocols.html">phage_annotator.data.source_protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.source_protocols_impl.html">phage_annotator.data.source_protocols_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.source_protocols_overlays.html">phage_annotator.data.source_protocols_overlays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.data.sources.html">phage_annotator.data.sources</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.deepstorm.html">phage_annotator.deepstorm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.deepstorm.infer.html">phage_annotator.deepstorm.infer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.deepstorm.widget.html">phage_annotator.deepstorm.widget</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.demo.html">phage_annotator.demo</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="simple">
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.density.html">phage_annotator.density</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.density.config.html">phage_annotator.density.config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.density.infer.html">phage_annotator.density.infer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.density.model.html">phage_annotator.density.model</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.framework.html">phage_annotator.framework</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.base.html">phage_annotator.framework.base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.cache_interface.html">phage_annotator.framework.cache_interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.command.html">phage_annotator.framework.command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.context.html">phage_annotator.framework.context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.context_config.html">phage_annotator.framework.context_config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_cache_service.html">phage_annotator.framework.default_cache_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_event_service.html">phage_annotator.framework.default_event_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_log_service.html">phage_annotator.framework.default_log_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_service_registry.html">phage_annotator.framework.default_service_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_settings_service.html">phage_annotator.framework.default_settings_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.default_thread_service.html">phage_annotator.framework.default_thread_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.event_interface.html">phage_annotator.framework.event_interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.events.html">phage_annotator.framework.events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.jobs.html">phage_annotator.framework.jobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.log_interface.html">phage_annotator.framework.log_interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.plugin.html">phage_annotator.framework.plugin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.registry_interface.html">phage_annotator.framework.registry_interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.services.html">phage_annotator.framework.services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.settings_interface.html">phage_annotator.framework.settings_interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.stale_result_guard.html">phage_annotator.framework.stale_result_guard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.framework.thread_interface.html">phage_annotator.framework.thread_interface</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.io.html">phage_annotator.io</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.csv_metadata_io.html">phage_annotator.io.csv_metadata_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.data.html">phage_annotator.io.data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.data.calibration.html">phage_annotator.io.data.calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.data.transforms.html">phage_annotator.io.data.transforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.io_annotations.html">phage_annotator.io.io_annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.metadata.html">phage_annotator.io.metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.metadata.annotation.html">phage_annotator.io.metadata.annotation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.metadata.index.html">phage_annotator.io.metadata.index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.metadata.reader.html">phage_annotator.io.metadata.reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.metadata_reader.html">phage_annotator.io.metadata_reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.projects.html">phage_annotator.io.projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.projects.base.html">phage_annotator.io.projects.base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.projects.project_io.html">phage_annotator.io.projects.project_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.qc_export.html">phage_annotator.io.qc_export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.html">phage_annotator.io.readers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.annotations.html">phage_annotator.io.readers.annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.base.html">phage_annotator.io.readers.base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.reader_axes.html">phage_annotator.io.readers.reader_axes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.reader_axes_impl.html">phage_annotator.io.readers.reader_axes_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.readers.reader_io.html">phage_annotator.io.readers.reader_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.io.standard_exports.html">phage_annotator.io.standard_exports</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.html">phage_annotator</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="simple">
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.plugins.html">phage_annotator.plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="simple">
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.rendering.html">phage_annotator.rendering</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.lut.html">phage_annotator.rendering.lut</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.mpl.html">phage_annotator.rendering.mpl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.mpl_canvas.html">phage_annotator.rendering.mpl_canvas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.mpl_utils.html">phage_annotator.rendering.mpl_utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.orthoview.html">phage_annotator.rendering.orthoview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.renderer_base.html">phage_annotator.rendering.renderer_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.renderer_export.html">phage_annotator.rendering.renderer_export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.renderer_overlays.html">phage_annotator.rendering.renderer_overlays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.renderer_overlays_methods1.html">phage_annotator.rendering.renderer_overlays_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.renderer_overlays_methods2.html">phage_annotator.rendering.renderer_overlays_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.rendering.scalebar.html">phage_annotator.rendering.scalebar</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.roi.html">phage_annotator.roi</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.auto.html">phage_annotator.roi.auto</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.command_base.html">phage_annotator.roi.command_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.command_base_impl.html">phage_annotator.roi.command_base_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands.html">phage_annotator.roi.commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands_delete.html">phage_annotator.roi.commands_delete</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands_draw.html">phage_annotator.roi.commands_draw</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands_edit.html">phage_annotator.roi.commands_edit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands_geometry.html">phage_annotator.roi.commands_geometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.commands_tags.html">phage_annotator.roi.commands_tags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor.html">phage_annotator.roi.interactor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_core.html">phage_annotator.roi.interactor_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_events.html">phage_annotator.roi.interactor_events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_geometry.html">phage_annotator.roi.interactor_geometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_render.html">phage_annotator.roi.interactor_render</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_state.html">phage_annotator.roi.interactor_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.interactor_types.html">phage_annotator.roi.interactor_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.manager.html">phage_annotator.roi.manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.manager_core.html">phage_annotator.roi.manager_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.manager_core_impl.html">phage_annotator.roi.manager_core_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.roi_interactor_core.html">phage_annotator.roi.roi_interactor_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.roi_model.html">phage_annotator.roi.roi_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.roi_serialization.html">phage_annotator.roi.roi_serialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.roi.widgets.html">phage_annotator.roi.widgets</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.runtime.html">phage_annotator.runtime</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.runtime.environment_check.html">phage_annotator.runtime.environment_check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.runtime.operational_policy.html">phage_annotator.runtime.operational_policy</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.session.html">phage_annotator.session</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.annotation_io.html">phage_annotator.session.annotation_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.annotation_io_methods1.html">phage_annotator.session.annotation_io_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.annotation_io_methods2.html">phage_annotator.session.annotation_io_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.annotations.html">phage_annotator.session.annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.batch_commands.html">phage_annotator.session.batch_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.batch_label_commands.html">phage_annotator.session.batch_label_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.command_base.html">phage_annotator.session.command_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.command_base_impl.html">phage_annotator.session.command_base_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands.html">phage_annotator.session.commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands_base.html">phage_annotator.session.commands_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands_display.html">phage_annotator.session.commands_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands_display_split1.html">phage_annotator.session.commands_display_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands_display_split2.html">phage_annotator.session.commands_display_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.commands_roi.html">phage_annotator.session.commands_roi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.context_command_support.html">phage_annotator.session.context_command_support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.context_commands.html">phage_annotator.session.context_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.context_commands_delete.html">phage_annotator.session.context_commands_delete</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.context_commands_edit.html">phage_annotator.session.context_commands_edit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.context_commands_snap.html">phage_annotator.session.context_commands_snap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller.html">phage_annotator.session.controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_annotation_commands.html">phage_annotator.session.controller_annotation_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_annotation_contexts.html">phage_annotator.session.controller_annotation_contexts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_display.html">phage_annotator.session.controller_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_preferences.html">phage_annotator.session.controller_preferences</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_smlm.html">phage_annotator.session.controller_smlm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_suggestions.html">phage_annotator.session.controller_suggestions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_sync.html">phage_annotator.session.controller_sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.controller_threshold_particles.html">phage_annotator.session.controller_threshold_particles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.file_io.html">phage_annotator.session.file_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.images.html">phage_annotator.session.images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.metadata_commands.html">phage_annotator.session.metadata_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.metadata_commands_split1.html">phage_annotator.session.metadata_commands_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.metadata_commands_split2.html">phage_annotator.session.metadata_commands_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.migration.html">phage_annotator.session.migration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.modality.html">phage_annotator.session.modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.modality_facade.html">phage_annotator.session.modality_facade</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.modality_manager_core.html">phage_annotator.session.modality_manager_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.multi_playback.html">phage_annotator.session.multi_playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.navigation_commands.html">phage_annotator.session.navigation_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.playback.html">phage_annotator.session.playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.playback_controls.html">phage_annotator.session.playback_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.playback_controls_config.html">phage_annotator.session.playback_controls_config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.playback_controls_timer.html">phage_annotator.session.playback_controls_timer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project.html">phage_annotator.session.project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_bridge.html">phage_annotator.session.project_bridge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_bridge_methods1.html">phage_annotator.session.project_bridge_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_bridge_methods2.html">phage_annotator.session.project_bridge_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_export.html">phage_annotator.session.project_export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_persistence.html">phage_annotator.session.project_persistence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.project_recovery.html">phage_annotator.session.project_recovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.qc_state.html">phage_annotator.session.qc_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.qc_thresholds.html">phage_annotator.session.qc_thresholds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.session_bridge.html">phage_annotator.session.session_bridge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.session_bridge_loader.html">phage_annotator.session.session_bridge_loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.signal_hub.html">phage_annotator.session.signal_hub</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.state.html">phage_annotator.session.state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_accept_commands.html">phage_annotator.session.suggestion_accept_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_command_helpers.html">phage_annotator.session.suggestion_command_helpers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_commands.html">phage_annotator.session.suggestion_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_commands_batch.html">phage_annotator.session.suggestion_commands_batch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_generation.html">phage_annotator.session.suggestion_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_operations.html">phage_annotator.session.suggestion_operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_pipeline.html">phage_annotator.session.suggestion_pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_rescore.html">phage_annotator.session.suggestion_rescore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_spatial.html">phage_annotator.session.suggestion_spatial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.suggestion_training.html">phage_annotator.session.suggestion_training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view.html">phage_annotator.session.view</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view_sync.html">phage_annotator.session.view_sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view_sync_crop.html">phage_annotator.session.view_sync_crop</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view_sync_index.html">phage_annotator.session.view_sync_index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view_sync_state.html">phage_annotator.session.view_sync_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.session.view_sync_zoom_pan.html">phage_annotator.session.view_sync_zoom_pan</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.smlm.html">phage_annotator.smlm</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends.html">phage_annotator.smlm.backends</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends_core.html">phage_annotator.smlm.backends_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends_core_impl.html">phage_annotator.smlm.backends_core_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends_discovery.html">phage_annotator.smlm.backends_discovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends_pyimagej.html">phage_annotator.smlm.backends_pyimagej</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.backends_subprocess.html">phage_annotator.smlm.backends_subprocess</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.context_menu.html">phage_annotator.smlm.context_menu</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.demo_cli.html">phage_annotator.smlm.demo_cli</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.dock_widget_handlers.html">phage_annotator.smlm.dock_widget_handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.dock_widget_ui.html">phage_annotator.smlm.dock_widget_ui</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.external_plugin_macros.html">phage_annotator.smlm.external_plugin_macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.external_plugin_types.html">phage_annotator.smlm.external_plugin_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.external_plugins.html">phage_annotator.smlm.external_plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.external_plugins_cli.html">phage_annotator.smlm.external_plugins_cli</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.parity.html">phage_annotator.smlm.parity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.parity_cli.html">phage_annotator.smlm.parity_cli</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.platform_utils.html">phage_annotator.smlm.platform_utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.preflight.html">phage_annotator.smlm.preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.preflight_cli.html">phage_annotator.smlm.preflight_cli</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.presets.html">phage_annotator.smlm.presets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.reproducibility.html">phage_annotator.smlm.reproducibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.thunderstorm.html">phage_annotator.smlm.thunderstorm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.ui.html">phage_annotator.smlm.ui</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.smlm.widget.html">phage_annotator.smlm.widget</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.tools.html">phage_annotator.tools</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.demo.html">phage_annotator.tools.demo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.demo.artifacts.html">phage_annotator.tools.demo.artifacts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.demo.image_generators.html">phage_annotator.tools.demo.image_generators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.demo.image_generators_files.html">phage_annotator.tools.demo.image_generators_files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.demo.image_generators_spots.html">phage_annotator.tools.demo.image_generators_spots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.router.html">phage_annotator.tools.router</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.utils.html">phage_annotator.tools.utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.tools.utils.gpu_utils.html">phage_annotator.tools.utils.gpu_utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="phage_annotator.ui_qt.html">phage_annotator.ui_qt</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.html">phage_annotator.ui_qt.actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_analysis.html">phage_annotator.ui_qt.actions.actions_analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_analysis_dialogs.html">phage_annotator.ui_qt.actions.actions_analysis_dialogs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_annotation.html">phage_annotator.ui_qt.actions.actions_annotation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_annotation_context.html">phage_annotator.ui_qt.actions.actions_annotation_context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_annotation_context2.html">phage_annotator.ui_qt.actions.actions_annotation_context2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_annotation_review.html">phage_annotator.ui_qt.actions.actions_annotation_review</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_assist_config.html">phage_annotator.ui_qt.actions.actions_assist_config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_bulk_accept.html">phage_annotator.ui_qt.actions.actions_bulk_accept</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_display.html">phage_annotator.ui_qt.actions.actions_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_file.html">phage_annotator.ui_qt.actions.actions_file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_file_open.html">phage_annotator.ui_qt.actions.actions_file_open</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_gating.html">phage_annotator.ui_qt.actions.actions_gating</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_gating_methods1.html">phage_annotator.ui_qt.actions.actions_gating_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_gating_methods2.html">phage_annotator.ui_qt.actions.actions_gating_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_learning.html">phage_annotator.ui_qt.actions.actions_learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_modality_consensus.html">phage_annotator.ui_qt.actions.actions_modality_consensus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_modality_layers.html">phage_annotator.ui_qt.actions.actions_modality_layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_model_ops.html">phage_annotator.ui_qt.actions.actions_model_ops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_model_persistence.html">phage_annotator.ui_qt.actions.actions_model_persistence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_panels.html">phage_annotator.ui_qt.actions.actions_panels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_pipeline_batch.html">phage_annotator.ui_qt.actions.actions_pipeline_batch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_pipeline_merge.html">phage_annotator.ui_qt.actions.actions_pipeline_merge</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_predictions.html">phage_annotator.ui_qt.actions.actions_predictions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_review.html">phage_annotator.ui_qt.actions.actions_review</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_review_queue.html">phage_annotator.ui_qt.actions.actions_review_queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_review_state.html">phage_annotator.ui_qt.actions.actions_review_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_suggestion_ops.html">phage_annotator.ui_qt.actions.actions_suggestion_ops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_suggestion_pipeline.html">phage_annotator.ui_qt.actions.actions_suggestion_pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_suggestion_visibility.html">phage_annotator.ui_qt.actions.actions_suggestion_visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_uncertain_nav.html">phage_annotator.ui_qt.actions.actions_uncertain_nav</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.actions_uncertain_navigation.html">phage_annotator.ui_qt.actions.actions_uncertain_navigation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.analysis_tools.html">phage_annotator.ui_qt.actions.analysis_tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.analysis_tools_display.html">phage_annotator.ui_qt.actions.analysis_tools_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.annotation_load.html">phage_annotator.ui_qt.actions.annotation_load</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.annotation_metadata_actions.html">phage_annotator.ui_qt.actions.annotation_metadata_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.annotation_types.html">phage_annotator.ui_qt.actions.annotation_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_context.html">phage_annotator.ui_qt.actions.assist_context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_generation.html">phage_annotator.ui_qt.actions.assist_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_review.html">phage_annotator.ui_qt.actions.assist_review</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_review_split1.html">phage_annotator.ui_qt.actions.assist_review_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_review_split2.html">phage_annotator.ui_qt.actions.assist_review_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_strategy.html">phage_annotator.ui_qt.actions.assist_strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.assist_training.html">phage_annotator.ui_qt.actions.assist_training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.dock_actions.html">phage_annotator.ui_qt.actions.dock_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events.html">phage_annotator.ui_qt.actions.events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_hover_tooltip.html">phage_annotator.ui_qt.actions.events_hover_tooltip</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_interaction.html">phage_annotator.ui_qt.actions.events_interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_mixin_core.html">phage_annotator.ui_qt.actions.events_mixin_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_wiring.html">phage_annotator.ui_qt.actions.events_wiring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_wiring_methods1.html">phage_annotator.ui_qt.actions.events_wiring_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.events_wiring_methods2.html">phage_annotator.ui_qt.actions.events_wiring_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.export_actions.html">phage_annotator.ui_qt.actions.export_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.file.html">phage_annotator.ui_qt.actions.file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.keyboard_events.html">phage_annotator.ui_qt.actions.keyboard_events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.navigation_actions.html">phage_annotator.ui_qt.actions.navigation_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.qc_actions.html">phage_annotator.ui_qt.actions.qc_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.qc_actions_methods1.html">phage_annotator.ui_qt.actions.qc_actions_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.qc_actions_methods2.html">phage_annotator.ui_qt.actions.qc_actions_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.qc_issue_types.html">phage_annotator.ui_qt.actions.qc_issue_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.standard.html">phage_annotator.ui_qt.actions.standard</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.standard_workspace.html">phage_annotator.ui_qt.actions.standard_workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.suggestion_focus.html">phage_annotator.ui_qt.actions.suggestion_focus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.suggestion_generation.html">phage_annotator.ui_qt.actions.suggestion_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.suggestion_generation_actions.html">phage_annotator.ui_qt.actions.suggestion_generation_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.suggestion_generation_impl.html">phage_annotator.ui_qt.actions.suggestion_generation_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.workspace_file_loader.html">phage_annotator.ui_qt.actions.workspace_file_loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.workspace_metadata_handler.html">phage_annotator.ui_qt.actions.workspace_metadata_handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.actions.workspace_recent_files.html">phage_annotator.ui_qt.actions.workspace_recent_files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.assist_state.html">phage_annotator.ui_qt.assist_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.html">phage_annotator.ui_qt.controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.axes_controls.html">phage_annotator.ui_qt.controls.axes_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.base.html">phage_annotator.ui_qt.controls.base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.command_base.html">phage_annotator.ui_qt.controls.command_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.density.html">phage_annotator.ui_qt.controls.density</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display.html">phage_annotator.ui_qt.controls.display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_contrast.html">phage_annotator.ui_qt.controls.display_contrast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_contrast_controls.html">phage_annotator.ui_qt.controls.display_contrast_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_contrast_sync.html">phage_annotator.ui_qt.controls.display_contrast_sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_channel.html">phage_annotator.ui_qt.controls.display_controls_channel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_histogram.html">phage_annotator.ui_qt.controls.display_controls_histogram</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_lut.html">phage_annotator.ui_qt.controls.display_controls_lut</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_modality.html">phage_annotator.ui_qt.controls.display_controls_modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_playback.html">phage_annotator.ui_qt.controls.display_controls_playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.display_controls_sync.html">phage_annotator.ui_qt.controls.display_controls_sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.extras_command_palette.html">phage_annotator.ui_qt.controls.extras_command_palette</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.file_io.html">phage_annotator.ui_qt.controls.file_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.histogram_contrast.html">phage_annotator.ui_qt.controls.histogram_contrast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.histogram_contrast_autoset.html">phage_annotator.ui_qt.controls.histogram_contrast_autoset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.marker_style.html">phage_annotator.ui_qt.controls.marker_style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.playback_controls.html">phage_annotator.ui_qt.controls.playback_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.playback_controls_tick.html">phage_annotator.ui_qt.controls.playback_controls_tick</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.preferences.html">phage_annotator.ui_qt.controls.preferences</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.preferences_controls_core.html">phage_annotator.ui_qt.controls.preferences_controls_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.preferences_controls_mixin.html">phage_annotator.ui_qt.controls.preferences_controls_mixin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.preferences_controls_mixin_methods1.html">phage_annotator.ui_qt.controls.preferences_controls_mixin_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.preferences_controls_mixin_methods2.html">phage_annotator.ui_qt.controls.preferences_controls_mixin_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.recorder.html">phage_annotator.ui_qt.controls.recorder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.results.html">phage_annotator.ui_qt.controls.results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi.html">phage_annotator.ui_qt.controls.roi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_controls_batch.html">phage_annotator.ui_qt.controls.roi_controls_batch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_controls_io.html">phage_annotator.ui_qt.controls.roi_controls_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_controls_style.html">phage_annotator.ui_qt.controls.roi_controls_style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_controls_tags.html">phage_annotator.ui_qt.controls.roi_controls_tags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_manager_core.html">phage_annotator.ui_qt.controls.roi_manager_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.roi_tag_commands.html">phage_annotator.ui_qt.controls.roi_tag_commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm.html">phage_annotator.ui_qt.controls.smlm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_channel.html">phage_annotator.ui_qt.controls.smlm_controls_channel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_export.html">phage_annotator.ui_qt.controls.smlm_controls_export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_filtering.html">phage_annotator.ui_qt.controls.smlm_controls_filtering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_output.html">phage_annotator.ui_qt.controls.smlm_controls_output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_reconstruction.html">phage_annotator.ui_qt.controls.smlm_controls_reconstruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_runbook.html">phage_annotator.ui_qt.controls.smlm_controls_runbook</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_runbook_methods1.html">phage_annotator.ui_qt.controls.smlm_controls_runbook_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_runbook_methods2.html">phage_annotator.ui_qt.controls.smlm_controls_runbook_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.smlm_controls_setup.html">phage_annotator.ui_qt.controls.smlm_controls_setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.source_protocols.html">phage_annotator.ui_qt.controls.source_protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.source_protocols_smlm.html">phage_annotator.ui_qt.controls.source_protocols_smlm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.threshold.html">phage_annotator.ui_qt.controls.threshold</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.threshold_controls_logic.html">phage_annotator.ui_qt.controls.threshold_controls_logic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.threshold_controls_mask.html">phage_annotator.ui_qt.controls.threshold_controls_mask</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.threshold_controls_particles.html">phage_annotator.ui_qt.controls.threshold_controls_particles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.controls.threshold_controls_sliders.html">phage_annotator.ui_qt.controls.threshold_controls_sliders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.demo_runner.html">phage_annotator.ui_qt.demo_runner</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.html">phage_annotator.ui_qt.dialogs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.bulk_metadata_editor_dialog.html">phage_annotator.ui_qt.dialogs.bulk_metadata_editor_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.contrast_adjustment_dialog.html">phage_annotator.ui_qt.dialogs.contrast_adjustment_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.metadata_editor_dialog.html">phage_annotator.ui_qt.dialogs.metadata_editor_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.modality_rename_dialog.html">phage_annotator.ui_qt.dialogs.modality_rename_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.dialogs.rename_modality_dialog.html">phage_annotator.ui_qt.dialogs.rename_modality_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.docks.html">phage_annotator.ui_qt.docks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.docks.metadata_dock.html">phage_annotator.ui_qt.docks.metadata_dock</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.handlers.keyboard_handlers.html">phage_annotator.ui_qt.handlers.keyboard_handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.integration.html">phage_annotator.ui_qt.integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.integration.channel_integration.html">phage_annotator.ui_qt.integration.channel_integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_manager_conflicts.html">phage_annotator.ui_qt.keyboard_manager_conflicts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_manager_dispatch.html">phage_annotator.ui_qt.keyboard_manager_dispatch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_manager_persistence.html">phage_annotator.ui_qt.keyboard_manager_persistence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_registry.html">phage_annotator.ui_qt.keyboard_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_shortcut_types.html">phage_annotator.ui_qt.keyboard_shortcut_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.keyboard_shortcuts.html">phage_annotator.ui_qt.keyboard_shortcuts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.main_window.html">phage_annotator.ui_qt.main_window</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.html">phage_annotator.ui_qt.models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.lazy_loader.html">phage_annotator.ui_qt.models.lazy_loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.lazy_loader_manifest.html">phage_annotator.ui_qt.models.lazy_loader_manifest</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.lazy_loader_modality.html">phage_annotator.ui_qt.models.lazy_loader_modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.lazy_loader_split1.html">phage_annotator.ui_qt.models.lazy_loader_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.models.lazy_loader_split2.html">phage_annotator.ui_qt.models.lazy_loader_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.html">phage_annotator.ui_qt.panels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.advanced_settings_panel.html">phage_annotator.ui_qt.panels.advanced_settings_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.analyze_particles_panel.html">phage_annotator.ui_qt.panels.analyze_particles_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.channel_controls.html">phage_annotator.ui_qt.panels.channel_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.deepstorm.html">phage_annotator.ui_qt.panels.deepstorm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.density.html">phage_annotator.ui_qt.panels.density</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.density_panel.html">phage_annotator.ui_qt.panels.density_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.onnx_density.html">phage_annotator.ui_qt.panels.onnx_density</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.particles.html">phage_annotator.ui_qt.panels.particles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.performance.html">phage_annotator.ui_qt.panels.performance</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">phage_annotator.ui_qt.panels.performance_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.performance_panel_metrics.html">phage_annotator.ui_qt.panels.performance_panel_metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.performance_panel_widgets.html">phage_annotator.ui_qt.panels.performance_panel_widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qc_issues_panel.html">phage_annotator.ui_qt.panels.qc_issues_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qc_issues_panel_methods1.html">phage_annotator.ui_qt.panels.qc_issues_panel_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qc_issues_panel_methods2.html">phage_annotator.ui_qt.panels.qc_issues_panel_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qc_thresholds_panel.html">phage_annotator.ui_qt.panels.qc_thresholds_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qcissues_panel_actions.html">phage_annotator.ui_qt.panels.qcissues_panel_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qcissues_panel_ui.html">phage_annotator.ui_qt.panels.qcissues_panel_ui</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qcthresholds_panel_actions.html">phage_annotator.ui_qt.panels.qcthresholds_panel_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qcthresholds_panel_controls.html">phage_annotator.ui_qt.panels.qcthresholds_panel_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.qcthresholds_panel_ui.html">phage_annotator.ui_qt.panels.qcthresholds_panel_ui</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.recorder.html">phage_annotator.ui_qt.panels.recorder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.registry.html">phage_annotator.ui_qt.panels.registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.registry_impl.html">phage_annotator.ui_qt.panels.registry_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.review_queue.html">phage_annotator.ui_qt.panels.review_queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.review_queue_advanced_controls.html">phage_annotator.ui_qt.panels.review_queue_advanced_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.review_queue_panel.html">phage_annotator.ui_qt.panels.review_queue_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.review_queue_ui.html">phage_annotator.ui_qt.panels.review_queue_ui</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.smlm.html">phage_annotator.ui_qt.panels.smlm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.status_details_panel.html">phage_annotator.ui_qt.panels.status_details_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.suggestion_explain_panel.html">phage_annotator.ui_qt.panels.suggestion_explain_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.suggestion_generation.html">phage_annotator.ui_qt.panels.suggestion_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.threshold.html">phage_annotator.ui_qt.panels.threshold</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.panels.threshold_panel.html">phage_annotator.ui_qt.panels.threshold_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.registry.html">phage_annotator.ui_qt.registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.registry.panel_registry.html">phage_annotator.ui_qt.registry.panel_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.html">phage_annotator.ui_qt.rendering</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.blend_kernels.html">phage_annotator.ui_qt.rendering.blend_kernels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.blend_modes.html">phage_annotator.ui_qt.rendering.blend_modes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.command_base.html">phage_annotator.ui_qt.rendering.command_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_preflight.html">phage_annotator.ui_qt.rendering.export_preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_render.html">phage_annotator.ui_qt.rendering.export_render</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_render_impl.html">phage_annotator.ui_qt.rendering.export_render_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_view.html">phage_annotator.ui_qt.rendering.export_view</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_view_core.html">phage_annotator.ui_qt.rendering.export_view_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_writers.html">phage_annotator.ui_qt.rendering.export_writers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.export_writers_impl.html">phage_annotator.ui_qt.rendering.export_writers_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.histogram_contrast.html">phage_annotator.ui_qt.rendering.histogram_contrast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.histogram_contrast_hist.html">phage_annotator.ui_qt.rendering.histogram_contrast_hist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.histogram_contrast_orthoview.html">phage_annotator.ui_qt.rendering.histogram_contrast_orthoview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.lazy_loader_modality.html">phage_annotator.ui_qt.rendering.lazy_loader_modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.lut_manager.html">phage_annotator.ui_qt.rendering.lut_manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer.html">phage_annotator.ui_qt.rendering.renderer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_control_sync.html">phage_annotator.ui_qt.rendering.renderer_control_sync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_frame.html">phage_annotator.ui_qt.rendering.renderer_frame</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_hist.html">phage_annotator.ui_qt.rendering.renderer_hist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_overlay_payload.html">phage_annotator.ui_qt.rendering.renderer_overlay_payload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_overlays.html">phage_annotator.ui_qt.rendering.renderer_overlays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_panel_frames.html">phage_annotator.ui_qt.rendering.renderer_panel_frames</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_refresh.html">phage_annotator.ui_qt.rendering.renderer_refresh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.renderer_view.html">phage_annotator.ui_qt.rendering.renderer_view</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.roi_auto_detection.html">phage_annotator.ui_qt.rendering.roi_auto_detection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.roi_crop.html">phage_annotator.ui_qt.rendering.roi_crop</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.roi_crop_display.html">phage_annotator.ui_qt.rendering.roi_crop_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.roi_crop_interaction.html">phage_annotator.ui_qt.rendering.roi_crop_interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.rendering.roi_crop_templates.html">phage_annotator.ui_qt.rendering.roi_crop_templates</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.html">phage_annotator.ui_qt.runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_init.html">phage_annotator.ui_qt.runtime.window_init</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_init_impl.html">phage_annotator.ui_qt.runtime.window_init_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_runtime.html">phage_annotator.ui_qt.runtime.window_runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_runtime_core.html">phage_annotator.ui_qt.runtime.window_runtime_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_services.html">phage_annotator.ui_qt.runtime.window_services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_state.html">phage_annotator.ui_qt.runtime.window_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.runtime.window_state_impl.html">phage_annotator.ui_qt.runtime.window_state_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.html">phage_annotator.ui_qt.services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.action_logger.html">phage_annotator.ui_qt.services.action_logger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.disk_cache_eviction.html">phage_annotator.ui_qt.services.disk_cache_eviction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.job_manager_exec.html">phage_annotator.ui_qt.services.job_manager_exec</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.job_manager_queue.html">phage_annotator.ui_qt.services.job_manager_queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.jobs.html">phage_annotator.ui_qt.services.jobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.panel_logging.html">phage_annotator.ui_qt.services.panel_logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.settings_proxy.html">phage_annotator.ui_qt.services.settings_proxy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.settings_qt.html">phage_annotator.ui_qt.services.settings_qt</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.settings_schema.html">phage_annotator.ui_qt.services.settings_schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status.html">phage_annotator.ui_qt.services.status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_actions.html">phage_annotator.ui_qt.services.status_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_derived.html">phage_annotator.ui_qt.services.status_derived</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_derived_core.html">phage_annotator.ui_qt.services.status_derived_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_details_payload.html">phage_annotator.ui_qt.services.status_details_payload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_service.html">phage_annotator.ui_qt.services.status_service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.status_snapshot.html">phage_annotator.ui_qt.services.status_snapshot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.services.thread_qt.html">phage_annotator.ui_qt.services.thread_qt</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.html">phage_annotator.ui_qt.utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotate_panel.html">phage_annotator.ui_qt.utils.annotate_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotation_io.html">phage_annotator.ui_qt.utils.annotation_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotation_navigation.html">phage_annotator.ui_qt.utils.annotation_navigation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotation_types.html">phage_annotator.ui_qt.utils.annotation_types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotations.html">phage_annotator.ui_qt.utils.annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotations_methods1.html">phage_annotator.ui_qt.utils.annotations_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.annotations_methods2.html">phage_annotator.ui_qt.utils.annotations_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.bcontrast_integration.html">phage_annotator.ui_qt.utils.bcontrast_integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.channel_display.html">phage_annotator.ui_qt.utils.channel_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.command_palette.html">phage_annotator.ui_qt.utils.command_palette</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.constants.html">phage_annotator.ui_qt.utils.constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.context_menu.html">phage_annotator.ui_qt.utils.context_menu</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.contrast_lut.html">phage_annotator.ui_qt.utils.contrast_lut</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.contrast_lut_split1.html">phage_annotator.ui_qt.utils.contrast_lut_split1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.contrast_lut_split2.html">phage_annotator.ui_qt.utils.contrast_lut_split2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.debug.html">phage_annotator.ui_qt.utils.debug</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_analysis_widgets.html">phage_annotator.ui_qt.utils.dock_analysis_widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_create.html">phage_annotator.ui_qt.utils.dock_panel_create</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_init.html">phage_annotator.ui_qt.utils.dock_panel_init</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_init_chunk1.html">phage_annotator.ui_qt.utils.dock_panel_init_chunk1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_init_chunk2.html">phage_annotator.ui_qt.utils.dock_panel_init_chunk2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_manager.html">phage_annotator.ui_qt.utils.dock_panel_manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_manager_impl.html">phage_annotator.ui_qt.utils.dock_panel_manager_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_registry.html">phage_annotator.ui_qt.utils.dock_panel_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_panel_registry_impl.html">phage_annotator.ui_qt.utils.dock_panel_registry_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_roi_widgets.html">phage_annotator.ui_qt.utils.dock_roi_widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_roi_widgets_impl.html">phage_annotator.ui_qt.utils.dock_roi_widgets_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_sidebar_widgets.html">phage_annotator.ui_qt.utils.dock_sidebar_widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.dock_status_bar.html">phage_annotator.ui_qt.utils.dock_status_bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export.html">phage_annotator.ui_qt.utils.export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_data.html">phage_annotator.ui_qt.utils.export_mixin_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_images.html">phage_annotator.ui_qt.utils.export_mixin_images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_layers.html">phage_annotator.ui_qt.utils.export_mixin_layers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_relink.html">phage_annotator.ui_qt.utils.export_mixin_relink</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_reports.html">phage_annotator.ui_qt.utils.export_mixin_reports</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.export_mixin_view_export.html">phage_annotator.ui_qt.utils.export_mixin_view_export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_annotate_panel.html">phage_annotator.ui_qt.utils.extras_annotate_panel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_command_palette.html">phage_annotator.ui_qt.utils.extras_command_palette</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_lazy_modality.html">phage_annotator.ui_qt.utils.extras_lazy_modality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_lazy_table.html">phage_annotator.ui_qt.utils.extras_lazy_table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_lazy_tree.html">phage_annotator.ui_qt.utils.extras_lazy_tree</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.extras_sidebar_toggle.html">phage_annotator.ui_qt.utils.extras_sidebar_toggle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.histogram_contrast.html">phage_annotator.ui_qt.utils.histogram_contrast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.histogram_contrast_impl.html">phage_annotator.ui_qt.utils.histogram_contrast_impl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.iconography.html">phage_annotator.ui_qt.utils.iconography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.image_io.html">phage_annotator.ui_qt.utils.image_io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.job_lifecycle.html">phage_annotator.ui_qt.utils.job_lifecycle</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.job_management.html">phage_annotator.ui_qt.utils.job_management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.jobs.html">phage_annotator.ui_qt.utils.jobs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.keyboard_shortcut_bindings.html">phage_annotator.ui_qt.utils.keyboard_shortcut_bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.keyboard_shortcut_handlers.html">phage_annotator.ui_qt.utils.keyboard_shortcut_handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.keyboard_shortcut_mixin.html">phage_annotator.ui_qt.utils.keyboard_shortcut_mixin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.keyboard_shortcuts.html">phage_annotator.ui_qt.utils.keyboard_shortcuts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.layout_preset.html">phage_annotator.ui_qt.utils.layout_preset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.lazy_annotation_table.html">phage_annotator.ui_qt.utils.lazy_annotation_table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.lazy_annotations.html">phage_annotator.ui_qt.utils.lazy_annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.lazy_loader_callbacks.html">phage_annotator.ui_qt.utils.lazy_loader_callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.lazy_loader_ops.html">phage_annotator.ui_qt.utils.lazy_loader_ops</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.lazy_loader_state.html">phage_annotator.ui_qt.utils.lazy_loader_state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.marker_style.html">phage_annotator.ui_qt.utils.marker_style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.modality_helpers.html">phage_annotator.ui_qt.utils.modality_helpers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.modality_styling.html">phage_annotator.ui_qt.utils.modality_styling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.panel_helpers.html">phage_annotator.ui_qt.utils.panel_helpers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.playback.html">phage_annotator.ui_qt.utils.playback</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.playback_controls.html">phage_annotator.ui_qt.utils.playback_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.playback_render.html">phage_annotator.ui_qt.utils.playback_render</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.roi_serialization.html">phage_annotator.ui_qt.utils.roi_serialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.sidebar_layout.html">phage_annotator.ui_qt.utils.sidebar_layout</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.sidebar_manager.html">phage_annotator.ui_qt.utils.sidebar_manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.sidebar_toolbar.html">phage_annotator.ui_qt.utils.sidebar_toolbar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.source_protocols.html">phage_annotator.ui_qt.utils.source_protocols</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.source_protocols_table.html">phage_annotator.ui_qt.utils.source_protocols_table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state.html">phage_annotator.ui_qt.utils.state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_cache.html">phage_annotator.ui_qt.utils.state_cache</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_coords.html">phage_annotator.ui_qt.utils.state_coords</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_mixin_display.html">phage_annotator.ui_qt.utils.state_mixin_display</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_projection.html">phage_annotator.ui_qt.utils.state_projection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_projection_methods1.html">phage_annotator.ui_qt.utils.state_projection_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_projection_methods2.html">phage_annotator.ui_qt.utils.state_projection_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.state_properties.html">phage_annotator.ui_qt.utils.state_properties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.suggestion_generation.html">phage_annotator.ui_qt.utils.suggestion_generation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status.html">phage_annotator.ui_qt.utils.table_status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status_bar.html">phage_annotator.ui_qt.utils.table_status_bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status_core.html">phage_annotator.ui_qt.utils.table_status_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status_events.html">phage_annotator.ui_qt.utils.table_status_events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status_navigation.html">phage_annotator.ui_qt.utils.table_status_navigation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.table_status_update.html">phage_annotator.ui_qt.utils.table_status_update</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.tool_routing.html">phage_annotator.ui_qt.utils.tool_routing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_action_descriptions.html">phage_annotator.ui_qt.utils.ui_action_descriptions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_actions.html">phage_annotator.ui_qt.utils.ui_actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_docks.html">phage_annotator.ui_qt.utils.ui_docks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_docks_core.html">phage_annotator.ui_qt.utils.ui_docks_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_extra.html">phage_annotator.ui_qt.utils.ui_extra</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_extra_annotations.html">phage_annotator.ui_qt.utils.ui_extra_annotations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_extra_refresh.html">phage_annotator.ui_qt.utils.ui_extra_refresh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_extra_tooltips.html">phage_annotator.ui_qt.utils.ui_extra_tooltips</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_panel_registry.html">phage_annotator.ui_qt.utils.ui_panel_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup.html">phage_annotator.ui_qt.utils.ui_setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_action_connections.html">phage_annotator.ui_qt.utils.ui_setup_action_connections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_advanced_sections.html">phage_annotator.ui_qt.utils.ui_setup_advanced_sections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_assist.html">phage_annotator.ui_qt.utils.ui_setup_assist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_base.html">phage_annotator.ui_qt.utils.ui_setup_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_canvas.html">phage_annotator.ui_qt.utils.ui_setup_canvas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_display_controls.html">phage_annotator.ui_qt.utils.ui_setup_display_controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_methods1.html">phage_annotator.ui_qt.utils.ui_setup_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_methods2.html">phage_annotator.ui_qt.utils.ui_setup_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_methods3.html">phage_annotator.ui_qt.utils.ui_setup_methods3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_methods4.html">phage_annotator.ui_qt.utils.ui_setup_methods4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_panel_connections.html">phage_annotator.ui_qt.utils.ui_setup_panel_connections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_panels.html">phage_annotator.ui_qt.utils.ui_setup_panels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_registry.html">phage_annotator.ui_qt.utils.ui_setup_registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_registry_events.html">phage_annotator.ui_qt.utils.ui_setup_registry_events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_workspace.html">phage_annotator.ui_qt.utils.ui_setup_workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_setup_workspace_sections.html">phage_annotator.ui_qt.utils.ui_setup_workspace_sections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_sidebar_builder.html">phage_annotator.ui_qt.utils.ui_sidebar_builder</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_sidebar_builder_methods1.html">phage_annotator.ui_qt.utils.ui_sidebar_builder_methods1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.ui_sidebar_builder_methods2.html">phage_annotator.ui_qt.utils.ui_sidebar_builder_methods2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.validation_hooks.html">phage_annotator.ui_qt.utils.validation_hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.utils.visual_indicators.html">phage_annotator.ui_qt.utils.visual_indicators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.html">phage_annotator.ui_qt.widgets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.canvas_manager_core.html">phage_annotator.ui_qt.widgets.canvas_manager_core</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.canvas_manager_layout.html">phage_annotator.ui_qt.widgets.canvas_manager_layout</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.contrast_dialog.html">phage_annotator.ui_qt.widgets.contrast_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.histogram_contrast.html">phage_annotator.ui_qt.widgets.histogram_contrast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.histogram_contrast_autorange.html">phage_annotator.ui_qt.widgets.histogram_contrast_autorange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.keyboard_shortcuts_dialog.html">phage_annotator.ui_qt.widgets.keyboard_shortcuts_dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.modality_canvas.html">phage_annotator.ui_qt.widgets.modality_canvas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.modality_fps_control.html">phage_annotator.ui_qt.widgets.modality_fps_control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.orthoview.html">phage_annotator.ui_qt.widgets.orthoview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.projection_selector.html">phage_annotator.ui_qt.widgets.projection_selector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.results_table.html">phage_annotator.ui_qt.widgets.results_table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.widgets.slider_panel_double.html">phage_annotator.ui_qt.widgets.slider_panel_double</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.ui_qt.workers.qc_background_monitor.html">phage_annotator.ui_qt.workers.qc_background_monitor</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phage_annotator.utils.html">phage_annotator.utils</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.gpu_utils.html">phage_annotator.utils.gpu_utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.hit_testing.html">phage_annotator.utils.hit_testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.logger.html">phage_annotator.utils.logger</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.memory_profiling.html">phage_annotator.utils.memory_profiling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.memory_profiling_funcs.html">phage_annotator.utils.memory_profiling_funcs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.memory_profiling_tracker.html">phage_annotator.utils.memory_profiling_tracker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.zero_copy.html">phage_annotator.utils.zero_copy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.zero_copy_slicing.html">phage_annotator.utils.zero_copy_slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="phage_annotator.utils.zero_copy_views.html">phage_annotator.utils.zero_copy_views</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="phage_annotator.ui_qt.html" class="nav-link">phage_annotator.ui_qt</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.panels.performance_panel</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="phage-annotator-ui-qt-panels-performance-panel">
+<h1>phage_annotator.ui_qt.panels.performance_panel<a class="headerlink" href="#phage-annotator-ui-qt-panels-performance-panel" title="Link to this heading">#</a></h1>
+<p>Backward compatibility facade for performance_panel.</p>
+<p>This module has been moved to ui_qt.panels.performance.
+All imports are re-exported for backward compatibility.</p>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="phage_annotator.ui_qt.panels.performance.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">phage_annotator.ui_qt.panels.performance</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="phage_annotator.ui_qt.panels.performance_panel_metrics.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">phage_annotator.ui_qt.panels.performance_panel_metrics</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/api/generated/phage_annotator.ui_qt.panels.performance_panel.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,1019 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.ui_qt.utils.lazy_loader_callbacks &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/ui_qt/utils/lazy_loader_callbacks';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../../_static/searchtools.js"></script>
+    <script src="../../../../_static/language_data.js"></script>
+    <script src="../../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.utils.lazy_loader_callbacks</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.ui_qt.utils.lazy_loader_callbacks</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Extracted method group 11 for UiExtrasMixin.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.qt_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtGui</span><span class="p">,</span> <span class="n">QtWidgets</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.services.action_logger</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_action_logger</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.models.lazy_loader</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">LAZY_LOADER_FILE_FILTER</span><span class="p">,</span>
+    <span class="n">LAZY_LOADER_OPEN_FILES_TITLE</span><span class="p">,</span>
+    <span class="n">LAZY_LOADER_OPEN_FOLDER_TITLE</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_GROUP</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_NAME</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_ANNOTATION_FILE</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_ANNOTATION_MODE</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_POINTS</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_PROJECTION</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_SHOW</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_SOURCE</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_SYNC_CONTRAST</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_SYNC_TIME</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_SYNC_VIEW</span><span class="p">,</span>
+    <span class="n">LAZY_TABLE_COLUMN_TABLE</span><span class="p">,</span>
+    <span class="n">LazyTableRowSpec</span><span class="p">,</span>
+    <span class="n">normalize_lazy_sync_groups</span><span class="p">,</span>
+    <span class="n">iter_tiff_paths</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.ui_extra_annotations</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">UiAnnotationViewsMixin</span><span class="p">,</span>
+    <span class="n">_LogicalVisibilityLabel</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.ui_extra_refresh</span><span class="w"> </span><span class="kn">import</span> <span class="n">UiRefreshMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.ui_extra_tooltips</span><span class="w"> </span><span class="kn">import</span> <span class="n">UiTooltipMixin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.iconography</span><span class="w"> </span><span class="kn">import</span> <span class="n">right_sidebar_icon</span><span class="p">,</span> <span class="n">tool_icon</span><span class="p">,</span> <span class="n">workflow_sidebar_icon</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.image_io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_metadata</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.ui_qt.utils.sidebar_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">SidebarLayoutConfig</span><span class="p">,</span> <span class="n">SidebarManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tool</span><span class="p">,</span> <span class="n">ToolCallbacks</span><span class="p">,</span> <span class="n">ToolRouter</span>
+
+<span class="n">PRIMARY_RIGHT_SIDEBAR_PANELS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">&quot;annotations&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;review_queue&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;advanced_settings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;advanced_analysis&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;qc_issues&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">SUPPLEMENTAL_RIGHT_SIDEBAR_PANELS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">&quot;status_details&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ALL_RIGHT_SIDEBAR_PANELS</span> <span class="o">=</span> <span class="n">PRIMARY_RIGHT_SIDEBAR_PANELS</span> <span class="o">+</span> <span class="n">SUPPLEMENTAL_RIGHT_SIDEBAR_PANELS</span>
+
+
+
+<div class="viewcode-block" id="LazyLoaderCallbacksMixin">
+<a class="viewcode-back" href="../../../../api/generated/phage_annotator.ui_qt.utils.lazy_loader_callbacks.html#phage_annotator.ui_qt.utils.lazy_loader_callbacks.LazyLoaderCallbacksMixin">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LazyLoaderCallbacksMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Method group 11 extracted from UiExtrasMixin.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_lazy_modality_projection_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">modality_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">projection_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle the on lazy modality projection changed helper flow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;controller&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.migration</span><span class="w"> </span><span class="kn">import</span> <span class="n">ensure_modality_system</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">phage_annotator.session.modality</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProjectionType</span>
+
+        <span class="n">manager</span> <span class="o">=</span> <span class="n">ensure_modality_system</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="p">)</span>
+        <span class="n">modality</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">get_modality</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">modality_idx</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">modality</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">old_projection</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">modality</span><span class="o">.</span><span class="n">projection_type</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;raw&quot;</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">modality</span><span class="o">.</span><span class="n">projection_type</span> <span class="o">=</span> <span class="n">ProjectionType</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">projection_key</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">modality</span><span class="o">.</span><span class="n">projection_type</span> <span class="o">=</span> <span class="n">ProjectionType</span><span class="o">.</span><span class="n">RAW</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_queue_lazy_panel_auto_contrast</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_panel_key_for_modality_idx</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">modality_idx</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_lazy_canvas_refresh</span><span class="p">(</span><span class="s2">&quot;lazy-projection-change&quot;</span><span class="p">,</span> <span class="n">refresh_table</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_flush_lazy_canvas_refresh</span><span class="p">()</span>
+        
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_action_logger</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log_action</span><span class="p">(</span>
+            <span class="s2">&quot;projection_changed&quot;</span><span class="p">,</span>
+            <span class="n">panel</span><span class="o">=</span><span class="s2">&quot;lazy_loader&quot;</span><span class="p">,</span>
+            <span class="n">details</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;modality_idx&quot;</span><span class="p">:</span> <span class="n">modality_idx</span><span class="p">,</span>
+                <span class="s2">&quot;old_projection&quot;</span><span class="p">:</span> <span class="n">old_projection</span><span class="p">,</span>
+                <span class="s2">&quot;new_projection&quot;</span><span class="p">:</span> <span class="n">projection_key</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_lazy_builtin_source_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">panel_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">image_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update source image for built-in mean/std panel rows.&quot;&quot;&quot;</span>
+        <span class="n">builtin</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_lazy_builtin_views&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">builtin</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">),</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="n">cfg</span><span class="p">[</span><span class="s2">&quot;image_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">image_id</span><span class="p">)</span>
+        <span class="n">builtin</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">)]</span> <span class="o">=</span> <span class="n">cfg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lazy_builtin_views</span> <span class="o">=</span> <span class="n">builtin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">clear_annotation_binding_for_panel</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">),</span>
+            <span class="n">annotation_space</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">controller</span><span class="o">.</span><span class="n">session_state</span><span class="p">,</span> <span class="s2">&quot;annotation_space&quot;</span><span class="p">,</span> <span class="s2">&quot;stack&quot;</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_auto_bind_detected_annotation_for_panel</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">image_id</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_queue_lazy_panel_auto_contrast</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_lazy_canvas_refresh</span><span class="p">(</span><span class="s2">&quot;lazy-builtin-source&quot;</span><span class="p">,</span> <span class="n">refresh_table</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_flush_lazy_canvas_refresh</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_lazy_builtin_projection_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">panel_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">projection_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update projection type for built-in mean/std panel rows.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;support&quot;</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">builtin</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_lazy_builtin_views&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">builtin</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">),</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="n">old_projection</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;projection&quot;</span><span class="p">,</span> <span class="s2">&quot;raw&quot;</span><span class="p">))</span>
+        <span class="n">cfg</span><span class="p">[</span><span class="s2">&quot;projection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">projection_key</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">builtin</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">)]</span> <span class="o">=</span> <span class="n">cfg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lazy_builtin_views</span> <span class="o">=</span> <span class="n">builtin</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_queue_lazy_panel_auto_contrast</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_key</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request_lazy_canvas_refresh</span><span class="p">(</span><span class="s2">&quot;lazy-builtin-projection&quot;</span><span class="p">,</span> <span class="n">refresh_table</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_flush_lazy_canvas_refresh</span><span class="p">()</span>
+        
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_action_logger</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log_action</span><span class="p">(</span>
+            <span class="s2">&quot;projection_changed&quot;</span><span class="p">,</span>
+            <span class="n">panel</span><span class="o">=</span><span class="s2">&quot;lazy_loader&quot;</span><span class="p">,</span>
+            <span class="n">details</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;builtin_panel&quot;</span><span class="p">:</span> <span class="n">panel_key</span><span class="p">,</span>
+                <span class="s2">&quot;old_projection&quot;</span><span class="p">:</span> <span class="n">old_projection</span><span class="p">,</span>
+                <span class="s2">&quot;new_projection&quot;</span><span class="p">:</span> <span class="n">projection_key</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_lazy_builtin_support_source_changed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update support panel source image from lazy table.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_support_combo</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_image_index_for_id</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">image_id</span><span class="p">)),</span>
+            <span class="n">refresh_lazy_table</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_focus_playback_controls</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Focus playback controls in the bottom bar from sidebar launcher page.&quot;&quot;&quot;</span>
+        <span class="n">slider</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;t_slider&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">slider</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">slider</span><span class="o">.</span><span class="n">setFocus</span><span class="p">(</span><span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">FocusReason</span><span class="o">.</span><span class="n">ShortcutFocusReason</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_status_info</span><span class="p">(</span>
+                <span class="s2">&quot;Playback controls are active in the bottom bar.&quot;</span><span class="p">,</span>
+                <span class="n">timeout_ms</span><span class="o">=</span><span class="mi">3500</span><span class="p">,</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;ui_extra.playback_focus&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sidebar_mode_label_for_stack_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the workflow page label associated with the stack index.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">action_idx</span><span class="p">,</span> <span class="n">mapped_idx</span> <span class="ow">in</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;sidebar_panel_indices&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">mapped_idx</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">int</span><span class="p">(</span><span class="n">stack_idx</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="n">actions</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;sidebar_actions&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="nb">int</span><span class="p">(</span><span class="n">action_idx</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">actions</span><span class="p">):</span>
+                <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">action_idx</span><span class="p">)]</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">break</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sidebar_mode_contract</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode_label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dock contract for a workflow page.</span>
+
+<span class="sd">        The left sidebar declares user intent; this contract determines which</span>
+<span class="sd">        supporting panels remain visible and which workflow panels should be</span>
+<span class="sd">        surfaced automatically through the panel manager.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">mode_label</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">contracts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;lazy loading&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;keep&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;hist&quot;</span><span class="p">},</span>
+                <span class="s2">&quot;auto_open&quot;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s2">&quot;right_mode&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;annotation&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;keep&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;annotations&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;review_queue&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;qc_issues&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="s2">&quot;auto_open&quot;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s2">&quot;right_mode&quot;</span><span class="p">:</span> <span class="s2">&quot;annotate&quot;</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;roi&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;keep&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;roi&quot;</span><span class="p">,</span> <span class="s2">&quot;roi_manager&quot;</span><span class="p">},</span>
+                <span class="s2">&quot;auto_open&quot;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s2">&quot;right_mode&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;contrast&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;keep&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;hist&quot;</span><span class="p">,</span> <span class="s2">&quot;profile&quot;</span><span class="p">},</span>
+                <span class="s2">&quot;auto_open&quot;</span><span class="p">:</span> <span class="p">(),</span>
+                <span class="s2">&quot;right_mode&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">contracts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;keep&quot;</span><span class="p">:</span> <span class="nb">set</span><span class="p">(),</span> <span class="s2">&quot;auto_open&quot;</span><span class="p">:</span> <span class="p">(),</span> <span class="s2">&quot;right_mode&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collapse_sidebar_context_docks_for_stack_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Collapse context docks from previous mode; keep only workflow-relevant panels.&quot;&quot;&quot;</span>
+        <span class="n">mode_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sidebar_mode_label_for_stack_index</span><span class="p">(</span><span class="n">stack_idx</span><span class="p">)</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sidebar_mode_contract</span><span class="p">(</span><span class="n">mode_label</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;keep&quot;</span><span class="p">,</span> <span class="nb">set</span><span class="p">()))</span>
+        <span class="n">managed</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;annotations&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;review_queue&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;advanced_settings&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;advanced_analysis&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;status_details&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;qc_issues&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roi&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roi_manager&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;results&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;orthoview&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;density&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;smlm&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;threshold&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;particles&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;performance&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;logs&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;metadata&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;hist&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;profile&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">panel_id</span> <span class="ow">in</span> <span class="n">managed</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">panel_id</span> <span class="ow">in</span> <span class="n">keep</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;is_panel_pinned&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_panel_pinned</span><span class="p">(</span><span class="n">panel_id</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;get_panel_opened_by&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_panel_opened_by</span><span class="p">(</span><span class="n">panel_id</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;user&quot;</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_panel_visible</span><span class="p">(</span><span class="n">panel_id</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;sidebar_mode_switch&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_sidebar_mode_defaults_for_stack_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply default supporting docks for the active workflow page.&quot;&quot;&quot;</span>
+        <span class="n">mode_label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sidebar_mode_label_for_stack_index</span><span class="p">(</span><span class="n">stack_idx</span><span class="p">)</span>
+        <span class="n">contract</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sidebar_mode_contract</span><span class="p">(</span><span class="n">mode_label</span><span class="p">)</span>
+        <span class="n">right_mode</span> <span class="o">=</span> <span class="n">contract</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;right_mode&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">right_mode</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_set_right_dock_mode&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_right_dock_mode</span><span class="p">(</span><span class="n">right_mode</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">panel_id</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">contract</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;auto_open&quot;</span><span class="p">,</span> <span class="p">())):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">open_panel</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">panel_id</span><span class="p">),</span> <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;sidebar_mode:</span><span class="si">{</span><span class="n">mode_label</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sidebar_action_index_for_label</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return sidebar action index by label, or -1 if not found.&quot;&quot;&quot;</span>
+        <span class="n">aliases</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;prepare&quot;</span><span class="p">:</span> <span class="s2">&quot;lazy loading&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lazy loading&quot;</span><span class="p">:</span> <span class="s2">&quot;lazy loading&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;annotate&quot;</span><span class="p">:</span> <span class="s2">&quot;annotation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;annotation&quot;</span><span class="p">:</span> <span class="s2">&quot;annotation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;review / qc&quot;</span><span class="p">:</span> <span class="s2">&quot;annotation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;assist / review&quot;</span><span class="p">:</span> <span class="s2">&quot;annotation&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;advanced&quot;</span><span class="p">:</span> <span class="s2">&quot;contrast&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;display&quot;</span><span class="p">:</span> <span class="s2">&quot;contrast&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;contrast&quot;</span><span class="p">:</span> <span class="s2">&quot;contrast&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;export / settings&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">&quot;roi&quot;</span><span class="p">:</span> <span class="s2">&quot;roi&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">raw</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">want</span> <span class="o">=</span> <span class="n">aliases</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">raw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">want</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">act</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;sidebar_actions&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">act</span><span class="o">.</span><span class="n">text</span><span class="p">())</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="n">want</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">i</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+<div class="viewcode-block" id="LazyLoaderCallbacksMixin.open_preferences">
+<a class="viewcode-back" href="../../../../api/generated/phage_annotator.ui_qt.utils.lazy_loader_callbacks.html#phage_annotator.ui_qt.utils.lazy_loader_callbacks.LazyLoaderCallbacksMixin.open_preferences">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">open_preferences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">section</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Open the preferences dialog and optionally focus a settings subsection.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_show_preferences_dialog</span><span class="p">()</span>
+
+        <span class="n">focus_widget</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;suggestion_auto_retrain_chk&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">section</span> <span class="o">==</span> <span class="s2">&quot;training_controls&quot;</span>
+            <span class="k">else</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;panel_policy_reset_btn&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">focus_widget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">focus_widget</span><span class="o">.</span><span class="n">setFocus</span><span class="p">(</span><span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">FocusReason</span><span class="o">.</span><span class="n">ShortcutFocusReason</span><span class="p">)</span>
+
+        <span class="c1"># Brief highlight to confirm navigation target.</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;advanced_group&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">group</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">advanced_group</span>
+            <span class="n">prior_style</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">styleSheet</span><span class="p">()</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">setStyleSheet</span><span class="p">(</span>
+                <span class="n">prior_style</span>
+                <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">QGroupBox { border: 2px solid #42a5f5; border-radius: 4px; }&quot;</span>
+            <span class="p">)</span>
+            <span class="k">def</span><span class="w"> </span><span class="nf">_restore_group_style</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;Restore group style for the current workflow.&quot;&quot;&quot;</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">group</span><span class="o">.</span><span class="n">setStyleSheet</span><span class="p">(</span><span class="n">prior_style</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+                    <span class="c1"># Widget may be deleted during teardown before timer fires.</span>
+                    <span class="k">return</span>
+
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">QTimer</span><span class="o">.</span><span class="n">singleShot</span><span class="p">(</span><span class="mi">1500</span><span class="p">,</span> <span class="n">_restore_group_style</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

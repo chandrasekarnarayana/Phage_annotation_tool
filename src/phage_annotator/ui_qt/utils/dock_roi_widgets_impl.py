@@ -209,3 +209,19 @@ def make_channel_controls_widget(self) -> QtWidgets.QWidget:
     widget = ChannelControlPanel(parent=self)
     self.channel_panel = widget
     return widget
+
+
+def make_deepstorm_widget(self) -> QtWidgets.QWidget:
+    """Create the Deep-STORM super-resolution inference panel."""
+    from phage_annotator.ui_qt.panels.deepstorm import DeepStormDockWidget
+    widget = DeepStormDockWidget(parent=self)
+    self.deepstorm_panel = widget
+    return widget
+
+
+def make_onnx_density_widget(self) -> QtWidgets.QWidget:
+    """Create the ONNX density prediction panel."""
+    from phage_annotator.ui_qt.panels.onnx_density import OnnxDensityPanel
+    widget = OnnxDensityPanel(parent=self)
+    self.onnx_density_panel = widget
+    return widget

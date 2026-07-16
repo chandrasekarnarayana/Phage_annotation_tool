@@ -15,6 +15,8 @@ from phage_annotator.ui_qt.utils.dock_roi_widgets_impl import (
     make_threshold_widget,
     make_particles_widget,
     make_channel_controls_widget,
+    make_deepstorm_widget,
+    make_onnx_density_widget,
 )
 
 def make_roi_widget(self) -> QtWidgets.QWidget:

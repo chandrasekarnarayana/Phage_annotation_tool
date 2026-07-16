@@ -1,0 +1,1025 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>phage_annotator.ui_qt.utils.ui_setup_action_connections &#8212; Phage Annotator Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=0790524f97105ba85085" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/phage-docs.css?v=5885c9b0" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../../_static/scripts/fontawesome.js?digest=0790524f97105ba85085"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085" />
+
+    <script src="../../../../_static/documentation_options.js?v=292eb321"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/phage_annotator/ui_qt/utils/ui_setup_action_connections';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="1.0.1" />
+  
+    
+    <script src="../../../../_static/searchtools.js"></script>
+    <script src="../../../../_static/language_data.js"></script>
+    <script src="../../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Phage Annotator Documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/overview.html">
+    Overview
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/annotation_workflow.html">
+    Tutorial: Annotate and Review a Time Series
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/interface.html">
+    Interface Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/annotations.html">
+    Annotation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/assisted_review.html">
+    Assisted Review
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/qc.html">
+    Quality Control
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/smlm.html">
+    SMLM and Fiji Bridge
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/deepstorm.html">
+    Deep-STORM Super-Resolution
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/density.html">
+    Density Inference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/projects.html">
+    Projects and Workspace State
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/architecture.html">
+    Architecture
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/modularity.html">
+    Modularity Rules
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/testing.html">
+    Testing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/documentation.html">
+    Documentation Workflow
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../development/contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/environment.html">
+    Environment
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/runtime.html">
+    Runtime Behavior
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../deployment/release.html">
+    Release Checklist
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/features.html">
+    Feature Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/keyboard_shortcuts.html">
+    Keyboard Shortcuts
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../reference/file_formats.html">
+    File Formats
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../release_notes/index.html">
+    Release Notes
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">phage_annotator.ui_qt.utils.ui_setup_action_connections</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for phage_annotator.ui_qt.utils.ui_setup_action_connections</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Menu and action signal connection helpers for UI setup.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+
+<div class="viewcode-block" id="connect_main_window_actions">
+<a class="viewcode-back" href="../../../../api/generated/phage_annotator.ui_qt.utils.ui_setup_action_connections.html#phage_annotator.ui_qt.utils.ui_setup_action_connections.connect_main_window_actions">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">connect_main_window_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">actions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">disable_shortcuts</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">disable_qc</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Connect menu actions and status-bar controls to main-window handlers.&quot;&quot;&quot;</span>
+    <span class="n">open_files_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;open_files&quot;</span><span class="p">]</span>
+    <span class="n">open_folder_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;open_folder&quot;</span><span class="p">]</span>
+    <span class="n">load_ann_current_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;load_ann_current&quot;</span><span class="p">]</span>
+    <span class="n">load_ann_multi_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;load_ann_multi&quot;</span><span class="p">]</span>
+    <span class="n">load_ann_all_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;load_ann_all&quot;</span><span class="p">]</span>
+    <span class="n">save_csv_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;save_csv&quot;</span><span class="p">]</span>
+    <span class="n">save_json_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;save_json&quot;</span><span class="p">]</span>
+    <span class="n">export_standard_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;export_standard&quot;</span><span class="p">]</span>
+    <span class="n">export_view_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;export_view&quot;</span><span class="p">]</span>
+    <span class="n">save_proj_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;save_proj&quot;</span><span class="p">]</span>
+    <span class="n">load_proj_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;load_proj&quot;</span><span class="p">]</span>
+    <span class="n">prefs_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;prefs&quot;</span><span class="p">]</span>
+    <span class="n">reset_confirms_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;reset_confirms&quot;</span><span class="p">]</span>
+    <span class="n">reload_ann_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;reload_ann&quot;</span><span class="p">]</span>
+    <span class="n">suggest_points_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;suggest_points&quot;</span><span class="p">]</span>
+    <span class="n">suggest_points_image_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;suggest_points_image&quot;</span><span class="p">]</span>
+    <span class="n">select_suggestion_strategy_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;select_suggestion_strategy&quot;</span><span class="p">]</span>
+    <span class="n">load_suggestion_rule_config_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;load_suggestion_rule_config&quot;</span><span class="p">]</span>
+    <span class="n">set_suggestion_score_threshold_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;set_suggestion_score_threshold&quot;</span><span class="p">]</span>
+    <span class="n">accept_visible_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;accept_visible_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">accept_green_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;accept_green_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">accept_suggestions_in_roi_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;accept_suggestions_in_roi&quot;</span><span class="p">]</span>
+    <span class="n">reject_visible_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;reject_visible_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">clear_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;clear_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">show_suggestion_patch_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;show_suggestion_patch&quot;</span><span class="p">]</span>
+    <span class="n">start_timed_session_assisted_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;start_timed_session_assisted&quot;</span><span class="p">]</span>
+    <span class="n">start_timed_session_manual_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;start_timed_session_manual&quot;</span><span class="p">]</span>
+    <span class="n">stop_timed_session_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;stop_timed_session&quot;</span><span class="p">]</span>
+    <span class="n">assist_warmup_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;assist_warmup&quot;</span><span class="p">]</span>
+    <span class="n">train_ranker_now_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;train_ranker_now&quot;</span><span class="p">]</span>
+    <span class="n">batch_correct_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;batch_correct_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">propagate_suggestions_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;propagate_suggestions&quot;</span><span class="p">]</span>
+    <span class="n">toggle_suggestions_overlay_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;toggle_suggestions_overlay&quot;</span><span class="p">]</span>
+    <span class="n">qc_validate_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;qc_validate&quot;</span><span class="p">]</span>
+    <span class="n">qc_jump_next_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;qc_jump_next&quot;</span><span class="p">]</span>
+    <span class="n">set_current_user_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;set_current_user&quot;</span><span class="p">]</span>
+    <span class="n">mark_selected_in_review_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;mark_selected_in_review&quot;</span><span class="p">]</span>
+    <span class="n">mark_selected_approved_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;mark_selected_approved&quot;</span><span class="p">]</span>
+    <span class="n">mark_selected_needs_changes_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;mark_selected_needs_changes&quot;</span><span class="p">]</span>
+    <span class="n">assign_selected_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;assign_selected&quot;</span><span class="p">]</span>
+    <span class="n">show_reviewer_analytics_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;show_reviewer_analytics&quot;</span><span class="p">]</span>
+    <span class="n">queue_all_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;queue_all&quot;</span><span class="p">]</span>
+    <span class="n">queue_my_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;queue_my&quot;</span><span class="p">]</span>
+    <span class="n">queue_needs_review_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;queue_needs_review&quot;</span><span class="p">]</span>
+    <span class="n">queue_blocked_qc_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;queue_blocked_qc&quot;</span><span class="p">]</span>
+    <span class="n">clear_hist_cache_act</span> <span class="o">=</span> <span class="n">actions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;clear_hist_cache&quot;</span><span class="p">)</span>
+    <span class="n">exit_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;exit&quot;</span><span class="p">]</span>
+    <span class="n">about_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;about&quot;</span><span class="p">]</span>
+    <span class="n">context_help_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;context_help&quot;</span><span class="p">]</span>
+    <span class="n">copy_display_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;copy_display&quot;</span><span class="p">]</span>
+    <span class="n">measure_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;measure&quot;</span><span class="p">]</span>
+    <span class="n">jump_to_frame_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;jump_to_frame&quot;</span><span class="p">]</span>
+    <span class="n">jump_to_z_act</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="s2">&quot;jump_to_z&quot;</span><span class="p">]</span>
+    <span class="n">show_roi_handles_act</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">show_roi_handles_act</span>
+    <span class="n">clear_roi_act</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">clear_roi_act</span>
+    <span class="c1"># Hooks for menus</span>
+    <span class="n">open_files_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_open_files</span><span class="p">)</span>
+    <span class="n">open_folder_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_open_folder</span><span class="p">)</span>
+    <span class="n">load_ann_current_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_load_annotations_current</span><span class="p">)</span>
+    <span class="n">load_ann_multi_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_load_annotations_multi</span><span class="p">)</span>
+    <span class="n">load_ann_all_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_load_annotations_all</span><span class="p">)</span>
+    <span class="n">reload_ann_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reload_annotations_current</span><span class="p">)</span>
+    <span class="n">save_csv_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save_csv</span><span class="p">)</span>
+    <span class="n">save_json_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save_json</span><span class="p">)</span>
+    <span class="n">export_standard_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_export_standard_bundle_dialog</span><span class="p">)</span>
+    <span class="n">export_view_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_export_view_dialog</span><span class="p">)</span>
+    <span class="n">save_proj_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save_project</span><span class="p">)</span>
+    <span class="n">load_proj_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_load_project</span><span class="p">)</span>
+    <span class="n">prefs_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_preferences_dialog</span><span class="p">)</span>
+    <span class="n">reset_confirms_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reset_confirmations</span><span class="p">)</span>
+    <span class="n">about_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_about</span><span class="p">)</span>
+    <span class="n">context_help_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_contextual_help</span><span class="p">)</span>
+    <span class="n">shortcuts_act</span> <span class="o">=</span> <span class="n">actions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shortcuts&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">shortcuts_act</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">shortcuts_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_keyboard_shortcuts</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">disable_shortcuts</span><span class="p">:</span>
+            <span class="n">shortcuts_act</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">shortcuts_act</span><span class="o">.</span><span class="n">setVisible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">disable_shortcuts</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_disable_all_shortcuts</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="n">exit_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">)</span>
+    <span class="n">show_roi_handles_act</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_roi_handles</span><span class="p">)</span>
+    <span class="n">clear_roi_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_clear_roi</span><span class="p">)</span>
+    <span class="c1"># P5.2: Multi-image ROI management</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;copy_roi_to_all_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">copy_roi_to_all_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_copy_roi_to_all_images</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;save_roi_template_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_roi_template_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save_roi_template</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;apply_roi_template_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">apply_roi_template_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_apply_roi_template</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">clear_hist_cache_act</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">clear_hist_cache_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_clear_histogram_cache</span><span class="p">)</span>
+    <span class="n">suggest_points_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_suggest_points_current_slice</span><span class="p">)</span>
+    <span class="n">suggest_points_image_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_suggest_points_current_image</span><span class="p">)</span>
+    <span class="n">select_suggestion_strategy_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_select_suggestion_strategy_dialog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;status_strategy_combo&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sync_status_strategy_selector</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_strategy_combo</span><span class="o">.</span><span class="n">currentIndexChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">_idx</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_suggestion_strategy</span><span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">status_strategy_combo</span><span class="o">.</span><span class="n">currentData</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">status_strategy_combo</span><span class="o">.</span><span class="n">currentText</span><span class="p">()),</span>
+                <span class="n">source</span><span class="o">=</span><span class="s2">&quot;status_bar&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_strategy_combo</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span>
+            <span class="s2">&quot;Suggestion strategy:</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Source Frame: peaks in unprocessed source signal</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Corrected: peaks after correction</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Evidence Consensus: strong across modalities</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;- Evidence Contradiction: enforce positive/negative evidence rules&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;status_modality_combo&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_modality_combo</span><span class="o">.</span><span class="n">currentIndexChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">idx</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_primary_combo</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">idx</span><span class="p">))</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;status_assist_mode_btn&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status_assist_mode_btn</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">checked</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_assist_mode</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">checked</span><span class="p">),</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;status_bar&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">default_assist_mode</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="s2">&quot;assistModeEnabled&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_assist_mode</span><span class="p">(</span><span class="n">default_assist_mode</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;startup&quot;</span><span class="p">)</span>
+    <span class="n">load_suggestion_rule_config_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_load_suggestion_rule_config_dialog</span>
+    <span class="p">)</span>
+    <span class="n">set_suggestion_score_threshold_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_suggestion_score_threshold_dialog</span>
+    <span class="p">)</span>
+    <span class="n">accept_visible_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_accept_visible_suggestions</span><span class="p">)</span>
+    <span class="n">accept_green_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_accept_high_confidence_suggestions</span><span class="p">)</span>
+    <span class="n">accept_suggestions_in_roi_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_accept_suggestions_in_roi</span><span class="p">)</span>
+    <span class="n">reject_visible_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reject_visible_suggestions</span><span class="p">)</span>
+    <span class="n">clear_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_clear_suggestions_current_image</span><span class="p">)</span>
+    <span class="n">show_suggestion_patch_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_current_suggestion_patch</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;show_all_predictions_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_all_predictions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_show_all_predictions_dialog</span>
+        <span class="p">)</span>
+    <span class="n">start_timed_session_assisted_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start_timed_annotation_session</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">start_timed_session_manual_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_start_timed_annotation_session</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">stop_timed_session_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stop_timed_annotation_session</span><span class="p">)</span>
+    <span class="n">assist_warmup_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_start_assist_warmup</span><span class="p">)</span>
+    <span class="n">train_ranker_now_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_train_suggestion_ranker_now</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;show_calibration_visualizer_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_calibration_visualizer_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_show_calibration_visualizer</span>
+        <span class="p">)</span>
+    <span class="n">batch_correct_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_batch_correct_suggestions_dialog</span>
+    <span class="p">)</span>
+    <span class="n">propagate_suggestions_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_propagate_suggestions_remaining_dialog</span>
+    <span class="p">)</span>
+    <span class="n">toggle_suggestions_overlay_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_suggestions_overlay</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">disable_qc</span><span class="p">:</span>
+        <span class="n">qc_validate_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_trigger_qc_validation</span><span class="p">)</span>
+        <span class="n">qc_jump_next_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jump_to_next_qc_issue</span><span class="p">)</span>
+    <span class="n">set_current_user_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_set_current_user_dialog</span><span class="p">)</span>
+    <span class="n">mark_selected_in_review_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_selected_review_state</span><span class="p">(</span><span class="s2">&quot;in_review&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">mark_selected_approved_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_selected_review_state</span><span class="p">(</span><span class="s2">&quot;approved&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">mark_selected_needs_changes_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_selected_review_state</span><span class="p">(</span><span class="s2">&quot;needs_changes&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">assign_selected_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_assign_selected_annotations_dialog</span><span class="p">)</span>
+    <span class="n">show_reviewer_analytics_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_reviewer_analytics_dialog</span><span class="p">)</span>
+    <span class="n">queue_all_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_review_queue_filter</span><span class="p">(</span><span class="s2">&quot;all&quot;</span><span class="p">))</span>
+    <span class="n">queue_my_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_review_queue_filter</span><span class="p">(</span><span class="s2">&quot;my_queue&quot;</span><span class="p">))</span>
+    <span class="n">queue_needs_review_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_review_queue_filter</span><span class="p">(</span><span class="s2">&quot;needs_review&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">queue_blocked_qc_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_review_queue_filter</span><span class="p">(</span><span class="s2">&quot;blocked_qc&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">review_context_pack_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_review_context_pack</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_profile_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_profile_panel</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_hist_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_hist_panel</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_left_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_left_pane</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_settings_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_settings_pane</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">link_zoom_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_link_zoom_menu</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">reset_layout_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reset_layout</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">save_layout_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save_layout_default</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_overlay_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_overlay</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">layout_preset_annotate_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_preset</span><span class="p">(</span><span class="s2">&quot;Annotate&quot;</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">layout_preset_analyze_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_preset</span><span class="p">(</span><span class="s2">&quot;Analyze&quot;</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">layout_preset_assist_expert_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_preset</span><span class="p">(</span><span class="s2">&quot;Assist Expert&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">layout_preset_minimal_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_preset</span><span class="p">(</span><span class="s2">&quot;Minimal&quot;</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">layout_preset_default_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_preset</span><span class="p">(</span><span class="s2">&quot;Default&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;advanced_panels_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">advanced_panels_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_command_palette</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;undo_layout_change_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">undo_layout_change_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_undo_layout_change</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;open_panel_policy_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">open_panel_policy_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">open_preferences</span><span class="p">(</span><span class="n">section</span><span class="o">=</span><span class="s2">&quot;panel_policy&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">focus_canvas_mode_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">_checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_toggle_focus_canvas_mode</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">command_palette_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_command_palette</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;open_logs_help_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">open_logs_help_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">_checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">open_panel</span><span class="p">(</span><span class="s2">&quot;logs&quot;</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;menu:help&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;open_performance_help_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">open_performance_help_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">_checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">open_panel</span><span class="p">(</span><span class="s2">&quot;performance&quot;</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;menu:help&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;open_recorder_help_act&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">open_recorder_help_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">_checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">open_panel</span><span class="p">(</span><span class="s2">&quot;recorder&quot;</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;menu:help&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">DISABLE_DIAGNOSTICS</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">toggle_logs_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">checked</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_panel_visible</span><span class="p">(</span><span class="s2">&quot;logs&quot;</span><span class="p">,</span> <span class="nb">bool</span><span class="p">(</span><span class="n">checked</span><span class="p">),</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;menu:layout&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toggle_overlay_act</span><span class="o">.</span><span class="n">setChecked</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">reset_view_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">reset_all_view</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">show_profiles_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_profile_dialog</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">show_bleach_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_bleach_dialog</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">show_table_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_table_dialog</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;threshold_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">threshold_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_threshold_panel</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;analyze_particles_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">analyze_particles_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_analyze_particles_panel</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;smlm_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">smlm_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_smlm_panel</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;deepstorm_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">deepstorm_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_deepstorm_panel</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;rerun_smlm_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rerun_smlm_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rerun_last_smlm</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;show_smlm_points_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_smlm_points_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_smlm_points</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;show_smlm_sr_act&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show_smlm_sr_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_smlm_sr</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">undo_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">undo_last_action</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">redo_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">redo_last_action</span><span class="p">)</span>
+    <span class="n">jump_to_frame_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jump_to_frame_dialog</span><span class="p">)</span>
+    <span class="n">jump_to_z_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jump_to_z_dialog</span><span class="p">)</span>
+    <span class="n">copy_display_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_copy_display_settings</span><span class="p">)</span>
+    <span class="n">measure_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_results_measure_current</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">show_recorder_act</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_toggle_recorder</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_length_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_thickness_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_location_combo</span><span class="o">.</span><span class="n">currentTextChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_text_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_background_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">scalebar_export_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_scalebar_change</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">suggestion_auto_retrain_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_suggestion_auto_retrain_changed</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">suggestion_min_labels_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_suggestion_min_labels_changed</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">suggestion_train_now_btn</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_train_suggestion_ranker_now</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">annotation_space_combo</span><span class="o">.</span><span class="n">currentTextChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_annotation_space_changed</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">generation_space_combo</span><span class="o">.</span><span class="n">currentTextChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_generation_space_changed</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">disable_bulk_accept_when_stale_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_disable_bulk_accept_when_stale_changed</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">interactive_learning_experimental_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_interactive_learning_experimental_changed</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_min_total_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_assist_minima_changed</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_min_positive_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_assist_minima_changed</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_min_negative_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_assist_minima_changed</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_min_context_spin</span><span class="o">.</span><span class="n">valueChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_assist_minima_changed</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">disable_qc</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qc_auto_show_chk</span><span class="o">.</span><span class="n">toggled</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_on_qc_auto_show_changed</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qc_auto_show_chk</span><span class="o">.</span><span class="n">setChecked</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qc_auto_show_chk</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_next_btn</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_next_uncertain_suggestion</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assist_warmup_refresh_btn</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_refresh_assist_warmup_panel</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=0790524f97105ba85085"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=0790524f97105ba85085"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Chandrasekar Subramani Narayana.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.18.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

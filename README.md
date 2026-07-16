@@ -34,7 +34,7 @@ python -m pip install -e .[dev,cache]
 ```bash
 conda env create -f project/environment.yml
 conda activate phage-annotator
-python -m pip install -e .
+python -m pip install -e .[dev,cache]
 ```
 
 The application checks `project/environment.yml` at startup and prints environment
@@ -108,17 +108,16 @@ QT_QPA_PLATFORM=offscreen .venv-phage/bin/python -m pytest -m gui --run-gui
 
 ## Documentation
 
-- [Documentation Index](docs/README.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Feature Access Guide](docs/FEATURE_ACCESS_GUIDE.md)
-- [Source Reference](docs/SOURCE_REFERENCE.md)
-- [Source Quality Audit](docs/SOURCE_QUALITY_AUDIT.md)
-- [Assist Guide](docs/ASSIST_GUIDE.md)
-- [Current Capabilities](docs/CURRENT_CAPABILITIES.md)
-- [Planned Features](docs/PLANNED_FEATURES.md)
-- [Fiji ThunderSTORM Bridge](docs/FIJI_THUNDERSTORM_BRIDGE.md)
-- [SMLM Reproducibility Runbook](docs/SMLM_REPRODUCIBILITY_RUNBOOK.md)
-- [Reports Index](docs/reports/README.md)
+The documentation is a Sphinx site in `docs`, with narrative guides in Markdown
+and API pages generated from source docstrings.
+
+```bash
+python -m pip install -e .[docs]
+make -C docs html
+```
+
+Open `docs/_build/html/index.html` after building. Start from
+`docs/index.md` for the source table of contents.
 
 ## Notes
 
