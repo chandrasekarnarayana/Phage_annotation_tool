@@ -15,29 +15,55 @@ Docker keeps Python, PyQt5, Qt's system libraries, and the full scientific
 stack inside a container, so nothing is installed on the host and the exact
 same environment runs on Linux and Windows.
 
-**Prerequisites:** Docker Desktop (Windows/macOS) or Docker Engine + the
-Compose plugin (Linux). On Windows, enable the WSL2 backend in Docker Desktop
-(default since 2021) — this also gives GUI passthrough via WSLg with no extra
-setup.
+### Step 1 — Install Docker
 
-**Launch the GUI — Linux:**
+- **Windows/macOS:** install Docker Desktop, then enable the WSL2 backend
+  (Windows, default since 2021) — this also gives GUI passthrough via WSLg
+  with no extra setup.
+- **Linux:** install Docker Engine + the Compose plugin. On Ubuntu, either
+  `sudo apt install docker.io` or `sudo snap install docker` both work; the
+  steps below call out where snap-installed Docker behaves differently.
+
+### Step 2 — Let your user run `docker` without `sudo` (Linux only)
 
 ```bash
+sudo usermod -aG docker "$USER"
+newgrp docker    # or just log out and back in
+```
+
+If this prints `usermod: group 'docker' does not exist`, you're on the snap
+package, which sets up permissions differently — skip this step and just use
+`sudo docker ...` / `sudo docker compose ...` for every command below
+instead. Both work; the only difference is who owns files Docker creates for
+you (see Step 3).
+
+### Step 3 — Create the data folder as yourself, before Docker does
+
+```bash
+cd phage-annotator     # or wherever you cloned it
 mkdir -p data
+```
+
+Annotation projects, exports, and demo TIFFs persist under `./data` on the
+host, and the app runs as a non-root user *inside* the container. If Docker
+(or `sudo`) creates `./data` for you instead of you creating it first, it
+ends up owned by root and the container can't write into it — you'll see
+`PermissionError: [Errno 13] Permission denied: '/data/...'` the first time
+the app tries to save something. Creating it yourself up front avoids that.
+
+### Step 4 — Launch the GUI
+
+**Linux:**
+
+```bash
 xhost +local:docker
 docker compose up app
 ```
 
-Run `docker compose` as your own user, not with `sudo`. If your user isn't in
-the `docker` group yet (you'll see `permission denied ... docker.sock`), add
-it once with `sudo usermod -aG docker $USER` and start a new shell, rather
-than reaching for `sudo docker`. The `mkdir -p data` above matters for the
-same reason: if `sudo` creates `./data` for you, it'll be owned by root and
-the container's non-root user won't be able to write into it. If that
-already happened, fix it with `sudo chown -R 1000:1000 data`.
+(prefix with `sudo` if you skipped Step 2)
 
-**Launch the GUI — Windows** (run from a WSL2 terminal, e.g. Ubuntu on WSL,
-with Docker Desktop's WSL2 integration enabled for that distro):
+**Windows** (run from a WSL2 terminal, e.g. Ubuntu on WSL, with Docker
+Desktop's WSL2 integration enabled for that distro):
 
 ```bash
 docker compose up app
@@ -49,9 +75,43 @@ WSLg, install an X server such as VcXsrv, launch it with "Disable access
 control", and set `DISPLAY=host.docker.internal:0.0` before running
 `docker compose up app`.
 
-Annotation projects, exports, and demo TIFFs persist under `./data` on the
-host — the container itself is fully disposable and can be rebuilt or removed
-at any time without losing work.
+The container is fully disposable — it can be rebuilt or removed at any time
+without losing work, since everything you create lives in `./data` on the
+host.
+
+### Troubleshooting
+
+**`permission denied while trying to connect to the docker API at
+unix:///var/run/docker.sock`** — your user isn't authorized to talk to the
+Docker daemon yet. Either finish Step 2, or prefix the command with `sudo`.
+
+**`PermissionError: [Errno 13] Permission denied: '/data/...'`** — `./data`
+is owned by someone other than the container's user (this happens if it got
+auto-created while running under `sudo`). Fix the ownership directly; the
+container always runs as uid 1000:
+
+```bash
+sudo chown -R 1000:1000 data
+docker compose up app
+```
+
+No rebuild needed for this — it's a host-side fix only. If you ever want to
+double-check the container's actual uid instead of trusting the 1000 above:
+
+```bash
+docker compose run --rm --entrypoint id app
+```
+
+**Nothing shows up on screen at all (no error, no window)** — check the
+mount in `docker-compose.yml` isn't accidentally read-only or misconfigured:
+
+```bash
+grep -A3 volumes docker-compose.yml
+```
+
+It should show `- ./data:/data` (no trailing `:ro`).
+
+### Other Docker commands
 
 **Run the CLI without a GUI:**
 
