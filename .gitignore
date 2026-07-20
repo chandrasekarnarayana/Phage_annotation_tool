@@ -26,6 +26,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .cache/
+.benchmarks/
 
 # Editor/OS files
 .DS_Store
@@ -34,3 +35,6 @@ htmlcov/
 
 # Demo data
 phage_annotator_demo.tif
+
+# Docker Compose bind-mount for project/annotation data (see docker-compose.yml)
+/data/

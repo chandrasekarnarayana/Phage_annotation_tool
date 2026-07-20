@@ -10,7 +10,10 @@ from pathlib import Path
 
 ROOT = Path.cwd()
 ALLOWED_ROOT_FILES = {
+    ".dockerignore",
     ".gitignore",
+    "docker-compose.yml",
+    "Dockerfile",
     "LICENSE",
     "README.md",
     "pyproject.toml",
@@ -20,8 +23,11 @@ ALLOWED_ROOT_DIRS = {
     ".codex",
     ".git",
     ".github",
+    ".mypy_cache",
     ".pytest_cache",
+    ".ruff_cache",
     ".venv-phage",
+    "data",
     "docs",
     "external_plugins",
     "project",

@@ -1,0 +1,43 @@
+# Isolated launch/test environment for Phage Annotator.
+#
+# Quick start (GUI):
+#   Linux:   xhost +local:docker && docker compose up app
+#   Windows: docker compose up app        (run from a WSL2 terminal; WSLg
+#            provides DISPLAY and the X11 socket automatically)
+#
+# Run the test suite in isolation (no display needed, works everywhere):
+#   docker compose run --rm test
+#
+# Everything the app reads/writes (projects, exported images, demo TIFFs)
+# lives under ./data on the host, so the container itself stays disposable.
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        EXTRAS: cache
+    image: phage-annotator:latest
+    environment:
+      - DISPLAY=${DISPLAY:-}
+      - QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-xcb}
+      - QT_X11_NO_MITSHM=1
+      - MPLBACKEND=Agg
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./data:/data
+    ipc: host
+
+  test:
+    build:
+      context: .
+      args:
+        EXTRAS: dev,cache
+    image: phage-annotator:test
+    working_dir: /app
+    environment:
+      - QT_QPA_PLATFORM=offscreen
+      - MPLBACKEND=Agg
+    entrypoint: ["python", "-m", "pytest"]
+    command: ["-m", "not gui", "-q"]
+    profiles: ["test"]
