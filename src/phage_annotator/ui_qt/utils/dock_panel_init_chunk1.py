@@ -8,19 +8,22 @@ from typing import Optional
 from matplotlib.backends.qt_compat import QtWidgets
 
 from phage_annotator.ui_qt.panels.registry import PanelSpec
-from phage_annotator.ui_qt.utils.dock_panel_create import create_dock, wire_dock_action
+from phage_annotator.ui_qt.utils.dock_panel_create import create_dock, wire_dock_action, apply_panel_defaults
 from phage_annotator.ui_qt.utils.dock_panel_registry_impl import (
     set_panel_auto_open_enabled,
     set_panel_pinned,
     refresh_panel_policy_actions,
+    _init_panel_auto_policy_state,
 )
+from phage_annotator.ui_qt.utils.dock_panel_manager_impl import build_panel_registry
+from phage_annotator.ui_qt.utils.panel_helpers import _merge_system_docks
 
 logger = logging.getLogger(__name__)
 
 def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     """Create dock widgets and corresponding View menu actions."""
     from phage_annotator.ui_qt.utils.dock_panel_init_chunk2 import _apply_panel_constraints
-    self.panel_specs = (self)
+    self.panel_specs = build_panel_registry(self)
     self.panel_docks.clear()
     self.dock_actions.clear()
     self.panel_open_actions = {}
@@ -28,7 +31,7 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.panel_policy_quick_pin_actions = {}
     self.panel_policy_quick_open_actions = {}
     self.panel_specs_by_id = {spec.id: spec for spec in self.panel_specs}
-    (self)
+    _init_panel_auto_policy_state(self)
     grouped_menus = {
         "inspect": dock_menu.addMenu("Inspect (Right)"),
         "tools": dock_menu.addMenu("Tools (Left)"),
@@ -116,7 +119,7 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
     self.dock_qc_issues = self.panel_docks.get("qc_issues")
     self.dock_system = None
 
-    (self)
+    _merge_system_docks(self)
 
     if self.dock_hist and self.dock_profile:
         self.tabifyDockWidget(self.dock_hist, self.dock_profile)
@@ -140,7 +143,7 @@ def init_panels(self, dock_menu: QtWidgets.QMenu) -> None:
 
     # Action wiring is intentionally centralized in ui_setup.py to avoid
     # duplicate signal connections and double-trigger behavior.
-    (self)
+    apply_panel_defaults(self)
     self._restore_sidebar_mode()
 
 def get_panel_spec(self, panel_id: str) -> Optional[PanelSpec]:

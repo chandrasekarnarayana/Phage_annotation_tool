@@ -7,6 +7,8 @@ from phage_annotator.ui_qt.utils.export_mixin_view_export import ExportMixinView
 from phage_annotator.ui_qt.utils.export_mixin_images import ExportMixinImagesMixin
 from phage_annotator.ui_qt.utils.export_mixin_reports import ExportMixinReportsMixin
 from phage_annotator.ui_qt.utils.export_mixin_layers import ExportMixinLayersMixin
+from phage_annotator.ui_qt.utils.annotation_io import AnnotationIoMixin
+from phage_annotator.ui_qt.utils.roi_serialization import RoiSerializationMixin
 
 
 class ExportMixin(
@@ -16,6 +18,8 @@ class ExportMixin(
     ExportMixinImagesMixin,
     ExportMixinReportsMixin,
     ExportMixinLayersMixin,
+    AnnotationIoMixin,
+    RoiSerializationMixin,
 ):
     """Aggregated mixin for all export and save/load helpers."""
     pass

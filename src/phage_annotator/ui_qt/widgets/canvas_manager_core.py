@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt5 import QtWidgets, QtCore
 import matplotlib.pyplot as plt
 
-
+if TYPE_CHECKING:
+    # Runtime bindings for LayoutMode/ModalityCanvasView are injected by
+    # phage_annotator.ui_qt.widgets.modality_canvas (which imports this
+    # module) to avoid a circular import; this import is for static
+    # analysis/type-checking only.
+    from phage_annotator.ui_qt.widgets.modality_canvas import (
+        LayoutMode,
+        ModalityCanvasView,
+    )
 
 
 class CanvasManagerCoreMixin:

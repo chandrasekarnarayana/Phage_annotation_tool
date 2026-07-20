@@ -7,7 +7,7 @@ from typing import Optional
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
-from phage_annotator.ui_qt.utils.panel_helpers import PANEL_TAB_GROUPS
+from phage_annotator.ui_qt.utils.panel_helpers import PANEL_TAB_GROUPS, _iter_unique_dock_specs
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,10 @@ PANEL_TAB_GROUPS = {
 
 def apply_panel_defaults(self) -> None:
     """Reset dock placement/visibility using PanelSpec defaults."""
-    for spec, dock in (self):
-        (self, dock, spec)
+    from phage_annotator.ui_qt.utils.dock_panel_init_chunk2 import _apply_panel_constraints
+
+    for spec, dock in _iter_unique_dock_specs(self):
+        _apply_panel_constraints(self, dock, spec)
         self.addDockWidget(spec.default_area, dock)
         dock.setVisible(spec.default_visible)
     for group_id, members in PANEL_TAB_GROUPS.items():

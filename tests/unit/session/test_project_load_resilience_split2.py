@@ -58,9 +58,14 @@ def test_project_load_prefers_workspace_snapshot_display_mapping_over_legacy_lut
             None,
         )
 
+    critical_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(project_module, "load_project", _fake_loader)
     monkeypatch.setattr(QtWidgets.QMessageBox, "warning", staticmethod(lambda *_args, **_kwargs: None))
-    monkeypatch.setattr(QtWidgets.QMessageBox, "critical", staticmethod(lambda *_args, **_kwargs: None))
+    monkeypatch.setattr(
+        QtWidgets.QMessageBox,
+        "critical",
+        staticmethod(lambda _parent, title, text: critical_calls.append((str(title), str(text)))),
+    )
 
     harness = _Harness()
     ok = harness.load_project(None, project_path, _mock_read_metadata)
@@ -73,7 +78,7 @@ def test_project_load_prefers_workspace_snapshot_display_mapping_over_legacy_lut
     assert mapping.lut == 2
     assert mapping.invert is True
     assert harness._lut_set is None
-    assert "Load failed" in critical_calls[0][0]
+    assert critical_calls == []
 
 def test_project_load_relinks_image_via_relative_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

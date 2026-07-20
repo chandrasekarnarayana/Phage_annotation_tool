@@ -33,14 +33,23 @@ from phage_annotator.ui_qt.services.settings_schema import (
     apply_settings_migrations,
     ensure_ui_settings_defaults)
 from phage_annotator.ui_qt.utils.constants import INTERACTIVE_DOWNSAMPLE, PLAYBACK_BUFFER_SIZE
-
+from phage_annotator.ui_qt.runtime.window_init_impl import (
+    init_settings_runtime,
+    init_display_runtime_preferences,
+    init_view_runtime_state,
+)
+from phage_annotator.ui_qt.runtime.window_state import (
+    init_controller_runtime,
+    init_feature_runtime_state,
+    init_runtime_state,
+)
 
 
 def bootstrap_runtime(owner, images: List[LazyImage], labels: Sequence[str] | None) -> None:
     """Initialize window-local runtime state before widgets are built."""
-    (owner)
+    init_settings_runtime(owner)
     init_display_runtime_preferences(owner)
     init_runtime_state(owner)
     init_controller_runtime(owner, images, labels)
     init_view_runtime_state(owner)
-    (owner)
+    init_feature_runtime_state(owner)

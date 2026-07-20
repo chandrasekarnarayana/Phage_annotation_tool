@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
-
-
+if TYPE_CHECKING:
+    # Runtime bindings for ModalitySpec/ModalityLinks/ProjectionType are
+    # injected by phage_annotator.session.modality (which imports this
+    # module) to avoid a circular import; this import is for static
+    # analysis only.
+    from phage_annotator.session.modality import (
+        ModalityLinks,
+        ModalitySpec,
+        ProjectionType,
+    )
 
 
 class ModalityManagerCoreMixin:

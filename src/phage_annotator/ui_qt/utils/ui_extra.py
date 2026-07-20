@@ -18,6 +18,9 @@ from phage_annotator.ui_qt.utils.lazy_loader_ops import LazyLoaderOpsMixin
 from phage_annotator.ui_qt.utils.lazy_loader_state import LazyLoaderStateMixin
 from phage_annotator.ui_qt.utils.sidebar_layout import SidebarLayoutMixin
 from phage_annotator.ui_qt.utils.sidebar_toolbar import SidebarToolbarMixin
+from phage_annotator.ui_qt.utils.ui_extra_refresh import UiRefreshMixin
+from phage_annotator.ui_qt.utils.ui_extra_tooltips import UiTooltipMixin
+from phage_annotator.ui_qt.utils.ui_extra_annotations import UiAnnotationViewsMixin
 
 
 class UiExtrasMixin(
@@ -38,6 +41,9 @@ class UiExtrasMixin(
     LazyLoaderStateMixin,
     SidebarLayoutMixin,
     SidebarToolbarMixin,
+    UiRefreshMixin,
+    UiTooltipMixin,
+    UiAnnotationViewsMixin,
 ):
     """Aggregated mixin for UI sidebar, tool routing, layout, and command palette helpers."""
     pass

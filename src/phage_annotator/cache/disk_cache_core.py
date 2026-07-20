@@ -21,6 +21,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+from phage_annotator.cache.disk_cache_types import DiskCacheConfig, DiskCacheStats
 from phage_annotator.cache.disk_cache_io import DiskCacheIOMixin
 from phage_annotator.cache.disk_cache_eviction import DiskCacheEvictionMixin
 

@@ -131,6 +131,5 @@ class QcthresholdsPanelUiMixin:
         count_spin.setToolTip("Minimum annotations in grid cell to flag as cluster")
         self.widgets["density_min_annotations"] = count_spin
         layout.addRow("Min annotations per cell:", count_spin)
-        
-        layout.addStretch()
+
         return w

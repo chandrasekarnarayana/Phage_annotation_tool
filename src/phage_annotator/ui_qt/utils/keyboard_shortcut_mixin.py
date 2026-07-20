@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from matplotlib.backends.qt_compat import QtCore, QtWidgets
+from matplotlib.backends.qt_compat import QtCore, QtGui, QtWidgets
 from typing import Callable, Dict, List, Tuple, Optional
 
 

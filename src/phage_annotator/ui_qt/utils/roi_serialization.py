@@ -33,6 +33,133 @@ from phage_annotator.rendering.scalebar import ScaleBarSpec
 class RoiSerializationMixin:
     """Method group 2 extracted from ExportMixin."""
 
+    @staticmethod
+    def _tokenize_filename_value(value: object) -> str:
+        text = str(value).strip().lower()
+        text = re.sub(r"[^a-z0-9._-]+", "-", text)
+        return text.strip("-") or "na"
+
+    def _annotation_filename_context_tokens(self) -> str:
+        context = (
+            dict(self.controller.current_annotation_context() or {})
+            if hasattr(self.controller, "current_annotation_context")
+            else {}
+        )
+        image_id = int(context.get("source_image_id", getattr(self.primary_image, "id", -1)))
+        base_meta = self.controller.build_annotation_metadata(image_id)
+        scope = self._tokenize_filename_value(
+            getattr(self, "annotation_scope", "current")
+        )
+        default_target = (
+            self._default_panel_key() if hasattr(self, "_default_panel_key") else "modality_0"
+        )
+        target = self._tokenize_filename_value(context.get("panel_key", getattr(self, "annotate_target", default_target)))
+        space = self._tokenize_filename_value(
+            context.get("annotation_space", getattr(self.controller.session_state, "annotation_space", "stack"))
+        )
+        context_key = self._tokenize_filename_value(context.get("context_key", ""))
+        t_val = int(getattr(self.controller.view_state, "t", 0))
+        z_val = int(getattr(self.controller.view_state, "z", 0))
+        roi = base_meta.get("roi")
+        roi_token = "none"
+        if isinstance(roi, dict):
+            roi_token = self._tokenize_filename_value(roi.get("shape", "set"))
+        crop = base_meta.get("crop")
+        crop_token = "0"
+        if isinstance(crop, (list, tuple)) and len(crop) == 4:
+            crop_token = "1"
+        return (
+            f"__scope={scope}"
+            f"__target={target}"
+            f"__space={space}"
+            f"__ctx={context_key}"
+            f"__t={t_val}"
+            f"__z={z_val}"
+            f"__roi={roi_token}"
+            f"__crop={crop_token}"
+        )
+
+    @staticmethod
+    def _serialize_suggestion(suggestion) -> dict:
+        return {
+            "image_id": int(getattr(suggestion, "image_id", -1)),
+            "image_name": str(getattr(suggestion, "image_name", "")),
+            "t": int(getattr(suggestion, "t", -1)),
+            "z": int(getattr(suggestion, "z", -1)),
+            "y": float(getattr(suggestion, "y", 0.0)),
+            "x": float(getattr(suggestion, "x", 0.0)),
+            "score": float(getattr(suggestion, "score", getattr(suggestion, "confidence", 0.0))),
+            "label": str(getattr(suggestion, "label", "phage")),
+            "suggestion_id": str(getattr(suggestion, "suggestion_id", "")),
+            "source_model": str(getattr(suggestion, "source_model", "unknown")),
+            "source_modality": str(getattr(suggestion, "source_modality", "raw")),
+            "supporting_modalities": list(getattr(suggestion, "supporting_modalities", []) or []),
+            "cross_modality_consistency_score": getattr(suggestion, "cross_modality_consistency_score", None),
+            "control_contradiction_score": getattr(suggestion, "control_contradiction_score", None),
+            "scale_sigma": float(getattr(suggestion, "scale_sigma", 1.0)),
+            "psf_radius": float(getattr(suggestion, "psf_radius", 6.0)),
+            "roi_id": getattr(suggestion, "roi_id", None),
+            "uncertainty_score": getattr(suggestion, "uncertainty_score", None),
+            "uncertainty_reason": str(getattr(suggestion, "uncertainty_reason", "") or ""),
+            "density_context": dict(getattr(suggestion, "density_context", {}) or {}),
+            "score_components": dict(getattr(suggestion, "score_components", {})),
+            "status": str(getattr(suggestion, "status", "proposed")),
+            "meta": dict(getattr(suggestion, "meta", {})),
+        }
+
+    @staticmethod
+    def _encode_qbytearray(value) -> str:
+        """Encode a QByteArray-like value to ASCII base64 string."""
+        if value is None:
+            return ""
+        try:
+            raw = bytes(value)
+            if not raw:
+                return ""
+            return base64.b64encode(raw).decode("ascii")
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _decode_qbytearray(value: object):
+        """Decode ASCII base64 string to bytes for Qt restore methods."""
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            return base64.b64decode(value.encode("ascii"))
+        except Exception:
+            return None
+
+    def _capture_ui_workspace_state(self) -> dict:
+        """Capture UI-level workspace state for exact project restore."""
+        linked_zoom_bounds = None
+        zoom_state = getattr(self, "_last_zoom_linked", None)
+        if (
+            isinstance(zoom_state, tuple)
+            and len(zoom_state) == 2
+            and all(isinstance(bounds, tuple) and len(bounds) == 2 for bounds in zoom_state)
+        ):
+            linked_zoom_bounds = {
+                "xlim": [float(zoom_state[0][0]), float(zoom_state[0][1])],
+                "ylim": [float(zoom_state[1][0]), float(zoom_state[1][1])],
+            }
+        state = {
+            "panel_visibility": dict(getattr(self, "_panel_visibility", {}) or {}),
+            "annotation_panel_visibility": dict(
+                getattr(self, "_annotation_panel_visibility", {}) or {}
+            ),
+            "canvas_layout_rows": int(getattr(self, "_canvas_layout_rows", 0) or 0),
+            "canvas_layout_cols": int(getattr(self, "_canvas_layout_cols", 0) or 0),
+            "active_layout_preset": str(getattr(self, "_active_layout_preset", "Default") or "Default"),
+            "sidebar_collapsed": bool(getattr(self, "_sidebar_collapsed", False)),
+            "right_sidebar_collapsed": bool(getattr(self, "_right_sidebar_collapsed", False)),
+            "sidebar_index": int(getattr(getattr(self, "sidebar_stack", None), "currentIndex", lambda: 0)()),
+            "window_geometry_b64": self._encode_qbytearray(self.saveGeometry()),
+            "window_state_b64": self._encode_qbytearray(self.saveState()),
+            "linked_zoom_bounds": linked_zoom_bounds,
+        }
+        return state
+
     def _restore_ui_workspace_state(self, ui_state: dict) -> None:
         """Restore UI-level workspace state captured in project snapshot."""
         if not isinstance(ui_state, dict) or not ui_state:

@@ -21,6 +21,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+from phage_annotator.cache.disk_cache_types import DiskCacheStats
+
+
 class DiskCacheEvictionMixin:
     def _evict_until_space(self, needed_bytes: int) -> None:
         """Remove oldest items from disk until space available (thread-safe).

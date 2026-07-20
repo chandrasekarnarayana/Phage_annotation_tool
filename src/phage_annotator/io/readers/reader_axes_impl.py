@@ -20,12 +20,8 @@ from phage_annotator.io.metadata.reader import read_metadata_summary as _read_su
 __all__ = [
     "ImageMeta",
     "load_images",
-    "parse_axes_info",
     "standardize_axes",
-    "read_contiguous_block",
     "read_contiguous_block_from_path",
-    "read_metadata_bundle",
-    "read_metadata_summary",
 ]
 
 

@@ -28,6 +28,16 @@ from phage_annotator.ui_qt.rendering.lut_manager import cmap_for
 from phage_annotator.rendering.scalebar import ScaleBarSpec
 
 
+def _save_image(path: pathlib.Path, image: np.ndarray, opts: ExportOptions) -> None:
+    """Write a rendered RGBA array to disk in the format requested by opts."""
+    if opts.fmt == "tiff":
+        import tifffile as tif
+
+        tif.imwrite(str(path), image)
+        return
+    import matplotlib.pyplot as plt
+
+    plt.imsave(str(path), image)
 
 
 class ExportMixinLayersMixin:

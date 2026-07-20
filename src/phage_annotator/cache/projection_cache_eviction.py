@@ -10,6 +10,8 @@ from typing import Callable, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+from phage_annotator.cache.projection_cache_types import CacheItem
+
 if TYPE_CHECKING:
     from phage_annotator.cache.disk_cache import CompressedBuffer, DiskCache
     from phage_annotator.config.settings import ComponentMemoryBudget

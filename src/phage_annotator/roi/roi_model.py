@@ -7,7 +7,7 @@ from typing import Callable, Optional, Tuple
 
 import matplotlib.pyplot as plt
 
-
+from phage_annotator.roi.interactor_types import CircleROI, CoordinateMapper, RectROI
 
 
 class RoiModelMixin:

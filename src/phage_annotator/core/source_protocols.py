@@ -15,16 +15,22 @@ from typing import Iterable
 
 import pandas as pd
 
+from phage_annotator.core.annotation_types import Keypoint, PointSuggestion
+from phage_annotator.core.annotation_serialization import (
+    keypoints_to_dataframe,
+    save_keypoints_csv,
+    save_keypoints_json,
+    keypoints_from_json,
+)
+
 __all__ = [
     "Keypoint",
     "PointSuggestion",
     "ANNOTATION_META_DEFAULTS",
     "PROVENANCE_DATAFRAME_COLUMNS",
-    "",
     "keypoints_to_dataframe",
     "save_keypoints_csv",
     "save_keypoints_json",
-    "",
     "keypoints_from_json",
 ]
 

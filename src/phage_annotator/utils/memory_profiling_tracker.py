@@ -17,10 +17,15 @@ try:
 except ImportError:
     psutil = None
 
+from phage_annotator.utils.memory_profiling_funcs import (
+    get_peak_memory_mb,
+    memory_snapshot,
+    profile_memory,
+)
+
 __all__ = [
     "profile_memory",
     "memory_snapshot",
-    "",
     "get_peak_memory_mb",
 ]
 

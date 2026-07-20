@@ -90,8 +90,7 @@ class QcthresholdsPanelControlsMixin:
         cluster_ratio.setDecimals(2)
         self.widgets["clustered_signal_ratio"] = cluster_ratio
         layout.addRow("Peak/mean multiplier:", cluster_ratio)
-        
-        layout.addStretch()
+
         return w
     def _create_stochasticity_tab(self) -> QtWidgets.QWidget:
         """Create stochasticity checks tab."""
@@ -149,6 +148,5 @@ class QcthresholdsPanelControlsMixin:
         ann_warn.setDecimals(2)
         self.widgets["annotation_fano_warning_threshold"] = ann_warn
         layout.addRow("Warning threshold:", ann_warn)
-        
-        layout.addStretch()
+
         return w

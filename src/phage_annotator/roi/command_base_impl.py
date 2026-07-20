@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
-from phage_annotator.roi.command_base import RoiCommand
+from phage_annotator.roi.command_base import RoiCommand, RoiCommandMemento
 from phage_annotator.roi.roi_interactor_core import RoiInteractorCoreMixin
 from phage_annotator.roi.manager_core_impl import RoiManager
 from phage_annotator.roi.roi_model import RoiModelMixin

@@ -10,6 +10,9 @@ from phage_annotator.ui_qt.controls.results import ResultsControlsMixin
 from phage_annotator.ui_qt.controls.roi import RoiControlsMixin
 from phage_annotator.ui_qt.controls.smlm import SmlmControlsMixin
 from phage_annotator.ui_qt.controls.threshold import ThresholdControlsMixin
+from phage_annotator.ui_qt.controls.marker_style import MarkerStyleMixin
+from phage_annotator.ui_qt.controls.playback_controls_tick import PlaybackControlsTimerMixin
+from phage_annotator.ui_qt.controls.histogram_contrast_autoset import HistogramContrastAutosetMixin
 
 
 class ControlsMixin(
@@ -21,5 +24,8 @@ class ControlsMixin(
     DensityControlsMixin,
     SmlmControlsMixin,
     ThresholdControlsMixin,
+    MarkerStyleMixin,
+    PlaybackControlsTimerMixin,
+    HistogramContrastAutosetMixin,
 ):
     """Mixin for GUI control handlers."""

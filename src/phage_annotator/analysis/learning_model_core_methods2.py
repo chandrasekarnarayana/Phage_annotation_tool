@@ -5,12 +5,19 @@ from __future__ import annotations
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, TYPE_CHECKING
 
 import numpy as np
 
 from phage_annotator.core.annotation import PointSuggestion
 from phage_annotator.analysis.training_data import TrainingExample
+
+if TYPE_CHECKING:
+    # learning_model_core.py imports this module before its
+    # InteractiveLearningModel class is defined, so a top-level runtime
+    # import here would be circular. This import is for static analysis
+    # only (used solely in a quoted return-type annotation below).
+    from phage_annotator.analysis.learning_model_core import InteractiveLearningModel
 
 
 @dataclass

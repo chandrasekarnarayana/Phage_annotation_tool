@@ -30,6 +30,14 @@ from phage_annotator.smlm.external_plugins import (
     build_plugin_arg_string,
     resolve_plugin_descriptor,
     resolve_plugin_jar)
+from phage_annotator.smlm.backends_core_impl import (
+    CSVSchemaMismatchError,
+    ImageJRuntime,
+    MacroExecutionError,
+    OutputMissingError,
+    PluginNotFoundError,
+    ThunderstormBridgeConfig,
+)
 
 
 ProgressCb = Optional[Callable[[int, str], None]]

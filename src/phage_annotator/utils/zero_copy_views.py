@@ -14,10 +14,8 @@ __all__ = [
     "safe_view",
     "readonly_view",
     "ensure_contiguous",
-    "ensure_writable",
     "is_view_of",
     "memory_size_mb",
-    "can_avoid_copy",
 ]
 
 

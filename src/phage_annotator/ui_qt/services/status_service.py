@@ -4,9 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import time
-from typing import Any, Mapping
+from typing import Any, Mapping, TYPE_CHECKING
 
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
+
+if TYPE_CHECKING:
+    # Runtime bindings for StatusModel/StatusMessage/ActivityStatus are
+    # injected by phage_annotator.ui_qt.services.status (which imports this
+    # module) to avoid a circular import; this import is for static
+    # analysis only.
+    from phage_annotator.ui_qt.services.status import (
+        ActivityStatus,
+        StatusMessage,
+        StatusModel,
+    )
 
 
 _SEVERITY_PRIORITY = {

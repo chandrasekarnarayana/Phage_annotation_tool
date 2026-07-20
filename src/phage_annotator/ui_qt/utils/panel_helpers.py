@@ -71,16 +71,88 @@ def _show_auto_open_toast(self: Any, panel_key: str, title: str) -> None:
 
 
 def _merge_system_docks(self: Any) -> None:
-    pass
+    """Merge logs/performance/recorder into a single tabbed System dock."""
+    from phage_annotator.ui_qt.utils.dock_panel_create import create_dock
+    from matplotlib.backends.qt_compat import QtCore
+
+    dock_logs = getattr(self, "dock_logs", None)
+    dock_perf = getattr(self, "dock_performance", None)
+    dock_rec = getattr(self, "dock_recorder", None)
+    if dock_logs is None or dock_perf is None or dock_rec is None:
+        return
+    if getattr(self, "dock_system", None) is not None:
+        return
+
+    logs_w = dock_logs.widget()
+    perf_w = dock_perf.widget()
+    rec_w = dock_rec.widget()
+    if logs_w is None or perf_w is None or rec_w is None:
+        return
+
+    tabs = QtWidgets.QTabWidget(self)
+    tabs.setObjectName("system_tabs")
+    tabs.addTab(logs_w, "Logs / Diagnostics")
+    tabs.addTab(perf_w, "Performance")
+    tabs.addTab(rec_w, "Recorder")
+
+    container = QtWidgets.QWidget(self)
+    layout = QtWidgets.QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(tabs)
+    self.system_tabs = tabs
+
+    system_dock = create_dock(self, "system", "System", container)
+    self.addDockWidget(QtCore.Qt.RightDockWidgetArea, system_dock)
+    system_dock.setAllowedAreas(QtCore.Qt.RightDockWidgetArea)
+    system_dock.setFloating(False)
+    try:
+        features = system_dock.features()
+        system_dock.setFeatures(features & ~QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+    except Exception:
+        pass
+    self.dock_system = system_dock
+
+    # Remove old standalone docks and remap panel ids to unified dock.
+    for old in (dock_logs, dock_perf, dock_rec):
+        try:
+            self.removeDockWidget(old)
+        except Exception:
+            pass
+        try:
+            old.hide()
+        except Exception:
+            pass
+    self.panel_docks["logs"] = system_dock
+    self.panel_docks["performance"] = system_dock
+    self.panel_docks["recorder"] = system_dock
+    self.panel_docks["system"] = system_dock
+    self.dock_logs = system_dock
+    self.dock_performance = system_dock
+    self.dock_recorder = system_dock
 
 
 def _select_system_tab_for_panel(self: Any, panel_key: str) -> None:
-    pass
+    """Select the appropriate tab inside merged System dock for a panel id."""
+    tabs = getattr(self, "system_tabs", None)
+    if tabs is None:
+        return
+    panel_key = str(panel_key)
+    target_idx = {"logs": 0, "performance": 1, "recorder": 2}.get(panel_key)
+    if target_idx is None:
+        return
+    if 0 <= int(target_idx) < int(tabs.count()):
+        tabs.setCurrentIndex(int(target_idx))
 
 
 def _iter_unique_dock_specs(self: Any) -> Generator:
+    """Yield first spec for each unique dock object in current panel mapping."""
     seen: set = set()
     for spec in getattr(self, "panel_specs", []) or []:
-        if getattr(spec, "id", None) not in seen:
-            seen.add(getattr(spec, "id", None))
-            yield spec
+        dock = getattr(self, "panel_docks", {}).get(spec.id)
+        if dock is None:
+            continue
+        key = id(dock)
+        if key in seen:
+            continue
+        seen.add(key)
+        yield spec, dock

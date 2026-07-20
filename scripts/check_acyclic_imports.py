@@ -29,6 +29,11 @@ Exit codes:
 Compatibility imports for split chunk modules.
 """
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from scripts.check_acyclic_imports_chunk1 import ImportVisitor, get_package_from_module, get_imports_from_file, check_file_imports, check_all_files, print_summary
 from scripts.check_acyclic_imports_chunk2 import suggest_fixes, main
 

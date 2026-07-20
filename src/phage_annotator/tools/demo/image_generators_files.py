@@ -11,6 +11,7 @@ import numpy as np
 DummyMode = Literal["2d", "z", "t", "tz"]
 
 
+from phage_annotator.tools.demo.artifacts import DummyImageArtifacts
 from phage_annotator.tools.demo.image_generators_spots import _add_gaussian_spots, _add_realistic_noise
 
 def generate_dummy_image(

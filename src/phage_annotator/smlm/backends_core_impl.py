@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,14 @@ from phage_annotator.smlm.external_plugins import (
     build_plugin_arg_string,
     resolve_plugin_descriptor,
     resolve_plugin_jar)
+
+if TYPE_CHECKING:
+    # Runtime bindings for _run_fiji_subprocess/_run_fiji_pyimagej are
+    # injected by phage_annotator.smlm.backends_core (which imports this
+    # module along with backends_subprocess/backends_pyimagej) to avoid a
+    # circular import; this import is for static analysis only.
+    from phage_annotator.smlm.backends_subprocess import _run_fiji_subprocess
+    from phage_annotator.smlm.backends_pyimagej import _run_fiji_pyimagej
 
 
 ProgressCb = Optional[Callable[[int, str], None]]

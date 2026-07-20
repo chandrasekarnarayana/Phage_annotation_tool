@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
+from scipy.ndimage import maximum_filter
 
 from phage_annotator.algorithms.analysis import local_maxima, mad_sigma
 from phage_annotator.cache.array_pool import acquire_array, release_array
@@ -108,8 +109,6 @@ def run_deepstorm_stream(
             if is_cancelled is not None and is_cancelled():
                 break
             frame_buffer.append(frame.astype(np.float32, copy=False))
-            if len(frame_buffer) < params.window_size:
-                continue
             if len(frame_buffer) > params.window_size:
                 frame_buffer.pop(0)
             agg = _aggregate_frames(frame_buffer, params.aggregation_mode)
@@ -154,8 +153,17 @@ def localizations_from_sr(
         return []
     med = np.median(sr)
     sigma = mad_sigma(sr)
-    threshold = med + thr_sigma * sigma
-    coords = local_maxima(sr, threshold, footprint=3)
+    if sigma <= 0:
+        # Flat/near-flat background: mad_sigma collapses to 0, which would make
+        # the inclusive local_maxima threshold (>= med) match every background
+        # pixel. Fall back to a strict greater-than-median comparison so only
+        # genuine outliers above a flat background are reported.
+        max_filt = maximum_filter(sr, size=3, mode="nearest")
+        peaks = (sr == max_filt) & (sr > med)
+        coords = np.column_stack(np.nonzero(peaks))
+    else:
+        threshold = med + thr_sigma * sigma
+        coords = local_maxima(sr, threshold, footprint=3)
     rx, ry, _, _ = roi_rect
     locs: List[DeepLocalization] = []
     for y, x in coords:

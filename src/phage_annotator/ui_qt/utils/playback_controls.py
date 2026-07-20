@@ -79,6 +79,14 @@ class PlaybackControlsMixin:
         """Run the support image idx workflow."""
         self.controller.set_support(value)
     @property
+    def primary_image(self) -> "LazyImage":
+        """Run the primary image workflow."""
+        return self.images[self.current_image_idx]
+    @property
+    def support_image(self) -> "LazyImage":
+        """Run the support image workflow."""
+        return self.images[self.support_image_idx]
+    @property
     def current_cmap_idx(self) -> int:
         """Run the current cmap idx workflow."""
         mapping = self.controller.display_mapping.mapping_for(self.primary_image.id, "frame")
@@ -246,6 +254,14 @@ class PlaybackControlsMixin:
     def _project_path(self, value: Optional[pathlib.Path]) -> None:
         """Handle the project path helper flow."""
         self.controller.set_project_path(value)
+    @property
+    def _last_folder(self) -> Optional[pathlib.Path]:
+        """Handle the last folder helper flow."""
+        return self.controller.session_state.last_folder
+    @_last_folder.setter
+    def _last_folder(self, value: Optional[pathlib.Path]) -> None:
+        """Handle the last folder helper flow."""
+        self.controller.set_last_folder(value)
     @property
     def _project_save_time(self) -> Optional[float]:
         """Handle the project save time helper flow."""

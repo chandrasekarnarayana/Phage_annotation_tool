@@ -104,6 +104,24 @@ class ActionsAssistConfigMixin:
         )
         self._refresh_assist_warmup_panel()
         self._update_status()
+    def _on_annotation_space_changed(self, value: str) -> None:
+        """Switch annotation space between stack and projection contexts."""
+        old_space = str(getattr(self.controller.session_state, "annotation_space", "stack")).strip().lower()
+        space = str(value or "stack").strip().lower()
+        if space not in ("stack", "projection"):
+            space = "stack"
+        self.controller.set_annotation_space_value(space)
+        if old_space != space:
+            self._mark_annotation_context_changed(
+                f"annotation space changed ({old_space} -> {space})"
+            )
+        self._status_info(
+            f"Annotation space: {space}.",
+            timeout_ms=2500,
+            source="standard.annotation_space",
+        )
+        self._refresh_assist_warmup_panel()
+        self._update_status()
     def _on_disable_bulk_accept_when_stale_changed(self, checked: bool) -> None:
         """Persist stale accept guard policy for review/batch actions."""
         self._disable_bulk_accept_when_stale = bool(checked)

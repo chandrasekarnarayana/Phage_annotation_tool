@@ -8,6 +8,7 @@ from phage_annotator.ui_qt.controls.display_controls_sync import DisplayControls
 from phage_annotator.ui_qt.controls.display_controls_modality import DisplayControlsModalityMixin
 from phage_annotator.ui_qt.controls.display_controls_lut import DisplayControlsLutMixin
 from phage_annotator.ui_qt.controls.display_contrast import DisplayContrastMixin
+from phage_annotator.ui_qt.controls.axes_controls import AxesControlsMixin
 from phage_annotator.session.signal_hub import emit_view_changed
 
 
@@ -19,6 +20,7 @@ class DisplayControlsMixin(
     DisplayControlsModalityMixin,
     DisplayControlsLutMixin,
     DisplayContrastMixin,
+    AxesControlsMixin,
 ):
     """Aggregated mixin for display, playback, and control handlers."""
     pass

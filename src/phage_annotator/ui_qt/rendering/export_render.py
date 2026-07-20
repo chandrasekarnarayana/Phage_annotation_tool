@@ -15,6 +15,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from phage_annotator.rendering.scalebar import ScaleBarSpec, compute_scalebar
+from phage_annotator.ui_qt.rendering.export_preflight import ExportOptions
 from phage_annotator.ui_qt.rendering.command_base import CommandBaseMixin
 from phage_annotator.ui_qt.rendering.histogram_contrast_orthoview import HistogramContrastAutosetMixin
 from phage_annotator.ui_qt.rendering.histogram_contrast_hist import HistogramContrastHistMixin

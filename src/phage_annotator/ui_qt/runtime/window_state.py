@@ -33,7 +33,11 @@ from phage_annotator.ui_qt.services.settings_schema import (
     apply_settings_migrations,
     ensure_ui_settings_defaults)
 from phage_annotator.ui_qt.utils.constants import INTERACTIVE_DOWNSAMPLE, PLAYBACK_BUFFER_SIZE
-
+from phage_annotator.ui_qt.runtime.window_init_impl import (
+    init_playback_runtime_state,
+    init_refresh_runtime_state,
+    init_render_job_runtime_state,
+)
 
 
 def init_widget_placeholder_state(owner) -> None:
@@ -42,6 +46,7 @@ def init_widget_placeholder_state(owner) -> None:
         "progress_label",
         "progress_bar",
         "progress_cancel_btn",
+        "progress_cancel_all_btn",
         "log_view",
         "cache_stats_label",
         "buffer_stats_label",

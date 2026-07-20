@@ -10,6 +10,7 @@ from typing import List, Literal, Optional
 import numpy as np
 
 from phage_annotator.core.annotation import PointSuggestion
+from phage_annotator.analysis.training_data import TrainingExample
 
 
 

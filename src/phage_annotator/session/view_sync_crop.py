@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional, Set, Tuple, TYPE_CHECKING
 
 from PyQt5 import QtCore
 
-
+if TYPE_CHECKING:
+    # Runtime binding for ViewState is injected by
+    # phage_annotator.session.view_sync (which imports this module) to
+    # avoid a circular import; this import is for static analysis only.
+    from phage_annotator.session.view_sync import ViewState
 
 
 class ViewSyncCropMixin:

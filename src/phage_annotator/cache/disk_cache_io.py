@@ -21,6 +21,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+from phage_annotator.cache.disk_cache_types import CompressedBuffer, DiskCacheStats
+
+
 class DiskCacheIOMixin:
     def save(self, key: tuple, data: np.ndarray, wait: bool = False) -> bool:
         """Save array to disk cache asynchronously with compression (P7a).

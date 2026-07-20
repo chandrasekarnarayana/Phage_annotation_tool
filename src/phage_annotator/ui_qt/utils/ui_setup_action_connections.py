@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+# Temporary feature gate (mirrors the sibling ui_setup_* modules).
+DISABLE_DIAGNOSTICS = True
+
 
 def connect_main_window_actions(self: object, actions: dict[str, object], *, disable_shortcuts: bool, disable_qc: bool) -> None:
     """Connect menu actions and status-bar controls to main-window handlers."""

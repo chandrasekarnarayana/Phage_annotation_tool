@@ -47,8 +47,14 @@ MEMORY_PRESSURE_LOW_THRESHOLD = 0.80  # >80% available
 
 from phage_annotator.ui_qt.panels.performance_panel_widgets import PerformancePanelWidgetsMixin
 from phage_annotator.ui_qt.panels.performance_panel_metrics import PerformancePanelMetricsMixin
+from phage_annotator.ui_qt.panels.suggestion_generation import SuggestionGenerationMixin as PerformanceTelemetryMixin
 
-class PerformancePanel(PerformancePanelWidgetsMixin, PerformancePanelMetricsMixin, QtWidgets.QWidget):
+class PerformancePanel(
+    PerformancePanelWidgetsMixin,
+    PerformancePanelMetricsMixin,
+    PerformanceTelemetryMixin,
+    QtWidgets.QWidget,
+):
     """Real-time performance metrics panel for cache, jobs, and buffers.
 
 Displays:

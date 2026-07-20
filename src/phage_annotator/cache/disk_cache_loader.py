@@ -8,7 +8,7 @@ from typing import Optional
 
 import numpy as np
 from phage_annotator.cache.disk_cache_eviction import DiskCacheEvictionMixin
-from phage_annotator.cache.disk_cache_storage import DiskCacheStorageMixin
+from phage_annotator.cache.disk_cache_storage import DiskCacheStorageMixin, DiskCacheStats, zstd, HAS_ZSTD
 from phage_annotator.cache.projection_cache_base import ProjectionCacheBase
 from phage_annotator.cache.projection_cache_data import ProjectionCacheDataMixin
 

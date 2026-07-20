@@ -64,7 +64,7 @@ ml-gpu = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers --benchmark-storage=file://./.pytest_cache/benchmarks"
 testpaths = ["tests"]
 markers = [
   "gui: GUI tests that require a Qt backend (run under Xvfb in CI)",

@@ -14,6 +14,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 from phage_annotator.algorithms.onnx_infer import (

@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional, List, Callable
+from typing import Dict, Optional, List, Callable, TYPE_CHECKING
 
 from PyQt5 import QtCore
 
-
+if TYPE_CHECKING:
+    # Runtime bindings for PlaybackMode/ModalityPlaybackState are injected by
+    # phage_annotator.session.multi_playback (which imports this module) to
+    # avoid a circular import; this import is for static analysis only.
+    from phage_annotator.session.multi_playback import (
+        ModalityPlaybackState,
+        PlaybackMode,
+    )
 
 
 class PlaybackControlsMixin:

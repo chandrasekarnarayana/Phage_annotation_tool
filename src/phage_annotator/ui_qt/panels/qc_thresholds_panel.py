@@ -7,33 +7,27 @@ from typing import Optional, Callable
 from matplotlib.backends.qt_compat import QtCore, QtWidgets, QtGui
 
 from phage_annotator.session.qc_thresholds import QCThresholds
+from phage_annotator.ui_qt.panels.qcthresholds_panel_ui import QcthresholdsPanelUiMixin
+from phage_annotator.ui_qt.panels.qcthresholds_panel_controls import QcthresholdsPanelControlsMixin
+from phage_annotator.ui_qt.panels.qcthresholds_panel_actions import QcthresholdsPanelActionsMixin
 
 
-class QCThresholdsPanel(QtWidgets.QDialog):
-    """Dialog for configuring QC thresholds."""
+class QCThresholdsPanel(
+    QcthresholdsPanelUiMixin,
+    QcthresholdsPanelControlsMixin,
+    QcthresholdsPanelActionsMixin,
+    QtWidgets.QDialog,
+):
+    """Dialog for configuring QC thresholds.
+
+    Organized into logical sections:
+    - Annotation Spatial Constraints
+    - Image Quality (Artifacts)
+    - Statistical (Stochasticity)
+    - Enable/Disable Checks
+    """
 
     thresholds_changed = QtCore.Signal()
-
-    def __init__(self, thresholds: Optional[QCThresholds] = None,
-                 parent: Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent)
-        self.setWindowTitle("QC Threshold Settings")
-        self.setMinimumSize(600, 500)
-        self._thresholds = thresholds or QCThresholds()
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(QtWidgets.QLabel("QC threshold configuration is available via the QC Issues panel."))
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def get_thresholds(self) -> QCThresholds:
-        return self._thresholds
 
 
 def show_qc_thresholds_dialog(
