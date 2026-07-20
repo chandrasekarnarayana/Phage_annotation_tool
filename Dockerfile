@@ -29,7 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --shell /bin/bash phage
+# Fixed UID/GID (rather than an implicit default) so the ./data bind mount
+# in docker-compose.yml lines up predictably with a typical Linux host user.
+RUN useradd --create-home --shell /bin/bash --uid 1000 phage
 WORKDIR /app
 
 # Install Python dependencies in their own layer so source-only edits don't
@@ -49,9 +51,7 @@ COPY external_plugins ./external_plugins
 COPY scripts ./scripts
 COPY tests ./tests
 
-ENV QT_QPA_PLATFORM=offscreen \
-    MPLBACKEND=Agg \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN mkdir -p /data && chown -R phage:phage /app /data

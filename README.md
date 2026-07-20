@@ -23,9 +23,18 @@ setup.
 **Launch the GUI — Linux:**
 
 ```bash
+mkdir -p data
 xhost +local:docker
 docker compose up app
 ```
+
+Run `docker compose` as your own user, not with `sudo`. If your user isn't in
+the `docker` group yet (you'll see `permission denied ... docker.sock`), add
+it once with `sudo usermod -aG docker $USER` and start a new shell, rather
+than reaching for `sudo docker`. The `mkdir -p data` above matters for the
+same reason: if `sudo` creates `./data` for you, it'll be owned by root and
+the container's non-root user won't be able to write into it. If that
+already happened, fix it with `sudo chown -R 1000:1000 data`.
 
 **Launch the GUI — Windows** (run from a WSL2 terminal, e.g. Ubuntu on WSL,
 with Docker Desktop's WSL2 integration enabled for that distro):

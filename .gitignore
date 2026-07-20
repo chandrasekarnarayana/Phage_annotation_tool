@@ -35,6 +35,7 @@ htmlcov/
 
 # Demo data
 phage_annotator_demo.tif
+phage_annotator_demo.csv
 
 # Docker Compose bind-mount for project/annotation data (see docker-compose.yml)
 /data/

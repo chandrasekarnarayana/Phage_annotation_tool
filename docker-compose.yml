@@ -1,7 +1,7 @@
 # Isolated launch/test environment for Phage Annotator.
 #
 # Quick start (GUI):
-#   Linux:   xhost +local:docker && docker compose up app
+#   Linux:   mkdir -p data && xhost +local:docker && docker compose up app
 #   Windows: docker compose up app        (run from a WSL2 terminal; WSLg
 #            provides DISPLAY and the X11 socket automatically)
 #
@@ -10,6 +10,13 @@
 #
 # Everything the app reads/writes (projects, exported images, demo TIFFs)
 # lives under ./data on the host, so the container itself stays disposable.
+#
+# Linux note: run `docker compose` as your own user, not with sudo/root. If
+# ./data doesn't exist yet, `mkdir -p data` first so it's owned by you before
+# Docker would otherwise auto-create it as root, which the container's
+# non-root user (uid 1000) can't write into. If you must use sudo (e.g. your
+# user isn't in the `docker` group), fix ownership afterwards with:
+#   sudo chown -R 1000:1000 data
 
 services:
   app:
@@ -22,7 +29,6 @@ services:
       - DISPLAY=${DISPLAY:-}
       - QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-xcb}
       - QT_X11_NO_MITSHM=1
-      - MPLBACKEND=Agg
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./data:/data
