@@ -29,7 +29,7 @@ def make_metadata_widget(self) -> QtWidgets.QWidget:
     """Create metadata inspector dock widget."""
     from phage_annotator.ui_qt.docks.metadata_dock import MetadataDock
     widget = MetadataDock(parent=self)
-    self.metadata_dock_widget = widget
+    self.metadata_widget = widget
     return widget
 
 

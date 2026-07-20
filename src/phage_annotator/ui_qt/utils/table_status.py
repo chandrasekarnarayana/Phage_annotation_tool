@@ -16,4 +16,19 @@ class TableStatusMixin(
     TableStatusUpdateMixin,
 ):
     """Aggregated mixin for annotation table management and status bar updates."""
-    pass
+
+    _ANNOT_TABLE_HEADERS = [
+        "ID",
+        "Label",
+        "T",
+        "Z",
+        "X",
+        "Y",
+        "Source",
+        "Status",
+        "Confidence",
+        "Candidate Class",
+        "ROI",
+        "Notes",
+        "Actions",
+    ]

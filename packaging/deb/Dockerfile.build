@@ -1,0 +1,54 @@
+# Builds a self-contained PyInstaller bundle of Phage Annotator.
+#
+# Based on Debian 11 (bullseye, glibc 2.31) rather than the newer default
+# python:3.11-slim (Debian 13, glibc 2.41+) so the resulting binaries run on
+# older target systems too (Ubuntu 20.04+, Debian 11+) instead of requiring
+# a glibc newer than what most machines actually have installed.
+FROM python:3.11-slim-bullseye
+
+# Runtime libs PyQt5 needs to even import (required at build time so
+# PyInstaller's import analysis can load the real Qt plugins), plus
+# build-essential in case any transitive dependency lacks a prebuilt wheel
+# for this exact Python/glibc combination.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libgl1 \
+        libglib2.0-0 \
+        libxkbcommon-x11-0 \
+        libxcb-cursor0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-sync1 \
+        libxcb-xfixes0 \
+        libxcb-xinerama0 \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libfreetype6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY project ./project
+
+ARG EXTRAS=cache
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir -e ".[${EXTRAS}]" pyinstaller==6.21.0
+
+COPY packaging/deb/phage-annotator.spec ./phage-annotator.spec
+COPY packaging/deb/entrypoint.py ./entrypoint.py
+
+RUN pyinstaller --clean --noconfirm phage-annotator.spec
+
+# phage_annotator.runtime.environment_check resolves the manifest path
+# relative to the onedir bundle root (three parents up from its own frozen
+# __file__), not PyInstaller's _internal/ data dir, so place it there
+# directly rather than via Analysis(datas=...).
+RUN cp -r project dist/phage-annotator/project
+
+# Output lands in /build/dist/phage-annotator (onedir bundle).

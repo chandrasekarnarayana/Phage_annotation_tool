@@ -147,6 +147,48 @@ external Fiji/ImageJ installation and are not bundled in the image; mount a
 host Fiji install into the container and point the SMLM panel at it if you
 need those backends.
 
+## Build a standalone .deb (for distributing to other Linux machines)
+
+For handing the app to colleagues who shouldn't need Docker or a Python
+environment at all, `packaging/deb/build.sh` produces a **self-contained**
+`.deb`: the Python runtime and the full scientific stack (numpy, scipy,
+scikit-learn, scikit-image, pandas, PyQt5) are bundled via PyInstaller, built
+inside a Debian 11 (glibc 2.31) container for wide compatibility (Ubuntu
+20.04+, Debian 11+). The only things the package depends on are system
+Qt/X11 shared libraries, which `apt` installs automatically and which are
+normally already present on any Linux desktop.
+
+**Build** (requires Docker; takes a few minutes the first time):
+
+```bash
+packaging/deb/build.sh
+```
+
+This produces `dist/phage-annotator_<version>_amd64.deb` (~180 MB — most of
+it is the bundled scientific stack).
+
+**Install on the target machine:**
+
+```bash
+sudo apt install ./phage-annotator_<version>_amd64.deb
+```
+
+`apt` (not `dpkg -i`) resolves the small set of system library dependencies
+automatically. The app then appears in the applications menu as "Phage
+Annotator", or launch it from a terminal with `phage-annotator`.
+
+**Uninstall:**
+
+```bash
+sudo apt remove phage-annotator
+```
+
+**Note:** the resulting `.deb` bundles a headless CPU-only build (`cache`
+extras, matching the Docker `app` image). It does not include the optional
+`ml` extras (torch/onnxruntime for ONNX/DeepSTORM inference) or Fiji bridge
+support; those would need separate build-arg plumbing in
+`packaging/deb/Dockerfile.build` if you need them in the distributed package.
+
 ## Native Install (without Docker)
 
 Prefer this path if you already manage Python environments yourself, or need

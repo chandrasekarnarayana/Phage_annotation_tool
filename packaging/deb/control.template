@@ -1,0 +1,17 @@
+Package: phage-annotator
+Version: __VERSION__
+Section: science
+Priority: optional
+Architecture: amd64
+Depends: libgl1, libglib2.0-0, libxkbcommon-x11-0, libxcb-cursor0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-randr0, libxcb-render-util0, libxcb-shape0, libxcb-sync1, libxcb-xfixes0, libxcb-xinerama0, libdbus-1-3, libfontconfig1, libfreetype6
+Maintainer: Chandrasekar Subramani Narayana <chandrasekarnarayana@gmail.com>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/<your-org-or-user>/phage-annotator
+Description: Qt + Matplotlib microscopy keypoint annotation IDE
+ Phage Annotator is a keypoint annotation GUI for 2D/3D/time microscopy
+ TIFF stacks, with assistive suggestion review, reproducible project
+ persistence, and dock-based expert UX. This package bundles its own
+ Python runtime and scientific-stack dependencies (numpy, scipy,
+ scikit-learn, scikit-image, pandas, PyQt5) so it does not depend on or
+ conflict with any Python environment already on the system; it only
+ depends on system Qt/X11 shared libraries.

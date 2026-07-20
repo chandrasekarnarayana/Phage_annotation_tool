@@ -120,6 +120,7 @@ class TableStatusNavigationMixin:
         if self._valid_zoom(xlim_full, ylim_full):
             self._last_zoom_linked = (xlim_full, ylim_full)
 
+    @staticmethod
     def _valid_zoom(xlim: Tuple[float, float], ylim: Tuple[float, float]) -> bool:
         """Document the valid_zoom flow."""
         if xlim[0] == xlim[1] or ylim[0] == ylim[1]:

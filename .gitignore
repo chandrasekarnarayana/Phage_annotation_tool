@@ -39,3 +39,6 @@ phage_annotator_demo.csv
 
 # Docker Compose bind-mount for project/annotation data (see docker-compose.yml)
 /data/
+
+# .deb build staging (see packaging/deb/build.sh)
+/packaging/deb/build/

@@ -9,6 +9,7 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 
 from phage_annotator.ui_qt.utils.panel_helpers import (
     _auto_trigger_from_reason,
+    _is_auto_reason,
     _is_user_intent_reason,
     _show_status_message,
     _show_auto_open_toast,
@@ -18,8 +19,9 @@ from phage_annotator.ui_qt.utils.dock_panel_registry_impl import (
     is_panel_auto_open_enabled,
     is_panel_auto_open_enabled_for_trigger,
     set_panel_pinned,
+    _find_tab_for_dock,
 )
-from phage_annotator.ui_qt.utils.dock_panel_init_chunk1 import get_dock
+from phage_annotator.ui_qt.utils.dock_panel_init_chunk1 import get_dock, get_panel_spec
 from phage_annotator.ui_qt.utils.dock_panel_init_chunk2 import (
     _apply_panel_constraints,
     _canonical_area_for_panel,
@@ -44,7 +46,7 @@ def _flash_dock(self, dock: QtWidgets.QDockWidget) -> None:
     """Flash the dock tab entry with a short animation (fallback to dock border)."""
     if dock is None:
         return
-    tabbar, tab_idx = (self, dock)
+    tabbar, tab_idx = _find_tab_for_dock(self, dock)
     if tabbar is not None and tab_idx >= 0:
         rect = tabbar.tabRect(tab_idx).adjusted(2, 2, -2, -2)
         overlay = QtWidgets.QWidget(tabbar)
@@ -120,12 +122,12 @@ class PanelManager:
 
     def open_panel(self, panel_id: str, *, reason: str = "user") -> Optional[QtWidgets.QDockWidget]:
         """Open panel for the current workflow."""
-        spec = (self.window, panel_id)
+        spec = get_panel_spec(self.window, panel_id)
         dock = get_dock(self.window, panel_id)
         if spec is None or dock is None:
             return dock
         reason_text = str(reason or "user")
-        is_auto = (reason_text)
+        is_auto = _is_auto_reason(reason_text)
         panel_key = str(panel_id)
         auto_trigger = _auto_trigger_from_reason(reason_text)
         if is_auto and not is_panel_auto_open_enabled(self.window, panel_key):

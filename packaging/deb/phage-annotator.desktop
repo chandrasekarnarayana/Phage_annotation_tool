@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Phage Annotator
+Comment=Qt + Matplotlib microscopy keypoint annotation IDE
+Exec=/opt/phage-annotator/phage-annotator
+Icon=phage-annotator
+Terminal=false
+Categories=Science;Graphics;
+StartupWMClass=phage-annotator
